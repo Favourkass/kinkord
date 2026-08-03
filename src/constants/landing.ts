@@ -1,11 +1,11 @@
-export const LAUNCH_DATE = new Date("2027-07-03T15:00:00+01:00");
+export const LAUNCH_DATE = new Date("2027-12-28T15:00:00+01:00");
 
 export const STATS = [
   { value: 2000, suffix: "+", label: "Members" },
   { value: 10, suffix: "+", label: "Countries" },
   { value: 100, suffix: "%", label: "Consent First" },
   { value: 18, suffix: "+", label: "Adults Only" },
-];
+] as const;
 
 export const COUNTRIES = [
   "Nigeria",
@@ -13,7 +13,7 @@ export const COUNTRIES = [
   "South Africa",
   "Kenya",
   "Ghana",
-];
+] as const;
 
 export const WHY_FEATURES = [
   "Consent-Driven Community",
@@ -26,7 +26,7 @@ export const WHY_FEATURES = [
   "Local & International Events",
   "Community Discussions",
   "Lifestyle Exploration",
-];
+] as const;
 
 export const EDUCATION_TOPICS = [
   "Consent & Communication",
@@ -36,7 +36,7 @@ export const EDUCATION_TOPICS = [
   "Community Etiquette",
   "Lifestyle Exploration",
   "Workshops & Discussions",
-];
+] as const;
 
 export const COMMUNITY_FEATURES = [
   "Private Communities",
@@ -45,7 +45,7 @@ export const COMMUNITY_FEATURES = [
   "Educational Spaces",
   "Networking Opportunities",
   "Adult Conversations",
-];
+] as const;
 
 export const SOCIALS = [
   { name: "Instagram", href: "#", icon: "instagram" },
@@ -53,10 +53,21 @@ export const SOCIALS = [
   { name: "TikTok", href: "#", icon: "tiktok" },
   { name: "Telegram", href: "#", icon: "send" },
   { name: "WhatsApp", href: "#", icon: "message-circle" },
-];
+] as const;
 
 export const FOOTER_LINKS = [
   { label: "Privacy Policy", href: "#" },
   { label: "Consent Policy", href: "#" },
   { label: "Terms & Conditions", href: "#" },
-];
+] as const;
+
+export const LECTURE_CATEGORIES = [
+  "Consent & Communication",
+  "BDSM Fundamentals",
+  "Relationship Dynamics",
+  "Safety Practices",
+  "Community Etiquette",
+  "Lifestyle Exploration",
+  "Workshops & Discussions",
+  "General",
+] as const;

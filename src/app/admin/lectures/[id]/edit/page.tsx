@@ -1,6 +1,6 @@
-import { getLectureById } from "@/lib/sheets";
-import LectureForm from "@/components/admin/LectureForm";
 import { notFound } from "next/navigation";
+import * as lectureService from "@/services/lecture.service";
+import EditLectureScreen from "./EditLectureScreen";
 
 export const metadata = { title: "Edit Lecture — Kinkord Admin" };
 
@@ -10,8 +10,8 @@ export default async function EditLecturePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const lecture = await getLectureById(id);
+  const lecture = await lectureService.getLectureById(id);
   if (!lecture) notFound();
 
-  return <LectureForm mode="edit" initial={lecture} />;
+  return <EditLectureScreen initial={lecture} />;
 }

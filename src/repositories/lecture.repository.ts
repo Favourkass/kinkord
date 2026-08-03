@@ -1,20 +1,6 @@
 import { google } from "googleapis";
-import type { Lecture, LectureInput } from "./types";
-
-// ── helpers ──────────────────────────────────────────────────────────────────
-
-function slugify(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .trim()
-    .replace(/\s+/g, "-");
-}
-
-function generateId(): string {
-  // crypto.randomUUID available in Node 14.17+ / Edge runtime
-  return globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
-}
+import type { Lecture, LectureInput } from "@/domain/lecture";
+import { generateId, slugify } from "@/util/slug";
 
 function getAuth() {
   return new google.auth.GoogleAuth({
@@ -33,15 +19,20 @@ function sheets() {
 const SHEET_ID = () => process.env.GOOGLE_SHEET_ID ?? "";
 const RANGE = "Lectures!A:H";
 
-// Row order: id | slug | title | category | body | links | published | createdAt
 function rowToLecture(row: string[]): Lecture {
   return {
-    id:        row[0] ?? "",
-    slug:      row[1] ?? "",
-    title:     row[2] ?? "",
-    category:  row[3] ?? "",
-    body:      row[4] ?? "",
-    links:     (() => { try { return JSON.parse(row[5] ?? "[]"); } catch { return []; } })(),
+    id: row[0] ?? "",
+    slug: row[1] ?? "",
+    title: row[2] ?? "",
+    category: row[3] ?? "",
+    body: row[4] ?? "",
+    links: (() => {
+      try {
+        return JSON.parse(row[5] ?? "[]");
+      } catch {
+        return [];
+      }
+    })(),
     published: row[6] === "true",
     createdAt: row[7] ?? new Date().toISOString(),
   };
@@ -60,14 +51,12 @@ function lectureToRow(l: Lecture): string[] {
   ];
 }
 
-// ── public API ────────────────────────────────────────────────────────────────
-
 export async function getLectures(publishedOnly = true): Promise<Lecture[]> {
   const res = await sheets().spreadsheets.values.get({
     spreadsheetId: SHEET_ID(),
     range: RANGE,
   });
-  const rows = (res.data.values ?? []).slice(1); // skip header
+  const rows = (res.data.values ?? []).slice(1);
   const lectures = rows.map(rowToLecture).filter((l) => l.id !== "");
   return publishedOnly ? lectures.filter((l) => l.published) : lectures;
 }
@@ -100,7 +89,10 @@ export async function createLecture(input: LectureInput): Promise<Lecture> {
   return lecture;
 }
 
-export async function updateLecture(id: string, input: Partial<LectureInput>): Promise<Lecture | null> {
+export async function updateLecture(
+  id: string,
+  input: Partial<LectureInput>,
+): Promise<Lecture | null> {
   const res = await sheets().spreadsheets.values.get({
     spreadsheetId: SHEET_ID(),
     range: RANGE,
@@ -113,7 +105,7 @@ export async function updateLecture(id: string, input: Partial<LectureInput>): P
   const updated: Lecture = { ...existing, ...input };
   if (input.title) updated.slug = slugify(input.title);
 
-  const sheetRow = rowIndex + 1; // 1-indexed
+  const sheetRow = rowIndex + 1;
   await sheets().spreadsheets.values.update({
     spreadsheetId: SHEET_ID(),
     range: `Lectures!A${sheetRow}:H${sheetRow}`,
@@ -133,30 +125,30 @@ export async function deleteLecture(id: string): Promise<boolean> {
   const rowIndex = rows.findIndex((r, i) => i > 0 && r[0] === id);
   if (rowIndex === -1) return false;
 
-  // Get sheet's internal sheetId (gid)
   const meta = await sheets().spreadsheets.get({ spreadsheetId: SHEET_ID() });
   const sheetGid = meta.data.sheets?.[0]?.properties?.sheetId ?? 0;
 
   await sheets().spreadsheets.batchUpdate({
     spreadsheetId: SHEET_ID(),
     requestBody: {
-      requests: [{
-        deleteDimension: {
-          range: {
-            sheetId: sheetGid,
-            dimension: "ROWS",
-            startIndex: rowIndex,
-            endIndex: rowIndex + 1,
+      requests: [
+        {
+          deleteDimension: {
+            range: {
+              sheetId: sheetGid,
+              dimension: "ROWS",
+              startIndex: rowIndex,
+              endIndex: rowIndex + 1,
+            },
           },
         },
-      }],
+      ],
     },
   });
 
   return true;
 }
 
-// Ensure header row exists
 export async function ensureSheetHeaders(): Promise<void> {
   const res = await sheets().spreadsheets.values.get({
     spreadsheetId: SHEET_ID(),

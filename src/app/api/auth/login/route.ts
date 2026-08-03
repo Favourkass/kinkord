@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { signToken, checkAdminCredentials, COOKIE_NAME } from "@/lib/auth";
+import {
+  checkAdminCredentials,
+  COOKIE_NAME,
+  signToken,
+} from "@/services/auth.service";
 
 export async function POST(req: NextRequest) {
   const { username, password } = await req.json();
@@ -15,7 +19,7 @@ export async function POST(req: NextRequest) {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 7, // 7 days
+    maxAge: 60 * 60 * 24 * 7,
     path: "/",
   });
 

@@ -1,84 +1,59 @@
 "use client";
 
-import { useState, FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { FormEvent } from "react";
 import { Plus, Trash2, ArrowLeft } from "lucide-react";
-import type { Lecture, LectureLink } from "@/lib/types";
-
-const CATEGORIES = [
-  "Consent & Communication",
-  "BDSM Fundamentals",
-  "Relationship Dynamics",
-  "Safety Practices",
-  "Community Etiquette",
-  "Lifestyle Exploration",
-  "Workshops & Discussions",
-  "General",
-];
+import type { LectureLink } from "@/domain/lecture";
 
 interface Props {
-  initial?: Partial<Lecture>;
   mode: "create" | "edit";
+  categories: string[];
+  title: string;
+  category: string;
+  body: string;
+  links: LectureLink[];
+  published: boolean;
+  saving: boolean;
+  error: string;
+  setTitle: (value: string) => void;
+  setCategory: (value: string) => void;
+  setBody: (value: string) => void;
+  setPublished: (value: boolean | ((prev: boolean) => boolean)) => void;
+  addLink: () => void;
+  updateLink: (i: number, field: keyof LectureLink, val: string) => void;
+  removeLink: (i: number) => void;
+  goBack: () => void;
+  submit: (e: FormEvent) => void;
 }
 
-export default function LectureForm({ initial = {}, mode }: Props) {
-  const router = useRouter();
-  const [title, setTitle] = useState(initial.title ?? "");
-  const [category, setCategory] = useState(initial.category ?? CATEGORIES[0]);
-  const [body, setBody] = useState(initial.body ?? "");
-  const [links, setLinks] = useState<LectureLink[]>(initial.links ?? []);
-  const [published, setPublished] = useState(initial.published ?? false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  function addLink() {
-    setLinks((prev) => [...prev, { label: "", url: "" }]);
-  }
-
-  function updateLink(i: number, field: keyof LectureLink, val: string) {
-    setLinks((prev) => prev.map((l, idx) => (idx === i ? { ...l, [field]: val } : l)));
-  }
-
-  function removeLink(i: number) {
-    setLinks((prev) => prev.filter((_, idx) => idx !== i));
-  }
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    setError("");
-
-    const payload = { title, category, body, links, published };
-    const url = mode === "edit" ? `/api/lectures/${initial.id}` : "/api/lectures";
-    const method = mode === "edit" ? "PUT" : "POST";
-
-    const res = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    setSaving(false);
-
-    if (res.ok) {
-      router.push("/admin");
-      router.refresh();
-    } else {
-      const d = await res.json().catch(() => ({}));
-      setError(d.error ?? "Something went wrong. Please try again.");
-    }
-  }
-
+export default function LectureFormView({
+  mode,
+  categories,
+  title,
+  category,
+  body,
+  links,
+  published,
+  saving,
+  error,
+  setTitle,
+  setCategory,
+  setBody,
+  setPublished,
+  addLink,
+  updateLink,
+  removeLink,
+  goBack,
+  submit,
+}: Props) {
   const inputClass =
     "w-full bg-[#0a0a0a] border border-[#d4af37]/20 text-[#f5f5f0] px-4 py-3 text-sm focus:outline-none focus:border-[#d4af37]/50 transition-colors placeholder:text-[#333]";
   const labelClass = "block text-[10px] uppercase tracking-widest text-[#888] mb-2";
 
   return (
     <div className="min-h-screen bg-[#080808]">
-      {/* Header */}
       <header className="border-b border-[#d4af37]/10 px-6 py-4 flex items-center gap-4">
         <button
-          onClick={() => router.push("/admin")}
+          onClick={goBack}
           className="text-[#555] hover:text-[#d4af37] transition-colors"
         >
           <ArrowLeft size={16} />
@@ -94,8 +69,7 @@ export default function LectureForm({ initial = {}, mode }: Props) {
       </header>
 
       <div className="max-w-3xl mx-auto px-6 py-10">
-        <form onSubmit={handleSubmit} className="space-y-7">
-          {/* Title */}
+        <form onSubmit={submit} className="space-y-7">
           <div>
             <label className={labelClass}>Lecture Title *</label>
             <input
@@ -108,7 +82,6 @@ export default function LectureForm({ initial = {}, mode }: Props) {
             />
           </div>
 
-          {/* Category */}
           <div>
             <label className={labelClass}>Category *</label>
             <select
@@ -116,7 +89,7 @@ export default function LectureForm({ initial = {}, mode }: Props) {
               onChange={(e) => setCategory(e.target.value)}
               className={`${inputClass} cursor-pointer`}
             >
-              {CATEGORIES.map((c) => (
+              {categories.map((c) => (
                 <option key={c} value={c} className="bg-[#0d0d0d]">
                   {c}
                 </option>
@@ -124,7 +97,6 @@ export default function LectureForm({ initial = {}, mode }: Props) {
             </select>
           </div>
 
-          {/* Body */}
           <div>
             <label className={labelClass}>
               Lecture Body *
@@ -137,12 +109,13 @@ export default function LectureForm({ initial = {}, mode }: Props) {
               onChange={(e) => setBody(e.target.value)}
               required
               rows={14}
-              placeholder={"Write the lecture content here.\n\nStart a new paragraph by leaving a blank line between sections.\n\nYou can add as many paragraphs as needed."}
+              placeholder={
+                "Write the lecture content here.\n\nStart a new paragraph by leaving a blank line between sections.\n\nYou can add as many paragraphs as needed."
+              }
               className={`${inputClass} resize-y leading-relaxed`}
             />
           </div>
 
-          {/* External Links */}
           <div>
             <div className="flex items-center justify-between mb-3">
               <label className={`${labelClass} mb-0`}>
@@ -195,12 +168,13 @@ export default function LectureForm({ initial = {}, mode }: Props) {
             </div>
           </div>
 
-          {/* Published toggle */}
           <div className="flex items-center justify-between border border-[#d4af37]/10 px-5 py-4">
             <div>
               <p className="text-sm text-[#f5f5f0] font-medium">Publish Lecture</p>
               <p className="text-[10px] text-[#555] mt-0.5">
-                {published ? "Visible to the public on /lectures" : "Draft — not visible to the public"}
+                {published
+                  ? "Visible to the public on /lectures"
+                  : "Draft — not visible to the public"}
               </p>
             </div>
             <button
@@ -218,23 +192,27 @@ export default function LectureForm({ initial = {}, mode }: Props) {
             </button>
           </div>
 
-          {/* Error */}
           {error && (
-            <p className="text-xs text-red-400 border border-red-400/20 px-4 py-3">{error}</p>
+            <p className="text-xs text-red-400 border border-red-400/20 px-4 py-3">
+              {error}
+            </p>
           )}
 
-          {/* Submit */}
           <div className="flex items-center gap-4 pt-2">
             <button
               type="submit"
               disabled={saving}
               className="bg-[#d4af37] text-[#0a0a0a] px-8 py-3 text-sm font-bold uppercase tracking-widest hover:bg-[#f5e27d] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {saving ? "Saving…" : mode === "create" ? "Create Lecture" : "Save Changes"}
+              {saving
+                ? "Saving…"
+                : mode === "create"
+                  ? "Create Lecture"
+                  : "Save Changes"}
             </button>
             <button
               type="button"
-              onClick={() => router.push("/admin")}
+              onClick={goBack}
               className="text-[#555] text-sm hover:text-[#888] transition-colors uppercase tracking-widest text-xs"
             >
               Cancel

@@ -1,21 +1,22 @@
 "use client";
 
 import { Send, MessageCircle, Music2, AtSign, Hash } from "lucide-react";
-import { FOOTER_LINKS } from "@/lib/constants";
+import type { LandingVM } from "@/presenters/getLandingVM";
 
-const socials = [
-  { name: "Instagram", href: "#", Icon: AtSign },
-  { name: "X / Twitter", href: "#", Icon: Hash },
-  { name: "TikTok", href: "#", Icon: Music2 },
-  { name: "Telegram", href: "#", Icon: Send },
-  { name: "WhatsApp", href: "#", Icon: MessageCircle },
-];
+type Props = LandingVM["footer"];
 
-export default function Footer() {
+const SOCIAL_ICONS: Record<string, typeof AtSign> = {
+  Instagram: AtSign,
+  "X / Twitter": Hash,
+  TikTok: Music2,
+  Telegram: Send,
+  WhatsApp: MessageCircle,
+};
+
+export default function Footer({ links, socials }: Props) {
   return (
     <footer className="bg-[#080808] border-t border-[#d4af37]/10 py-14 px-6">
       <div className="max-w-4xl mx-auto flex flex-col items-center gap-8">
-        {/* Logo */}
         <div className="text-center">
           <h3
             className="text-2xl font-bold tracking-[0.3em] uppercase gold-gradient"
@@ -28,26 +29,26 @@ export default function Footer() {
           </p>
         </div>
 
-        {/* Divider */}
         <div className="section-divider w-16" />
 
-        {/* Socials */}
         <div className="flex items-center gap-5">
-          {socials.map(({ name, href, Icon }) => (
-            <a
-              key={name}
-              href={href}
-              aria-label={name}
-              className="w-9 h-9 border border-[#d4af37]/15 flex items-center justify-center text-[#888] hover:text-[#d4af37] hover:border-[#d4af37]/50 transition-all duration-200"
-            >
-              <Icon size={15} />
-            </a>
-          ))}
+          {socials.map(({ name, href }) => {
+            const Icon = SOCIAL_ICONS[name] ?? AtSign;
+            return (
+              <a
+                key={name}
+                href={href}
+                aria-label={name}
+                className="w-9 h-9 border border-[#d4af37]/15 flex items-center justify-center text-[#888] hover:text-[#d4af37] hover:border-[#d4af37]/50 transition-all duration-200"
+              >
+                <Icon size={15} />
+              </a>
+            );
+          })}
         </div>
 
-        {/* Legal links */}
         <div className="flex flex-wrap justify-center gap-4 md:gap-8">
-          {FOOTER_LINKS.map((link) => (
+          {links.map((link) => (
             <a
               key={link.label}
               href={link.href}
@@ -58,7 +59,6 @@ export default function Footer() {
           ))}
         </div>
 
-        {/* Copyright */}
         <p className="text-[10px] text-[#333] tracking-widest uppercase">
           &copy; Kinkord 2026. All Rights Reserved.
         </p>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import InvestPage from "@/components/pages/InvestPage";
+import { getInvestVM } from "@/presenters/getInvestVM";
 
 export const metadata: Metadata = {
   title: "Invest in Kinkord — Equity Investment Opportunity",
@@ -14,5 +15,6 @@ export const metadata: Metadata = {
 };
 
 export default function InvestRoute() {
-  return <InvestPage />;
+  const vm = getInvestVM();
+  return <InvestPage {...vm} />;
 }
