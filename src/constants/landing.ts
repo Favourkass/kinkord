@@ -1,4 +1,4 @@
-export const LAUNCH_DATE = new Date("2027-07-03T15:00:00+01:00");
+export const LAUNCH_DATE = new Date("2027-12-28T15:00:00+01:00");
 
 export const STATS = [
   { value: 2000, suffix: "+", label: "Members" },

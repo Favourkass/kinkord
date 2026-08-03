@@ -17,7 +17,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Kinkord — Global Luxury Lifestyle Community",
   description:
-    "A global luxury lifestyle community for adults built on consent, education, connection and expression. Coming July 3, 2027.",
+    "A global luxury lifestyle community for adults built on consent, education, connection and expression. Coming December 28, 2027.",
   keywords: ["kinkord", "lifestyle community", "adult community", "consent", "education"],
   openGraph: {
     title: "Kinkord — Global Luxury Lifestyle Community",

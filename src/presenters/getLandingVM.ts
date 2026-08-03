@@ -17,7 +17,7 @@ export function getLandingVM() {
       brand: "KINKORD",
       label: "Coming Soon",
       launchDateIso: LAUNCH_DATE.toISOString(),
-      launchNote: "Launching July 3, 2027",
+      launchNote: "Launching December 28, 2027",
       headline: "Welcome to Kinkord",
       subcopy:
         "A global luxury lifestyle community for adults built on consent, education, connection and expression.",
@@ -51,7 +51,7 @@ export function getLandingVM() {
     },
     finalCta: {
       launchDateIso: LAUNCH_DATE.toISOString(),
-      launchNote: "July 3, 2027",
+      launchNote: "December 28, 2027",
     },
     footer: {
       links: FOOTER_LINKS.map((l) => ({ ...l })),
