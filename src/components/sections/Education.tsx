@@ -1,10 +1,12 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { EDUCATION_TOPICS } from "@/lib/constants";
 import SectionReveal from "@/components/ui/SectionReveal";
+import type { LandingVM } from "@/presenters/getLandingVM";
 
-export default function Education() {
+type Props = LandingVM["education"];
+
+export default function Education({ topics }: Props) {
   return (
     <section className="py-20 md:py-28 bg-[#0a0a0a]">
       <div className="max-w-5xl mx-auto px-6">
@@ -26,7 +28,7 @@ export default function Education() {
         </SectionReveal>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {EDUCATION_TOPICS.map((topic, i) => (
+          {topics.map((topic, i) => (
             <motion.div
               key={topic}
               className="group border border-[#d4af37]/15 p-4 md:p-5 hover:border-[#d4af37]/50 hover:bg-[#d4af37]/5 transition-all duration-300 cursor-default"

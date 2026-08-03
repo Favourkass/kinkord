@@ -2,12 +2,13 @@
 
 import SectionReveal from "@/components/ui/SectionReveal";
 import GoldButton from "@/components/ui/GoldButton";
-import { INVEST_WHATSAPP_URL } from "@/lib/invest";
+import type { LandingVM } from "@/presenters/getLandingVM";
 
-export default function Invest() {
+type Props = LandingVM["investTeaser"];
+
+export default function Invest({ href, whatsappUrl }: Props) {
   return (
     <section className="py-20 md:py-28 bg-[#080808] relative overflow-hidden">
-      {/* Background texture */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute inset-0 bg-[linear-gradient(135deg,_rgba(212,175,55,0.03)_0%,_transparent_50%,_rgba(212,175,55,0.02)_100%)]" />
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#d4af37]/20 to-transparent" />
@@ -41,12 +42,12 @@ export default function Invest() {
         </SectionReveal>
 
         <SectionReveal delay={0.35}>
-          <GoldButton variant="solid" href="/invest" size="lg">
+          <GoldButton variant="solid" href={href} size="lg">
             Invest With Us
           </GoldButton>
           <p className="text-[10px] text-[#444] mt-6 uppercase tracking-widest">
             <a
-              href={INVEST_WHATSAPP_URL}
+              href={whatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-[#d4af37] transition-colors"

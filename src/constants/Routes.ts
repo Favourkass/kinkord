@@ -1,0 +1,10 @@
+export const Routes = {
+  home: "/",
+  invest: "/invest",
+  lectures: "/lectures",
+  lecture: (slug: string) => `/lectures/${slug}`,
+  admin: "/admin",
+  adminLogin: "/admin/login",
+  adminLecturesNew: "/admin/lectures/new",
+  adminLectureEdit: (id: string) => `/admin/lectures/${id}/edit`,
+} as const;

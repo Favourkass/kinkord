@@ -5,7 +5,12 @@ import GoldParticles from "@/components/ui/GoldParticles";
 import CountdownTimer from "@/components/ui/CountdownTimer";
 import GoldButton from "@/components/ui/GoldButton";
 
-export default function FinalCTA() {
+interface Props {
+  launchDateIso: string;
+  launchNote: string;
+}
+
+export default function FinalCTA({ launchDateIso, launchNote }: Props) {
   return (
     <section
       id="join"
@@ -59,9 +64,9 @@ export default function FinalCTA() {
           transition={{ duration: 0.7, delay: 0.35 }}
           className="border border-[#d4af37]/20 px-6 py-4 bg-[#0a0a0a]/60 backdrop-blur-sm"
         >
-          <CountdownTimer size="lg" />
+          <CountdownTimer targetDateIso={launchDateIso} size="lg" />
           <p className="text-[10px] text-[#999] tracking-widest uppercase mt-3">
-            July 3, 2027
+            {launchNote}
           </p>
         </motion.div>
 

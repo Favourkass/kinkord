@@ -5,19 +5,7 @@ import { ArrowLeft, MessageCircle } from "lucide-react";
 import SectionReveal from "@/components/ui/SectionReveal";
 import GoldButton from "@/components/ui/GoldButton";
 import Footer from "@/components/sections/Footer";
-import {
-  BUSINESS_MODEL,
-  CURRENT_POSITION,
-  INVESTMENT_STRUCTURE,
-  INVESTMENT_TIERS,
-  INVEST_WHATSAPP_MESSAGE,
-  INVEST_WHATSAPP_URL,
-  INVESTOR_BENEFITS,
-  OWNERSHIP_EXIT,
-  PROBLEMS,
-  USE_OF_FUNDS,
-  VISION_ITEMS,
-} from "@/lib/invest";
+import type { InvestVM } from "@/presenters/getInvestVM";
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -95,28 +83,42 @@ function ContentSection({
   );
 }
 
-export default function InvestPage() {
+export default function InvestPage({
+  whatsappUrl,
+  whatsappMessage,
+  homeHref,
+  currentPosition,
+  visionItems,
+  problems,
+  investmentStructure,
+  investmentTiers,
+  investorBenefits,
+  businessModel,
+  useOfFunds,
+  ownershipExit,
+  footer,
+}: InvestVM) {
   return (
     <main className="min-h-screen bg-[#0a0a0a]">
       {/* Top nav */}
       <header className="sticky top-0 z-50 border-b border-[#d4af37]/10 bg-[#0a0a0a]/90 backdrop-blur-md">
         <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link
-            href="/"
+            href={homeHref}
             className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-[#666] hover:text-[#d4af37] transition-colors"
           >
             <ArrowLeft size={14} />
             Home
           </Link>
           <Link
-            href="/"
+            href={homeHref}
             className="text-sm font-bold tracking-[0.2em] uppercase gold-gradient"
             style={{ fontFamily: "var(--font-playfair)" }}
           >
             Kinkord
           </Link>
           <a
-            href={INVEST_WHATSAPP_URL}
+            href={whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-[#d4af37] hover:text-[#f5e27d] transition-colors"
@@ -155,7 +157,7 @@ export default function InvestPage() {
             </p>
           </SectionReveal>
           <SectionReveal delay={0.25} className="mt-10">
-            <GoldButton variant="solid" href={INVEST_WHATSAPP_URL} size="lg">
+            <GoldButton variant="solid" href={whatsappUrl} size="lg">
               Invest in Kinkord
             </GoldButton>
             <p className="text-[10px] text-[#555] mt-4 uppercase tracking-widest">
@@ -168,7 +170,7 @@ export default function InvestPage() {
       <div className="max-w-3xl mx-auto px-6 pb-8">
         <ContentSection label="Position" title="Current Position">
           <GoldCard>
-            <BulletList items={CURRENT_POSITION} />
+            <BulletList items={currentPosition} />
           </GoldCard>
         </ContentSection>
 
@@ -179,7 +181,7 @@ export default function InvestPage() {
             becomes the #1 destination for:
           </p>
           <GoldCard>
-            <BulletList items={VISION_ITEMS} />
+            <BulletList items={visionItems} />
           </GoldCard>
         </ContentSection>
 
@@ -188,13 +190,13 @@ export default function InvestPage() {
             Kinkord addresses major gaps in the global kink ecosystem:
           </p>
           <GoldCard>
-            <BulletList items={PROBLEMS} />
+            <BulletList items={problems} />
           </GoldCard>
         </ContentSection>
 
         <ContentSection label="Structure" title="Investment Structure">
           <GoldCard className="mb-6">
-            <BulletList items={INVESTMENT_STRUCTURE} />
+            <BulletList items={investmentStructure} />
           </GoldCard>
           <div className="grid grid-cols-2 gap-3 text-center text-xs">
             <div className="border border-[#d4af37]/15 p-4 bg-[#080808]">
@@ -214,7 +216,7 @@ export default function InvestPage() {
 
         <ContentSection label="Tiers" title="Investment Tiers">
           <div className="grid gap-3 sm:grid-cols-2">
-            {INVESTMENT_TIERS.map((tier) => (
+            {investmentTiers.map((tier) => (
               <div
                 key={tier.name}
                 className="border border-[#d4af37]/15 bg-[#080808] p-5 relative overflow-hidden group hover:border-[#d4af37]/35 transition-colors"
@@ -236,19 +238,19 @@ export default function InvestPage() {
 
         <ContentSection label="Benefits" title="Investor Benefits">
           <GoldCard>
-            <BulletList items={INVESTOR_BENEFITS} />
+            <BulletList items={investorBenefits} />
           </GoldCard>
         </ContentSection>
 
         <ContentSection label="Revenue" title="Business Model">
           <GoldCard>
-            <BulletList items={BUSINESS_MODEL} />
+            <BulletList items={businessModel} />
           </GoldCard>
         </ContentSection>
 
         <ContentSection label="Allocation" title="Use of Funds">
           <div className="space-y-4">
-            {USE_OF_FUNDS.map((item) => (
+            {useOfFunds.map((item) => (
               <div key={item.label}>
                 <div className="flex justify-between text-xs mb-1.5 gap-4">
                   <span className="text-[#888] leading-snug">{item.label}</span>
@@ -269,7 +271,7 @@ export default function InvestPage() {
 
         <ContentSection label="Exit" title="Ownership & Exit">
           <GoldCard>
-            <BulletList items={OWNERSHIP_EXIT} />
+            <BulletList items={ownershipExit} />
           </GoldCard>
         </ContentSection>
 
@@ -327,7 +329,7 @@ export default function InvestPage() {
               Click below to join the investment process. You will be redirected
               to WhatsApp to connect directly with the Kinkord team.
             </p>
-            <GoldButton variant="solid" href={INVEST_WHATSAPP_URL} size="lg">
+            <GoldButton variant="solid" href={whatsappUrl} size="lg">
               Invest in Kinkord
             </GoldButton>
             <div className="mt-8 max-w-md mx-auto border border-[#d4af37]/10 bg-[#080808] p-4 text-left">
@@ -335,7 +337,7 @@ export default function InvestPage() {
                 WhatsApp message (auto-sent)
               </p>
               <p className="text-sm text-[#aaa] italic">
-                &ldquo;{INVEST_WHATSAPP_MESSAGE}&rdquo;
+                &ldquo;{whatsappMessage}&rdquo;
               </p>
             </div>
           </SectionReveal>
@@ -356,7 +358,7 @@ export default function InvestPage() {
         </section>
       </div>
 
-      <Footer />
+      <Footer {...footer} />
     </main>
   );
 }

@@ -10,22 +10,25 @@ import TeamLogin from "@/components/sections/TeamLogin";
 import Mission from "@/components/sections/Mission";
 import FinalCTA from "@/components/sections/FinalCTA";
 import Footer from "@/components/sections/Footer";
+import { getLandingVM } from "@/presenters/getLandingVM";
 
 export default function Home() {
+  const vm = getLandingVM();
+
   return (
     <main>
-      <Hero />
-      <Stats />
-      <WhyKinkord />
+      <Hero {...vm.hero} />
+      <Stats {...vm.stats} />
+      <WhyKinkord {...vm.why} />
       <ConsentSafety />
       <About />
-      <Education />
-      <Community />
-      <Invest />
+      <Education {...vm.education} />
+      <Community {...vm.community} />
+      <Invest {...vm.investTeaser} />
       <TeamLogin />
       <Mission />
-      <FinalCTA />
-      <Footer />
+      <FinalCTA {...vm.finalCta} />
+      <Footer {...vm.footer} />
     </main>
   );
 }

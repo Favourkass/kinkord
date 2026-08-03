@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LAUNCH_DATE } from "@/lib/constants";
 
 interface TimeLeft {
   days: number;
@@ -10,8 +9,8 @@ interface TimeLeft {
   seconds: number;
 }
 
-function getTimeLeft(): TimeLeft {
-  const diff = LAUNCH_DATE.getTime() - Date.now();
+function getTimeLeft(targetDate: Date): TimeLeft {
+  const diff = targetDate.getTime() - Date.now();
   if (diff <= 0) return { days: 0, hours: 0, minutes: 0, seconds: 0 };
   return {
     days: Math.floor(diff / (1000 * 60 * 60 * 24)),
@@ -22,16 +21,19 @@ function getTimeLeft(): TimeLeft {
 }
 
 interface Props {
+  targetDateIso: string;
   size?: "sm" | "lg";
 }
 
-export default function CountdownTimer({ size = "lg" }: Props) {
-  const [time, setTime] = useState<TimeLeft>(getTimeLeft());
+export default function CountdownTimer({ targetDateIso, size = "lg" }: Props) {
+  const targetDate = new Date(targetDateIso);
+  const [time, setTime] = useState<TimeLeft>(() => getTimeLeft(targetDate));
 
   useEffect(() => {
-    const id = setInterval(() => setTime(getTimeLeft()), 1000);
+    const target = new Date(targetDateIso);
+    const id = setInterval(() => setTime(getTimeLeft(target)), 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [targetDateIso]);
 
   const units = [
     { label: "Days", value: time.days },
@@ -50,8 +52,7 @@ export default function CountdownTimer({ size = "lg" }: Props) {
       ? "text-[10px] uppercase tracking-widest text-[#999] mt-1"
       : "text-[9px] uppercase tracking-widest text-[#999] mt-0.5";
 
-  const blockClass =
-    size === "lg" ? "min-w-[64px] px-4" : "min-w-[48px] px-2";
+  const blockClass = size === "lg" ? "min-w-[64px] px-4" : "min-w-[48px] px-2";
 
   return (
     <div className="flex items-center gap-1">
@@ -62,9 +63,7 @@ export default function CountdownTimer({ size = "lg" }: Props) {
             <span className={labelClass}>{u.label}</span>
           </div>
           {i < 3 && (
-            <span className="text-[#d4af37] text-xl font-bold mb-4 opacity-60">
-              :
-            </span>
+            <span className="text-[#d4af37] text-xl font-bold mb-4 opacity-60">:</span>
           )}
         </div>
       ))}
