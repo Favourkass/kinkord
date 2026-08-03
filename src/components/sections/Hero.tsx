@@ -61,7 +61,7 @@ export default function Hero() {
         >
           <CountdownTimer size="lg" />
           <p className="text-[10px] text-[#999] tracking-widest uppercase mt-3">
-            Launching July 3, 2027
+            Launching December 28, 2027
           </p>
         </motion.div>
 
