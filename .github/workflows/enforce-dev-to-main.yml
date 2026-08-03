@@ -1,0 +1,28 @@
+name: Enforce dev-only merges into main
+
+# main is protected so it can ONLY ever receive changes from the `dev`
+# branch. GitHub branch protection has no native "source branch" rule, so
+# this required check enforces it: any pull request into main whose head
+# branch is not `dev` fails here and cannot be merged.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, edited]
+
+jobs:
+  dev-only:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify PR source branch is dev
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          echo "Base branch: $BASE_REF"
+          echo "Head branch: $HEAD_REF"
+          if [ "$HEAD_REF" != "dev" ]; then
+            echo "::error::main only accepts merges from 'dev'. This PR's source branch is '$HEAD_REF'. Merge your work into dev first, then open a dev -> main pull request."
+            exit 1
+          fi
+          echo "Source branch is 'dev' — merge into main is allowed."
