@@ -1,5 +1,7 @@
 import {
   COMMUNITY_FEATURES,
+  COMPANY_ADDRESS,
+  COMPANY_NAME,
   COUNTRIES,
   EDUCATION_TOPICS,
   FOOTER_LINKS,
@@ -56,6 +58,7 @@ export function getLandingVM() {
     footer: {
       links: FOOTER_LINKS.map((l) => ({ ...l })),
       socials: SOCIALS.map((s) => ({ name: s.name, href: s.href })),
+      addressLine: `${COMPANY_NAME} \u00b7 ${COMPANY_ADDRESS}`,
     },
   };
 }
