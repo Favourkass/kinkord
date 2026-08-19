@@ -32,7 +32,7 @@ export class DataStack extends cdk.Stack {
 
     const db = new rds.DatabaseInstance(this, "Postgres", {
       engine: rds.DatabaseInstanceEngine.postgres({
-        version: rds.PostgresEngineVersion.of("16.6", "16"),
+        version: rds.PostgresEngineVersion.of("17.10", "17"),
       }),
       instanceType: ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE4_GRAVITON, ec2.InstanceSize.MICRO),
       vpc: props.vpc,
