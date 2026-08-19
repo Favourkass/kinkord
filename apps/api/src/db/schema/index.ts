@@ -2,3 +2,4 @@
 // tables land alongside as features ship.
 
 export * from "./auth";
+export * from "./profile";

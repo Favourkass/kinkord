@@ -46,6 +46,13 @@ export function buildAuth(db: Db, email: EmailService) {
             }
             return { data: u };
           },
+          after: async (u) => {
+            // Public persona starts as the signup name; user customizes later.
+            await db
+              .insert(schema.profile)
+              .values({ userId: u.id, displayName: u.name })
+              .onConflictDoNothing();
+          },
         },
       },
     },

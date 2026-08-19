@@ -5,6 +5,8 @@ import { DbModule } from "./db/db.module";
 import { EmailModule } from "./email/email.module";
 import { HealthController } from "./health/health.controller";
 import { MessagingModule } from "./messaging/messaging.module";
+import { ProfilesModule } from "./profiles/profiles.module";
+import { StorageModule } from "./storage/storage.module";
 
 @Module({
   imports: [
@@ -13,6 +15,8 @@ import { MessagingModule } from "./messaging/messaging.module";
     EmailModule,
     AuthModule,
     MessagingModule,
+    StorageModule,
+    ProfilesModule,
   ],
   controllers: [HealthController],
 })
