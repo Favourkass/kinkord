@@ -11,7 +11,7 @@ import {
   USE_OF_FUNDS,
   VISION_ITEMS,
 } from "@/constants/invest";
-import { FOOTER_LINKS, SOCIALS } from "@/constants/landing";
+import { COMPANY_ADDRESS, COMPANY_NAME, FOOTER_LINKS, SOCIALS } from "@/constants/landing";
 import { Routes } from "@/constants/Routes";
 
 export function getInvestVM() {
@@ -31,6 +31,7 @@ export function getInvestVM() {
     footer: {
       links: FOOTER_LINKS.map((l) => ({ ...l })),
       socials: SOCIALS.map((s) => ({ name: s.name, href: s.href })),
+      addressLine: `${COMPANY_NAME} \u00b7 ${COMPANY_ADDRESS}`,
     },
   };
 }

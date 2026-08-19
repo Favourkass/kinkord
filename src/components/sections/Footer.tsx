@@ -13,7 +13,7 @@ const SOCIAL_ICONS: Record<string, typeof AtSign> = {
   WhatsApp: MessageCircle,
 };
 
-export default function Footer({ links, socials }: Props) {
+export default function Footer({ links, socials, addressLine }: Props) {
   return (
     <footer className="bg-[#080808] border-t border-[#d4af37]/10 py-14 px-6">
       <div className="max-w-4xl mx-auto flex flex-col items-center gap-8">
@@ -58,6 +58,10 @@ export default function Footer({ links, socials }: Props) {
             </a>
           ))}
         </div>
+
+        <p className="text-[11px] text-[#555] tracking-widest text-center">
+          {addressLine}
+        </p>
 
         <p className="text-[10px] text-[#333] tracking-widest uppercase">
           &copy; Kinkord 2026. All Rights Reserved.
