@@ -1,0 +1,17 @@
+{
+  "/_global-error/page": "app/_global-error/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/admin/lectures/[id]/edit/page": "app/admin/lectures/[id]/edit/page.js",
+  "/admin/lectures/new/page": "app/admin/lectures/new/page.js",
+  "/admin/login/page": "app/admin/login/page.js",
+  "/admin/page": "app/admin/page.js",
+  "/api/auth/login/route": "app/api/auth/login/route.js",
+  "/api/auth/logout/route": "app/api/auth/logout/route.js",
+  "/api/lectures/[id]/route": "app/api/lectures/[id]/route.js",
+  "/api/lectures/route": "app/api/lectures/route.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/invest/page": "app/invest/page.js",
+  "/lectures/[slug]/page": "app/lectures/[slug]/page.js",
+  "/lectures/page": "app/lectures/page.js",
+  "/page": "app/page.js"
+}
