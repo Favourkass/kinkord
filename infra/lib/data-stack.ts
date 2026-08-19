@@ -26,7 +26,7 @@ export class DataStack extends cdk.Stack {
       this.dbSecurityGroup.addIngressRule(
         ec2.Peer.ipv4(props.adminCidr),
         ec2.Port.tcp(5432),
-        "TEMPORARY: owner laptop for migrations — remove once API handles migrations in-VPC",
+        "TEMPORARY: owner laptop for migrations - remove once API handles migrations in-VPC",
       );
     }
 
