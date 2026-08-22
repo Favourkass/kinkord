@@ -12,11 +12,13 @@ If another repo doc disagrees with this file, follow `AGENTS.md`.
 
 ## Repo Snapshot
 
-- App: Kinkord marketing site + admin (lectures)
-- Platform: Next.js App Router (React)
+- Monorepo (pnpm workspaces + Turborepo): `apps/web` (Next.js site), `apps/api` (platform API), `packages/domain` (shared PMs), `infra/` (AWS CDK)
+- App: Kinkord marketing site + admin (lectures), evolving into the full platform
+- Platform: Next.js App Router (React) on AWS; API on AWS (no Vercel)
 - Styling: Tailwind CSS
-- Data: Google Sheets via repositories; JWT cookie auth
+- Data: Google Sheets via repositories (legacy, migrating to Postgres); JWT cookie auth
 - Main layers: views → presenters → services → repositories → domain
+- Unqualified `src/` paths in this file refer to `apps/web/src/`
 
 ## Core Principles
 
@@ -138,15 +140,21 @@ Never:
 ### File Organization
 
 ```text
-src/
-  app/            Next.js routes (top-level screens + API handlers)
-  components/     Dumb UI building blocks (sections, ui, admin views)
-  presenters/     Presentation orchestration (hooks + get*VM)
-  domain/         Domain models (PMs) and PM → VM transforms
-  services/       Business logic
-  repositories/   Data access (Sheets, auth credentials boundary)
-  constants/      App constants and Routes
-  util/           Pure utilities
+apps/
+  web/            Next.js app (this tree is what `src/` refers to below)
+    src/
+      app/            Next.js routes (top-level screens + API handlers)
+      components/     Dumb UI building blocks (sections, ui, admin views)
+      presenters/     Presentation orchestration (hooks + get*VM)
+      domain/         Domain models (PMs) and PM → VM transforms
+      services/       Business logic
+      repositories/   Data access (Sheets, auth credentials boundary)
+      constants/      App constants and Routes
+      util/           Pure utilities
+  api/            Platform API (NestJS) — services/repositories mirror the same layering
+packages/
+  domain/         Shared domain models/contracts consumed by web + api
+infra/            AWS CDK stacks (all infrastructure as code)
 ```
 
 ### Screens vs components
