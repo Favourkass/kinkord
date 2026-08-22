@@ -17,6 +17,9 @@ export type Db = NodePgDatabase<typeof schema>;
         new Pool({
           connectionString: process.env.DATABASE_URL,
           max: 10,
+          // Fail fast instead of hanging: /health must answer within the
+          // App Runner probe window even when the DB is unreachable.
+          connectionTimeoutMillis: 3000,
         }),
     },
     {
