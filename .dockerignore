@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+.git
+.vercel
+.claude
+design
+docs
+cdk.out
+**/.env
+**/.env.local

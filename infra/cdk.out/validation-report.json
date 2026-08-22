@@ -31,8 +31,8 @@
               "stackTraces": [
                 "...new DatabaseInstance2 in .pnpm...",
                 "new DataStack (/Users/greymaxxmedialimited/kinkord/infra/lib/data-stack.ts:33:16)",
-                "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:23:1)",
-                "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:28:2)",
+                "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:24:14)",
+                "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:37:64)",
                 "...node internals, .pnpm..."
               ]
             }
@@ -61,8 +61,8 @@
               "stackTraces": [
                 "...new DatabaseInstance2 in .pnpm...",
                 "new DataStack (/Users/greymaxxmedialimited/kinkord/infra/lib/data-stack.ts:33:16)",
-                "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:23:1)",
-                "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:28:2)",
+                "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:24:14)",
+                "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:37:64)",
                 "...node internals, .pnpm..."
               ]
             }

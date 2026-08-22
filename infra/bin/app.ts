@@ -3,6 +3,7 @@ import { FoundationStack } from "../lib/foundation-stack";
 import { BillingStack } from "../lib/billing-stack";
 import { NetworkStack } from "../lib/network-stack";
 import { DataStack } from "../lib/data-stack";
+import { ApiBaseStack, ApiStack } from "../lib/api-stack";
 
 const app = new cdk.App();
 
@@ -20,9 +21,17 @@ const foundation = new FoundationStack(app, "KinkordFoundation", { env: primary 
 
 const network = new NetworkStack(app, "KinkordNetwork", { env: primary });
 
-new DataStack(app, "KinkordData", {
+const data = new DataStack(app, "KinkordData", {
   env: primary,
   vpc: network.vpc,
   // Temporary: laptop IP allowed for migrations until the API runs in-VPC.
   adminCidr: process.env.ADMIN_IP ? `${process.env.ADMIN_IP}/32` : undefined,
 });
+
+const apiBase = new ApiBaseStack(app, "KinkordApiBase", {
+  env: primary,
+  vpc: network.vpc,
+  dbSecurityGroup: data.dbSecurityGroup,
+});
+
+new ApiStack(app, "KinkordApi", { env: primary, base: apiBase });

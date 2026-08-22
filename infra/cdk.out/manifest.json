@@ -88,7 +88,7 @@
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::989624288003:role/cdk-hnb659fds-deploy-role-989624288003-eu-west-1",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::989624288003:role/cdk-hnb659fds-cfn-exec-role-989624288003-eu-west-1",
-        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-989624288003-eu-west-1/56672756ca9cda4651757a50fd77e56ed63262b0394ca2dcd2df97452cf4cebd.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-989624288003-eu-west-1/c75c61805ac2a68f0a0487042d01f363e1b98a39f18c3f7fd6db2cdd99424f96.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
         "additionalDependencies": [
@@ -123,7 +123,7 @@
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::989624288003:role/cdk-hnb659fds-deploy-role-989624288003-eu-west-1",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::989624288003:role/cdk-hnb659fds-cfn-exec-role-989624288003-eu-west-1",
-        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-989624288003-eu-west-1/8377320a0f01e5c551304c0f5867123b8dae2bc02a5045308fb58509f32bcd7d.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-989624288003-eu-west-1/7cfabe3b688fec56583c43d5f356e7dfe64e75f83f13d6a62d20f62aa70eb8f1.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
         "additionalDependencies": [
@@ -137,10 +137,83 @@
       },
       "dependencies": [
         "KinkordNetwork",
+        "KinkordApiBase",
         "KinkordData.assets"
       ],
       "additionalMetadataFile": "KinkordData.metadata.json",
       "displayName": "KinkordData"
+    },
+    "KinkordApiBase.assets": {
+      "type": "cdk:asset-manifest",
+      "properties": {
+        "file": "KinkordApiBase.assets.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+      }
+    },
+    "KinkordApiBase": {
+      "type": "aws:cloudformation:stack",
+      "environment": "aws://989624288003/eu-west-1",
+      "properties": {
+        "templateFile": "KinkordApiBase.template.json",
+        "terminationProtection": false,
+        "validateOnSynth": false,
+        "assumeRoleArn": "arn:${AWS::Partition}:iam::989624288003:role/cdk-hnb659fds-deploy-role-989624288003-eu-west-1",
+        "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::989624288003:role/cdk-hnb659fds-cfn-exec-role-989624288003-eu-west-1",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-989624288003-eu-west-1/712458961896d4eec31d55e6cadfd2975717cb7b495f2d9e046097f8ec11750e.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
+        "additionalDependencies": [
+          "KinkordApiBase.assets"
+        ],
+        "lookupRole": {
+          "arn": "arn:${AWS::Partition}:iam::989624288003:role/cdk-hnb659fds-lookup-role-989624288003-eu-west-1",
+          "requiresBootstrapStackVersion": 8,
+          "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+        }
+      },
+      "dependencies": [
+        "KinkordNetwork",
+        "KinkordApiBase.assets"
+      ],
+      "additionalMetadataFile": "KinkordApiBase.metadata.json",
+      "displayName": "KinkordApiBase"
+    },
+    "KinkordApi.assets": {
+      "type": "cdk:asset-manifest",
+      "properties": {
+        "file": "KinkordApi.assets.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+      }
+    },
+    "KinkordApi": {
+      "type": "aws:cloudformation:stack",
+      "environment": "aws://989624288003/eu-west-1",
+      "properties": {
+        "templateFile": "KinkordApi.template.json",
+        "terminationProtection": false,
+        "validateOnSynth": false,
+        "assumeRoleArn": "arn:${AWS::Partition}:iam::989624288003:role/cdk-hnb659fds-deploy-role-989624288003-eu-west-1",
+        "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::989624288003:role/cdk-hnb659fds-cfn-exec-role-989624288003-eu-west-1",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-989624288003-eu-west-1/8d88d368919e5e1ecf6d3b28ea4d1e9d7f9c8f349901266e3c697b59ebb9afe2.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
+        "additionalDependencies": [
+          "KinkordApi.assets"
+        ],
+        "lookupRole": {
+          "arn": "arn:${AWS::Partition}:iam::989624288003:role/cdk-hnb659fds-lookup-role-989624288003-eu-west-1",
+          "requiresBootstrapStackVersion": 8,
+          "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+        }
+      },
+      "dependencies": [
+        "KinkordApiBase",
+        "KinkordApi.assets"
+      ],
+      "additionalMetadataFile": "KinkordApi.metadata.json",
+      "displayName": "KinkordApi"
     },
     "Tree": {
       "type": "cdk:tree",
