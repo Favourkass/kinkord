@@ -3,8 +3,8 @@
     {
       "type": "aws:cdk:creationStack",
       "data": [
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:19:20)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:28:2)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:20:20)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:37:64)",
         "...node internals, .pnpm..."
       ]
     }
@@ -23,9 +23,9 @@
     {
       "type": "aws:cdk:creationStack",
       "data": [
-        "new FoundationStack (/Users/greymaxxmedialimited/kinkord/infra/lib/foundation-stack.ts:102:5)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:19:20)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:28:2)",
+        "new FoundationStack (/Users/greymaxxmedialimited/kinkord/infra/lib/foundation-stack.ts:106:5)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:20:20)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:37:64)",
         "...node internals, .pnpm..."
       ]
     }
@@ -38,9 +38,9 @@
     {
       "type": "aws:cdk:creationStack",
       "data": [
-        "new FoundationStack (/Users/greymaxxmedialimited/kinkord/infra/lib/foundation-stack.ts:103:5)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:19:20)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:28:2)",
+        "new FoundationStack (/Users/greymaxxmedialimited/kinkord/infra/lib/foundation-stack.ts:107:5)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:20:20)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:37:64)",
         "...node internals, .pnpm..."
       ]
     }
@@ -53,9 +53,9 @@
     {
       "type": "aws:cdk:creationStack",
       "data": [
-        "new FoundationStack (/Users/greymaxxmedialimited/kinkord/infra/lib/foundation-stack.ts:104:5)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:19:20)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:28:2)",
+        "new FoundationStack (/Users/greymaxxmedialimited/kinkord/infra/lib/foundation-stack.ts:108:5)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:20:20)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:37:64)",
         "...node internals, .pnpm..."
       ]
     }
@@ -68,9 +68,9 @@
     {
       "type": "aws:cdk:creationStack",
       "data": [
-        "new FoundationStack (/Users/greymaxxmedialimited/kinkord/infra/lib/foundation-stack.ts:105:5)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:19:20)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:28:2)",
+        "new FoundationStack (/Users/greymaxxmedialimited/kinkord/infra/lib/foundation-stack.ts:109:5)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:20:20)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:37:64)",
         "...node internals, .pnpm..."
       ]
     }
@@ -83,9 +83,9 @@
     {
       "type": "aws:cdk:creationStack",
       "data": [
-        "new FoundationStack (/Users/greymaxxmedialimited/kinkord/infra/lib/foundation-stack.ts:106:5)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:19:20)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:28:2)",
+        "new FoundationStack (/Users/greymaxxmedialimited/kinkord/infra/lib/foundation-stack.ts:110:5)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:20:20)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:37:64)",
         "...node internals, .pnpm..."
       ]
     }
@@ -98,9 +98,9 @@
     {
       "type": "aws:cdk:creationStack",
       "data": [
-        "new FoundationStack (/Users/greymaxxmedialimited/kinkord/infra/lib/foundation-stack.ts:107:5)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:19:20)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:28:2)",
+        "new FoundationStack (/Users/greymaxxmedialimited/kinkord/infra/lib/foundation-stack.ts:111:5)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:20:20)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:37:64)",
         "...node internals, .pnpm..."
       ]
     }
@@ -141,8 +141,8 @@
       "data": [
         "...new Bucket2 in .pnpm...",
         "new FoundationStack (/Users/greymaxxmedialimited/kinkord/infra/lib/foundation-stack.ts:16:19)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:19:20)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:28:2)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:20:20)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:37:64)",
         "...node internals, .pnpm..."
       ]
     }
@@ -157,8 +157,8 @@
       "data": [
         "...new Repository2 in .pnpm...",
         "new FoundationStack (/Users/greymaxxmedialimited/kinkord/infra/lib/foundation-stack.ts:38:21)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:19:20)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:28:2)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:20:20)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:37:64)",
         "...node internals, .pnpm..."
       ]
     }
@@ -173,8 +173,8 @@
       "data": [
         "...new Secret2 in .pnpm...",
         "new FoundationStack (/Users/greymaxxmedialimited/kinkord/infra/lib/foundation-stack.ts:46:26)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:19:20)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:28:2)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:20:20)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:37:64)",
         "...node internals, .pnpm..."
       ]
     }
@@ -189,8 +189,8 @@
       "data": [
         "...new Secret2 in .pnpm...",
         "new FoundationStack (/Users/greymaxxmedialimited/kinkord/infra/lib/foundation-stack.ts:50:26)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:19:20)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:28:2)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:20:20)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:37:64)",
         "...node internals, .pnpm..."
       ]
     }
@@ -205,8 +205,8 @@
       "data": [
         "...new PublicHostedZone2 in .pnpm...",
         "new FoundationStack (/Users/greymaxxmedialimited/kinkord/infra/lib/foundation-stack.ts:56:18)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:19:20)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:28:2)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:20:20)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:37:64)",
         "...node internals, .pnpm..."
       ]
     }
@@ -221,8 +221,8 @@
       "data": [
         "...new OpenIdConnectProvider2 in .pnpm...",
         "new FoundationStack (/Users/greymaxxmedialimited/kinkord/infra/lib/foundation-stack.ts:61:20)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:19:20)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:28:2)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:20:20)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:37:64)",
         "...node internals..."
       ]
     }
@@ -237,8 +237,8 @@
       "data": [
         "...new OpenIdConnectProvider2 in .pnpm...",
         "new FoundationStack (/Users/greymaxxmedialimited/kinkord/infra/lib/foundation-stack.ts:61:20)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:19:20)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:28:2)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:20:20)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:37:64)",
         "...node internals..."
       ]
     }
@@ -253,8 +253,8 @@
       "data": [
         "...new Role2 in .pnpm...",
         "new FoundationStack (/Users/greymaxxmedialimited/kinkord/infra/lib/foundation-stack.ts:66:24)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:19:20)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:28:2)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:20:20)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:37:64)",
         "...node internals, .pnpm..."
       ]
     }
@@ -282,7 +282,7 @@
       "data": [
         "...new Bucket2 in .pnpm...",
         "new FoundationStack (/Users/greymaxxmedialimited/kinkord/infra/lib/foundation-stack.ts:16:19)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:19:20)"
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:20:20)"
       ]
     }
   ],
@@ -296,8 +296,8 @@
       "data": [
         "...new OpenIdConnectProvider2 in .pnpm...",
         "new FoundationStack (/Users/greymaxxmedialimited/kinkord/infra/lib/foundation-stack.ts:61:20)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:19:20)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:28:2)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:20:20)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:37:64)",
         "...node internals, .pnpm..."
       ]
     }

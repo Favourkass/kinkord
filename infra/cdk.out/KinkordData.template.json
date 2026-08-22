@@ -16,7 +16,7 @@
     ],
     "SecurityGroupIngress": [
      {
-      "CidrIp": "102.88.169.83/32",
+      "CidrIp": "197.211.59.97/32",
       "Description": "TEMPORARY: owner laptop for migrations - remove once API handles migrations in-VPC",
       "FromPort": 5432,
       "IpProtocol": "tcp",
@@ -29,6 +29,27 @@
    },
    "Metadata": {
     "aws:cdk:path": "KinkordData/DbSg/Resource"
+   }
+  },
+  "DbSgfromKinkordApiBaseConnectorSg5B179B0C543210EAF6C9": {
+   "Type": "AWS::EC2::SecurityGroupIngress",
+   "Properties": {
+    "Description": "API (App Runner) to Postgres",
+    "FromPort": 5432,
+    "GroupId": {
+     "Fn::GetAtt": [
+      "DbSg495F8305",
+      "GroupId"
+     ]
+    },
+    "IpProtocol": "tcp",
+    "SourceSecurityGroupId": {
+     "Fn::ImportValue": "KinkordApiBase:ExportsOutputFnGetAttConnectorSgC689ACEAGroupId08D61F7F"
+    },
+    "ToPort": 5432
+   },
+   "Metadata": {
+    "aws:cdk:path": "KinkordData/DbSg/from KinkordApiBaseConnectorSg5B179B0C:5432"
    }
   },
   "PostgresSubnetGroup9F8A4D6E": {
@@ -144,7 +165,7 @@
   "CDKMetadata": {
    "Type": "AWS::CDK::Metadata",
    "Properties": {
-    "Analytics": "v2:deflate64:H4sIAAAAAAAA/12PzQ6CMBCEn8V7qYZE7iqJ8WQi3s1SVixIIe1WY5q+u8UGop42+83M/qQ8zdZ8tYCnSUTVJndZclcQiJYFdHEo0tCjsFrSa697O7DdVf0Az3RluMuBoASDB2UIlEBW2FIhzZl8+w0md5ikkaI+JT0zH2o6UFCj5i6uHI2xnEHXSBsKd946VMRmw7/i/agdLQ2WPFN9hbwxy0ea8fHrxkiZaKtIdshPsb4BMSVW/xIBAAA="
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/32QzQrCQAyEn8X7dpWCvfsD4kmw3iXdxrqtTcsmq0jZd7e1VMSDp5BvZpKQWMfJUi9m8ODI5FV0s5nuUgFTqR6dOzRx36Pxzspz5xrfqs2F/oM9FQ6Zg3I5624LAhkw7okFyKBKfUYon+h2/Q0mdz/QoYz6lAyK35RrICjQ6W7cPBjHcgJXoKykv/9aI4n6GH6VEAbt4KX1EhQ1OeqS5/c40cM3SrY2cp7E1qiPY30B2/12WioBAAA="
    },
    "Metadata": {
     "aws:cdk:path": "KinkordData/CDKMetadata/Default"

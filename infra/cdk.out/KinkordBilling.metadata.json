@@ -3,8 +3,8 @@
     {
       "type": "aws:cdk:creationStack",
       "data": [
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:13:1)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:28:2)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:14:1)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:37:64)",
         "...node internals, .pnpm..."
       ]
     }
@@ -18,8 +18,8 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "new BillingStack (/Users/greymaxxmedialimited/kinkord/infra/lib/billing-stack.ts:14:5)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:13:1)",
-        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:28:2)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:14:1)",
+        "<anonymous> (/Users/greymaxxmedialimited/kinkord/infra/bin/app.ts:37:64)",
         "...node internals, .pnpm..."
       ]
     }
