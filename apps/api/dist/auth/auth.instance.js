@@ -38,6 +38,7 @@ exports.buildAuth = buildAuth;
 const better_auth_1 = require("better-auth");
 const drizzle_1 = require("better-auth/adapters/drizzle");
 const api_1 = require("better-auth/api");
+const plugins_1 = require("better-auth/plugins");
 const schema = __importStar(require("../db/schema"));
 const templates_1 = require("../email/templates");
 exports.AUTH = Symbol("AUTH");
@@ -58,8 +59,13 @@ function buildAuth(db, email) {
                 session: schema.session,
                 account: schema.account,
                 verification: schema.verification,
+                twoFactor: schema.twoFactor,
             },
         }),
+        plugins: [
+            (0, plugins_1.username)({ minUsernameLength: 3, maxUsernameLength: 30 }),
+            (0, plugins_1.twoFactor)({ issuer: "Kinkord" }),
+        ],
         user: {
             additionalFields: {
                 ageAttested: { type: "boolean", required: true, input: true },
@@ -76,13 +82,19 @@ function buildAuth(db, email) {
                         }
                         return { data: u };
                     },
+                    after: async (u) => {
+                        await db
+                            .insert(schema.profile)
+                            .values({ userId: u.id, displayName: u.name })
+                            .onConflictDoNothing();
+                    },
                 },
             },
         },
         emailAndPassword: {
             enabled: true,
             minPasswordLength: 10,
-            requireEmailVerification: true,
+            requireEmailVerification: false,
             sendResetPassword: async ({ user, url }) => {
                 const t = (0, templates_1.resetPasswordEmail)(url);
                 await email.send({ to: user.email, ...t });

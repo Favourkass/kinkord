@@ -7,6 +7,21 @@ export class MeController {
   @UseGuards(AuthGuard)
   me(@Req() req: AuthedRequest) {
     const { id, email, name, emailVerified, image, createdAt } = req.user;
-    return { id, email, name, emailVerified, image, createdAt };
+    const u = req.user as typeof req.user & {
+      username?: string | null;
+      displayUsername?: string | null;
+      twoFactorEnabled?: boolean | null;
+    };
+    return {
+      id,
+      email,
+      name,
+      emailVerified,
+      image,
+      createdAt,
+      username: u.username ?? null,
+      displayUsername: u.displayUsername ?? null,
+      twoFactorEnabled: u.twoFactorEnabled ?? false,
+    };
   }
 }

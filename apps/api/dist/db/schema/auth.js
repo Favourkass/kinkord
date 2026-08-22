@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.accountRelations = exports.sessionRelations = exports.userRelations = exports.verification = exports.account = exports.session = exports.user = void 0;
+exports.twoFactorRelations = exports.accountRelations = exports.sessionRelations = exports.userRelations = exports.twoFactor = exports.verification = exports.account = exports.session = exports.user = void 0;
 const drizzle_orm_1 = require("drizzle-orm");
 const pg_core_1 = require("drizzle-orm/pg-core");
 exports.user = (0, pg_core_1.pgTable)("user", {
@@ -14,6 +14,9 @@ exports.user = (0, pg_core_1.pgTable)("user", {
         .defaultNow()
         .$onUpdate(() => new Date())
         .notNull(),
+    username: (0, pg_core_1.text)("username").unique(),
+    displayUsername: (0, pg_core_1.text)("display_username"),
+    twoFactorEnabled: (0, pg_core_1.boolean)("two_factor_enabled").default(false),
     ageAttested: (0, pg_core_1.boolean)("age_attested").notNull(),
 });
 exports.session = (0, pg_core_1.pgTable)("session", {
@@ -61,9 +64,24 @@ exports.verification = (0, pg_core_1.pgTable)("verification", {
         .$onUpdate(() => new Date())
         .notNull(),
 }, (table) => [(0, pg_core_1.index)("verification_identifier_idx").on(table.identifier)]);
+exports.twoFactor = (0, pg_core_1.pgTable)("two_factor", {
+    id: (0, pg_core_1.text)("id").primaryKey(),
+    secret: (0, pg_core_1.text)("secret").notNull(),
+    backupCodes: (0, pg_core_1.text)("backup_codes").notNull(),
+    userId: (0, pg_core_1.text)("user_id")
+        .notNull()
+        .references(() => exports.user.id, { onDelete: "cascade" }),
+    verified: (0, pg_core_1.boolean)("verified").default(true),
+    failedVerificationCount: (0, pg_core_1.integer)("failed_verification_count").default(0),
+    lockedUntil: (0, pg_core_1.timestamp)("locked_until"),
+}, (table) => [
+    (0, pg_core_1.index)("twoFactor_secret_idx").on(table.secret),
+    (0, pg_core_1.index)("twoFactor_userId_idx").on(table.userId),
+]);
 exports.userRelations = (0, drizzle_orm_1.relations)(exports.user, ({ many }) => ({
     sessions: many(exports.session),
     accounts: many(exports.account),
+    twoFactors: many(exports.twoFactor),
 }));
 exports.sessionRelations = (0, drizzle_orm_1.relations)(exports.session, ({ one }) => ({
     user: one(exports.user, {
@@ -74,6 +92,12 @@ exports.sessionRelations = (0, drizzle_orm_1.relations)(exports.session, ({ one 
 exports.accountRelations = (0, drizzle_orm_1.relations)(exports.account, ({ one }) => ({
     user: one(exports.user, {
         fields: [exports.account.userId],
+        references: [exports.user.id],
+    }),
+}));
+exports.twoFactorRelations = (0, drizzle_orm_1.relations)(exports.twoFactor, ({ one }) => ({
+    user: one(exports.user, {
+        fields: [exports.twoFactor.userId],
         references: [exports.user.id],
     }),
 }));

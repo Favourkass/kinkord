@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, date, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
 /**
@@ -14,8 +14,20 @@ export const profile = pgTable("profile", {
   pronouns: text("pronouns"),
   /** ISO 3166-1 alpha-2, from the country-selection onboarding step. */
   country: text("country"),
-  /** S3 object key under avatars/; served via presigned GET. */
+  /** Onboarding step 2 "Tell us about you". */
+  state: text("state"),
+  city: text("city"),
+  dateOfBirth: date("date_of_birth"),
+  gender: text("gender"),
+  /** Kink roles picked at step 4; free-form labels. */
+  roles: jsonb("roles").$type<string[]>().notNull().default([]),
+  /** Collected at signup; unverified until SMS returns. */
+  phone: text("phone"),
+  /** "Basic verified" gate: flips only via phone OTP once SMS is live. */
+  phoneVerified: boolean("phone_verified").notNull().default(false),
+  /** S3 object keys; served via presigned GET. */
   avatarKey: text("avatar_key"),
+  coverKey: text("cover_key"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
