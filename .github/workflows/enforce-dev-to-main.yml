@@ -1,28 +1,38 @@
 name: Enforce dev-only merges into main
 
 # main is protected so it can ONLY ever receive changes from the `dev`
-# branch. GitHub branch protection has no native "source branch" rule, so
-# this required check enforces it: any pull request into main whose head
-# branch is not `dev` fails here and cannot be merged.
+# branch, and ONLY the release owner may open that pull request. GitHub
+# rulesets can express neither rule natively, so this required check
+# enforces both: wrong source branch or wrong author fails here and the
+# PR cannot be merged.
 
 on:
   pull_request:
     branches: [main]
     types: [opened, reopened, synchronize, edited]
 
+env:
+  RELEASE_OWNER: Favourkass
+
 jobs:
   dev-only:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify PR source branch is dev
+      - name: Verify source branch is dev and author is the release owner
         env:
           HEAD_REF: ${{ github.head_ref }}
           BASE_REF: ${{ github.base_ref }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           echo "Base branch: $BASE_REF"
           echo "Head branch: $HEAD_REF"
+          echo "PR author:   $PR_AUTHOR"
           if [ "$HEAD_REF" != "dev" ]; then
             echo "::error::main only accepts merges from 'dev'. This PR's source branch is '$HEAD_REF'. Merge your work into dev first, then open a dev -> main pull request."
             exit 1
           fi
-          echo "Source branch is 'dev' — merge into main is allowed."
+          if [ "$PR_AUTHOR" != "$RELEASE_OWNER" ]; then
+            echo "::error::Only @$RELEASE_OWNER may open dev -> main release PRs. This PR was opened by @$PR_AUTHOR."
+            exit 1
+          fi
+          echo "Source is 'dev' and author is @$RELEASE_OWNER — merge into main is allowed."
