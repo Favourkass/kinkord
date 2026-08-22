@@ -10,7 +10,7 @@ const serviceMock = () =>
   ({
     getOwn: vi.fn(async () => ({ displayName: "Favour" })),
     updateOwn: vi.fn(async () => ({ displayName: "FavourK" })),
-    presignAvatarUpload: vi.fn(async () => ({ key: "k", uploadUrl: "u" })),
+    presignImageUpload: vi.fn(async () => ({ key: "k", uploadUrl: "u" })),
   }) as unknown as ProfilesService;
 
 describe("ProfilesController", () => {
@@ -21,13 +21,27 @@ describe("ProfilesController", () => {
 
   it("passes validated updates to the service", async () => {
     const service = serviceMock();
-    const controller = new ProfilesController(service);
-    await controller.update(req, { country: "ng" });
-    expect(service.updateOwn).toHaveBeenCalledWith("u1", { country: "NG" }, "Favour");
+    await new ProfilesController(service).update(req, { country: "ng", roles: ["Switch"] });
+    expect(service.updateOwn).toHaveBeenCalledWith(
+      "u1",
+      { country: "NG", roles: ["Switch"] },
+      "Favour",
+    );
   });
 
-  it("requires contentType for avatar presign", () => {
+  it("requires a valid kind for upload URLs", () => {
     const controller = new ProfilesController(serviceMock());
-    expect(() => controller.presignAvatar(req, {})).toThrow(BadRequestException);
+    expect(() =>
+      controller.presignUpload(req, { kind: "banner", contentType: "image/png" }),
+    ).toThrow(BadRequestException);
+  });
+
+  it("passes kind and contentType through to the service", async () => {
+    const service = serviceMock();
+    await new ProfilesController(service).presignUpload(req, {
+      kind: "cover",
+      contentType: "image/png",
+    });
+    expect(service.presignImageUpload).toHaveBeenCalledWith("u1", "cover", "image/png");
   });
 });

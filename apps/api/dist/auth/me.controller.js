@@ -18,7 +18,18 @@ const auth_guard_1 = require("./auth.guard");
 let MeController = class MeController {
     me(req) {
         const { id, email, name, emailVerified, image, createdAt } = req.user;
-        return { id, email, name, emailVerified, image, createdAt };
+        const u = req.user;
+        return {
+            id,
+            email,
+            name,
+            emailVerified,
+            image,
+            createdAt,
+            username: u.username ?? null,
+            displayUsername: u.displayUsername ?? null,
+            twoFactorEnabled: u.twoFactorEnabled ?? false,
+        };
     }
 };
 exports.MeController = MeController;

@@ -8,28 +8,17 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var __param = (this && this.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.HealthController = void 0;
 const common_1 = require("@nestjs/common");
-const pg_1 = require("pg");
-const db_module_1 = require("../db/db.module");
+const health_service_1 = require("./health.service");
 let HealthController = class HealthController {
-    pool;
-    constructor(pool) {
-        this.pool = pool;
+    health;
+    constructor(health) {
+        this.health = health;
     }
-    async health() {
-        let db = "down";
-        try {
-            await this.pool.query("SELECT 1");
-            db = "up";
-        }
-        catch {
-        }
-        return { ok: true, db, ts: new Date().toISOString() };
+    check() {
+        return this.health.check();
     }
 };
 exports.HealthController = HealthController;
@@ -37,11 +26,10 @@ __decorate([
     (0, common_1.Get)("health"),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
-    __metadata("design:returntype", Promise)
-], HealthController.prototype, "health", null);
+    __metadata("design:returntype", void 0)
+], HealthController.prototype, "check", null);
 exports.HealthController = HealthController = __decorate([
     (0, common_1.Controller)(),
-    __param(0, (0, common_1.Inject)(db_module_1.PG_POOL)),
-    __metadata("design:paramtypes", [pg_1.Pool])
+    __metadata("design:paramtypes", [health_service_1.HealthService])
 ], HealthController);
 //# sourceMappingURL=health.controller.js.map

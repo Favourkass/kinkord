@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError } from "better-auth/api";
+import { twoFactor, username } from "better-auth/plugins";
 import { Db } from "../db/db.module";
 import * as schema from "../db/schema";
 import { EmailService } from "../email/email.service";
@@ -27,8 +28,15 @@ export function buildAuth(db: Db, email: EmailService) {
         session: schema.session,
         account: schema.account,
         verification: schema.verification,
+        twoFactor: schema.twoFactor,
       },
     }),
+    plugins: [
+      // Unique handle (@username) on the account; sign-in works with it too.
+      username({ minUsernameLength: 3, maxUsernameLength: 30 }),
+      // TOTP 2FA: works with Google Authenticator/Authy/any authenticator app.
+      twoFactor({ issuer: "Kinkord" }),
+    ],
     user: {
       additionalFields: {
         ageAttested: { type: "boolean", required: true, input: true },
@@ -59,7 +67,11 @@ export function buildAuth(db: Db, email: EmailService) {
     emailAndPassword: {
       enabled: true,
       minPasswordLength: 10,
-      requireEmailVerification: true,
+      // Signup opens a session immediately so the onboarding wizard can finish
+      // (steps 4-5 need auth). Email link verification runs alongside; the
+      // step-3 phone OTP is skippable until SMS is live (user decision
+      // 2026-08-22) and gates "Basic verified", not login.
+      requireEmailVerification: false,
       sendResetPassword: async ({ user, url }) => {
         const t = resetPasswordEmail(url);
         await email.send({ to: user.email, ...t });
