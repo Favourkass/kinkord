@@ -31,9 +31,7 @@ export default function AdminLoginView({
           >
             KINKORD
           </h1>
-          <p className="text-[10px] uppercase tracking-[0.4em] text-[#d4af37]/60">
-            Admin Portal
-          </p>
+          <p className="text-[10px] uppercase tracking-[0.4em] text-[#d4af37]/60">Admin Portal</p>
         </div>
 
         <div className="border border-[#d4af37]/15 bg-[#0d0d0d] p-8">
@@ -75,9 +73,7 @@ export default function AdminLoginView({
               />
             </div>
 
-            {error && (
-              <p className="text-[11px] text-red-400 text-center">{error}</p>
-            )}
+            {error && <p className="text-[11px] text-red-400 text-center">{error}</p>}
 
             <button
               type="submit"

@@ -11,9 +11,7 @@ export default function Education({ topics }: Props) {
     <section className="py-20 md:py-28 bg-[#0a0a0a]">
       <div className="max-w-5xl mx-auto px-6">
         <SectionReveal className="text-center mb-14">
-          <p className="text-[10px] uppercase tracking-[0.4em] text-[#d4af37] mb-3">
-            Grow With Us
-          </p>
+          <p className="text-[10px] uppercase tracking-[0.4em] text-[#d4af37] mb-3">Grow With Us</p>
           <h2
             className="text-3xl md:text-4xl font-bold text-[#f5f5f0] mb-4"
             style={{ fontFamily: "var(--font-playfair)" }}
@@ -22,8 +20,8 @@ export default function Education({ topics }: Props) {
           </h2>
           <div className="section-divider mb-6" />
           <p className="text-sm text-[#888] max-w-xl mx-auto">
-            Explore lectures, discussions and educational resources covering
-            every aspect of the lifestyle.
+            Explore lectures, discussions and educational resources covering every aspect of the
+            lifestyle.
           </p>
         </SectionReveal>
 

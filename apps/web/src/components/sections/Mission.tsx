@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import SectionReveal from "@/components/ui/SectionReveal";
 
 export default function Mission() {
@@ -10,9 +9,7 @@ export default function Mission() {
 
       <div className="max-w-4xl mx-auto px-6 text-center relative">
         <SectionReveal>
-          <p className="text-[10px] uppercase tracking-[0.4em] text-[#d4af37] mb-8">
-            Our Purpose
-          </p>
+          <p className="text-[10px] uppercase tracking-[0.4em] text-[#d4af37] mb-8">Our Purpose</p>
         </SectionReveal>
 
         <SectionReveal delay={0.15}>
@@ -30,9 +27,9 @@ export default function Mission() {
               className="text-2xl md:text-3xl lg:text-4xl font-bold text-[#f5f5f0] leading-relaxed relative z-10"
               style={{ fontFamily: "var(--font-playfair)" }}
             >
-              To create safer, informed and globally connected spaces where
-              adults can explore lifestyle expression, education, networking
-              and community through respect, consent and privacy.
+              To create safer, informed and globally connected spaces where adults can explore
+              lifestyle expression, education, networking and community through respect, consent and
+              privacy.
             </h2>
 
             <span

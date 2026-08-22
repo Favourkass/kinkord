@@ -8,11 +8,7 @@ import Footer from "@/components/sections/Footer";
 import type { InvestVM } from "@/presenters/getInvestVM";
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-[10px] uppercase tracking-[0.4em] text-[#d4af37] mb-3">
-      {children}
-    </p>
-  );
+  return <p className="text-[10px] uppercase tracking-[0.4em] text-[#d4af37] mb-3">{children}</p>;
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -26,17 +22,9 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-function GoldCard({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
+function GoldCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div
-      className={`relative border border-[#d4af37]/15 bg-[#0a0a0a] p-6 md:p-8 ${className}`}
-    >
+    <div className={`relative border border-[#d4af37]/15 bg-[#0a0a0a] p-6 md:p-8 ${className}`}>
       <div className="absolute top-3 left-3 w-5 h-5 border-t border-l border-[#d4af37]/20" />
       <div className="absolute bottom-3 right-3 w-5 h-5 border-b border-r border-[#d4af37]/20" />
       <div className="relative">{children}</div>
@@ -48,10 +36,7 @@ function BulletList({ items }: { items: string[] }) {
   return (
     <ul className="space-y-3">
       {items.map((item) => (
-        <li
-          key={item}
-          className="flex gap-3 text-sm text-[#888] leading-relaxed"
-        >
+        <li key={item} className="flex gap-3 text-sm text-[#888] leading-relaxed">
           <span className="text-[#d4af37] shrink-0 mt-1.5 w-1 h-1 rounded-full bg-[#d4af37]" />
           <span>{item}</span>
         </li>
@@ -149,11 +134,10 @@ export default function InvestPage({
               Building the World&apos;s Largest Kink Community &amp; Ecosystem
             </p>
             <p className="text-sm md:text-base text-[#777] max-w-2xl mx-auto leading-relaxed">
-              Kinkord is a next-generation platform designed to unite kinksters
-              globally through education, community, entertainment, and
-              commerce. We are opening a limited equity investment opportunity
-              for members and supporters who believe in the long-term vision of
-              Kinkord.
+              Kinkord is a next-generation platform designed to unite kinksters globally through
+              education, community, entertainment, and commerce. We are opening a limited equity
+              investment opportunity for members and supporters who believe in the long-term vision
+              of Kinkord.
             </p>
           </SectionReveal>
           <SectionReveal delay={0.25} className="mt-10">
@@ -176,9 +160,8 @@ export default function InvestPage({
 
         <ContentSection label="Vision" title="Our Vision">
           <p className="text-sm text-[#888] leading-relaxed mb-6">
-            Our goal over the next 15 years is to build one of the world&apos;s
-            largest kink communities and ecosystems — a global platform that
-            becomes the #1 destination for:
+            Our goal over the next 15 years is to build one of the world&apos;s largest kink
+            communities and ecosystems — a global platform that becomes the #1 destination for:
           </p>
           <GoldCard>
             <BulletList items={visionItems} />
@@ -200,9 +183,7 @@ export default function InvestPage({
           </GoldCard>
           <div className="grid grid-cols-2 gap-3 text-center text-xs">
             <div className="border border-[#d4af37]/15 p-4 bg-[#080808]">
-              <p className="text-[#d4af37] font-semibold uppercase tracking-wider mb-1">
-                Minimum
-              </p>
+              <p className="text-[#d4af37] font-semibold uppercase tracking-wider mb-1">Minimum</p>
               <p className="text-[#f5f5f0] text-lg font-bold">$10</p>
             </div>
             <div className="border border-[#d4af37]/15 p-4 bg-[#080808]">
@@ -254,9 +235,7 @@ export default function InvestPage({
               <div key={item.label}>
                 <div className="flex justify-between text-xs mb-1.5 gap-4">
                   <span className="text-[#888] leading-snug">{item.label}</span>
-                  <span className="text-[#d4af37] font-semibold shrink-0">
-                    {item.pct}%
-                  </span>
+                  <span className="text-[#d4af37] font-semibold shrink-0">{item.pct}%</span>
                 </div>
                 <div className="h-1.5 bg-[#1a1a1a] overflow-hidden">
                   <div
@@ -278,12 +257,9 @@ export default function InvestPage({
         <ContentSection label="Trust" title="Founder Message">
           <GoldCard className="text-center">
             <p className="text-sm text-[#888] leading-relaxed mb-2">
-              A short founder pitch video helps investors understand the vision
-              and builds trust.
+              A short founder pitch video helps investors understand the vision and builds trust.
             </p>
-            <p className="text-xs text-[#555] uppercase tracking-widest">
-              Video coming soon
-            </p>
+            <p className="text-xs text-[#555] uppercase tracking-widest">Video coming soon</p>
           </GoldCard>
         </ContentSection>
 
@@ -304,14 +280,11 @@ export default function InvestPage({
         {/* Risk notice */}
         <section className="py-8">
           <div className="border border-[#444]/30 bg-[#080808] p-6 md:p-8">
-            <p className="text-[10px] uppercase tracking-[0.3em] text-[#666] mb-3">
-              Risk Notice
-            </p>
+            <p className="text-[10px] uppercase tracking-[0.3em] text-[#666] mb-3">Risk Notice</p>
             <p className="text-xs text-[#666] leading-relaxed">
-              All investments carry risk, and returns are not guaranteed. The
-              value of equity may increase or decrease depending on the
-              performance and growth of Kinkord. Please invest only what you
-              are comfortable committing to long-term growth participation.
+              All investments carry risk, and returns are not guaranteed. The value of equity may
+              increase or decrease depending on the performance and growth of Kinkord. Please invest
+              only what you are comfortable committing to long-term growth participation.
             </p>
           </div>
         </section>
@@ -326,8 +299,8 @@ export default function InvestPage({
             <SectionTitle>Express Your Interest</SectionTitle>
             <div className="section-divider mb-8" />
             <p className="text-sm text-[#888] max-w-lg mx-auto leading-relaxed mb-8">
-              Click below to join the investment process. You will be redirected
-              to WhatsApp to connect directly with the Kinkord team.
+              Click below to join the investment process. You will be redirected to WhatsApp to
+              connect directly with the Kinkord team.
             </p>
             <GoldButton variant="solid" href={whatsappUrl} size="lg">
               Invest in Kinkord
@@ -336,9 +309,7 @@ export default function InvestPage({
               <p className="text-[10px] uppercase tracking-widest text-[#555] mb-2">
                 WhatsApp message (auto-sent)
               </p>
-              <p className="text-sm text-[#aaa] italic">
-                &ldquo;{whatsappMessage}&rdquo;
-              </p>
+              <p className="text-sm text-[#aaa] italic">&ldquo;{whatsappMessage}&rdquo;</p>
             </div>
           </SectionReveal>
         </section>

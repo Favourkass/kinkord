@@ -26,15 +26,7 @@ function useCountUp(target: number, active: boolean, duration = 1800) {
   return value;
 }
 
-function StatCard({
-  stat,
-  index,
-  active,
-}: {
-  stat: Stat;
-  index: number;
-  active: boolean;
-}) {
+function StatCard({ stat, index, active }: { stat: Stat; index: number; active: boolean }) {
   const count = useCountUp(stat.value, active);
   return (
     <motion.div
@@ -51,9 +43,7 @@ function StatCard({
         {count}
         {stat.suffix}
       </span>
-      <span className="text-[11px] uppercase tracking-widest text-[#999] mt-2">
-        {stat.label}
-      </span>
+      <span className="text-[11px] uppercase tracking-widest text-[#999] mt-2">{stat.label}</span>
     </motion.div>
   );
 }
@@ -68,9 +58,7 @@ export default function Stats({ eyebrow, stats, countriesLabel, countries }: Pro
 
       <div className="max-w-5xl mx-auto px-6">
         <SectionReveal className="text-center mb-12">
-          <p className="text-[10px] uppercase tracking-[0.4em] text-[#d4af37] mb-3">
-            {eyebrow}
-          </p>
+          <p className="text-[10px] uppercase tracking-[0.4em] text-[#d4af37] mb-3">{eyebrow}</p>
           <div className="section-divider" />
         </SectionReveal>
 

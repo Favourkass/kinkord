@@ -34,7 +34,10 @@ export class DataStack extends cdk.Stack {
       engine: rds.DatabaseInstanceEngine.postgres({
         version: rds.PostgresEngineVersion.of("17.10", "17"),
       }),
-      instanceType: ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE4_GRAVITON, ec2.InstanceSize.MICRO),
+      instanceType: ec2.InstanceType.of(
+        ec2.InstanceClass.BURSTABLE4_GRAVITON,
+        ec2.InstanceSize.MICRO,
+      ),
       vpc: props.vpc,
       // Public subnet + publiclyAccessible is a deliberate week-1 tradeoff so
       // migrations can run before the API exists in-VPC; the SG only admits the

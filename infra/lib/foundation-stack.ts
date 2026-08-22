@@ -94,7 +94,11 @@ export class FoundationStack extends cdk.Stack {
     // App Runner service updates triggered from CI.
     deployRole.addToPolicy(
       new iam.PolicyStatement({
-        actions: ["apprunner:StartDeployment", "apprunner:ListServices", "apprunner:DescribeService"],
+        actions: [
+          "apprunner:StartDeployment",
+          "apprunner:ListServices",
+          "apprunner:DescribeService",
+        ],
         resources: ["*"],
       }),
     );

@@ -11,6 +11,7 @@
     "test": "turbo run test"
   },
   "devDependencies": {
+    "prettier": "^3.9.6",
     "turbo": "^2.5.0"
   }
 }

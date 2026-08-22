@@ -18,7 +18,10 @@ export default function FinalCTA({ launchDateIso, launchNote }: Props) {
     >
       <GoldParticles />
 
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(212,175,55,0.07)_0%,_transparent_65%)] pointer-events-none" style={{ zIndex: 2 }} />
+      <div
+        className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(212,175,55,0.07)_0%,_transparent_65%)] pointer-events-none"
+        style={{ zIndex: 2 }}
+      />
 
       <div
         className="relative flex flex-col items-center text-center px-6 py-20 gap-8 max-w-2xl mx-auto"
@@ -65,9 +68,7 @@ export default function FinalCTA({ launchDateIso, launchNote }: Props) {
           className="border border-[#d4af37]/20 px-6 py-4 bg-[#0a0a0a]/60 backdrop-blur-sm"
         >
           <CountdownTimer targetDateIso={launchDateIso} size="lg" />
-          <p className="text-[10px] text-[#999] tracking-widest uppercase mt-3">
-            {launchNote}
-          </p>
+          <p className="text-[10px] text-[#999] tracking-widest uppercase mt-3">{launchNote}</p>
         </motion.div>
 
         <motion.div

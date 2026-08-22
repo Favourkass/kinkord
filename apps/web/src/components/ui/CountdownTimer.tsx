@@ -62,9 +62,7 @@ export default function CountdownTimer({ targetDateIso, size = "lg" }: Props) {
             <span className={numClass}>{String(u.value).padStart(2, "0")}</span>
             <span className={labelClass}>{u.label}</span>
           </div>
-          {i < 3 && (
-            <span className="text-[#d4af37] text-xl font-bold mb-4 opacity-60">:</span>
-          )}
+          {i < 3 && <span className="text-[#d4af37] text-xl font-bold mb-4 opacity-60">:</span>}
         </div>
       ))}
     </div>

@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  checkAdminCredentials,
-  COOKIE_NAME,
-  signToken,
-} from "@/services/auth.service";
+import { checkAdminCredentials, COOKIE_NAME, signToken } from "@/services/auth.service";
 
 export async function POST(req: NextRequest) {
   const { username, password } = await req.json();

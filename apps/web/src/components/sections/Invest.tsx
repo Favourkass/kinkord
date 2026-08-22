@@ -17,9 +17,7 @@ export default function Invest({ href, whatsappUrl }: Props) {
 
       <div className="max-w-4xl mx-auto px-6 text-center relative">
         <SectionReveal>
-          <p className="text-[10px] uppercase tracking-[0.4em] text-[#d4af37] mb-3">
-            Opportunity
-          </p>
+          <p className="text-[10px] uppercase tracking-[0.4em] text-[#d4af37] mb-3">Opportunity</p>
           <h2
             className="text-3xl md:text-5xl font-bold text-[#f5f5f0] mb-6 leading-tight"
             style={{ fontFamily: "var(--font-playfair)" }}
@@ -31,13 +29,11 @@ export default function Invest({ href, whatsappUrl }: Props) {
 
         <SectionReveal delay={0.2}>
           <p className="text-sm md:text-base text-[#888] max-w-2xl mx-auto leading-relaxed mb-4">
-            Become part of the future of adult lifestyle networking and
-            education.
+            Become part of the future of adult lifestyle networking and education.
           </p>
           <p className="text-sm text-[#666] max-w-2xl mx-auto leading-relaxed mb-10">
-            Kinkord is opening opportunities for shareholders and strategic
-            investors interested in supporting the growth of a global lifestyle
-            platform.
+            Kinkord is opening opportunities for shareholders and strategic investors interested in
+            supporting the growth of a global lifestyle platform.
           </p>
         </SectionReveal>
 

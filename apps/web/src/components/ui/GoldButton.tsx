@@ -30,8 +30,7 @@ export default function GoldButton({
     "inline-flex items-center justify-center font-semibold uppercase rounded-none transition-all duration-300 cursor-pointer select-none";
 
   const variants = {
-    solid:
-      "bg-[#d4af37] text-[#0a0a0a] hover:bg-[#f5e27d] active:scale-95",
+    solid: "bg-[#d4af37] text-[#0a0a0a] hover:bg-[#f5e27d] active:scale-95",
     outline:
       "border border-[#d4af37] text-[#d4af37] hover:bg-[#d4af37] hover:text-[#0a0a0a] active:scale-95",
   };
@@ -50,22 +49,14 @@ export default function GoldButton({
 
   if (href) {
     return (
-      <motion.a
-        href={href}
-        className={classes}
-        whileTap={{ scale: 0.96 }}
-      >
+      <motion.a href={href} className={classes} whileTap={{ scale: 0.96 }}>
         {content}
       </motion.a>
     );
   }
 
   return (
-    <motion.button
-      onClick={onClick}
-      className={classes}
-      whileTap={{ scale: 0.96 }}
-    >
+    <motion.button onClick={onClick} className={classes} whileTap={{ scale: 0.96 }}>
       {content}
     </motion.button>
   );

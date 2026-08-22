@@ -7,20 +7,14 @@ async function adminGuard(req: NextRequest) {
   return token ? verifyToken(token) : null;
 }
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const lecture = await lectureService.getLectureById(id);
   if (!lecture) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(lecture);
 }
 
-export async function PUT(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const payload = await adminGuard(req);
   if (!payload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -31,10 +25,7 @@ export async function PUT(
   return NextResponse.json(updated);
 }
 
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const payload = await adminGuard(req);
   if (!payload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

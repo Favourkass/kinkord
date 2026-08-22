@@ -39,9 +39,7 @@ export default function AdminDashboardView({
           >
             KINKORD
           </h1>
-          <p className="text-[9px] uppercase tracking-widest text-[#555] mt-0.5">
-            Admin Dashboard
-          </p>
+          <p className="text-[9px] uppercase tracking-widest text-[#555] mt-0.5">Admin Dashboard</p>
         </div>
         <div className="flex items-center gap-4">
           <Link

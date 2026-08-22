@@ -11,8 +11,9 @@ export function useAdminDashboardPresenter() {
   const [lectures, setLectures] = useState<LectureVM[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchLectures = useCallback(async () => {
-    setLoading(true);
+  // No synchronous setState on this path: the mount effect calls it while
+  // loading already starts true, so state changes only happen after the fetch.
+  const loadLectures = useCallback(async () => {
     const res = await fetch("/api/lectures?all=true");
     if (res.ok) {
       const data: Lecture[] = await res.json();
@@ -21,9 +22,18 @@ export function useAdminDashboardPresenter() {
     setLoading(false);
   }, []);
 
+  const fetchLectures = useCallback(async () => {
+    setLoading(true);
+    await loadLectures();
+  }, [loadLectures]);
+
   useEffect(() => {
-    fetchLectures();
-  }, [fetchLectures]);
+    // Legacy Sheets-era admin screen (replaced by the platform admin app).
+    // All setState here happens after the awaited fetch; the analyzer can't
+    // see through the useCallback boundary, so it's disabled with intent.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadLectures();
+  }, [loadLectures]);
 
   async function deleteLecture(id: string, title: string) {
     if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;

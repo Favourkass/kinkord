@@ -7,13 +7,7 @@ export const STATS = [
   { value: 18, suffix: "+", label: "Adults Only" },
 ] as const;
 
-export const COUNTRIES = [
-  "Nigeria",
-  "United States",
-  "South Africa",
-  "Kenya",
-  "Ghana",
-] as const;
+export const COUNTRIES = ["Nigeria", "United States", "South Africa", "Kenya", "Ghana"] as const;
 
 export const WHY_FEATURES = [
   "Consent-Driven Community",

@@ -49,7 +49,9 @@ body {
 
 /* Subtle gold border glow */
 .gold-glow {
-  box-shadow: 0 0 20px rgba(212, 175, 55, 0.2), 0 0 40px rgba(212, 175, 55, 0.05);
+  box-shadow:
+    0 0 20px rgba(212, 175, 55, 0.2),
+    0 0 40px rgba(212, 175, 55, 0.05);
 }
 
 /* Section divider */

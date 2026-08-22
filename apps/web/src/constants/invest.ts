@@ -1,7 +1,6 @@
 export const INVEST_WHATSAPP_NUMBER = "2349031219057";
 
-export const INVEST_WHATSAPP_MESSAGE =
-  "I want to invest in Kinkord please send me the details.";
+export const INVEST_WHATSAPP_MESSAGE = "I want to invest in Kinkord please send me the details.";
 
 export const INVEST_WHATSAPP_URL = `https://wa.me/${INVEST_WHATSAPP_NUMBER}?text=${encodeURIComponent(INVEST_WHATSAPP_MESSAGE)}`;
 

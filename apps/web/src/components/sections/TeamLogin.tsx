@@ -19,8 +19,7 @@ export default function TeamLogin() {
             Team Login
           </h2>
           <p className="text-xs text-[#555] mb-7 leading-relaxed">
-            Secure access for administrators, moderators and internal
-            management teams.
+            Secure access for administrators, moderators and internal management teams.
           </p>
           <GoldButton variant="outline" href="#" size="sm">
             Login

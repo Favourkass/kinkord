@@ -63,9 +63,7 @@ export default function Hero({
           className="border border-[#d4af37]/20 px-6 py-4 bg-[#0a0a0a]/60 backdrop-blur-sm"
         >
           <CountdownTimer targetDateIso={launchDateIso} size="lg" />
-          <p className="text-[10px] text-[#999] tracking-widest uppercase mt-3">
-            {launchNote}
-          </p>
+          <p className="text-[10px] text-[#999] tracking-widest uppercase mt-3">{launchNote}</p>
         </motion.div>
 
         <motion.div
@@ -107,9 +105,7 @@ export default function Hero({
         animate={{ opacity: 1 }}
         transition={{ delay: 1.5, duration: 1 }}
       >
-        <span className="text-[9px] uppercase tracking-widest text-[#d4af37]/50">
-          Scroll
-        </span>
+        <span className="text-[9px] uppercase tracking-widest text-[#d4af37]/50">Scroll</span>
         <motion.div
           className="w-px h-8 bg-gradient-to-b from-[#d4af37]/40 to-transparent"
           animate={{ scaleY: [0, 1, 0] }}

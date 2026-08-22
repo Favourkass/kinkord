@@ -52,10 +52,7 @@ export default function LectureFormView({
   return (
     <div className="min-h-screen bg-[#080808]">
       <header className="border-b border-[#d4af37]/10 px-6 py-4 flex items-center gap-4">
-        <button
-          onClick={goBack}
-          className="text-[#555] hover:text-[#d4af37] transition-colors"
-        >
+        <button onClick={goBack} className="text-[#555] hover:text-[#d4af37] transition-colors">
           <ArrowLeft size={16} />
         </button>
         <div>
@@ -193,9 +190,7 @@ export default function LectureFormView({
           </div>
 
           {error && (
-            <p className="text-xs text-red-400 border border-red-400/20 px-4 py-3">
-              {error}
-            </p>
+            <p className="text-xs text-red-400 border border-red-400/20 px-4 py-3">{error}</p>
           )}
 
           <div className="flex items-center gap-4 pt-2">
@@ -204,11 +199,7 @@ export default function LectureFormView({
               disabled={saving}
               className="bg-[#d4af37] text-[#0a0a0a] px-8 py-3 text-sm font-bold uppercase tracking-widest hover:bg-[#f5e27d] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {saving
-                ? "Saving…"
-                : mode === "create"
-                  ? "Create Lecture"
-                  : "Save Changes"}
+              {saving ? "Saving…" : mode === "create" ? "Create Lecture" : "Save Changes"}
             </button>
             <button
               type="button"

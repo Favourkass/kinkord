@@ -39,8 +39,8 @@ export default async function LecturesPage() {
           </h1>
           <div className="section-divider mb-6" />
           <p className="text-sm text-[#888] max-w-lg mx-auto">
-            Explore our growing library of educational resources covering consent,
-            safety, relationship dynamics and lifestyle exploration.
+            Explore our growing library of educational resources covering consent, safety,
+            relationship dynamics and lifestyle exploration.
           </p>
         </SectionReveal>
       </section>
