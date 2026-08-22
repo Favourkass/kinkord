@@ -59,9 +59,7 @@ export default function Footer({ links, socials, addressLine }: Props) {
           ))}
         </div>
 
-        <p className="text-[11px] text-[#555] tracking-widest text-center">
-          {addressLine}
-        </p>
+        <p className="text-[11px] text-[#555] tracking-widest text-center">{addressLine}</p>
 
         <p className="text-[10px] text-[#333] tracking-widest uppercase">
           &copy; Kinkord 2026. All Rights Reserved.
