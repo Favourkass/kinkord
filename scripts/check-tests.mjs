@@ -41,6 +41,8 @@ const EXEMPT = [
   /\/types?\.ts$/,
   // DI/config assembly, same class of wiring as *.module.ts.
   /\.instance\.ts$/,
+  // Client SDK construction (createAuthClient config) — wiring, no logic.
+  /apps\/web\/src\/services\/authClient\.ts$/,
   // Legacy Sheets-era admin stack: replaced wholesale by the platform admin
   // app; covered by Playwright until deletion. Remove these lines with it.
   /apps\/web\/src\/presenters\/useAdmin\w+Presenter\.ts$/,

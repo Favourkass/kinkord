@@ -20,6 +20,18 @@
   --color-gold-muted: var(--gold-muted);
   --color-charcoal: var(--charcoal);
   --color-muted: var(--muted);
+  /* Auth/onboarding palette, lifted from the Figma auth frames */
+  --color-kink-gold: #ffc729;
+  --color-kink-accent: #ffb014;
+  --color-kink-amber: #faab14;
+  --color-kink-ink: #050404;
+  --color-kink-surface: #090908;
+  --color-kink-panel: #0d0d0b;
+  --color-kink-line: #1f1f1c;
+  --color-kink-line-gold: #382b0f;
+  --color-kink-cream: #f2f2ed;
+  --color-kink-dim: #a1a19c;
+  --color-kink-faint: #6e6a5e;
 }
 
 * {

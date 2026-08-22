@@ -7,4 +7,10 @@ export const Routes = {
   adminLogin: "/admin/login",
   adminLecturesNew: "/admin/lectures/new",
   adminLectureEdit: (id: string) => `/admin/lectures/${id}/edit`,
+  signup: "/signup",
+  login: "/login",
+  forgotPassword: "/forgot-password",
+  resetPassword: "/reset-password",
+  verifyEmail: "/verify-email",
+  profile: "/profile",
 } as const;
