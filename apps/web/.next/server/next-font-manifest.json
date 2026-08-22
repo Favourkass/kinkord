@@ -20,6 +20,10 @@
       "static/media/2a65768255d6b625-s.p.14by5b4al-y~f.woff2",
       "static/media/83afe278b6a6bb3c-s.p.0q-301v4kxxnr.woff2"
     ],
+    "[project]/apps/web/src/app/forgot-password/page": [
+      "static/media/2a65768255d6b625-s.p.14by5b4al-y~f.woff2",
+      "static/media/83afe278b6a6bb3c-s.p.0q-301v4kxxnr.woff2"
+    ],
     "[project]/apps/web/src/app/invest/page": [
       "static/media/2a65768255d6b625-s.p.14by5b4al-y~f.woff2",
       "static/media/83afe278b6a6bb3c-s.p.0q-301v4kxxnr.woff2"
@@ -32,7 +36,27 @@
       "static/media/2a65768255d6b625-s.p.14by5b4al-y~f.woff2",
       "static/media/83afe278b6a6bb3c-s.p.0q-301v4kxxnr.woff2"
     ],
+    "[project]/apps/web/src/app/login/page": [
+      "static/media/2a65768255d6b625-s.p.14by5b4al-y~f.woff2",
+      "static/media/83afe278b6a6bb3c-s.p.0q-301v4kxxnr.woff2"
+    ],
     "[project]/apps/web/src/app/page": [
+      "static/media/2a65768255d6b625-s.p.14by5b4al-y~f.woff2",
+      "static/media/83afe278b6a6bb3c-s.p.0q-301v4kxxnr.woff2"
+    ],
+    "[project]/apps/web/src/app/profile/page": [
+      "static/media/2a65768255d6b625-s.p.14by5b4al-y~f.woff2",
+      "static/media/83afe278b6a6bb3c-s.p.0q-301v4kxxnr.woff2"
+    ],
+    "[project]/apps/web/src/app/reset-password/page": [
+      "static/media/2a65768255d6b625-s.p.14by5b4al-y~f.woff2",
+      "static/media/83afe278b6a6bb3c-s.p.0q-301v4kxxnr.woff2"
+    ],
+    "[project]/apps/web/src/app/signup/page": [
+      "static/media/2a65768255d6b625-s.p.14by5b4al-y~f.woff2",
+      "static/media/83afe278b6a6bb3c-s.p.0q-301v4kxxnr.woff2"
+    ],
+    "[project]/apps/web/src/app/verify-email/page": [
       "static/media/2a65768255d6b625-s.p.14by5b4al-y~f.woff2",
       "static/media/83afe278b6a6bb3c-s.p.0q-301v4kxxnr.woff2"
     ]

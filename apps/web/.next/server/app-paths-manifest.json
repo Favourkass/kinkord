@@ -10,8 +10,14 @@
   "/api/lectures/[id]/route": "app/api/lectures/[id]/route.js",
   "/api/lectures/route": "app/api/lectures/route.js",
   "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/forgot-password/page": "app/forgot-password/page.js",
   "/invest/page": "app/invest/page.js",
   "/lectures/[slug]/page": "app/lectures/[slug]/page.js",
   "/lectures/page": "app/lectures/page.js",
-  "/page": "app/page.js"
+  "/login/page": "app/login/page.js",
+  "/page": "app/page.js",
+  "/profile/page": "app/profile/page.js",
+  "/reset-password/page": "app/reset-password/page.js",
+  "/signup/page": "app/signup/page.js",
+  "/verify-email/page": "app/verify-email/page.js"
 }

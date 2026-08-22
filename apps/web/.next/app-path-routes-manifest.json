@@ -10,8 +10,14 @@
   "/api/lectures/[id]/route": "/api/lectures/[id]",
   "/api/lectures/route": "/api/lectures",
   "/favicon.ico/route": "/favicon.ico",
+  "/forgot-password/page": "/forgot-password",
   "/invest/page": "/invest",
   "/lectures/[slug]/page": "/lectures/[slug]",
   "/lectures/page": "/lectures",
-  "/page": "/"
+  "/login/page": "/login",
+  "/page": "/",
+  "/profile/page": "/profile",
+  "/reset-password/page": "/reset-password",
+  "/signup/page": "/signup",
+  "/verify-email/page": "/verify-email"
 }

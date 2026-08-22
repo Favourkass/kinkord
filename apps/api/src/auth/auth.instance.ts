@@ -81,7 +81,10 @@ export function buildAuth(db: Db, email: EmailService) {
       sendOnSignUp: true,
       autoSignInAfterVerification: true,
       sendVerificationEmail: async ({ user, url }) => {
-        const t = verificationEmail(url);
+        // Land the click on the web app's confirmation page, signed in.
+        const link = new URL(url);
+        link.searchParams.set("callbackURL", `${webOrigins[0]}/verify-email`);
+        const t = verificationEmail(link.toString());
         await email.send({ to: user.email, ...t });
       },
     },

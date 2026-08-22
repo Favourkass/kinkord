@@ -2,10 +2,16 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "kinkord-dev",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "--port", "3001"],
-      "port": 3001
+      "name": "kinkord-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "web", "dev"],
+      "port": 3000
+    },
+    {
+      "name": "kinkord-api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "api", "start"],
+      "port": 4000
     }
   ]
 }

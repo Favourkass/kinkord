@@ -104,7 +104,9 @@ function buildAuth(db, email) {
             sendOnSignUp: true,
             autoSignInAfterVerification: true,
             sendVerificationEmail: async ({ user, url }) => {
-                const t = (0, templates_1.verificationEmail)(url);
+                const link = new URL(url);
+                link.searchParams.set("callbackURL", `${webOrigins[0]}/verify-email`);
+                const t = (0, templates_1.verificationEmail)(link.toString());
                 await email.send({ to: user.email, ...t });
             },
         },
