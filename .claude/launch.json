@@ -4,14 +4,36 @@
     {
       "name": "kinkord-web",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "web", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "web",
+        "dev"
+      ],
       "port": 3000
     },
     {
       "name": "kinkord-api",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "api", "start"],
+      "runtimeArgs": [
+        "--filter",
+        "api",
+        "start"
+      ],
       "port": 4000
+    },
+    {
+      "name": "kinkord-web-alt",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "web",
+        "exec",
+        "next",
+        "dev",
+        "-p",
+        "3100"
+      ],
+      "port": 3100
     }
   ]
 }

@@ -25,6 +25,7 @@ export class FoundationStack extends cdk.Stack {
             "https://kinkord.com",
             "https://www.kinkord.com",
             "http://localhost:3000",
+            "http://localhost:3100",
           ],
           allowedHeaders: ["*"],
           maxAge: 3600,

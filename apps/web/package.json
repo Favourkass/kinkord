@@ -34,6 +34,7 @@
     "eslint-plugin-boundaries": "^7.2.0",
     "eslint-plugin-unused-imports": "^4.4.1",
     "jsdom": "^30.0.1",
+    "playwright": "^1.62.1",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.11"
