@@ -38,7 +38,7 @@ function Wheel<T extends number>({
 }) {
   return (
     <div
-      className="relative h-56 flex-1 overflow-y-auto rounded-xl border border-kink-line bg-kink-surface py-20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="relative h-56 flex-1 overflow-y-auto rounded-[12px] border border-kink-edge bg-kink-field py-20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       role="listbox"
       aria-label={ariaLabel}
     >
@@ -51,10 +51,10 @@ function Wheel<T extends number>({
             role="option"
             aria-selected={selected}
             onClick={() => onSelect(item)}
-            className={`block w-full py-2 text-center text-[16px] transition ${
+            className={`block w-full py-2 text-center transition ${
               selected
-                ? "border-y border-kink-amber font-bold text-kink-gold"
-                : "text-kink-cream/80 hover:text-kink-cream"
+                ? "border-y-[1.5px] border-kink-gold-bright text-[17px] font-bold text-kink-gold-bright"
+                : "text-[15px] text-white/85 hover:text-white"
             }`}
           >
             {render(item)}
@@ -74,7 +74,7 @@ export default function DobPicker({ day, month, year, onChange, error }: Props) 
 
   return (
     <div className="w-full">
-      <p className="mb-2 text-[15px] font-semibold text-kink-cream">Date of birth</p>
+      <p className="mb-2 text-[12px] font-medium text-white lg:text-[20px]">Date of birth</p>
       <div className="flex gap-3">
         <Wheel
           items={days}
@@ -98,7 +98,9 @@ export default function DobPicker({ day, month, year, onChange, error }: Props) 
           onSelect={(y) => onChange({ day, month, year: y })}
         />
       </div>
-      <p className={`mt-1.5 text-[13px] ${error ? "text-red-400" : "text-kink-faint"}`}>
+      <p
+        className={`mt-1.5 text-[11px] lg:text-[16px] ${error ? "text-red-400" : "text-kink-help"}`}
+      >
         {error ?? "You must be 18 years or older to join."}
       </p>
     </div>

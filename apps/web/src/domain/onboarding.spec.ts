@@ -34,6 +34,14 @@ describe("validateAccount", () => {
         .password,
     ).toBeTruthy();
   });
+  it("accepts 8-character passwords with letters and numbers (design minimum)", () => {
+    expect(validateAccount(account({ password: "abcde123", confirmPassword: "abcde123" }))).toEqual(
+      {},
+    );
+    expect(
+      validateAccount(account({ password: "abc1234", confirmPassword: "abc1234" })).password,
+    ).toBeTruthy();
+  });
 });
 
 describe("toE164", () => {

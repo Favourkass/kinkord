@@ -27,20 +27,23 @@ export default function SelectField({
   const id = useId();
   return (
     <div className="w-full">
-      <label htmlFor={id} className="mb-2 block text-[15px] font-semibold text-kink-cream">
+      <label
+        htmlFor={id}
+        className="mb-2 block text-[12px] font-medium text-white lg:mb-2.5 lg:text-[20px]"
+      >
         {label}
       </label>
       <div
-        className={`relative flex items-center gap-3 rounded-xl border bg-kink-surface px-4 transition focus-within:border-kink-gold ${
-          error ? "border-red-500/70" : "border-kink-line"
+        className={`relative flex h-[44px] items-center gap-3 rounded-lg border bg-kink-field px-4 transition focus-within:border-kink-gold-bright lg:h-[65px] lg:pl-8 ${
+          error ? "border-red-500/70" : "border-kink-edge"
         }`}
       >
-        {Icon && <Icon size={18} className="shrink-0 text-kink-gold" aria-hidden />}
+        {Icon && <Icon size={18} className="shrink-0 text-white lg:size-6" aria-hidden />}
         <select
           id={id}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full appearance-none bg-transparent py-[13px] pr-8 text-[16px] text-kink-cream outline-none [&>option]:bg-kink-surface"
+          className="h-full w-full appearance-none bg-transparent pr-8 text-[15px] text-white outline-none lg:text-[20px] [&>option]:bg-kink-field"
         >
           <option value="" disabled>
             {placeholder}
@@ -51,12 +54,12 @@ export default function SelectField({
             </option>
           ))}
         </select>
-        <ChevronDown size={18} className="pointer-events-none absolute right-4 text-kink-dim" />
+        <ChevronDown size={18} className="pointer-events-none absolute right-4 text-white" />
       </div>
       {error ? (
-        <p className="mt-1.5 text-[13px] text-red-400">{error}</p>
+        <p className="mt-1.5 text-[11px] text-red-400 lg:text-[16px]">{error}</p>
       ) : helper ? (
-        <p className="mt-1.5 text-[13px] text-kink-faint">{helper}</p>
+        <p className="mt-1.5 text-[11px] text-kink-help lg:text-[16px]">{helper}</p>
       ) : null}
     </div>
   );

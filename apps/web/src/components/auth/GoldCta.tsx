@@ -24,14 +24,14 @@ export default function GoldCta({
 }: Props) {
   const skin =
     variant === "solid"
-      ? "bg-kink-gold text-black hover:brightness-105"
-      : "border-[1.5px] border-kink-amber bg-transparent text-kink-cream hover:bg-kink-amber/10";
+      ? "bg-kink-gold-bright text-[#0d0d0d] font-bold uppercase tracking-[2px] hover:brightness-105"
+      : "border-2 border-kink-gold-bright bg-transparent font-semibold text-kink-gold-bright hover:bg-kink-gold-bright/10";
   return (
     <button
       type={type}
       onClick={onClick}
       disabled={disabled || loading}
-      className={`relative flex w-full items-center justify-center gap-3 rounded-2xl px-8 py-4 text-[17px] sm:text-[19px] font-extrabold tracking-[0.06em] uppercase transition disabled:opacity-40 disabled:cursor-not-allowed ${skin} ${className}`}
+      className={`relative flex h-[48px] w-full items-center justify-center gap-3 rounded-full px-8 text-[15px] transition disabled:cursor-not-allowed disabled:opacity-40 lg:h-[68px] lg:text-[24px] ${skin} ${className}`}
     >
       {loading ? "Please wait…" : label}
       {arrow && !loading && (

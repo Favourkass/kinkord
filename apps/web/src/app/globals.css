@@ -38,6 +38,14 @@
   --color-kink-mist: #b3b1a9;
   --color-kink-paper: #faf7ed;
   --color-kink-divider: #1a1a17;
+  /* Auth redesign palette (Figma login 487-100 / signup 560-175) */
+  --color-kink-night: #050505;
+  --color-kink-bronze: #997012;
+  --color-kink-steel: #616161;
+  --color-kink-soft: #cec2c2;
+  --color-kink-field: #1a1a1a;
+  --color-kink-edge: #2e2e2e;
+  --color-kink-help: #888888;
 }
 
 * {
