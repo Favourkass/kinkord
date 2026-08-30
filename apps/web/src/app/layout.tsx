@@ -15,14 +15,14 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Kinkord — Global Luxury Lifestyle Community",
+  title: "Kinkord — Where Kinksters Connect",
   description:
-    "A global luxury lifestyle community for adults built on consent, education, connection and expression. Coming December 28, 2027.",
+    "Where kinksters connect, explore their interests, build meaningful relationships, and find a community where they truly belong.",
   keywords: ["kinkord", "lifestyle community", "adult community", "consent", "education"],
   openGraph: {
-    title: "Kinkord — Global Luxury Lifestyle Community",
+    title: "Kinkord — Where Kinksters Connect",
     description:
-      "A global luxury lifestyle community for adults built on consent, education, connection and expression.",
+      "Where kinksters connect, explore their interests, build meaningful relationships, and find a community where they truly belong.",
     type: "website",
   },
 };

@@ -5,7 +5,7 @@ import SectionReveal from "@/components/ui/SectionReveal";
 import GoldButton from "@/components/ui/GoldButton";
 import type { Metadata } from "next";
 import { Routes } from "@/constants/Routes";
-import { getLandingVM } from "@/presenters/getLandingVM";
+import { getFooterVM } from "@/presenters/getFooterVM";
 import * as lectureService from "@/services/lecture.service";
 
 export const revalidate = 60;
@@ -39,7 +39,7 @@ export async function generateStaticParams() {
 
 export default async function LectureDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const { footer } = getLandingVM();
+  const footer = getFooterVM();
 
   let lecture = null;
   try {

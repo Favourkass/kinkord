@@ -2,7 +2,7 @@ import Link from "next/link";
 import Footer from "@/components/sections/Footer";
 import SectionReveal from "@/components/ui/SectionReveal";
 import { Routes } from "@/constants/Routes";
-import { getLandingVM } from "@/presenters/getLandingVM";
+import { getFooterVM } from "@/presenters/getFooterVM";
 import * as lectureService from "@/services/lecture.service";
 import type { LectureVM } from "@/domain/lecture";
 
@@ -15,7 +15,7 @@ export const metadata = {
 export const revalidate = 60;
 
 export default async function LecturesPage() {
-  const { footer } = getLandingVM();
+  const footer = getFooterVM();
   let lectures: LectureVM[] = [];
   try {
     lectures = await lectureService.listPublishedLectures();

@@ -32,6 +32,12 @@
   --color-kink-cream: #f2f2ed;
   --color-kink-dim: #a1a19c;
   --color-kink-faint: #6e6a5e;
+  /* Landing splash palette, lifted from the Figma landing redesign (node 452-107) */
+  --color-kink-gold-bright: #ffba1f;
+  --color-kink-gold-deep: #ffab1f;
+  --color-kink-mist: #b3b1a9;
+  --color-kink-paper: #faf7ed;
+  --color-kink-divider: #1a1a17;
 }
 
 * {

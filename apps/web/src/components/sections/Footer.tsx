@@ -1,9 +1,9 @@
 "use client";
 
 import { Send, MessageCircle, Music2, AtSign, Hash } from "lucide-react";
-import type { LandingVM } from "@/presenters/getLandingVM";
+import type { FooterVM } from "@/presenters/getFooterVM";
 
-type Props = LandingVM["footer"];
+type Props = FooterVM;
 
 const SOCIAL_ICONS: Record<string, typeof AtSign> = {
   Instagram: AtSign,
