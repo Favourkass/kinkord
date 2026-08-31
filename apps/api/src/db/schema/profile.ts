@@ -21,6 +21,11 @@ export const profile = pgTable("profile", {
   gender: text("gender"),
   /** Kink roles picked at step 4; free-form labels. */
   roles: jsonb("roles").$type<string[]>().notNull().default([]),
+  relationshipStatus: text("relationship_status"),
+  lookingFor: jsonb("looking_for").$type<string[]>().notNull().default([]),
+  interests: jsonb("interests").$type<string[]>().notNull().default([]),
+  /** Free-text public whereabouts line, e.g. "Sapele, Delta State, Nigeria". */
+  location: text("location"),
   /** Collected at signup; unverified until SMS returns. */
   phone: text("phone"),
   /** "Basic verified" gate: flips only via phone OTP once SMS is live. */

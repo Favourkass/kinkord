@@ -49,7 +49,7 @@ export function useLoginPresenter() {
         setNeedsTwoFactor(true);
         return;
       }
-      router.push(Routes.profile);
+      router.push(Routes.appHome);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Sign in failed. Check your details.");
     } finally {
@@ -67,7 +67,7 @@ export function useLoginPresenter() {
     try {
       const { error: err } = await authClient.twoFactor.verifyTotp({ code });
       if (err) throw new Error(err.message ?? "Invalid code");
-      router.push(Routes.profile);
+      router.push(Routes.appHome);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Invalid code. Try again.");
     } finally {

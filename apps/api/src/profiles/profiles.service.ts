@@ -33,6 +33,10 @@ export const updateProfileSchema = z.object({
     .optional(),
   gender: z.string().trim().min(1).max(20).nullable().optional(),
   roles: z.array(z.string().trim().min(1).max(40)).max(10).optional(),
+  relationshipStatus: z.string().trim().min(1).max(60).nullable().optional(),
+  lookingFor: z.array(z.string().trim().min(1).max(40)).max(10).optional(),
+  interests: z.array(z.string().trim().min(1).max(40)).max(15).optional(),
+  location: z.string().trim().min(1).max(120).nullable().optional(),
   phone: z
     .string()
     .trim()
@@ -119,6 +123,10 @@ export class ProfilesService {
       dateOfBirth: row.dateOfBirth,
       gender: row.gender,
       roles: row.roles ?? [],
+      relationshipStatus: row.relationshipStatus,
+      lookingFor: row.lookingFor ?? [],
+      interests: row.interests ?? [],
+      location: row.location,
       phone: row.phone,
       phoneVerified: row.phoneVerified,
       avatarUrl: row.avatarKey ? await this.storage.presignDownload(row.avatarKey) : null,

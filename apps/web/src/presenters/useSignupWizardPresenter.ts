@@ -171,7 +171,7 @@ export function useSignupWizardPresenter() {
     }
   }, [avatarUrl, coverUrl, noMinors, consentThirdParty, roles]);
 
-  const finish = useCallback(() => router.push(Routes.profile), [router]);
+  const finish = useCallback(() => router.push(Routes.appHome), [router]);
 
   return useMemo(
     () => ({

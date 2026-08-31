@@ -37,6 +37,22 @@ describe("updateProfileSchema", () => {
     expect(updateProfileSchema.safeParse({ phone: "+2348012345678" }).success).toBe(true);
     expect(updateProfileSchema.safeParse({ phone: "0801 234 5678" }).success).toBe(false);
   });
+
+  it("validates the edit-profile persona fields", () => {
+    const ok = updateProfileSchema.parse({
+      relationshipStatus: "  Head of House ",
+      lookingFor: ["Events", "Relationships"],
+      interests: ["DDLG", "Bondage", "Sensual Domination"],
+      location: "Sapele, Delta State, Nigeria",
+    });
+    expect(ok.relationshipStatus).toBe("Head of House");
+    expect(ok.lookingFor).toEqual(["Events", "Relationships"]);
+    expect(ok.interests).toHaveLength(3);
+    expect(updateProfileSchema.safeParse({ lookingFor: Array(11).fill("x") }).success).toBe(false);
+    expect(updateProfileSchema.safeParse({ interests: Array(16).fill("x") }).success).toBe(false);
+    expect(updateProfileSchema.safeParse({ location: "" }).success).toBe(false);
+    expect(updateProfileSchema.safeParse({ relationshipStatus: null }).success).toBe(true);
+  });
 });
 
 describe("ProfilesService", () => {
@@ -52,6 +68,10 @@ describe("ProfilesService", () => {
       dateOfBirth: null,
       gender: null,
       roles: [],
+      relationshipStatus: null,
+      lookingFor: [],
+      interests: [],
+      location: null,
       phone: null,
       phoneVerified: false,
       avatarKey: null,
@@ -86,6 +106,14 @@ describe("ProfilesService", () => {
   it("exposes phoneVerified=false in the VM until SMS verification exists", async () => {
     const vm = await makeService().getOwn("u1", "Favour");
     expect(vm.phoneVerified).toBe(false);
+  });
+
+  it("maps the persona fields into the VM with array defaults", async () => {
+    const vm = await makeService().getOwn("u1", "Favour");
+    expect(vm.relationshipStatus).toBeNull();
+    expect(vm.lookingFor).toEqual([]);
+    expect(vm.interests).toEqual([]);
+    expect(vm.location).toBeNull();
   });
 
   it("presigns avatar and cover uploads under per-user prefixes", async () => {

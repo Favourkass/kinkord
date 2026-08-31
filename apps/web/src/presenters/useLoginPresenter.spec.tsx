@@ -45,7 +45,7 @@ describe("useLoginPresenter", () => {
       password: "supersecret123",
       rememberMe: false,
     });
-    expect(push).toHaveBeenCalledWith("/profile");
+    expect(push).toHaveBeenCalledWith("/home");
   });
 
   it("routes @handles to signIn.username, lowercased and stripped", async () => {
@@ -75,7 +75,7 @@ describe("useLoginPresenter", () => {
       password: "supersecret123",
       rememberMe: false,
     });
-    expect(push).toHaveBeenCalledWith("/profile");
+    expect(push).toHaveBeenCalledWith("/home");
   });
 
   it("enters the 2FA challenge instead of redirecting when the server asks", async () => {
@@ -92,7 +92,7 @@ describe("useLoginPresenter", () => {
     act(() => result.current.setCode("123456"));
     await act(() => result.current.submitTwoFactor());
     expect(verifyTotp).toHaveBeenCalledWith({ code: "123456" });
-    expect(push).toHaveBeenCalledWith("/profile");
+    expect(push).toHaveBeenCalledWith("/home");
   });
 
   it("surfaces sign-in errors", async () => {
