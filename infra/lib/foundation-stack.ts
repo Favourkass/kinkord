@@ -70,7 +70,12 @@ export class FoundationStack extends cdk.Stack {
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
         },
         StringLike: {
-          "token.actions.githubusercontent.com:sub": `repo:${GITHUB_REPO}:*`,
+          // GitHub began embedding owner/repo IDs in the OIDC sub claim; accept
+          // both spellings, deploys only ever run from main.
+          "token.actions.githubusercontent.com:sub": [
+            `repo:${GITHUB_REPO}:ref:refs/heads/main`,
+            "repo:Favourkass@81357407/kinkord@1321498061:ref:refs/heads/main",
+          ],
         },
       }),
       description: "Assumed by GitHub Actions to push images and run CDK deploys",
@@ -78,6 +83,9 @@ export class FoundationStack extends cdk.Stack {
     });
 
     apiRepo.grantPullPush(deployRole);
+    // Created outside CDK; referenced here so CI can push web images too.
+    const webRepo = ecr.Repository.fromRepositoryName(this, "WebRepo", "kinkord-web");
+    webRepo.grantPullPush(deployRole);
     deployRole.addToPolicy(
       new iam.PolicyStatement({
         actions: ["ecr:GetAuthorizationToken"],
