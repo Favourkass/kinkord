@@ -23,17 +23,17 @@ export default function CheckRow({ checked, onChange, children, trailing, error 
           e.preventDefault();
           onChange(!checked);
         }}
-        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-2 transition ${
+        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-[5px] border-2 transition lg:h-7 lg:w-7 ${
           checked
-            ? "border-kink-accent bg-kink-accent"
+            ? "border-kink-gold-bright bg-kink-gold-bright"
             : error
               ? "border-red-500/80"
-              : "border-kink-accent bg-transparent"
+              : "border-kink-gold-bright bg-transparent"
         }`}
       >
-        {checked && <Check size={18} strokeWidth={3.5} className="text-black" />}
+        {checked && <Check size={16} strokeWidth={3.5} className="text-black" />}
       </span>
-      <span className="flex-1 text-[15px] sm:text-[16px] leading-relaxed text-kink-cream">
+      <span className="flex-1 text-[13px] font-semibold leading-relaxed text-kink-cream lg:text-[17px]">
         {children}
       </span>
       {trailing && <span className="shrink-0 text-kink-gold">{trailing}</span>}

@@ -37,15 +37,18 @@ export default function TextField({
 
   return (
     <div className="w-full">
-      <label htmlFor={id} className="mb-2 block text-[15px] font-semibold text-kink-cream">
+      <label
+        htmlFor={id}
+        className="mb-2 block text-[12px] font-medium text-white lg:mb-2.5 lg:text-[20px]"
+      >
         {label}
       </label>
       <div
-        className={`flex items-center gap-3 rounded-xl border bg-kink-surface px-4 py-[13px] transition focus-within:border-kink-gold ${
-          error ? "border-red-500/70" : "border-kink-line"
+        className={`flex h-[44px] items-center gap-3 rounded-lg border bg-kink-field px-4 transition focus-within:border-kink-gold-bright lg:h-[65px] lg:pl-8 lg:pr-4 ${
+          error ? "border-red-500/70" : "border-kink-edge"
         }`}
       >
-        {Icon && <Icon size={18} className="shrink-0 text-kink-gold" aria-hidden />}
+        {Icon && <Icon size={18} className="shrink-0 text-white lg:size-6" aria-hidden />}
         {leftAddon}
         <input
           id={id}
@@ -54,25 +57,30 @@ export default function TextField({
           placeholder={placeholder}
           autoComplete={autoComplete}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full bg-transparent text-[16px] text-kink-cream placeholder:text-kink-faint outline-none"
+          className="h-full w-full bg-transparent text-[15px] text-white outline-none placeholder:text-kink-help lg:text-[20px]"
         />
         {type === "password" ? (
           <button
             type="button"
             aria-label={reveal ? "Hide password" : "Show password"}
             onClick={() => setReveal((r) => !r)}
-            className="text-kink-dim hover:text-kink-cream"
+            className={reveal ? "text-kink-gold-bright" : "text-white"}
           >
             {reveal ? <EyeOff size={18} /> : <Eye size={18} />}
           </button>
         ) : valid ? (
-          <CheckCircle2 size={18} className="text-kink-gold" aria-hidden />
+          <span
+            aria-hidden
+            className="grid size-5 shrink-0 place-items-center rounded-full bg-kink-gold-bright lg:size-7"
+          >
+            <CheckCircle2 size={14} className="text-black lg:size-[18px]" />
+          </span>
         ) : null}
       </div>
       {error ? (
-        <p className="mt-1.5 text-[13px] text-red-400">{error}</p>
+        <p className="mt-1.5 text-[11px] text-red-400 lg:text-[16px]">{error}</p>
       ) : helper ? (
-        <p className="mt-1.5 text-[13px] text-kink-faint">{helper}</p>
+        <p className="mt-1.5 text-[11px] text-kink-help lg:text-[16px]">{helper}</p>
       ) : null}
     </div>
   );

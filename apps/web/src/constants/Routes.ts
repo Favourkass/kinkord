@@ -1,5 +1,8 @@
 export const Routes = {
   home: "/",
+  kinkopedia: "/kinkopedia",
+  about: "/about",
+  contact: "/contact",
   invest: "/invest",
   lectures: "/lectures",
   lecture: (slug: string) => `/lectures/${slug}`,

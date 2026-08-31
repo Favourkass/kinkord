@@ -23,8 +23,8 @@ export default function RoleChips({ options, selected, onToggle, max = 10 }: Pro
             onClick={() => onToggle(role)}
             className={`rounded-full border px-4 py-2 text-[14px] font-semibold transition disabled:opacity-30 ${
               on
-                ? "border-kink-accent bg-kink-accent text-black"
-                : "border-kink-line bg-kink-surface text-kink-cream hover:border-kink-gold/60"
+                ? "border-kink-gold-bright bg-kink-gold-bright text-black"
+                : "border-kink-edge bg-kink-field text-kink-cream hover:border-kink-gold-bright/60"
             }`}
           >
             {role}

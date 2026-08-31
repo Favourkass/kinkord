@@ -1,65 +1,24 @@
-import {
-  COMMUNITY_FEATURES,
-  COMPANY_ADDRESS,
-  COMPANY_NAME,
-  COUNTRIES,
-  EDUCATION_TOPICS,
-  FOOTER_LINKS,
-  LAUNCH_DATE,
-  SOCIALS,
-  STATS,
-  WHY_FEATURES,
-} from "@/constants/landing";
-import { INVEST_WHATSAPP_URL } from "@/constants/invest";
+import { BRAND_NAME, BRAND_TAGLINE, COPYRIGHT_LINE } from "@/constants/landing";
 import { Routes } from "@/constants/Routes";
 
 export function getLandingVM() {
   return {
+    logo: { src: "/brand/logo-badge.png", alt: "Kinkord" },
     hero: {
-      brand: "KINKORD",
-      label: "Coming Soon",
-      launchDateIso: LAUNCH_DATE.toISOString(),
-      launchNote: "Launching December 28, 2027",
-      headline: "Welcome to Kinkord",
-      subcopy:
-        "A global luxury lifestyle community for adults built on consent, education, connection and expression.",
-      primaryCtaLabel: "Join Kinkord",
-      primaryCtaHref: "#join",
-      secondaryCtaLabel: "Explore More",
-      secondaryCtaHref: "#about",
+      src: "/brand/hero-trio.jpg",
+      alt: "Three community members in black satin against a dark satin backdrop",
     },
-    stats: {
-      eyebrow: "Our Community",
-      stats: STATS.map((s) => ({ ...s })),
-      countriesLabel: "Global Reach",
-      countries: [...COUNTRIES],
-    },
-    why: {
-      eyebrow: "The Platform",
-      title: "Why Kinkord?",
-      features: [...WHY_FEATURES],
-      footnote:
-        "Built for adults seeking safe, informed and respectful exploration within the global kink lifestyle community.",
-    },
-    education: {
-      topics: [...EDUCATION_TOPICS],
-    },
-    community: {
-      features: [...COMMUNITY_FEATURES],
-    },
-    investTeaser: {
-      href: Routes.invest,
-      whatsappUrl: INVEST_WHATSAPP_URL,
-    },
-    finalCta: {
-      launchDateIso: LAUNCH_DATE.toISOString(),
-      launchNote: "December 28, 2027",
-    },
-    footer: {
-      links: FOOTER_LINKS.map((l) => ({ ...l })),
-      socials: SOCIALS.map((s) => ({ name: s.name, href: s.href })),
-      addressLine: `${COMPANY_NAME} \u00b7 ${COMPANY_ADDRESS}`,
-    },
+    downloadCta: { label: "Download Kinkord", href: Routes.signup },
+    brand: BRAND_NAME,
+    tagline: BRAND_TAGLINE,
+    signUp: { label: "SIGN UP", href: Routes.signup },
+    signIn: { label: "SIGN IN", href: Routes.login },
+    navLinks: [
+      { label: "KINKOPEDIA", href: Routes.kinkopedia },
+      { label: "ABOUT KINKORD", href: Routes.about },
+      { label: "CONTACT US", href: Routes.contact },
+    ],
+    copyright: COPYRIGHT_LINE,
   };
 }
 

@@ -27,33 +27,47 @@ export default function UploadTile({
 }: Props) {
   const input = useRef<HTMLInputElement>(null);
   const Icon = shape === "circle" ? Camera : ImagePlus;
-  const frame = shape === "circle" ? "mx-auto h-44 w-44 rounded-full" : "h-40 w-full rounded-2xl";
+  const frame =
+    shape === "circle"
+      ? "mx-auto h-44 w-44 rounded-full lg:h-[220px] lg:w-[220px]"
+      : "h-40 w-full rounded-[12px] lg:h-[210px]";
 
   return (
     <div className="w-full">
-      <p className="mb-3 text-[16px] font-semibold text-kink-cream">
+      <p className="mb-3 text-[15px] font-semibold text-white lg:text-[20px]">
         {label}{" "}
-        {required && <span className="text-[12px] font-normal text-kink-faint">(required)</span>}
+        {required && (
+          <span className="text-[12px] font-normal text-kink-gold-bright lg:text-[16px]">
+            (required)
+          </span>
+        )}
       </p>
       <button
         type="button"
         onClick={() => input.current?.click()}
         disabled={uploading}
-        className={`relative flex items-center justify-center overflow-hidden border-2 border-dashed transition hover:border-kink-gold ${
-          error ? "border-red-500/70" : "border-kink-amber/70"
-        } bg-kink-surface ${frame}`}
-        style={{ boxShadow: "0 0 24px rgba(255,176,20,0.12)" }}
+        className={`relative flex items-center justify-center overflow-hidden border-[1.5px] border-dashed transition hover:border-kink-gold-bright ${
+          error ? "border-red-500/70" : "border-[rgba(200,146,42,0.6)]"
+        } bg-[#181818] ${frame}`}
+        style={{ boxShadow: "0 0 32px rgba(255,186,31,0.14)" }}
       >
         {previewUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- S3-presigned preview, remote domain varies
           <img src={previewUrl} alt="" className="h-full w-full object-cover" />
         ) : (
           <span className="flex flex-col items-center gap-1.5 px-4 text-center">
-            <Icon size={22} className="text-kink-gold" />
-            <span className="text-[15px] font-semibold text-kink-cream">
+            <span className="flex items-start">
+              <Icon size={26} className="text-kink-gold-bright" />
+              <span className="-mt-1 text-[16px] font-light leading-none text-kink-gold-bright">
+                +
+              </span>
+            </span>
+            <span className="text-[14px] font-semibold text-white lg:text-[16px]">
               {uploading ? "Uploading…" : "Tap to upload"}
             </span>
-            <span className="text-[11px] text-kink-faint">JPG, PNG or WEBP · Max {maxMb}MB</span>
+            <span className="text-[11px] text-kink-help lg:text-[13px]">
+              JPG, PNG or WEBP · Max {maxMb}MB
+            </span>
           </span>
         )}
         <input
@@ -68,7 +82,7 @@ export default function UploadTile({
           }}
         />
       </button>
-      {error && <p className="mt-1.5 text-[13px] text-red-400">{error}</p>}
+      {error && <p className="mt-1.5 text-[11px] text-red-400 lg:text-[14px]">{error}</p>}
     </div>
   );
 }

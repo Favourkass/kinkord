@@ -55,7 +55,7 @@ export default function CodeInput({ length = 6, value, onChange, disabled, label
                 refs.current[Math.min(digits.length, length - 1)]?.focus();
               }
             }}
-            className="h-14 w-11 sm:h-16 sm:w-14 rounded-xl border-2 border-kink-amber/80 bg-transparent text-center text-2xl font-bold text-kink-gold outline-none transition focus:border-kink-gold disabled:opacity-40"
+            className="h-12 w-11 rounded-[12px] border-2 border-kink-gold-bright bg-black text-center text-xl font-bold text-white outline-none transition focus:border-white disabled:opacity-40 sm:h-16 sm:w-14 lg:h-[72px] lg:w-[70px] lg:text-3xl"
           />
         ))}
       </div>

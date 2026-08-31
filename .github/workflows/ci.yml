@@ -41,4 +41,7 @@ jobs:
         run: node scripts/check-tests.mjs
 
       - name: Build
+        env:
+          # next build's type-check worker overflows Node's default ~2GB heap
+          NODE_OPTIONS: --max-old-space-size=6144
         run: pnpm run build
