@@ -27,9 +27,11 @@ RUN pnpm --filter web build \
 # Runtime stage
 FROM node:22-alpine
 ENV NODE_ENV=production
-ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
 WORKDIR /app
 COPY --from=build /repo/apps/web/.next/standalone /app
 EXPOSE 3000
-CMD ["node", "apps/web/server.js"]
+# The container runtime overwrites the HOSTNAME env var with the instance
+# hostname, and Next's standalone server binds to it — force the wildcard
+# bind at spawn time so the health probe on localhost can connect.
+CMD ["sh", "-c", "HOSTNAME=0.0.0.0 node apps/web/server.js"]
