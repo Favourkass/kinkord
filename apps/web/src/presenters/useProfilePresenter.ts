@@ -26,6 +26,10 @@ export interface ProfileVM {
   dateOfBirth: string | null;
   gender: string | null;
   roles: string[];
+  relationshipStatus: string | null;
+  lookingFor: string[];
+  interests: string[];
+  location: string | null;
   phone: string | null;
   phoneVerified: boolean;
   avatarUrl: string | null;

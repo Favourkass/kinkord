@@ -1,5 +1,52 @@
 @import "tailwindcss";
 
+/* App light/dark theme (post-login screens). `data-theme` is set on <html>
+   before paint by the inline script in layout.tsx. */
+@custom-variant dark (&:where(html[data-theme="dark"], html[data-theme="dark"] *));
+
+:root {
+  /* Post-login app palette — light values (Figma user-home frames) */
+  --app-page: #f5f5f5;
+  --app-surface: #ffffff;
+  --app-text: #000000;
+  --app-subtle: #616161;
+  --app-line: #e9e9e9;
+  --app-input: #f6f6f6;
+  --app-input-border: #616161;
+  --app-value: #090909;
+  --app-drawer: #ffffff;
+  --app-drawer-border: #eae6dc;
+  --app-members: #fff6e4;
+  --app-members-count: #b8850f;
+  --app-name: #000000;
+  --app-handle: #000000;
+  --app-logout-text: #1f1f1d;
+  --app-logout-icon: #b8850f;
+  --app-people-icon: #b8850f;
+  --app-glow: rgba(255, 148, 13, 0.25);
+}
+
+html[data-theme="dark"] {
+  --app-page: #090908;
+  --app-surface: #000000;
+  --app-text: #ffffff;
+  --app-subtle: #b4b4b4;
+  --app-line: #464242;
+  --app-input: #000000;
+  --app-input-border: #616161;
+  --app-value: #ffffff;
+  --app-drawer: #1c1b18;
+  --app-drawer-border: #322f28;
+  --app-members: #26221a;
+  --app-members-count: #ffba1f;
+  --app-name: #f2efe8;
+  --app-handle: #8c8778;
+  --app-logout-text: #d08464;
+  --app-logout-icon: #d08464;
+  --app-people-icon: #ffba1f;
+  --app-glow: rgba(255, 148, 13, 0.5);
+}
+
 :root {
   --background: #0a0a0a;
   --foreground: #f5f5f0;
@@ -46,6 +93,24 @@
   --color-kink-field: #1a1a1a;
   --color-kink-edge: #2e2e2e;
   --color-kink-help: #888888;
+  /* Post-login app semantic tokens (light/dark via html[data-theme]) */
+  --color-app-page: var(--app-page);
+  --color-app-surface: var(--app-surface);
+  --color-app-text: var(--app-text);
+  --color-app-subtle: var(--app-subtle);
+  --color-app-line: var(--app-line);
+  --color-app-input: var(--app-input);
+  --color-app-input-border: var(--app-input-border);
+  --color-app-value: var(--app-value);
+  --color-app-drawer: var(--app-drawer);
+  --color-app-drawer-border: var(--app-drawer-border);
+  --color-app-members: var(--app-members);
+  --color-app-members-count: var(--app-members-count);
+  --color-app-name: var(--app-name);
+  --color-app-handle: var(--app-handle);
+  --color-app-logout-text: var(--app-logout-text);
+  --color-app-logout-icon: var(--app-logout-icon);
+  --color-app-people-icon: var(--app-people-icon);
 }
 
 * {
