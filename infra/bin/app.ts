@@ -4,6 +4,7 @@ import { BillingStack } from "../lib/billing-stack";
 import { NetworkStack } from "../lib/network-stack";
 import { DataStack } from "../lib/data-stack";
 import { ApiBaseStack, ApiStack } from "../lib/api-stack";
+import { WebStack } from "../lib/web-stack";
 
 const app = new cdk.App();
 
@@ -35,3 +36,5 @@ const apiBase = new ApiBaseStack(app, "KinkordApiBase", {
 });
 
 new ApiStack(app, "KinkordApi", { env: primary, base: apiBase });
+
+new WebStack(app, "KinkordWeb", { env: primary });
