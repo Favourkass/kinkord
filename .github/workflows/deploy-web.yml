@@ -1,0 +1,55 @@
+name: Deploy Web
+
+# Merge to main -> build the Next.js standalone image -> push to ECR. App
+# Runner has auto-deployments enabled on the :latest tag, so the push IS the
+# deploy. Auth is OIDC (kinkord-github-deploy role) — no stored AWS keys.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/web/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/deploy-web.yml"
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-web
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::989624288003:role/kinkord-github-deploy
+          aws-region: eu-west-1
+
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: ecr
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://api.kinkord.com
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/kinkord-web:latest
+            ${{ steps.ecr.outputs.registry }}/kinkord-web:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Note
+        run: echo "Pushed. App Runner auto-deploys :latest."
