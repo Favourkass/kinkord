@@ -14,7 +14,7 @@ export default function ContactPage() {
     <ComingSoonScreen
       logo={logo}
       title="CONTACT US"
-      note="Support channels open at launch. Kinkord Limited · 30 Major Bowen Road, Sapele, Delta State, Nigeria."
+      note="Support channels open at launch. Kinkord · The World's Kink Community."
       back={{ label: "BACK TO HOME", href: Routes.home }}
     />
   );
