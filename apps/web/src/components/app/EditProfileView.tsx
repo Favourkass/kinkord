@@ -9,6 +9,8 @@ export interface EditProfileField {
   label: string;
   value: string;
   placeholder?: string;
+  /** When present the field renders as a select instead of a text input. */
+  options?: readonly string[];
 }
 
 export interface EditProfileViewProps {
@@ -49,17 +51,34 @@ function Input({
   field: EditProfileField;
   onChange: (key: string, value: string) => void;
 }) {
+  const styles =
+    "h-[41px] w-full rounded-[10px] border border-app-input-border bg-app-input px-[27px] text-[15px] font-light text-app-value outline-none focus:border-kink-amber";
   return (
     <label className="block">
       <span className="block pb-[4px] pl-[12px] text-[14px] font-bold text-app-text">
         {field.label}
       </span>
-      <input
-        value={field.value}
-        placeholder={field.placeholder}
-        onChange={(e) => onChange(field.key, e.target.value)}
-        className="h-[41px] w-full rounded-[10px] border border-app-input-border bg-app-input px-[27px] text-[15px] font-light text-app-value outline-none focus:border-kink-amber"
-      />
+      {field.options ? (
+        <select
+          value={field.value}
+          onChange={(e) => onChange(field.key, e.target.value)}
+          className={styles}
+        >
+          <option value="">{field.placeholder ?? "Select…"}</option>
+          {field.options.map((o) => (
+            <option key={o} value={o}>
+              {o}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input
+          value={field.value}
+          placeholder={field.placeholder}
+          onChange={(e) => onChange(field.key, e.target.value)}
+          className={styles}
+        />
+      )}
     </label>
   );
 }

@@ -33,6 +33,7 @@ import {
   NG_STATES,
   PHONE_COUNTRY_CODES,
 } from "@/constants/onboarding";
+import { NG_LGAS } from "@/constants/nigeria";
 import { Routes } from "@/constants/Routes";
 
 function StageHeading({ plain, highlight }: { plain: string; highlight: string }) {
@@ -226,19 +227,22 @@ export default function SignupPage() {
                 options={NG_STATES}
                 placeholder="Select your state"
                 value={p.aboutStep.draft.state}
-                onChange={(v) => p.aboutStep.set({ ...p.aboutStep.draft, state: v })}
+                onChange={(v) => p.aboutStep.set({ ...p.aboutStep.draft, state: v, city: "" })}
                 error={p.aboutStep.errors.state}
               />
-              <TextField
-                label="City"
+              <SelectField
+                label="LGA / Area"
                 icon={MapPin}
-                placeholder="e.g. Sapele"
+                options={NG_LGAS[p.aboutStep.draft.state] ?? []}
+                placeholder={
+                  p.aboutStep.draft.state ? "Select your area" : "Select your state first"
+                }
                 value={p.aboutStep.draft.city}
                 onChange={(v) => p.aboutStep.set({ ...p.aboutStep.draft, city: v })}
               />
             </div>
             <p className="-mt-3 w-full text-left text-[11px] text-kink-help lg:text-[16px]">
-              Your state and city help us show you local communities and events.
+              Your state and area help us show you local communities and events.
             </p>
             <DobPicker
               day={p.aboutStep.draft.dobDay}
