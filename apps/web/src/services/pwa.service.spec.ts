@@ -105,6 +105,22 @@ describe("PwaService", () => {
     });
   });
 
+  describe("isAndroidDevice", () => {
+    it("identifies Android user agent", () => {
+      vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
+        "Mozilla/5.0 (Linux; Android 13; Pixel 7)"
+      );
+      expect(pwaService.isAndroidDevice()).toBe(true);
+    });
+
+    it("identifies iPhone user agent as not Android", () => {
+      vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)"
+      );
+      expect(pwaService.isAndroidDevice()).toBe(false);
+    });
+  });
+
   describe("isOnline", () => {
     it("checks navigator.onLine", () => {
       vi.spyOn(navigator, "onLine", "get").mockReturnValue(true);
@@ -159,6 +175,65 @@ describe("PwaService", () => {
     it("returns 'failed' if event is null or prompt fails", async () => {
       const outcome = await pwaService.triggerInstall(null);
       expect(outcome).toBe("failed");
+    });
+  });
+
+  describe("guide and prompt store methods", () => {
+    it("handles guide open, close, and subscription", () => {
+      const listener = vi.fn();
+      const unsub = pwaService.subscribeGuide(listener);
+
+      expect(pwaService.getIsInstallGuideOpen()).toBe(false);
+
+      pwaService.openInstallGuide();
+      expect(pwaService.getIsInstallGuideOpen()).toBe(true);
+      expect(listener).toHaveBeenCalledTimes(1);
+
+      pwaService.closeInstallGuide();
+      expect(pwaService.getIsInstallGuideOpen()).toBe(false);
+      expect(listener).toHaveBeenCalledTimes(2);
+
+      unsub();
+      pwaService.openInstallGuide();
+      expect(listener).toHaveBeenCalledTimes(2);
+    });
+
+    it("handles prompt set and subscription", () => {
+      const listener = vi.fn();
+      const unsub = pwaService.subscribePrompt(listener);
+
+      expect(pwaService.getDeferredPrompt()).toBeNull();
+
+      const mockEvent = {} as BeforeInstallPromptEvent;
+      pwaService.setDeferredPrompt(mockEvent);
+      expect(pwaService.getDeferredPrompt()).toBe(mockEvent);
+      expect(listener).toHaveBeenCalledTimes(1);
+
+      unsub();
+      pwaService.setDeferredPrompt(null);
+      expect(listener).toHaveBeenCalledTimes(1);
+    });
+
+    it("downloadApp triggers direct prompt when deferredPrompt is available", async () => {
+      const mockEvent = {
+        prompt: vi.fn().mockResolvedValue(undefined),
+        userChoice: Promise.resolve({ outcome: "accepted", platform: "web" }),
+      } as unknown as BeforeInstallPromptEvent;
+
+      pwaService.setDeferredPrompt(mockEvent);
+
+      const outcome = await pwaService.downloadApp();
+      expect(outcome).toBe("accepted");
+      expect(pwaService.getDeferredPrompt()).toBeNull();
+      expect(pwaService.getIsInstalled()).toBe(true);
+    });
+
+    it("downloadApp opens install guide when deferredPrompt is not available", async () => {
+      pwaService.setDeferredPrompt(null);
+
+      const outcome = await pwaService.downloadApp();
+      expect(outcome).toBe("failed");
+      expect(pwaService.getIsInstallGuideOpen()).toBe(true);
     });
   });
 });

@@ -1,9 +1,15 @@
 import Image from "next/image";
 import Link from "next/link";
 
-interface SplashLink {
+export interface SplashLink {
   label: string;
   href: string;
+}
+
+export interface SplashAction {
+  label: string;
+  href?: string;
+  onClick?: () => void;
 }
 
 interface SplashImage {
@@ -14,7 +20,7 @@ interface SplashImage {
 export interface SplashScreenProps {
   logo: SplashImage;
   hero: SplashImage;
-  downloadCta: SplashLink;
+  downloadCta: SplashAction;
   brand: string;
   tagline: string;
   signUp: SplashLink;
@@ -71,14 +77,21 @@ function ChevronIcon() {
   );
 }
 
-function DownloadPill({ cta, compact }: { cta: SplashLink; compact?: boolean }) {
+function DownloadPill({ cta, compact }: { cta: SplashAction; compact?: boolean }) {
+  const className = `grid place-items-center rounded-[24px] bg-kink-gold-deep font-extrabold tracking-[0.3px] text-black transition hover:brightness-110 active:scale-95 cursor-pointer ${
+    compact ? "h-[28px] w-[119px] text-[10px]" : "h-[60px] w-[254px] text-[24px]"
+  }`;
+
+  if (cta.onClick) {
+    return (
+      <button type="button" onClick={cta.onClick} className={className}>
+        {cta.label}
+      </button>
+    );
+  }
+
   return (
-    <Link
-      href={cta.href}
-      className={`grid place-items-center rounded-[24px] bg-kink-gold-deep font-extrabold tracking-[0.3px] text-black ${
-        compact ? "h-[28px] w-[119px] text-[10px]" : "h-[60px] w-[254px] text-[24px]"
-      }`}
-    >
+    <Link href={cta.href ?? "#"} className={className}>
       {cta.label}
     </Link>
   );

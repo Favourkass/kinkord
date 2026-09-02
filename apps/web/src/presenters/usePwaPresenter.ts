@@ -10,15 +10,19 @@ export interface PwaVM {
   isInstalled: boolean;
   isOffline: boolean;
   isIos: boolean;
+  isAndroid: boolean;
+  canPromptDirectly: boolean;
+  showInstallGuide: boolean;
   promptInstall: () => Promise<void>;
+  downloadApp: () => Promise<void>;
+  openInstallGuide: () => void;
+  closeInstallGuide: () => void;
   dismissPrompt: () => void;
 }
 
 const emptySubscribe = () => () => {};
 
 export function usePwaPresenter(): PwaVM {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [installedViaPrompt, setInstalledViaPrompt] = useState(false);
   const [dismissed, setDismissed] = useState(() => {
     if (typeof window === "undefined") return false;
     try {
@@ -28,15 +32,40 @@ export function usePwaPresenter(): PwaVM {
     }
   });
 
-  const isStandalone = useSyncExternalStore(
-    emptySubscribe,
-    () => pwaService.isStandalone(),
+  const deferredPrompt = useSyncExternalStore(
+    (onStoreChange) => pwaService.subscribePrompt(onStoreChange),
+    () => pwaService.getDeferredPrompt(),
+    () => null
+  );
+
+  const showInstallGuide = useSyncExternalStore(
+    (onStoreChange) => pwaService.subscribeGuide(onStoreChange),
+    () => pwaService.getIsInstallGuideOpen(),
+    () => false
+  );
+
+  const isInstalled = useSyncExternalStore(
+    (onStoreChange) => {
+      const unsub1 = pwaService.subscribePrompt(onStoreChange);
+      const unsub2 = pwaService.subscribeGuide(onStoreChange);
+      return () => {
+        unsub1();
+        unsub2();
+      };
+    },
+    () => pwaService.getIsInstalled(),
     () => false
   );
 
   const isIos = useSyncExternalStore(
     emptySubscribe,
     () => pwaService.isIosDevice(),
+    () => false
+  );
+
+  const isAndroid = useSyncExternalStore(
+    emptySubscribe,
+    () => pwaService.isAndroidDevice(),
     () => false
   );
 
@@ -48,27 +77,28 @@ export function usePwaPresenter(): PwaVM {
 
   useEffect(() => {
     void pwaService.registerServiceWorker();
-
-    const unsubscribePrompt = pwaService.setupInstallPromptListener((event) => {
-      setDeferredPrompt(event);
-    });
-
-    return () => {
-      unsubscribePrompt();
-    };
+    pwaService.attachGlobalListeners();
   }, []);
 
-  const isInstalled = isStandalone || installedViaPrompt;
+  const canPromptDirectly = Boolean(deferredPrompt);
 
   const promptInstall = useCallback(async () => {
-    if (!deferredPrompt) return;
-
-    const outcome = await pwaService.triggerInstall(deferredPrompt);
-    if (outcome === "accepted") {
-      setInstalledViaPrompt(true);
-      setDeferredPrompt(null);
+    if (deferredPrompt) {
+      await pwaService.triggerInstall(deferredPrompt);
     }
   }, [deferredPrompt]);
+
+  const openInstallGuide = useCallback(() => {
+    pwaService.openInstallGuide();
+  }, []);
+
+  const closeInstallGuide = useCallback(() => {
+    pwaService.closeInstallGuide();
+  }, []);
+
+  const downloadApp = useCallback(async () => {
+    await pwaService.downloadApp();
+  }, []);
 
   const dismissPrompt = useCallback(() => {
     setDismissed(true);
@@ -89,7 +119,13 @@ export function usePwaPresenter(): PwaVM {
     isInstalled,
     isOffline,
     isIos,
+    isAndroid,
+    canPromptDirectly,
+    showInstallGuide,
     promptInstall,
+    downloadApp,
+    openInstallGuide,
+    closeInstallGuide,
     dismissPrompt,
   };
 }
