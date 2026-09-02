@@ -9,5 +9,6 @@ export default defineConfig({
     include: ["src/**/*.spec.{ts,tsx}"],
     environment: "node",
     clearMocks: true,
+    pool: "threads",
   },
 });
