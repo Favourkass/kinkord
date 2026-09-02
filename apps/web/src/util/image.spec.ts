@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { compressImage } from "./image";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("compressImage", () => {
   it("passes non-image files through unchanged", async () => {
@@ -13,8 +17,10 @@ describe("compressImage", () => {
     expect(await compressImage(gif)).toBe(gif);
   });
 
-  it("returns the original when canvas decoding is unavailable (jsdom)", async () => {
-    // jsdom has no real canvas/bitmap decode; the util must fail safe, never throw.
+  it("fails safe to the original file when the image can't be decoded", async () => {
+    // Force the decode path to reject deterministically (no real canvas in jsdom);
+    // the util must swallow it and hand back the untouched file, never throw/hang.
+    vi.stubGlobal("createImageBitmap", vi.fn().mockRejectedValue(new Error("decode unavailable")));
     const jpg = new File([new Uint8Array(9_000_000)], "huge.jpg", { type: "image/jpeg" });
     const out = await compressImage(jpg);
     expect(out).toBe(jpg);
