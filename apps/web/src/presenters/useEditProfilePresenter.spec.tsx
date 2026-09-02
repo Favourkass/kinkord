@@ -42,6 +42,10 @@ vi.mock("@/services/apiClient", () => {
   };
 });
 
+vi.mock("@/util/image", () => ({
+  compressImage: (f: File) => Promise.resolve(f),
+}));
+
 const me = { id: "u1", username: "tegamaxwell" };
 const profile = {
   displayName: "SIR T",
