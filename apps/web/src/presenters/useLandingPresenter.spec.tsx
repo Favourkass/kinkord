@@ -2,12 +2,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import { useLandingPresenter } from "./useLandingPresenter";
-import { pwaService } from "@/services/pwa.service";
+import { BeforeInstallPromptEvent, pwaService } from "@/services/pwa.service";
 
 describe("useLandingPresenter", () => {
   beforeEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
+    // Reset shared singleton state between tests.
+    pwaService.setDeferredPrompt(null);
+    pwaService.closeInstallGuide();
     vi.spyOn(pwaService, "registerServiceWorker").mockResolvedValue(null);
     vi.spyOn(pwaService, "isStandalone").mockReturnValue(false);
     vi.spyOn(pwaService, "isIosDevice").mockReturnValue(false);
@@ -40,8 +43,8 @@ describe("useLandingPresenter", () => {
     expect(result.current.downloadCta.label).toBe("Installing...");
   });
 
-  it("triggers promptInstall on click when prompt is available", async () => {
-    const mockEvent = {} as any;
+  it("fires the native install prompt on click when one is available", async () => {
+    const mockEvent = {} as unknown as BeforeInstallPromptEvent;
     pwaService.setDeferredPrompt(mockEvent);
     const triggerSpy = vi.spyOn(pwaService, "triggerInstall").mockResolvedValue("accepted");
     const { result } = renderHook(() => useLandingPresenter());
@@ -51,5 +54,15 @@ describe("useLandingPresenter", () => {
     });
 
     expect(triggerSpy).toHaveBeenCalledWith(mockEvent);
+  });
+
+  it("opens the install guide on click when no native prompt is available", async () => {
+    const { result } = renderHook(() => useLandingPresenter());
+
+    await act(async () => {
+      result.current.downloadCta.onClick?.();
+    });
+
+    expect(pwaService.getIsInstallGuideOpen()).toBe(true);
   });
 });
