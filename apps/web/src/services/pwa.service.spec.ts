@@ -172,6 +172,22 @@ describe("PwaService", () => {
       expect(outcome).toBe("accepted");
     });
 
+    it("clears deferredPrompt even when user dismisses the prompt", async () => {
+      const mockEvent = {
+        preventDefault: vi.fn(),
+        prompt: vi.fn().mockResolvedValue(undefined),
+        userChoice: Promise.resolve({ outcome: "dismissed", platform: "web" }),
+      } as unknown as BeforeInstallPromptEvent;
+
+      pwaService.setDeferredPrompt(mockEvent);
+      expect(pwaService.getDeferredPrompt()).toBe(mockEvent);
+
+      const outcome = await pwaService.triggerInstall(mockEvent);
+      expect(outcome).toBe("dismissed");
+      expect(pwaService.getDeferredPrompt()).toBeNull();
+      expect(pwaService.getIsInstalling()).toBe(false);
+    });
+
     it("returns 'failed' if event is null or prompt fails", async () => {
       const outcome = await pwaService.triggerInstall(null);
       expect(outcome).toBe("failed");

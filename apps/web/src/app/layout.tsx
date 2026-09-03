@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Playfair_Display, Inter } from "next/font/google";
 import { themeInitScript } from "@/util/theme";
+import { pwaInitScript } from "@/util/pwaInit";
 import { PwaWrapper } from "./PwaWrapper";
 import "./globals.css";
 
@@ -64,6 +65,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         suppressHydrationWarning
       >
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <script dangerouslySetInnerHTML={{ __html: pwaInitScript }} />
         {children}
         <PwaWrapper />
       </body>

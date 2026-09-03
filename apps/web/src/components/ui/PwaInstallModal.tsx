@@ -47,7 +47,7 @@ export function PwaInstallModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="pwa-install-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6"
     >
       {/* Backdrop */}
       <div
@@ -57,7 +57,7 @@ export function PwaInstallModal({
       />
 
       {/* Modal Container */}
-      <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-[#D4AF37]/40 bg-[#121212] p-6 shadow-2xl shadow-black/90 sm:p-8 animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl border border-[#D4AF37]/40 bg-[#121212] p-6 shadow-2xl shadow-black/90 sm:p-8 animate-in fade-in zoom-in-95 duration-200 overscroll-contain">
         {/* Close Button */}
         <button
           type="button"

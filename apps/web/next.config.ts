@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["192.168.1.234", "192.168.1.*", "localhost"],
   // Self-contained server bundle for the App Runner image.
   output: "standalone",
   // No sharp in the runtime image: the build stage runs on the builder's

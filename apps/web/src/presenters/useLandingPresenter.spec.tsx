@@ -33,14 +33,23 @@ describe("useLandingPresenter", () => {
     expect(result.current.downloadCta.label).toBe("App Installed");
   });
 
-  it("triggers downloadApp on click", async () => {
-    const triggerSpy = vi.spyOn(pwaService, "triggerInstall");
+  it("updates downloadCta label when installing", () => {
+    vi.spyOn(pwaService, "getIsInstalling").mockReturnValue(true);
+    const { result } = renderHook(() => useLandingPresenter());
+
+    expect(result.current.downloadCta.label).toBe("Installing...");
+  });
+
+  it("triggers promptInstall on click when prompt is available", async () => {
+    const mockEvent = {} as any;
+    pwaService.setDeferredPrompt(mockEvent);
+    const triggerSpy = vi.spyOn(pwaService, "triggerInstall").mockResolvedValue("accepted");
     const { result } = renderHook(() => useLandingPresenter());
 
     await act(async () => {
       result.current.downloadCta.onClick?.();
     });
 
-    expect(triggerSpy).not.toHaveBeenCalled(); // No deferredPrompt, so it opened guide instead
+    expect(triggerSpy).toHaveBeenCalledWith(mockEvent);
   });
 });

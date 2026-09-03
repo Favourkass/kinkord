@@ -78,20 +78,27 @@ function ChevronIcon() {
 }
 
 function DownloadPill({ cta, compact }: { cta: SplashAction; compact?: boolean }) {
-  const className = `grid place-items-center rounded-[24px] bg-kink-gold-deep font-extrabold tracking-[0.3px] text-black transition hover:brightness-110 active:scale-95 cursor-pointer ${
-    compact ? "h-[28px] w-[119px] text-[10px]" : "h-[60px] w-[254px] text-[24px]"
+  const isInactive = cta.label === "App Installed" || cta.label === "Installing...";
+  const className = `relative grid place-items-center rounded-[24px] bg-kink-gold-deep font-extrabold tracking-[0.3px] text-black transition hover:brightness-110 active:scale-95 cursor-pointer touch-manipulation select-none before:absolute before:-inset-2.5 before:content-[''] disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100 ${
+    compact ? "h-[32px] min-w-[120px] px-3.5 text-[11px]" : "h-[60px] w-[254px] text-[24px]"
   }`;
 
   if (cta.onClick) {
     return (
-      <button type="button" onClick={cta.onClick} className={className}>
+      <button
+        type="button"
+        onClick={cta.onClick}
+        disabled={isInactive}
+        aria-label={cta.label}
+        className={className}
+      >
         {cta.label}
       </button>
     );
   }
 
   return (
-    <Link href={cta.href ?? "#"} className={className}>
+    <Link href={cta.href ?? "#"} aria-label={cta.label} className={className}>
       {cta.label}
     </Link>
   );
@@ -148,7 +155,7 @@ export default function SplashScreen({
             />
           </div>
         </div>
-        <div className="absolute right-[22px] top-[40px] z-10">
+        <div className="absolute right-[22px] top-[max(env(safe-area-inset-top,0px)+16px,36px)] z-30 pointer-events-auto">
           <DownloadPill cta={downloadCta} compact />
         </div>
         <div className="relative z-10 flex flex-1 flex-col items-center px-[27px]">

@@ -13,17 +13,24 @@ export function useLandingPresenter(): ClientLandingVM {
   const baseVM = useMemo(() => getLandingVM(), []);
   const pwa = usePwaPresenter();
 
+  const downloadLabel = useMemo(() => {
+    if (pwa.isInstalled) return "App Installed";
+    if (pwa.isInstalling) return "Installing...";
+    return baseVM.downloadCta.label;
+  }, [pwa.isInstalled, pwa.isInstalling, baseVM.downloadCta.label]);
+
   return {
     ...baseVM,
     isInstalled: pwa.isInstalled,
     onDownload: () => {
-      void pwa.downloadApp();
+      void pwa.promptInstall();
     },
     downloadCta: {
       ...baseVM.downloadCta,
-      label: pwa.isInstalled ? "App Installed" : baseVM.downloadCta.label,
+      label: downloadLabel,
       onClick: () => {
-        void pwa.downloadApp();
+        if (pwa.isInstalled || pwa.isInstalling) return;
+        void pwa.promptInstall();
       },
     },
   };
