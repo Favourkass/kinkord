@@ -17,7 +17,6 @@ async function migrateOnBoot() {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
   try {
     await migrate(drizzle(pool), { migrationsFolder: "./drizzle" });
-    // eslint-disable-next-line no-console
     console.log("migrations: up to date");
   } finally {
     await pool.end();

@@ -6,10 +6,12 @@ import AppShell from "@/components/app/AppShell";
 import { ChevronRightIcon } from "@/components/app/icons";
 import { Routes } from "@/constants/Routes";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
+import { usePwaPresenter } from "@/presenters/usePwaPresenter";
 import { getTheme, setTheme, type Theme } from "@/util/theme";
 
 export default function SettingsPage() {
   const vm = useHomePresenter();
+  const pwa = usePwaPresenter();
   const [theme, setThemeState] = useState<Theme>(() =>
     typeof document === "undefined" ? "light" : getTheme(),
   );
@@ -60,6 +62,15 @@ export default function SettingsPage() {
           {chip("light", "Light")}
           {chip("dark", "Dark")}
         </div>
+        <p className="pt-[28px] pb-[8px] text-[14px] font-bold text-app-text">Application</p>
+        <button
+          type="button"
+          onClick={pwa.downloadApp}
+          className="flex h-[52px] w-full items-center justify-between rounded-[16px] bg-app-members px-[18px] text-[18px] font-medium text-app-name cursor-pointer"
+        >
+          <span>{pwa.isInstalled ? "App Installed" : "Download / Install App"}</span>
+          <ChevronRightIcon className="text-[#b8850f]" />
+        </button>
         <p className="pt-[28px] pb-[8px] text-[14px] font-bold text-app-text">Account</p>
         <Link
           href={Routes.profileEdit}
