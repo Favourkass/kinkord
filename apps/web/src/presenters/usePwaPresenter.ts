@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
-import { pwaService } from "@/services/pwa.service";
+import { BeforeInstallPromptEvent, pwaService } from "@/services/pwa.service";
 
 const DISMISSED_STORAGE_KEY = "kinkord_pwa_install_dismissed";
 
 export interface PwaVM {
   isInstallable: boolean;
   isInstalled: boolean;
+  isInstalling: boolean;
   isOffline: boolean;
   isIos: boolean;
   isAndroid: boolean;
@@ -57,6 +58,12 @@ export function usePwaPresenter(): PwaVM {
     () => false,
   );
 
+  const isInstalling = useSyncExternalStore(
+    (onStoreChange) => pwaService.subscribePrompt(onStoreChange),
+    () => pwaService.getIsInstalling(),
+    () => false,
+  );
+
   const isIos = useSyncExternalStore(
     emptySubscribe,
     () => pwaService.isIosDevice(),
@@ -83,8 +90,14 @@ export function usePwaPresenter(): PwaVM {
   const canPromptDirectly = Boolean(deferredPrompt);
 
   const promptInstall = useCallback(async () => {
-    if (deferredPrompt) {
-      await pwaService.triggerInstall(deferredPrompt);
+    let prompt = deferredPrompt || pwaService.getDeferredPrompt();
+    if (!prompt && typeof window !== "undefined") {
+      prompt =
+        (window as unknown as { __kinkord_pwa_prompt?: BeforeInstallPromptEvent | null })
+          .__kinkord_pwa_prompt ?? null;
+    }
+    if (prompt) {
+      await pwaService.triggerInstall(prompt);
     }
   }, [deferredPrompt]);
 
@@ -115,6 +128,7 @@ export function usePwaPresenter(): PwaVM {
   return {
     isInstallable,
     isInstalled,
+    isInstalling,
     isOffline,
     isIos,
     isAndroid,
