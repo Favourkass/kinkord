@@ -1,8 +1,10 @@
+"use client";
+
 import SplashScreen from "@/components/landing/SplashScreen";
-import { getLandingVM } from "@/presenters/getLandingVM";
+import { useLandingPresenter } from "@/presenters/useLandingPresenter";
 
 export default function Home() {
-  const vm = getLandingVM();
+  const vm = useLandingPresenter();
 
   return <SplashScreen {...vm} />;
 }
