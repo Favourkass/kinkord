@@ -2,7 +2,16 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { Download, Monitor, Smartphone, Share, PlusSquare, MoreVertical, X, CheckCircle2 } from "lucide-react";
+import {
+  Download,
+  Monitor,
+  Smartphone,
+  Share,
+  PlusSquare,
+  MoreVertical,
+  X,
+  CheckCircle2,
+} from "lucide-react";
 
 export interface PwaInstallModalProps {
   open: boolean;
@@ -246,7 +255,8 @@ export function PwaInstallModal({
                       2
                     </span>
                     <span className="leading-relaxed">
-                      Click <strong className="text-[#D4AF37]">Install</strong> when prompted to add Kinkord to your applications.
+                      Click <strong className="text-[#D4AF37]">Install</strong> when prompted to add
+                      Kinkord to your applications.
                     </span>
                   </li>
                   <li className="flex items-start gap-2.5">
@@ -254,7 +264,8 @@ export function PwaInstallModal({
                       3
                     </span>
                     <span>
-                      Launch Kinkord anytime as a standalone desktop application with high performance.
+                      Launch Kinkord anytime as a standalone desktop application with high
+                      performance.
                     </span>
                   </li>
                 </ol>

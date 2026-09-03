@@ -40,7 +40,8 @@ export default function OfflinePage() {
             You&apos;re currently offline
           </h1>
           <p className="text-sm text-[#a3a3a3] leading-relaxed">
-            It looks like your internet connection was interrupted. Check your network or try reconnecting to continue exploring Kinkord.
+            It looks like your internet connection was interrupted. Check your network or try
+            reconnecting to continue exploring Kinkord.
           </p>
         </div>
 

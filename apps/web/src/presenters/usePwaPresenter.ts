@@ -35,13 +35,13 @@ export function usePwaPresenter(): PwaVM {
   const deferredPrompt = useSyncExternalStore(
     (onStoreChange) => pwaService.subscribePrompt(onStoreChange),
     () => pwaService.getDeferredPrompt(),
-    () => null
+    () => null,
   );
 
   const showInstallGuide = useSyncExternalStore(
     (onStoreChange) => pwaService.subscribeGuide(onStoreChange),
     () => pwaService.getIsInstallGuideOpen(),
-    () => false
+    () => false,
   );
 
   const isInstalled = useSyncExternalStore(
@@ -54,25 +54,25 @@ export function usePwaPresenter(): PwaVM {
       };
     },
     () => pwaService.getIsInstalled(),
-    () => false
+    () => false,
   );
 
   const isIos = useSyncExternalStore(
     emptySubscribe,
     () => pwaService.isIosDevice(),
-    () => false
+    () => false,
   );
 
   const isAndroid = useSyncExternalStore(
     emptySubscribe,
     () => pwaService.isAndroidDevice(),
-    () => false
+    () => false,
   );
 
   const isOffline = useSyncExternalStore(
     (onStoreChange) => pwaService.addNetworkStatusListener(onStoreChange, onStoreChange),
     () => !pwaService.isOnline(),
-    () => false
+    () => false,
   );
 
   useEffect(() => {
@@ -110,9 +110,7 @@ export function usePwaPresenter(): PwaVM {
   }, []);
 
   const isInstallable =
-    !isInstalled &&
-    !dismissed &&
-    (Boolean(deferredPrompt) || (isIos && !isInstalled));
+    !isInstalled && !dismissed && (Boolean(deferredPrompt) || (isIos && !isInstalled));
 
   return {
     isInstallable,

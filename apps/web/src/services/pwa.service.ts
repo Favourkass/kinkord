@@ -144,7 +144,7 @@ export class PwaService {
 
     const isMediaStandalone = window.matchMedia?.("(display-mode: standalone)").matches ?? false;
     const isNavStandalone = Boolean(
-      (window.navigator as unknown as { standalone?: boolean })?.standalone
+      (window.navigator as unknown as { standalone?: boolean })?.standalone,
     );
 
     return isMediaStandalone || isNavStandalone;
@@ -204,7 +204,7 @@ export class PwaService {
    * Captures the browser's `beforeinstallprompt` event.
    */
   setupInstallPromptListener(
-    onPromptAvailable: (event: BeforeInstallPromptEvent) => void
+    onPromptAvailable: (event: BeforeInstallPromptEvent) => void,
   ): () => void {
     if (typeof window === "undefined") {
       return () => {};
