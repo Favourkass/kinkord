@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
-import { BeforeInstallPromptEvent, pwaService } from "@/services/pwa.service";
+import { pwaService } from "@/services/pwa.service";
 
 const DISMISSED_STORAGE_KEY = "kinkord_pwa_install_dismissed";
 
