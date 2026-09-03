@@ -31,15 +31,35 @@ export class PwaService {
       return;
     }
 
+    const syncEarlyPrompt = () => {
+      const early = (
+        window as unknown as { __kinkord_pwa_prompt?: BeforeInstallPromptEvent | null }
+      ).__kinkord_pwa_prompt;
+      if (early && !this.deferredPrompt) {
+        this.deferredPrompt = early;
+        this.notifyPromptSubscribers();
+      }
+    };
+
+    syncEarlyPrompt();
+
+    window.addEventListener("kinkord:prompt-ready", syncEarlyPrompt);
+
     window.addEventListener("beforeinstallprompt", (e: Event) => {
       const promptEvent = e as BeforeInstallPromptEvent;
       promptEvent.preventDefault?.();
       this.deferredPrompt = promptEvent;
+      (
+        window as unknown as { __kinkord_pwa_prompt?: BeforeInstallPromptEvent | null }
+      ).__kinkord_pwa_prompt = promptEvent;
       this.notifyPromptSubscribers();
     });
 
     window.addEventListener("appinstalled", () => {
       this.deferredPrompt = null;
+      (
+        window as unknown as { __kinkord_pwa_prompt?: BeforeInstallPromptEvent | null }
+      ).__kinkord_pwa_prompt = null;
       this.isInstalledViaPrompt = true;
       this.isInstallGuideOpen = false;
       this.notifyPromptSubscribers();
@@ -50,6 +70,14 @@ export class PwaService {
   }
 
   getDeferredPrompt(): BeforeInstallPromptEvent | null {
+    if (!this.deferredPrompt && typeof window !== "undefined") {
+      const early = (
+        window as unknown as { __kinkord_pwa_prompt?: BeforeInstallPromptEvent | null }
+      ).__kinkord_pwa_prompt;
+      if (early) {
+        this.deferredPrompt = early;
+      }
+    }
     return this.deferredPrompt;
   }
 
@@ -105,9 +133,6 @@ export class PwaService {
     if (this.deferredPrompt) {
       const outcome = await this.triggerInstall(this.deferredPrompt);
       if (outcome === "accepted") {
-        this.isInstalledViaPrompt = true;
-        this.deferredPrompt = null;
-        this.notifyPromptSubscribers();
         return "accepted";
       }
     }
@@ -159,7 +184,14 @@ export class PwaService {
     }
 
     const ua = navigator.userAgent;
-    return /iPad|iPhone|iPod/.test(ua) && !(window as unknown as { MSStream?: unknown }).MSStream;
+    const isIosUa =
+      /iPad|iPhone|iPod/.test(ua) && !(window as unknown as { MSStream?: unknown }).MSStream;
+    const isIpadOs =
+      typeof navigator !== "undefined" &&
+      navigator.platform === "MacIntel" &&
+      (navigator.maxTouchPoints ?? 0) > 1;
+
+    return isIosUa || isIpadOs;
   }
 
   /**
@@ -226,25 +258,52 @@ export class PwaService {
     };
   }
 
+  private isInstalling = false;
+
+  getIsInstalling(): boolean {
+    return this.isInstalling;
+  }
+
+  private setIsInstalling(value: boolean): void {
+    this.isInstalling = value;
+    this.notifyPromptSubscribers();
+  }
+
   /**
    * Triggers the deferred install prompt.
    */
   async triggerInstall(event: BeforeInstallPromptEvent | null): Promise<InstallOutcome> {
-    if (!event || typeof event.prompt !== "function") {
+    if (!event || typeof event.prompt !== "function" || this.isInstalling) {
       return "failed";
     }
 
     try {
+      this.setIsInstalling(true);
       await event.prompt();
       const choice = await event.userChoice;
+      // Invalidate deferredPrompt immediately so it is never called twice
+      this.deferredPrompt = null;
+      if (typeof window !== "undefined") {
+        (
+          window as unknown as { __kinkord_pwa_prompt?: BeforeInstallPromptEvent | null }
+        ).__kinkord_pwa_prompt = null;
+      }
       if (choice.outcome === "accepted") {
         this.isInstalledViaPrompt = true;
-        this.deferredPrompt = null;
-        this.notifyPromptSubscribers();
       }
+      this.notifyPromptSubscribers();
       return choice.outcome;
     } catch {
+      this.deferredPrompt = null;
+      if (typeof window !== "undefined") {
+        (
+          window as unknown as { __kinkord_pwa_prompt?: BeforeInstallPromptEvent | null }
+        ).__kinkord_pwa_prompt = null;
+      }
+      this.notifyPromptSubscribers();
       return "failed";
+    } finally {
+      this.setIsInstalling(false);
     }
   }
 }
