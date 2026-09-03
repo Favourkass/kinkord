@@ -42,6 +42,10 @@ vi.mock("@/services/apiClient", () => {
   };
 });
 
+vi.mock("@/util/image", () => ({
+  compressImage: (f: File) => Promise.resolve(f),
+}));
+
 const me = { id: "u1", username: "tegamaxwell" };
 const profile = {
   displayName: "SIR T",
@@ -50,7 +54,9 @@ const profile = {
   roles: ["Sadist"],
   lookingFor: ["Events", "Relationships"],
   interests: ["DDLG", "Bondage"],
-  location: "Sapele, Delta State, Nigeria",
+  state: "Delta",
+  city: "Sapele",
+  location: "Sapele, Delta, Nigeria",
   avatarUrl: null,
 };
 
@@ -84,7 +90,8 @@ describe("useEditProfilePresenter", () => {
       role: "Sadist",
       lookingFor: "Events, Relationships",
       interests: "DDLG, Bondage",
-      address: "Sapele, Delta State, Nigeria",
+      state: "Delta",
+      lga: "Sapele",
     });
   });
 
@@ -93,7 +100,7 @@ describe("useEditProfilePresenter", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     act(() => {
       result.current.setField("lookingFor", "Events,  Mentorship , ");
-      result.current.setField("address", " Warri, Nigeria ");
+      result.current.setField("lga", "Warri");
     });
     act(() => {
       void result.current.save();
@@ -107,8 +114,18 @@ describe("useEditProfilePresenter", () => {
       roles: ["Sadist"],
       lookingFor: ["Events", "Mentorship"],
       interests: ["DDLG", "Bondage"],
-      location: "Warri, Nigeria",
+      state: "Delta",
+      city: "Warri",
+      location: "Warri, Delta, Nigeria",
     });
+  });
+
+  it("clears the chosen LGA when the state changes", async () => {
+    const { result } = renderHook(() => useEditProfilePresenter());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => result.current.setField("state", "Edo"));
+    expect(result.current.fields.state).toBe("Edo");
+    expect(result.current.fields.lga).toBe("");
   });
 
   it("updates the username through better-auth when it changes", async () => {

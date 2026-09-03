@@ -92,14 +92,14 @@ describe("PwaService", () => {
   describe("isIosDevice", () => {
     it("identifies iPhone user agent", () => {
       vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)"
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)",
       );
       expect(pwaService.isIosDevice()).toBe(true);
     });
 
     it("identifies Android user agent as not iOS", () => {
       vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
-        "Mozilla/5.0 (Linux; Android 13; Pixel 7)"
+        "Mozilla/5.0 (Linux; Android 13; Pixel 7)",
       );
       expect(pwaService.isIosDevice()).toBe(false);
     });
@@ -108,14 +108,14 @@ describe("PwaService", () => {
   describe("isAndroidDevice", () => {
     it("identifies Android user agent", () => {
       vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
-        "Mozilla/5.0 (Linux; Android 13; Pixel 7)"
+        "Mozilla/5.0 (Linux; Android 13; Pixel 7)",
       );
       expect(pwaService.isAndroidDevice()).toBe(true);
     });
 
     it("identifies iPhone user agent as not Android", () => {
       vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)"
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)",
       );
       expect(pwaService.isAndroidDevice()).toBe(false);
     });

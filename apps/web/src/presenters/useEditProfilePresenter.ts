@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/services/authClient";
 import { api, ApiError, uploadToPresignedUrl } from "@/services/apiClient";
+import { compressImage } from "@/util/image";
 import { Routes } from "@/constants/Routes";
 import type { MeVM, ProfileVM } from "./useProfilePresenter";
 
@@ -15,7 +16,8 @@ export interface EditProfileFields {
   role: string;
   lookingFor: string;
   interests: string;
-  address: string;
+  state: string;
+  lga: string;
 }
 
 const splitList = (value: string) =>
@@ -32,7 +34,8 @@ const emptyFields: EditProfileFields = {
   role: "",
   lookingFor: "",
   interests: "",
-  address: "",
+  state: "",
+  lga: "",
 };
 
 /** Edit-profile screen: text persona fields + avatar/cover uploads. */
@@ -67,7 +70,8 @@ export function useEditProfilePresenter() {
           role: (profile.roles ?? []).join(", "),
           lookingFor: (profile.lookingFor ?? []).join(", "),
           interests: (profile.interests ?? []).join(", "),
-          address: profile.location ?? "",
+          state: profile.state ?? "",
+          lga: profile.city ?? "",
         });
       } catch (e) {
         if (cancelled) return;
@@ -86,7 +90,8 @@ export function useEditProfilePresenter() {
   }, [router]);
 
   const setField = useCallback((key: string, value: string) => {
-    setFields((f) => ({ ...f, [key]: value }));
+    // A new state invalidates the previously chosen LGA.
+    setFields((f) => (key === "state" ? { ...f, state: value, lga: "" } : { ...f, [key]: value }));
     setNotice(null);
   }, []);
 
@@ -101,6 +106,8 @@ export function useEditProfilePresenter() {
         if (err) throw new Error(err.message ?? "Could not update username");
         setInitialUsername(nextUsername);
       }
+      const state = fields.state.trim();
+      const lga = fields.lga.trim();
       await api.patch<ProfileVM>("/profile", {
         displayName: fields.displayName.trim(),
         gender: fields.gender.trim() || null,
@@ -108,7 +115,9 @@ export function useEditProfilePresenter() {
         roles: splitList(fields.role),
         lookingFor: splitList(fields.lookingFor),
         interests: splitList(fields.interests),
-        location: fields.address.trim() || null,
+        state: state || null,
+        city: lga || null,
+        location: state ? [lga, state, "Nigeria"].filter(Boolean).join(", ") : null,
       });
       setNotice("Profile saved.");
     } catch (e) {
@@ -126,10 +135,12 @@ export function useEditProfilePresenter() {
     }
   }, [fields, initialUsername]);
 
-  const uploadImage = useCallback(async (kind: "avatar" | "cover", file: File) => {
+  const uploadImage = useCallback(async (kind: "avatar" | "cover", rawFile: File) => {
     setUploading(true);
     setError(null);
     try {
+      // Shrink phone photos before upload so they survive slow connections.
+      const file = await compressImage(rawFile);
       const spec = await api.post<{ key: string; uploadUrl: string; maxSizeMb: number }>(
         "/profile/upload-url",
         { kind, contentType: file.type },

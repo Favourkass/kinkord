@@ -1,6 +1,8 @@
 "use client";
 
 import EditProfileView from "@/components/app/EditProfileView";
+import { NG_LGAS } from "@/constants/nigeria";
+import { NG_STATES } from "@/constants/onboarding";
 import { Routes } from "@/constants/Routes";
 import { useEditProfilePresenter } from "@/presenters/useEditProfilePresenter";
 
@@ -45,7 +47,20 @@ export default function EditProfilePage() {
           value: vm.fields.interests,
           placeholder: "Comma-separated interests",
         },
-        { key: "address", label: "Address", value: vm.fields.address },
+        {
+          key: "state",
+          label: "State",
+          value: vm.fields.state,
+          placeholder: "Select your state",
+          options: NG_STATES,
+        },
+        {
+          key: "lga",
+          label: "LGA / Area",
+          value: vm.fields.lga,
+          placeholder: vm.fields.state ? "Select your area" : "Select your state first",
+          options: NG_LGAS[vm.fields.state] ?? [],
+        },
       ]}
       saveLabel="SAVE CHANGES"
       saving={vm.saving}

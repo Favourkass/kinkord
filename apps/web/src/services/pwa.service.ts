@@ -32,7 +32,9 @@ export class PwaService {
     }
 
     const syncEarlyPrompt = () => {
-      const early = (window as unknown as { __kinkord_pwa_prompt?: BeforeInstallPromptEvent | null }).__kinkord_pwa_prompt;
+      const early = (
+        window as unknown as { __kinkord_pwa_prompt?: BeforeInstallPromptEvent | null }
+      ).__kinkord_pwa_prompt;
       if (early && !this.deferredPrompt) {
         this.deferredPrompt = early;
         this.notifyPromptSubscribers();
@@ -47,13 +49,17 @@ export class PwaService {
       const promptEvent = e as BeforeInstallPromptEvent;
       promptEvent.preventDefault?.();
       this.deferredPrompt = promptEvent;
-      (window as unknown as { __kinkord_pwa_prompt?: BeforeInstallPromptEvent | null }).__kinkord_pwa_prompt = promptEvent;
+      (
+        window as unknown as { __kinkord_pwa_prompt?: BeforeInstallPromptEvent | null }
+      ).__kinkord_pwa_prompt = promptEvent;
       this.notifyPromptSubscribers();
     });
 
     window.addEventListener("appinstalled", () => {
       this.deferredPrompt = null;
-      (window as unknown as { __kinkord_pwa_prompt?: BeforeInstallPromptEvent | null }).__kinkord_pwa_prompt = null;
+      (
+        window as unknown as { __kinkord_pwa_prompt?: BeforeInstallPromptEvent | null }
+      ).__kinkord_pwa_prompt = null;
       this.isInstalledViaPrompt = true;
       this.isInstallGuideOpen = false;
       this.notifyPromptSubscribers();
@@ -65,7 +71,9 @@ export class PwaService {
 
   getDeferredPrompt(): BeforeInstallPromptEvent | null {
     if (!this.deferredPrompt && typeof window !== "undefined") {
-      const early = (window as unknown as { __kinkord_pwa_prompt?: BeforeInstallPromptEvent | null }).__kinkord_pwa_prompt;
+      const early = (
+        window as unknown as { __kinkord_pwa_prompt?: BeforeInstallPromptEvent | null }
+      ).__kinkord_pwa_prompt;
       if (early) {
         this.deferredPrompt = early;
       }
@@ -161,7 +169,7 @@ export class PwaService {
 
     const isMediaStandalone = window.matchMedia?.("(display-mode: standalone)").matches ?? false;
     const isNavStandalone = Boolean(
-      (window.navigator as unknown as { standalone?: boolean })?.standalone
+      (window.navigator as unknown as { standalone?: boolean })?.standalone,
     );
 
     return isMediaStandalone || isNavStandalone;
@@ -176,7 +184,8 @@ export class PwaService {
     }
 
     const ua = navigator.userAgent;
-    const isIosUa = /iPad|iPhone|iPod/.test(ua) && !(window as unknown as { MSStream?: unknown }).MSStream;
+    const isIosUa =
+      /iPad|iPhone|iPod/.test(ua) && !(window as unknown as { MSStream?: unknown }).MSStream;
     const isIpadOs =
       typeof navigator !== "undefined" &&
       navigator.platform === "MacIntel" &&
@@ -227,7 +236,7 @@ export class PwaService {
    * Captures the browser's `beforeinstallprompt` event.
    */
   setupInstallPromptListener(
-    onPromptAvailable: (event: BeforeInstallPromptEvent) => void
+    onPromptAvailable: (event: BeforeInstallPromptEvent) => void,
   ): () => void {
     if (typeof window === "undefined") {
       return () => {};
@@ -275,7 +284,9 @@ export class PwaService {
       // Invalidate deferredPrompt immediately so it is never called twice
       this.deferredPrompt = null;
       if (typeof window !== "undefined") {
-        (window as unknown as { __kinkord_pwa_prompt?: BeforeInstallPromptEvent | null }).__kinkord_pwa_prompt = null;
+        (
+          window as unknown as { __kinkord_pwa_prompt?: BeforeInstallPromptEvent | null }
+        ).__kinkord_pwa_prompt = null;
       }
       if (choice.outcome === "accepted") {
         this.isInstalledViaPrompt = true;
@@ -285,7 +296,9 @@ export class PwaService {
     } catch {
       this.deferredPrompt = null;
       if (typeof window !== "undefined") {
-        (window as unknown as { __kinkord_pwa_prompt?: BeforeInstallPromptEvent | null }).__kinkord_pwa_prompt = null;
+        (
+          window as unknown as { __kinkord_pwa_prompt?: BeforeInstallPromptEvent | null }
+        ).__kinkord_pwa_prompt = null;
       }
       this.notifyPromptSubscribers();
       return "failed";

@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/services/authClient";
 import { api, uploadToPresignedUrl } from "@/services/apiClient";
+import { compressImage } from "@/util/image";
 import {
   validateAccount,
   validateAbout,
@@ -121,10 +122,12 @@ export function useSignupWizardPresenter() {
 
   const skipVerification = useCallback(() => setStage("profile"), []);
 
-  const uploadImage = useCallback(async (kind: "avatar" | "cover", file: File) => {
+  const uploadImage = useCallback(async (kind: "avatar" | "cover", rawFile: File) => {
     setUploading(kind);
     setProfileError(null);
     try {
+      // Shrink phone photos before upload so they survive slow connections.
+      const file = await compressImage(rawFile);
       const spec = await api.post<{ key: string; uploadUrl: string; maxSizeMb: number }>(
         "/profile/upload-url",
         { kind, contentType: file.type },

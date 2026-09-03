@@ -56,11 +56,13 @@ export function PwaInstallBanner({
               <span>To install: tap </span>
               <Share className="w-3.5 h-3.5 inline text-[#D4AF37] mx-0.5 align-text-bottom" />
               <span> Share, then select </span>
-              <strong className="text-[#f5f5f0] font-medium">&quot;Add to Home Screen&quot;</strong>.
+              <strong className="text-[#f5f5f0] font-medium">&quot;Add to Home Screen&quot;</strong>
+              .
             </div>
           ) : (
             <p className="mt-1 text-xs text-[#a3a3a3] leading-relaxed">
-              Add Kinkord to your home screen for full-screen view, faster load times, and instant notifications.
+              Add Kinkord to your home screen for full-screen view, faster load times, and instant
+              notifications.
             </p>
           )}
 
