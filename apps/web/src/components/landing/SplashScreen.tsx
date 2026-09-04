@@ -25,6 +25,13 @@ export interface PolicyItem {
   icon: "privacy" | "terms" | "guidelines" | "cookie" | "safety" | "copyright";
 }
 
+export interface AdultBadgeData {
+  age: string;
+  label: string;
+  line1: string;
+  line2: string;
+}
+
 export interface SplashScreenProps {
   logo: SplashImage;
   hero: SplashImage;
@@ -34,6 +41,7 @@ export interface SplashScreenProps {
   signUp: SplashLink;
   signIn: SplashLink;
   joinAgeDisclaimer?: string;
+  adultBadge?: AdultBadgeData;
   navLinks: SplashLink[];
   policyLinks?: PolicyItem[];
   copyright: string;
@@ -134,6 +142,30 @@ function StarDivider() {
           <path d="M7 0L8.5 5.5L14 7L8.5 8.5L7 14L5.5 8.5L0 7L5.5 5.5L7 0Z" fill="currentColor" />
         </svg>
       </div>
+    </div>
+  );
+}
+
+function AdultAgeBadge({
+  badge,
+  className = "",
+}: {
+  badge: AdultBadgeData;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`inline-flex items-center gap-3 sm:gap-3.5 rounded-[22px] border-[1.5px] border-[#faab14] bg-black/50 px-5 py-2 backdrop-blur-sm shadow-md shadow-black/60 ${className}`}
+      aria-label={`${badge.age} ${badge.label}`}
+    >
+      <div className="flex size-[32px] sm:size-[36px] items-center justify-center rounded-full border-[1.5px] border-[#faab14]">
+        <span className="text-[13px] sm:text-[14px] font-extrabold tracking-tight text-[#faab14]">
+          {badge.age}
+        </span>
+      </div>
+      <span className="text-[19px] sm:text-[22px] font-black tracking-wider text-[#faab14]">
+        {badge.label}
+      </span>
     </div>
   );
 }
@@ -244,7 +276,7 @@ function SignInButton({ cta }: { cta: SplashLink }) {
   return (
     <Link
       href={cta.href}
-      className="flex h-[60px] w-full max-w-[347px] items-center justify-center gap-3 rounded-[10px] border border-kink-amber text-[20px] font-bold text-kink-gold-bright"
+      className="flex h-[60px] w-full max-w-[347px] items-center justify-center gap-3 rounded-[10px] border border-kink-amber text-[20px] font-bold text-kink-gold-bright uppercase"
     >
       <SignInIcon />
       {cta.label}
@@ -260,7 +292,7 @@ export default function SplashScreen({
   tagline,
   signUp,
   signIn,
-  joinAgeDisclaimer,
+  adultBadge,
   navLinks,
   policyLinks,
   copyright,
@@ -321,7 +353,17 @@ export default function SplashScreen({
           <p className="mt-1 max-w-[318px] text-center text-[15px] font-extrabold leading-normal text-white">
             {tagline}
           </p>
-          <div className="min-h-[40px] flex-1" />
+
+          {adultBadge && (
+            <div className="my-6 flex flex-col items-center text-center">
+              <AdultAgeBadge badge={adultBadge} />
+              <div className="mt-2.5 text-[13.5px] font-bold leading-tight text-white">
+                <p>{adultBadge.line1}</p>
+                <p>{adultBadge.line2}</p>
+              </div>
+            </div>
+          )}
+
           <SignUpButton cta={signUp} />
           <div className="mt-3 w-full max-w-[347px]">
             <SignInButton cta={signIn} />
@@ -343,13 +385,10 @@ export default function SplashScreen({
             ))}
           </nav>
 
-          {joinAgeDisclaimer && (
+          {policyLinks && policyLinks.length > 0 && (
             <div className="mt-7 w-full max-w-[347px] sm:max-w-[440px]">
-              <p className="text-center text-[13px] sm:text-[14px] font-medium text-[#d8d8d2]">
-                {joinAgeDisclaimer}
-              </p>
               <StarDivider />
-              {policyLinks && policyLinks.length > 0 && <PolicyButtonsGrid links={policyLinks} />}
+              <PolicyButtonsGrid links={policyLinks} />
             </div>
           )}
 
@@ -374,27 +413,38 @@ export default function SplashScreen({
             <Image src={logo.src} alt={logo.alt} width={98} height={98} priority unoptimized />
             <DownloadPill cta={downloadCta} />
           </div>
-          <div className="relative z-10 pl-[118px]">
-            <h1 className="mt-[160px] xl:mt-[200px] text-[96px] font-extrabold leading-normal text-kink-gold-bright">
+          <div className="relative z-10 w-full max-w-[51.85%] pl-[64px] xl:pl-[118px] pr-8">
+            <h1 className="mt-[120px] xl:mt-[160px] text-[72px] xl:text-[96px] font-extrabold leading-normal text-kink-gold-bright">
               {brand}
             </h1>
-            <p className="mt-[16px] w-[635px] text-[24px] font-semibold leading-normal text-kink-mist">
+            <p className="mt-[16px] max-w-[635px] text-[20px] xl:text-[24px] font-semibold leading-normal text-kink-mist">
               {tagline}
             </p>
-            <div className="mt-[52px] flex gap-[38px]">
-              <div className="w-[347px]">
+
+            {adultBadge && (
+              <div className="mt-[28px] flex items-center gap-4">
+                <AdultAgeBadge badge={adultBadge} />
+                <div className="text-[14px] xl:text-[15px] font-bold leading-snug text-white">
+                  <p>{adultBadge.line1}</p>
+                  <p>{adultBadge.line2}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-[36px] flex flex-wrap gap-[20px] xl:gap-[38px]">
+              <div className="w-full sm:w-[347px]">
                 <SignUpButton cta={signUp} />
               </div>
-              <div className="w-[347px]">
+              <div className="w-full sm:w-[347px]">
                 <SignInButton cta={signIn} />
               </div>
             </div>
-            <nav className="mt-[48px] flex gap-[25px]">
+            <nav className="mt-[40px] flex flex-wrap gap-[16px] xl:gap-[25px]">
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="flex h-[60px] min-w-[216px] items-center justify-between gap-6 rounded-[10px] border border-kink-amber px-[24px] text-[20px] font-bold text-white transition hover:bg-white/5"
+                  className="flex h-[60px] min-w-[200px] xl:min-w-[216px] items-center justify-between gap-6 rounded-[10px] border border-kink-amber px-[24px] text-[18px] xl:text-[20px] font-bold text-white transition hover:bg-white/5"
                 >
                   {link.label}
                   <span className="text-kink-gold-bright">
@@ -404,13 +454,10 @@ export default function SplashScreen({
               ))}
             </nav>
 
-            {joinAgeDisclaimer && (
-              <div className="mt-[48px] max-w-[732px]">
-                <p className="text-center text-[16px] font-medium text-[#d8d8d2]">
-                  {joinAgeDisclaimer}
-                </p>
+            {policyLinks && policyLinks.length > 0 && (
+              <div className="mt-[40px] max-w-[732px]">
                 <StarDivider />
-                {policyLinks && policyLinks.length > 0 && <PolicyButtonsGrid links={policyLinks} />}
+                <PolicyButtonsGrid links={policyLinks} />
               </div>
             )}
           </div>

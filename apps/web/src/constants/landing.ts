@@ -13,6 +13,13 @@ export const AGE_DISCLAIMER_FOOTER =
 export const JOIN_AGE_DISCLAIMER = "You must be 18 years or older to join.";
 export const ALL_RIGHTS_RESERVED = "All rights reserved.";
 
+export const ADULT_BADGE = {
+  age: "18+",
+  label: "ONLY",
+  line1: "Kinkord is an adult Community.",
+  line2: "You must be 18 years or older to join.",
+} as const;
+
 export const AGE_GATE_MODAL = {
   badge: "🔞 18+ ADULT COMMUNITY",
   title: "AGE VERIFICATION",

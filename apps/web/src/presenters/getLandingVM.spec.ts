@@ -13,7 +13,7 @@ describe("getLandingVM", () => {
 
   it("points the auth CTAs at the signup and login routes", () => {
     expect(vm.signUp).toEqual({ label: "SIGN UP", href: Routes.signup });
-    expect(vm.signIn).toEqual({ label: "login", href: Routes.login });
+    expect(vm.signIn).toEqual({ label: "LOG IN", href: Routes.login });
     expect(vm.downloadCta.href).toBe(Routes.signup);
   });
 
@@ -58,5 +58,12 @@ describe("getLandingVM", () => {
     expect(vm.ageGate.warning).toContain("Providing false age information");
     expect(vm.ageGate.confirmLabel).toContain("18 OR OLDER");
     expect(vm.ageGate.declineLabel).toContain("UNDER 18");
+  });
+
+  it("exposes the adult badge design copy", () => {
+    expect(vm.adultBadge.age).toBe("18+");
+    expect(vm.adultBadge.label).toBe("ONLY");
+    expect(vm.adultBadge.line1).toBe("Kinkord is an adult Community.");
+    expect(vm.adultBadge.line2).toBe("You must be 18 years or older to join.");
   });
 });
