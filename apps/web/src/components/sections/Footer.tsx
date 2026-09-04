@@ -13,11 +13,11 @@ const SOCIAL_ICONS: Record<string, typeof AtSign> = {
   WhatsApp: MessageCircle,
 };
 
-export default function Footer({ links, socials, addressLine }: Props) {
+export default function Footer({ links, socials, addressLine, ageDisclaimer }: Props) {
   return (
     <footer className="bg-[#080808] border-t border-[#d4af37]/10 py-14 px-6">
       <div className="max-w-4xl mx-auto flex flex-col items-center gap-8">
-        <div className="text-center">
+        <div className="text-center flex flex-col items-center">
           <h3
             className="text-2xl font-bold tracking-[0.3em] uppercase gold-gradient"
             style={{ fontFamily: "var(--font-playfair)" }}
@@ -27,6 +27,13 @@ export default function Footer({ links, socials, addressLine }: Props) {
           <p className="text-[10px] uppercase tracking-[0.3em] text-[#555] mt-2">
             Global Lifestyle Community for Adults
           </p>
+          {ageDisclaimer && (
+            <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-[#d4af37]/25 bg-[#d4af37]/5 px-3.5 py-1 text-[10px] sm:text-[11px] text-[#d4af37]">
+              <span className="font-bold tracking-wider">18+</span>
+              <span className="text-[#666]">·</span>
+              <span className="text-[#bbb] font-medium">{ageDisclaimer}</span>
+            </div>
+          )}
         </div>
 
         <div className="section-divider w-16" />

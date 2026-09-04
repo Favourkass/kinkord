@@ -25,6 +25,7 @@ import DobPicker from "@/components/auth/DobPicker";
 import CodeInput from "@/components/auth/CodeInput";
 import UploadTile from "@/components/auth/UploadTile";
 import RoleChips from "@/components/auth/RoleChips";
+import AgePill from "@/components/ui/AgePill";
 import { ShieldCheckIcon } from "@/components/auth/AuthIcons";
 import { useSignupWizardPresenter } from "@/presenters/useSignupWizardPresenter";
 import {
@@ -70,6 +71,10 @@ export default function SignupPage() {
                   onSelect={() => p.stepOne.setCountry(c.code)}
                 />
               ))}
+            </div>
+
+            <div className="w-full">
+              <AgePill lead="18+ Only." rest="You must be 18 or older to join Kinkord." />
             </div>
 
             <div className="w-full divide-y divide-kink-line rounded-[18px] border border-kink-line bg-kink-surface px-5 sm:px-6">

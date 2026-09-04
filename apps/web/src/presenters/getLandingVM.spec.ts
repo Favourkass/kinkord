@@ -13,7 +13,7 @@ describe("getLandingVM", () => {
 
   it("points the auth CTAs at the signup and login routes", () => {
     expect(vm.signUp).toEqual({ label: "SIGN UP", href: Routes.signup });
-    expect(vm.signIn).toEqual({ label: "SIGN IN", href: Routes.login });
+    expect(vm.signIn).toEqual({ label: "login", href: Routes.login });
     expect(vm.downloadCta.href).toBe(Routes.signup);
   });
 
@@ -30,5 +30,10 @@ describe("getLandingVM", () => {
     expect(vm.hero.src).toBe("/brand/hero-trio.jpg");
     expect(vm.logo.alt).not.toHaveLength(0);
     expect(vm.hero.alt).not.toHaveLength(0);
+  });
+
+  it("includes the 18+ age disclaimer", () => {
+    expect(vm.ageDisclaimer.lead).toBe("18+ Only.");
+    expect(vm.ageDisclaimer.rest).toContain("18 or older");
   });
 });

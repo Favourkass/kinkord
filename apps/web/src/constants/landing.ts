@@ -5,6 +5,12 @@ export const BRAND_TAGLINE =
 
 export const COPYRIGHT_LINE = "© 2026 Kinkord Limited. A Temaxiro Company";
 
+export const AGE_DISCLAIMER_LEAD = "18+ Only.";
+export const AGE_DISCLAIMER_TEXT = "You must be 18 or older to access Kinkord.";
+export const AGE_DISCLAIMER_FOOTER =
+  "18+ Only · You must be 18 or older to access Kinkord · Consensual adult community.";
+
+
 export const SOCIALS = [
   { name: "Instagram", href: "#", icon: "instagram" },
   { name: "X / Twitter", href: "#", icon: "twitter" },

@@ -8,7 +8,7 @@ export const metadata = {
 };
 
 export default function ContactPage() {
-  const { logo } = getLandingVM();
+  const { logo, ageDisclaimer } = getLandingVM();
 
   return (
     <ComingSoonScreen
@@ -16,6 +16,7 @@ export default function ContactPage() {
       title="CONTACT US"
       note="Support channels open at launch. Kinkord · The World's Kink Community."
       back={{ label: "BACK TO HOME", href: Routes.home }}
+      ageDisclaimer={ageDisclaimer}
     />
   );
 }

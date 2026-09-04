@@ -21,6 +21,7 @@ describe("useLandingPresenter", () => {
     expect(result.current.brand).toBe("KINKORD");
     expect(result.current.isInstalled).toBe(false);
     expect(result.current.downloadCta.label).toBe("Download Kinkord");
+    expect(result.current.ageDisclaimer.lead).toBe("18+ Only.");
     expect(typeof result.current.onDownload).toBe("function");
     expect(typeof result.current.downloadCta.onClick).toBe("function");
   });

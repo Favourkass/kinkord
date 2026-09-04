@@ -13,7 +13,7 @@ File key `BIcp5EnoAPjkOBHZ6MNCXo`, canvas `452:107` ("Landing Page").
 
 Gold page background with a dark rounded panel. Circular gold "K" badge logo
 (NEW mark), "Download Kinkord" gold pill top-right, KINKORD display heading +
-tagline, solid-gold SIGN UP (user icon) + outline SIGN IN (log-in icon),
+tagline, solid-gold SIGN UP (user icon) + outline login (log-in icon),
 secondary nav buttons KINKOPEDIA / ABOUT KINKORD / CONTACT US with gold
 chevrons, footer "© 2026 Kinkord Limited. A Temaxiro Company".
 Mobile: full-bleed black satin texture, centered logo, hero photo mid-screen,

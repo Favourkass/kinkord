@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import AgePill from "@/components/ui/AgePill";
 
 export interface SplashLink {
   label: string;
@@ -25,6 +26,7 @@ export interface SplashScreenProps {
   tagline: string;
   signUp: SplashLink;
   signIn: SplashLink;
+  ageDisclaimer: { lead: string; rest: string };
   navLinks: SplashLink[];
   copyright: string;
 }
@@ -136,6 +138,7 @@ export default function SplashScreen({
   tagline,
   signUp,
   signIn,
+  ageDisclaimer,
   navLinks,
   copyright,
 }: SplashScreenProps) {
@@ -179,7 +182,10 @@ export default function SplashScreen({
           <div className="mt-3 w-full max-w-[347px]">
             <SignInButton cta={signIn} />
           </div>
-          <nav className="mt-[29px] w-full max-w-[347px] rounded-[20px] border border-kink-amber bg-kink-surface px-[22px]">
+          <div className="mt-4 w-full max-w-[347px]">
+            <AgePill lead={ageDisclaimer.lead} rest={ageDisclaimer.rest} compact />
+          </div>
+          <nav className="mt-[20px] w-full max-w-[347px] rounded-[20px] border border-kink-amber bg-kink-surface px-[22px]">
             {navLinks.map((link, i) => (
               <Link
                 key={link.href}
@@ -245,6 +251,9 @@ export default function SplashScreen({
                 </Link>
               ))}
             </nav>
+            <div className="mt-[36px] max-w-[732px]">
+              <AgePill lead={ageDisclaimer.lead} rest={ageDisclaimer.rest} />
+            </div>
           </div>
           <p className="absolute inset-x-0 bottom-[37px] z-10 text-center text-[20px] font-medium text-kink-mist">
             {copyright}
