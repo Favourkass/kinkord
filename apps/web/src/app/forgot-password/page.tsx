@@ -6,6 +6,7 @@ import AuthShell from "@/components/auth/AuthShell";
 import WizardHeading from "@/components/auth/WizardHeading";
 import TextField from "@/components/auth/TextField";
 import GoldCta from "@/components/auth/GoldCta";
+import AgePill from "@/components/ui/AgePill";
 import { useForgotPasswordPresenter } from "@/presenters/usePasswordResetPresenter";
 import { Routes } from "@/constants/Routes";
 
@@ -49,6 +50,9 @@ export default function ForgotPasswordPage() {
             <GoldCta label="Send reset link" type="submit" loading={p.busy} />
           </form>
         )}
+        <div className="w-full max-w-[354px]">
+          <AgePill lead="18+ Only." rest="You must be 18 or older to use Kinkord." compact />
+        </div>
         <Link
           href={Routes.login}
           className="text-[15px] font-semibold text-kink-gold underline-offset-4 hover:underline"
