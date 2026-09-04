@@ -35,5 +35,28 @@ describe("getLandingVM", () => {
   it("includes the 18+ age disclaimer", () => {
     expect(vm.ageDisclaimer.lead).toBe("18+ Only.");
     expect(vm.ageDisclaimer.rest).toContain("18 or older");
+    expect(vm.joinAgeDisclaimer).toBe("You must be 18 years or older to join.");
+  });
+
+  it("exposes the 6 policy links for the footer buttons", () => {
+    expect(vm.policyLinks).toHaveLength(6);
+    expect(vm.policyLinks.map((p) => p.label)).toEqual([
+      "Privacy Policy",
+      "Terms of Service",
+      "Community Guidelines",
+      "Cookie Policy",
+      "Safety & Reporting",
+      "Copyright Policy",
+    ]);
+    expect(vm.allRightsReserved).toBe("All rights reserved.");
+  });
+
+  it("exposes the age gate modal copy", () => {
+    expect(vm.ageGate.title).toBe("AGE VERIFICATION");
+    expect(vm.ageGate.badge).toContain("18+ ADULT COMMUNITY");
+    expect(vm.ageGate.points).toHaveLength(4);
+    expect(vm.ageGate.warning).toContain("Providing false age information");
+    expect(vm.ageGate.confirmLabel).toContain("18 OR OLDER");
+    expect(vm.ageGate.declineLabel).toContain("UNDER 18");
   });
 });

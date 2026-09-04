@@ -22,6 +22,9 @@ describe("useLandingPresenter", () => {
     expect(result.current.isInstalled).toBe(false);
     expect(result.current.downloadCta.label).toBe("Download Kinkord");
     expect(result.current.ageDisclaimer.lead).toBe("18+ Only.");
+    expect(result.current.joinAgeDisclaimer).toBe("You must be 18 years or older to join.");
+    expect(result.current.policyLinks).toHaveLength(6);
+    expect(result.current.allRightsReserved).toBe("All rights reserved.");
     expect(typeof result.current.onDownload).toBe("function");
     expect(typeof result.current.downloadCta.onClick).toBe("function");
   });
@@ -52,5 +55,17 @@ describe("useLandingPresenter", () => {
     });
 
     expect(triggerSpy).toHaveBeenCalledWith(mockEvent);
+  });
+
+  it("shows age gate when age has not been confirmed, and closes it upon confirmation", async () => {
+    const { result } = renderHook(() => useLandingPresenter());
+
+    expect(result.current.showAgeGate).toBe(true);
+
+    await act(async () => {
+      result.current.onConfirmAge();
+    });
+
+    expect(result.current.showAgeGate).toBe(false);
   });
 });

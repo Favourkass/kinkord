@@ -1,9 +1,13 @@
 import {
   AGE_DISCLAIMER_LEAD,
   AGE_DISCLAIMER_TEXT,
+  AGE_GATE_MODAL,
+  ALL_RIGHTS_RESERVED,
   BRAND_NAME,
   BRAND_TAGLINE,
   COPYRIGHT_LINE,
+  JOIN_AGE_DISCLAIMER,
+  POLICY_LINKS,
 } from "@/constants/landing";
 import { Routes } from "@/constants/Routes";
 
@@ -30,12 +34,16 @@ export function getLandingVM() {
       lead: AGE_DISCLAIMER_LEAD,
       rest: AGE_DISCLAIMER_TEXT,
     },
+    joinAgeDisclaimer: JOIN_AGE_DISCLAIMER,
     navLinks: [
       { label: "KINKOPEDIA", href: Routes.kinkopedia },
       { label: "ABOUT KINKORD", href: Routes.about },
       { label: "CONTACT US", href: Routes.contact },
     ],
+    policyLinks: POLICY_LINKS.map((p) => ({ ...p })),
+    ageGate: { ...AGE_GATE_MODAL },
     copyright: COPYRIGHT_LINE,
+    allRightsReserved: ALL_RIGHTS_RESERVED,
   };
 }
 

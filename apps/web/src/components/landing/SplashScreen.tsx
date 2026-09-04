@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import AgePill from "@/components/ui/AgePill";
+import { Cookie, Copyright, FileText, Lock, Shield, ShieldAlert, Users } from "lucide-react";
+import AgeGateModal from "@/components/ui/AgeGateModal";
 
 export interface SplashLink {
   label: string;
@@ -18,6 +19,12 @@ interface SplashImage {
   alt: string;
 }
 
+export interface PolicyItem {
+  label: string;
+  href: string;
+  icon: "privacy" | "terms" | "guidelines" | "cookie" | "safety" | "copyright";
+}
+
 export interface SplashScreenProps {
   logo: SplashImage;
   hero: SplashImage;
@@ -26,9 +33,25 @@ export interface SplashScreenProps {
   tagline: string;
   signUp: SplashLink;
   signIn: SplashLink;
-  ageDisclaimer: { lead: string; rest: string };
+  joinAgeDisclaimer?: string;
   navLinks: SplashLink[];
+  policyLinks?: PolicyItem[];
   copyright: string;
+  allRightsReserved?: string;
+  ageDisclaimer?: { lead: string; rest: string };
+  ageGate?: {
+    title: string;
+    badge: string;
+    statement: string;
+    intro?: string;
+    points?: readonly { icon: string; text: string }[];
+    warning?: string;
+    confirmLabel: string;
+    declineLabel: string;
+  };
+  showAgeGate?: boolean;
+  onConfirmAge?: () => void;
+  onDeclineAge?: () => void;
 }
 
 function UserIcon() {
@@ -76,6 +99,105 @@ function ChevronIcon() {
         />
       </svg>
     </span>
+  );
+}
+
+function PolicyChevron() {
+  return (
+    <span aria-hidden className="grid size-5 place-items-center text-[#faab14]">
+      <svg width="8" height="14" viewBox="0 0 8 14" fill="none" overflow="visible">
+        <path
+          d="M1 1L7 7L1 13"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </span>
+  );
+}
+
+function StarDivider() {
+  return (
+    <div className="relative my-5 sm:my-6 flex w-full items-center justify-center">
+      <div className="h-px w-full bg-gradient-to-r from-transparent via-[#faab14]/60 to-transparent" />
+      <div className="absolute grid size-5 place-items-center bg-black">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 14 14"
+          fill="none"
+          className="text-[#faab14]"
+          aria-hidden
+        >
+          <path d="M7 0L8.5 5.5L14 7L8.5 8.5L7 14L5.5 8.5L0 7L5.5 5.5L7 0Z" fill="currentColor" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function PolicyIcon({ type }: { type: PolicyItem["icon"] }) {
+  switch (type) {
+    case "privacy":
+      return <Shield className="size-[20px] sm:size-[22px] text-[#faab14]" aria-hidden />;
+    case "terms":
+      return <FileText className="size-[20px] sm:size-[22px] text-[#faab14]" aria-hidden />;
+    case "guidelines":
+      return <Users className="size-[20px] sm:size-[22px] text-[#faab14]" aria-hidden />;
+    case "cookie":
+      return <Cookie className="size-[20px] sm:size-[22px] text-[#faab14]" aria-hidden />;
+    case "safety":
+      return <ShieldAlert className="size-[20px] sm:size-[22px] text-[#faab14]" aria-hidden />;
+    case "copyright":
+      return <Copyright className="size-[20px] sm:size-[22px] text-[#faab14]" aria-hidden />;
+    default:
+      return <Shield className="size-[20px] sm:size-[22px] text-[#faab14]" aria-hidden />;
+  }
+}
+
+function PolicyButtonsGrid({ links }: { links: PolicyItem[] }) {
+  return (
+    <div className="grid w-full grid-cols-2 gap-2.5 sm:gap-3.5">
+      {links.map((link) => (
+        <Link
+          key={link.label}
+          href={link.href}
+          className="flex h-[52px] sm:h-[58px] items-center justify-between rounded-[12px] border border-[#faab14]/40 bg-[#0c0c0b] px-3 sm:px-4 text-white transition hover:border-[#faab14] hover:bg-[#181815] active:scale-[0.99]"
+        >
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <span className="shrink-0">
+              <PolicyIcon type={link.icon} />
+            </span>
+            <span className="truncate text-[11px] sm:text-[14px] lg:text-[15px] font-medium text-white">
+              {link.label}
+            </span>
+          </div>
+          <PolicyChevron />
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function FooterNotice({
+  copyright,
+  allRightsReserved,
+}: {
+  copyright: string;
+  allRightsReserved?: string;
+}) {
+  return (
+    <div className="py-6 text-center">
+      <p className="text-[12px] sm:text-[14px] font-medium text-kink-mist">{copyright}</p>
+      {allRightsReserved && (
+        <p className="mt-1.5 flex items-center justify-center gap-1.5 text-[11px] sm:text-[13px] font-medium text-kink-mist">
+          <Lock className="size-3.5 text-[#faab14]" aria-hidden />
+          <span>{allRightsReserved}</span>
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -138,12 +260,34 @@ export default function SplashScreen({
   tagline,
   signUp,
   signIn,
-  ageDisclaimer,
+  joinAgeDisclaimer,
   navLinks,
+  policyLinks,
   copyright,
+  allRightsReserved,
+  ageGate,
+  showAgeGate,
+  onConfirmAge,
+  onDeclineAge,
 }: SplashScreenProps) {
   return (
     <div className="min-h-dvh bg-black">
+      {showAgeGate && ageGate && onConfirmAge && onDeclineAge && (
+        <AgeGateModal
+          open={showAgeGate}
+          title={ageGate.title}
+          badge={ageGate.badge}
+          statement={ageGate.statement}
+          intro={ageGate.intro}
+          points={ageGate.points}
+          warning={ageGate.warning}
+          confirmLabel={ageGate.confirmLabel}
+          declineLabel={ageGate.declineLabel}
+          onConfirm={onConfirmAge}
+          onDecline={onDeclineAge}
+        />
+      )}
+
       {/* Mobile splash */}
       <div className="relative flex min-h-dvh flex-col overflow-hidden bg-black lg:hidden">
         <div className="absolute inset-x-0 top-0 bottom-[28px] overflow-hidden">
@@ -161,7 +305,7 @@ export default function SplashScreen({
         <div className="absolute right-[22px] top-[max(env(safe-area-inset-top,0px)+16px,36px)] z-30 pointer-events-auto">
           <DownloadPill cta={downloadCta} compact />
         </div>
-        <div className="relative z-10 flex flex-1 flex-col items-center px-[27px]">
+        <div className="relative z-10 flex flex-1 flex-col items-center px-[22px] sm:px-[27px] pb-8">
           <Image
             src={logo.src}
             alt={logo.alt}
@@ -182,10 +326,7 @@ export default function SplashScreen({
           <div className="mt-3 w-full max-w-[347px]">
             <SignInButton cta={signIn} />
           </div>
-          <div className="mt-4 w-full max-w-[347px]">
-            <AgePill lead={ageDisclaimer.lead} rest={ageDisclaimer.rest} compact />
-          </div>
-          <nav className="mt-[20px] w-full max-w-[347px] rounded-[20px] border border-kink-amber bg-kink-surface px-[22px]">
+          <nav className="mt-[24px] w-full max-w-[347px] rounded-[20px] border border-kink-amber bg-kink-surface px-[22px]">
             {navLinks.map((link, i) => (
               <Link
                 key={link.href}
@@ -201,13 +342,24 @@ export default function SplashScreen({
               </Link>
             ))}
           </nav>
-          <p className="py-[7px] text-center text-[12px] font-medium text-kink-mist">{copyright}</p>
+
+          {joinAgeDisclaimer && (
+            <div className="mt-7 w-full max-w-[347px] sm:max-w-[440px]">
+              <p className="text-center text-[13px] sm:text-[14px] font-medium text-[#d8d8d2]">
+                {joinAgeDisclaimer}
+              </p>
+              <StarDivider />
+              {policyLinks && policyLinks.length > 0 && <PolicyButtonsGrid links={policyLinks} />}
+            </div>
+          )}
+
+          <FooterNotice copyright={copyright} allRightsReserved={allRightsReserved} />
         </div>
       </div>
 
       {/* Desktop splash */}
       <div className="hidden lg:block">
-        <div className="relative min-h-[max(100dvh,946px)] overflow-hidden bg-black">
+        <div className="relative min-h-screen overflow-x-hidden bg-black pb-16">
           <div className="absolute right-0 top-0 h-[calc(100%-72px)] w-[48.15%]">
             <Image
               src={hero.src}
@@ -223,13 +375,13 @@ export default function SplashScreen({
             <DownloadPill cta={downloadCta} />
           </div>
           <div className="relative z-10 pl-[118px]">
-            <h1 className="mt-[210px] text-[96px] font-extrabold leading-normal text-kink-gold-bright">
+            <h1 className="mt-[160px] xl:mt-[200px] text-[96px] font-extrabold leading-normal text-kink-gold-bright">
               {brand}
             </h1>
             <p className="mt-[16px] w-[635px] text-[24px] font-semibold leading-normal text-kink-mist">
               {tagline}
             </p>
-            <div className="mt-[58px] flex gap-[38px]">
+            <div className="mt-[52px] flex gap-[38px]">
               <div className="w-[347px]">
                 <SignUpButton cta={signUp} />
               </div>
@@ -237,12 +389,12 @@ export default function SplashScreen({
                 <SignInButton cta={signIn} />
               </div>
             </div>
-            <nav className="mt-[59px] flex gap-[25px]">
+            <nav className="mt-[48px] flex gap-[25px]">
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="flex h-[60px] min-w-[216px] items-center justify-between gap-6 rounded-[10px] border border-kink-amber px-[24px] text-[20px] font-bold text-white"
+                  className="flex h-[60px] min-w-[216px] items-center justify-between gap-6 rounded-[10px] border border-kink-amber px-[24px] text-[20px] font-bold text-white transition hover:bg-white/5"
                 >
                   {link.label}
                   <span className="text-kink-gold-bright">
@@ -251,13 +403,19 @@ export default function SplashScreen({
                 </Link>
               ))}
             </nav>
-            <div className="mt-[36px] max-w-[732px]">
-              <AgePill lead={ageDisclaimer.lead} rest={ageDisclaimer.rest} />
-            </div>
+
+            {joinAgeDisclaimer && (
+              <div className="mt-[48px] max-w-[732px]">
+                <p className="text-center text-[16px] font-medium text-[#d8d8d2]">
+                  {joinAgeDisclaimer}
+                </p>
+                <StarDivider />
+                {policyLinks && policyLinks.length > 0 && <PolicyButtonsGrid links={policyLinks} />}
+              </div>
+            )}
           </div>
-          <p className="absolute inset-x-0 bottom-[37px] z-10 text-center text-[20px] font-medium text-kink-mist">
-            {copyright}
-          </p>
+
+          <FooterNotice copyright={copyright} allRightsReserved={allRightsReserved} />
         </div>
       </div>
     </div>

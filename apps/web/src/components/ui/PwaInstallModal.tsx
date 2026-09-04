@@ -79,13 +79,13 @@ export function PwaInstallModal({
 
         {/* Header */}
         <div className="flex items-center gap-4 pr-6">
-          <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-[#D4AF37]/40 bg-[#1a1a1a] p-2.5 shadow-inner">
+          <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-[#D4AF37]/40 shadow-lg shadow-black/80 bg-[#0a0a0a]">
             <Image
-              src="/brand/logo-badge.png"
+              src="/icons/icon-192x192.png"
               alt="Kinkord"
-              width={40}
-              height={40}
-              className="object-contain"
+              width={56}
+              height={56}
+              className="w-full h-full object-cover"
             />
           </div>
           <div>
