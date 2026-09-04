@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import { getLandingVM, LandingVM } from "./getLandingVM";
 import { usePwaPresenter } from "./usePwaPresenter";
 import { ageGateService } from "@/services/ageGate.service";
@@ -16,11 +16,15 @@ export type ClientLandingVM = LandingVM & {
 export function useLandingPresenter(): ClientLandingVM {
   const baseVM = useMemo(() => getLandingVM(), []);
   const pwa = usePwaPresenter();
-  const [hasConfirmedAge, setHasConfirmedAge] = useState<boolean>(true);
 
-  useEffect(() => {
-    setHasConfirmedAge(ageGateService.isConfirmed());
-  }, []);
+  // Client-only age confirmation. useSyncExternalStore keeps this SSR-safe
+  // (server snapshot = unconfirmed, so the gate shows until the client
+  // confirms) without a setState-in-effect. Mirrors usePwaPresenter.
+  const hasConfirmedAge = useSyncExternalStore(
+    (onStoreChange) => ageGateService.subscribe(onStoreChange),
+    () => ageGateService.isConfirmed(),
+    () => false,
+  );
 
   const downloadLabel = useMemo(() => {
     if (pwa.isInstalled) return "App Installed";
@@ -33,8 +37,8 @@ export function useLandingPresenter(): ClientLandingVM {
     isInstalled: pwa.isInstalled,
     showAgeGate: !hasConfirmedAge,
     onConfirmAge: () => {
+      // confirm() notifies subscribers, which re-renders via useSyncExternalStore.
       ageGateService.confirm();
-      setHasConfirmedAge(true);
     },
     onDeclineAge: () => {
       if (typeof window !== "undefined") {

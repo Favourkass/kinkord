@@ -106,9 +106,7 @@ export default function AgeGateModal({
         </div>
 
         {/* Statement */}
-        <p className="text-[15px] sm:text-[17px] font-bold text-white leading-snug">
-          {statement}
-        </p>
+        <p className="text-[15px] sm:text-[17px] font-bold text-white leading-snug">{statement}</p>
 
         {/* Intro */}
         {intro && (
