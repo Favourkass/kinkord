@@ -49,7 +49,6 @@ export const POLICY_LINKS: readonly PolicyLink[] = [
   { label: "Copyright Policy", href: "#", icon: "copyright" },
 ];
 
-
 export const SOCIALS = [
   { name: "Instagram", href: "#", icon: "instagram" },
   { name: "X / Twitter", href: "#", icon: "twitter" },

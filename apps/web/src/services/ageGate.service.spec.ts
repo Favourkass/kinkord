@@ -24,4 +24,19 @@ describe("AgeGateService", () => {
     ageGateService.reset();
     expect(ageGateService.isConfirmed()).toBe(false);
   });
+
+  it("notifies subscribers on confirm/reset and stops after unsubscribe", () => {
+    let calls = 0;
+    const unsubscribe = ageGateService.subscribe(() => {
+      calls += 1;
+    });
+
+    ageGateService.confirm();
+    ageGateService.reset();
+    expect(calls).toBe(2);
+
+    unsubscribe();
+    ageGateService.confirm();
+    expect(calls).toBe(2);
+  });
 });
