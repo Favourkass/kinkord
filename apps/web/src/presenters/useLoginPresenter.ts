@@ -15,7 +15,10 @@ export function useLoginPresenter() {
   const router = useRouter();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
+  // Stay signed in by default (Facebook-style): the session cookie persists
+  // across app closes so reopening lands on /home, not the login screen. Users
+  // can still opt out (e.g. on a shared device) by unchecking "Remember me".
+  const [rememberMe, setRememberMe] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needsTwoFactor, setNeedsTwoFactor] = useState(false);
