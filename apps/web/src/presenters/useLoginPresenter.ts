@@ -42,7 +42,7 @@ export function useLoginPresenter() {
           id.kind === "email"
             ? await authClient.signIn.email({ email: id.value, password, rememberMe })
             : await authClient.signIn.username({ username: id.value, password, rememberMe });
-        if (err) throw new Error(err.message ?? "Sign in failed");
+        if (err) throw new Error(err.message ?? "login failed");
         outcome = data as SignInOutcome | null;
       }
       if (outcome?.twoFactorRedirect) {
@@ -51,7 +51,7 @@ export function useLoginPresenter() {
       }
       router.push(Routes.appHome);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Sign in failed. Check your details.");
+      setError(e instanceof Error ? e.message : "login failed. Check your details.");
     } finally {
       setBusy(false);
     }

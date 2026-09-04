@@ -23,4 +23,9 @@ describe("getFooterVM", () => {
     expect(vm.addressLine).toContain("Temaxiro Limited");
     expect(vm.addressLine).toContain("Sapele");
   });
+
+  it("provides an 18+ age disclaimer for the footer", () => {
+    expect(vm.ageDisclaimer).toContain("18+ Only");
+    expect(vm.ageDisclaimer).toContain("18 or older");
+  });
 });

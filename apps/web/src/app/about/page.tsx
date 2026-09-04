@@ -8,7 +8,7 @@ export const metadata = {
 };
 
 export default function AboutPage() {
-  const { logo, tagline } = getLandingVM();
+  const { logo, tagline, ageDisclaimer } = getLandingVM();
 
   return (
     <ComingSoonScreen
@@ -16,6 +16,7 @@ export default function AboutPage() {
       title="ABOUT KINKORD"
       note={`${tagline} Built by Kinkord Limited, a Temaxiro company.`}
       back={{ label: "BACK TO HOME", href: Routes.home }}
+      ageDisclaimer={ageDisclaimer}
     />
   );
 }

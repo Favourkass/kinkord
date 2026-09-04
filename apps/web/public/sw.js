@@ -1,5 +1,5 @@
 // Kinkord Service Worker
-const CACHE_NAME = "kinkord-pwa-v1";
+const CACHE_NAME = "kinkord-pwa-v2";
 const OFFLINE_URL = "/offline";
 
 const PRECACHE_ASSETS = [

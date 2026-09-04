@@ -109,7 +109,7 @@ export default function LoginPage() {
               )}
 
               <div className="mt-8 flex justify-center lg:mt-7">
-                <AmberCta label="Sign In" type="submit" loading={p.busy} className="lg:w-[620px]" />
+                <AmberCta label="LOGIN" type="submit" loading={p.busy} className="lg:w-[620px]" />
               </div>
             </form>
 

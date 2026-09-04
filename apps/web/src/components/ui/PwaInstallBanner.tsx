@@ -26,13 +26,13 @@ export function PwaInstallBanner({
       className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-md z-50 animate-in fade-in slide-in-from-bottom-5 duration-300"
     >
       <div className="bg-[#121212]/95 backdrop-blur-md border border-[#D4AF37]/40 rounded-2xl p-4 shadow-2xl shadow-black/80 flex items-start gap-3.5">
-        <div className="w-12 h-12 rounded-xl bg-[#1c1c1c] border border-[#D4AF37]/30 flex-shrink-0 flex items-center justify-center p-2 shadow-inner">
+        <div className="w-12 h-12 rounded-xl overflow-hidden border border-[#D4AF37]/40 flex-shrink-0 shadow-md shadow-black/80 bg-[#0a0a0a]">
           <Image
-            src="/brand/logo-badge.png"
+            src="/icons/icon-192x192.png"
             alt="Kinkord"
-            width={32}
-            height={32}
-            className="object-contain"
+            width={48}
+            height={48}
+            className="w-full h-full object-cover"
           />
         </div>
 

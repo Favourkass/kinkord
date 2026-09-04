@@ -8,7 +8,7 @@ export const metadata = {
 };
 
 export default function KinkopediaPage() {
-  const { logo } = getLandingVM();
+  const { logo, ageDisclaimer } = getLandingVM();
 
   return (
     <ComingSoonScreen
@@ -16,6 +16,7 @@ export default function KinkopediaPage() {
       title="KINKOPEDIA"
       note="The kink education library is being written. It launches with the platform."
       back={{ label: "BACK TO HOME", href: Routes.home }}
+      ageDisclaimer={ageDisclaimer}
     />
   );
 }
