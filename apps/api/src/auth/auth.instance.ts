@@ -64,6 +64,15 @@ export function buildAuth(db: Db, email: EmailService) {
         },
       },
     },
+    session: {
+      // Long, sliding session so people stay signed in like a native app.
+      // The cookie lives 30 days and is refreshed on activity (updateAge), so
+      // active users are effectively never logged out; only true inactivity for
+      // 30 days ends the session. Persistence itself is gated by `rememberMe`
+      // at sign-in (defaulted on for the web client).
+      expiresIn: 60 * 60 * 24 * 30, // 30 days
+      updateAge: 60 * 60 * 24, // refresh the window once per day of activity
+    },
     emailAndPassword: {
       enabled: true,
       minPasswordLength: 10,
