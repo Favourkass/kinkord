@@ -13,7 +13,7 @@ describe("getLandingVM", () => {
 
   it("points the auth CTAs at the signup and login routes", () => {
     expect(vm.signUp).toEqual({ label: "SIGN UP", href: Routes.signup });
-    expect(vm.signIn).toEqual({ label: "LOG IN", href: Routes.login });
+    expect(vm.signIn).toEqual({ label: "LOGIN", href: Routes.login });
     expect(vm.downloadCta.href).toBe(Routes.signup);
   });
 

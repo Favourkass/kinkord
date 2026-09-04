@@ -146,13 +146,7 @@ function StarDivider() {
   );
 }
 
-function AdultAgeBadge({
-  badge,
-  className = "",
-}: {
-  badge: AdultBadgeData;
-  className?: string;
-}) {
+function AdultAgeBadge({ badge, className = "" }: { badge: AdultBadgeData; className?: string }) {
   return (
     <div
       className={`inline-flex items-center gap-3 sm:gap-3.5 rounded-[22px] border-[1.5px] border-[#faab14] bg-black/50 px-5 py-2 backdrop-blur-sm shadow-md shadow-black/60 ${className}`}
