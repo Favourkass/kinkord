@@ -42,14 +42,16 @@ export function useLandingPresenter(): ClientLandingVM {
       }
     },
     onDownload: () => {
-      void pwa.promptInstall();
+      void pwa.downloadApp();
     },
     downloadCta: {
       ...baseVM.downloadCta,
       label: downloadLabel,
       onClick: () => {
         if (pwa.isInstalled || pwa.isInstalling) return;
-        void pwa.promptInstall();
+        // Fires the native install prompt when available, otherwise opens the
+        // platform install guide — so the button works on iOS/desktop too.
+        void pwa.downloadApp();
       },
     },
   };
