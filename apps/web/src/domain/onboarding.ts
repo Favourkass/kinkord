@@ -1,6 +1,6 @@
 /** Pure signup-wizard logic: validation and normalization, no React. */
 
-export const WIZARD_STEPS = 5;
+export const WIZARD_STEPS = 4;
 
 export interface AccountDraft {
   username: string;

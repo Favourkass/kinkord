@@ -2,7 +2,6 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { authClient } from "@/services/authClient";
 import { api, uploadToPresignedUrl } from "@/services/apiClient";
 import { compressImage } from "@/util/image";
 import {
@@ -10,6 +9,7 @@ import {
   validateAbout,
   toE164,
   dobToIso,
+  WIZARD_STEPS,
   type AccountDraft,
   type AboutDraft,
 } from "@/domain/onboarding";
@@ -22,7 +22,7 @@ const STAGE_STEP: Record<WizardStage, number> = {
   about: 2,
   verify: 3,
   profile: 4,
-  welcome: 5,
+  welcome: 4,
 };
 
 interface ProfileVM {
@@ -43,7 +43,7 @@ export function useSignupWizardPresenter() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [stepOneTouched, setStepOneTouched] = useState(false);
 
-  // step 2
+  // step 2 (account + about, one combined screen)
   const [account, setAccount] = useState<AccountDraft>({
     username: "",
     displayName: "",
@@ -81,28 +81,28 @@ export function useSignupWizardPresenter() {
     setStage("account");
   }, [country, ageAttested, termsAccepted]);
 
-  const submitAccount = useCallback(() => {
-    const errors = validateAccount(account);
-    setAccountErrors(errors);
-    if (Object.keys(errors).length === 0) setStage("about");
-  }, [account]);
+  const backToCountry = useCallback(() => setStage("country"), []);
 
-  const submitAbout = useCallback(async () => {
-    const errors = validateAbout(about);
-    setAboutErrors(errors);
-    if (Object.keys(errors).length > 0) return;
+  /**
+   * The account + about fields live on one screen, so they're created together
+   * in a single atomic call (POST /auth-ext/sign-up): the server creates the
+   * account and writes the about-fields, rolling the account back if the second
+   * half fails — so a retry never hits "email already exists".
+   */
+  const submitCombinedStep = useCallback(async () => {
+    const accErrors = validateAccount(account);
+    const abtErrors = validateAbout(about);
+    setAccountErrors(accErrors);
+    setAboutErrors(abtErrors);
+    if (Object.keys(accErrors).length > 0 || Object.keys(abtErrors).length > 0) return;
     setBusy(true);
     setTopError(null);
     try {
-      const { error } = await authClient.signUp.email({
+      await api.post("/auth-ext/sign-up", {
         email: account.email.trim(),
         password: account.password,
-        name: account.displayName.trim(),
+        displayName: account.displayName.trim(),
         username: account.username.replace(/^@/, "").toLowerCase(),
-        ageAttested: true,
-      } as Parameters<typeof authClient.signUp.email>[0]);
-      if (error) throw new Error(error.message ?? "Sign up failed");
-      await api.patch("/profile", {
         country,
         state: about.state,
         city: about.city.trim() || null,
@@ -180,6 +180,7 @@ export function useSignupWizardPresenter() {
     () => ({
       stage,
       step,
+      totalSteps: WIZARD_STEPS,
       busy,
       topError,
       stepOne: {
@@ -192,13 +193,10 @@ export function useSignupWizardPresenter() {
         touched: stepOneTouched,
         submit: submitCountry,
       },
-      accountStep: {
-        draft: account,
-        set: setAccount,
-        errors: accountErrors,
-        submit: submitAccount,
-      },
-      aboutStep: { draft: about, set: setAbout, errors: aboutErrors, submit: submitAbout },
+      accountStep: { draft: account, set: setAccount, errors: accountErrors },
+      aboutStep: { draft: about, set: setAbout, errors: aboutErrors },
+      submitCombinedStep,
+      backToCountry,
       verifyStep: { skip: skipVerification },
       profileStep: {
         roles,
@@ -228,10 +226,10 @@ export function useSignupWizardPresenter() {
       submitCountry,
       account,
       accountErrors,
-      submitAccount,
       about,
       aboutErrors,
-      submitAbout,
+      submitCombinedStep,
+      backToCountry,
       skipVerification,
       roles,
       toggleRole,

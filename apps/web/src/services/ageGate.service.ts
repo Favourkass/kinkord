@@ -2,6 +2,7 @@ const STORAGE_KEY = "kinkord_age_confirmed";
 
 export class AgeGateService {
   private subscribers = new Set<() => void>();
+  private inMemoryConfirmed = false;
 
   /** Subscribe to confirmation changes (for useSyncExternalStore). */
   subscribe(callback: () => void): () => void {
@@ -16,6 +17,7 @@ export class AgeGateService {
   }
 
   isConfirmed(): boolean {
+    if (this.inMemoryConfirmed) return true;
     if (typeof window === "undefined") return false;
     try {
       return localStorage.getItem(STORAGE_KEY) === "true";
@@ -25,21 +27,25 @@ export class AgeGateService {
   }
 
   confirm(): void {
-    if (typeof window === "undefined") return;
-    try {
-      localStorage.setItem(STORAGE_KEY, "true");
-    } catch {
-      // ignore local storage errors (e.g. private browsing restrictions)
+    this.inMemoryConfirmed = true;
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(STORAGE_KEY, "true");
+      } catch {
+        // ignore local storage errors (e.g. private browsing restrictions)
+      }
     }
     this.notify();
   }
 
   reset(): void {
-    if (typeof window === "undefined") return;
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // ignore
+    this.inMemoryConfirmed = false;
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // ignore
+      }
     }
     this.notify();
   }
