@@ -55,7 +55,7 @@ export default function AgeGateModal({
     >
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/90 backdrop-blur-md transition-opacity animate-in fade-in duration-300"
+        className="fixed inset-0 bg-black/90 backdrop-blur-md transition-opacity animate-in fade-in duration-300 pointer-events-none"
         aria-hidden="true"
       />
 

@@ -5,6 +5,7 @@ import {
   toE164,
   validateAccount,
   validateAbout,
+  WIZARD_STEPS,
   type AccountDraft,
 } from "./onboarding";
 
@@ -80,5 +81,9 @@ describe("dob", () => {
     expect(errors.dob).toBeTruthy();
     expect(errors.state).toBeTruthy();
     expect(errors.gender).toBeTruthy();
+  });
+
+  it("defines WIZARD_STEPS as 4", () => {
+    expect(WIZARD_STEPS).toBe(4);
   });
 });

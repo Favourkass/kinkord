@@ -104,10 +104,49 @@ describe("useSignupWizardPresenter", () => {
     expect(result.current.stage).toBe("profile");
   });
 
+  it("submits joined account and about step in one action", async () => {
+    const { result } = renderHook(() => useSignupWizardPresenter());
+    act(() => {
+      result.current.stepOne.setCountry("NG");
+      result.current.stepOne.setAgeAttested(true);
+      result.current.stepOne.setTermsAccepted(true);
+    });
+    act(() => result.current.stepOne.submit());
+    expect(result.current.stage).toBe("account");
+
+    await act(() => result.current.submitCombinedStep());
+    expect(result.current.stage).toBe("account");
+    expect(Object.keys(result.current.accountStep.errors).length).toBeGreaterThan(0);
+    expect(Object.keys(result.current.aboutStep.errors).length).toBeGreaterThan(0);
+
+    fillAccount(result);
+    act(() =>
+      result.current.aboutStep.set({
+        state: "Delta",
+        city: "Sapele",
+        dobDay: 4,
+        dobMonth: 8,
+        dobYear: 1999,
+        gender: "male",
+      }),
+    );
+
+    await act(() => result.current.submitCombinedStep());
+    expect(signUp).toHaveBeenCalledWith(
+      expect.objectContaining({ username: "tegamaxwell", ageAttested: true, name: "Sir T" }),
+    );
+    expect(result.current.stage).toBe("verify");
+  });
+
   it("refuses to complete the profile without both images and confirmations", async () => {
     const { result } = renderHook(() => useSignupWizardPresenter());
     await act(() => result.current.profileStep.submit());
     expect(result.current.profileStep.error).toMatch(/required/);
     expect(result.current.stage).toBe("country");
+  });
+
+  it("exposes totalSteps as 4", () => {
+    const { result } = renderHook(() => useSignupWizardPresenter());
+    expect(result.current.totalSteps).toBe(4);
   });
 });

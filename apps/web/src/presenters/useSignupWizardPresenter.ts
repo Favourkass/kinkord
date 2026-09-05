@@ -10,6 +10,7 @@ import {
   validateAbout,
   toE164,
   dobToIso,
+  WIZARD_STEPS,
   type AccountDraft,
   type AboutDraft,
 } from "@/domain/onboarding";
@@ -22,7 +23,7 @@ const STAGE_STEP: Record<WizardStage, number> = {
   about: 2,
   verify: 3,
   profile: 4,
-  welcome: 5,
+  welcome: 4,
 };
 
 interface ProfileVM {
@@ -120,6 +121,43 @@ export function useSignupWizardPresenter() {
     }
   }, [about, account, country]);
 
+  const backToCountry = useCallback(() => setStage("country"), []);
+
+  const submitCombinedStep = useCallback(async () => {
+    const accErrors = validateAccount(account);
+    const abtErrors = validateAbout(about);
+    setAccountErrors(accErrors);
+    setAboutErrors(abtErrors);
+    if (Object.keys(accErrors).length > 0 || Object.keys(abtErrors).length > 0) return;
+    setBusy(true);
+    setTopError(null);
+    try {
+      const { error } = await authClient.signUp.email({
+        email: account.email.trim(),
+        password: account.password,
+        name: account.displayName.trim(),
+        username: account.username.replace(/^@/, "").toLowerCase(),
+        ageAttested: true,
+      } as Parameters<typeof authClient.signUp.email>[0]);
+      if (error) throw new Error(error.message ?? "Sign up failed");
+      await api.patch("/profile", {
+        country,
+        state: about.state,
+        city: about.city.trim() || null,
+        dateOfBirth: dobToIso(about),
+        gender: about.gender,
+        phone: account.phoneLocal.trim()
+          ? toE164(account.phoneCountryCode, account.phoneLocal)
+          : null,
+      });
+      setStage("verify");
+    } catch (e) {
+      setTopError(e instanceof Error ? e.message : "Something went wrong. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }, [about, account, country]);
+
   const skipVerification = useCallback(() => setStage("profile"), []);
 
   const uploadImage = useCallback(async (kind: "avatar" | "cover", rawFile: File) => {
@@ -180,6 +218,7 @@ export function useSignupWizardPresenter() {
     () => ({
       stage,
       step,
+      totalSteps: WIZARD_STEPS,
       busy,
       topError,
       stepOne: {
@@ -199,6 +238,8 @@ export function useSignupWizardPresenter() {
         submit: submitAccount,
       },
       aboutStep: { draft: about, set: setAbout, errors: aboutErrors, submit: submitAbout },
+      submitCombinedStep,
+      backToCountry,
       verifyStep: { skip: skipVerification },
       profileStep: {
         roles,
@@ -232,6 +273,8 @@ export function useSignupWizardPresenter() {
       about,
       aboutErrors,
       submitAbout,
+      submitCombinedStep,
+      backToCountry,
       skipVerification,
       roles,
       toggleRole,
