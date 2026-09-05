@@ -123,12 +123,7 @@ export default function SignupPage() {
       )}
 
       {(p.stage === "account" || p.stage === "about") && (
-        <SignupShell
-          step={p.step}
-          badge="STEP 2 OF 4"
-          showTagline={false}
-          onBack={p.backToCountry}
-        >
+        <SignupShell step={p.step} badge="STEP 2 OF 4" showTagline={false} onBack={p.backToCountry}>
           <section className="flex w-full max-w-[706px] flex-col items-center gap-6 lg:max-w-[1130px] lg:gap-8">
             <StageHeading plain="CREATE YOUR" highlight="ACCOUNT" />
             <p className="text-center text-[12px] font-black text-[#cccccc] lg:text-[24px] lg:font-bold">

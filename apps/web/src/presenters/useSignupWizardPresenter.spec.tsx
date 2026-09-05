@@ -6,11 +6,6 @@ import { useSignupWizardPresenter } from "./useSignupWizardPresenter";
 const push = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push, replace: vi.fn() }) }));
 
-const signUp = vi.fn();
-vi.mock("@/services/authClient", () => ({
-  authClient: { signUp: { email: (...a: unknown[]) => signUp(...a) } },
-}));
-
 const patch = vi.fn();
 const post = vi.fn();
 vi.mock("@/services/apiClient", () => ({
@@ -35,66 +30,72 @@ const fillAccount = (result: { current: ReturnType<typeof useSignupWizardPresent
     }),
   );
 
+const fillAbout = (result: { current: ReturnType<typeof useSignupWizardPresenter> }) =>
+  act(() =>
+    result.current.aboutStep.set({
+      state: "Delta",
+      city: "Sapele",
+      dobDay: 4,
+      dobMonth: 8,
+      dobYear: 1999,
+      gender: "male",
+    }),
+  );
+
+const reachCombinedStep = (result: { current: ReturnType<typeof useSignupWizardPresenter> }) => {
+  act(() => {
+    result.current.stepOne.setCountry("NG");
+    result.current.stepOne.setAgeAttested(true);
+    result.current.stepOne.setTermsAccepted(true);
+  });
+  act(() => result.current.stepOne.submit());
+};
+
 describe("useSignupWizardPresenter", () => {
   beforeEach(() => {
-    signUp.mockReset().mockResolvedValue({ data: {}, error: null });
     patch.mockReset().mockResolvedValue({ avatarUrl: "a", coverUrl: "c" });
-    post.mockReset();
+    post.mockReset().mockResolvedValue({});
+    push.mockReset();
   });
 
   it("blocks step 1 until country + both confirmations are set", () => {
     const { result } = renderHook(() => useSignupWizardPresenter());
     act(() => result.current.stepOne.submit());
     expect(result.current.stage).toBe("country");
-    act(() => {
-      result.current.stepOne.setCountry("NG");
-      result.current.stepOne.setAgeAttested(true);
-      result.current.stepOne.setTermsAccepted(true);
-    });
-    act(() => result.current.stepOne.submit());
+    reachCombinedStep(result);
     expect(result.current.stage).toBe("account");
   });
 
-  it("keeps invalid account drafts on the account stage with field errors", () => {
+  it("keeps the combined step in place with field errors when invalid", async () => {
     const { result } = renderHook(() => useSignupWizardPresenter());
-    act(() => result.current.accountStep.submit());
-    expect(result.current.stage).toBe("country"); // unchanged; also errors recorded
+    reachCombinedStep(result);
+
+    await act(() => result.current.submitCombinedStep());
+
+    expect(result.current.stage).toBe("account");
     expect(Object.keys(result.current.accountStep.errors).length).toBeGreaterThan(0);
+    expect(Object.keys(result.current.aboutStep.errors).length).toBeGreaterThan(0);
+    expect(post).not.toHaveBeenCalled();
   });
 
-  it("signs up with normalized username and posts wizard data to the profile", async () => {
+  it("posts account + about to the combined sign-up endpoint and advances to verify", async () => {
     const { result } = renderHook(() => useSignupWizardPresenter());
-    act(() => {
-      result.current.stepOne.setCountry("NG");
-      result.current.stepOne.setAgeAttested(true);
-      result.current.stepOne.setTermsAccepted(true);
-    });
-    act(() => result.current.stepOne.submit());
+    reachCombinedStep(result);
     fillAccount(result);
-    act(() => result.current.accountStep.submit());
-    expect(result.current.stage).toBe("about");
+    fillAbout(result);
 
-    act(() =>
-      result.current.aboutStep.set({
-        state: "Delta",
-        city: "Sapele",
-        dobDay: 4,
-        dobMonth: 8,
-        dobYear: 1999,
-        gender: "male",
-      }),
-    );
-    await act(() => result.current.aboutStep.submit());
+    await act(() => result.current.submitCombinedStep());
 
-    expect(signUp).toHaveBeenCalledWith(
-      expect.objectContaining({ username: "tegamaxwell", ageAttested: true, name: "Sir T" }),
-    );
-    expect(patch).toHaveBeenCalledWith(
-      "/profile",
+    expect(post).toHaveBeenCalledWith(
+      "/auth-ext/sign-up",
       expect.objectContaining({
+        email: "tega@kinkord.com",
+        displayName: "Sir T",
+        username: "tegamaxwell",
         country: "NG",
         state: "Delta",
         dateOfBirth: "1999-08-04",
+        gender: "male",
         phone: "+2348031234567",
       }),
     );
@@ -104,38 +105,17 @@ describe("useSignupWizardPresenter", () => {
     expect(result.current.stage).toBe("profile");
   });
 
-  it("submits joined account and about step in one action", async () => {
+  it("surfaces a server error on the combined step without advancing", async () => {
+    post.mockRejectedValue(new Error("Email already exists"));
     const { result } = renderHook(() => useSignupWizardPresenter());
-    act(() => {
-      result.current.stepOne.setCountry("NG");
-      result.current.stepOne.setAgeAttested(true);
-      result.current.stepOne.setTermsAccepted(true);
-    });
-    act(() => result.current.stepOne.submit());
-    expect(result.current.stage).toBe("account");
-
-    await act(() => result.current.submitCombinedStep());
-    expect(result.current.stage).toBe("account");
-    expect(Object.keys(result.current.accountStep.errors).length).toBeGreaterThan(0);
-    expect(Object.keys(result.current.aboutStep.errors).length).toBeGreaterThan(0);
-
+    reachCombinedStep(result);
     fillAccount(result);
-    act(() =>
-      result.current.aboutStep.set({
-        state: "Delta",
-        city: "Sapele",
-        dobDay: 4,
-        dobMonth: 8,
-        dobYear: 1999,
-        gender: "male",
-      }),
-    );
+    fillAbout(result);
 
     await act(() => result.current.submitCombinedStep());
-    expect(signUp).toHaveBeenCalledWith(
-      expect.objectContaining({ username: "tegamaxwell", ageAttested: true, name: "Sir T" }),
-    );
-    expect(result.current.stage).toBe("verify");
+
+    expect(result.current.topError).toBe("Email already exists");
+    expect(result.current.stage).toBe("account");
   });
 
   it("refuses to complete the profile without both images and confirmations", async () => {
