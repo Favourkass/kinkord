@@ -40,26 +40,27 @@ describe("useLoginPresenter", () => {
       result.current.setPassword("supersecret123");
     });
     await act(() => result.current.submit());
+    // Stays signed in by default so reopening the app lands on /home.
     expect(signInEmail).toHaveBeenCalledWith({
       email: "a@b.com",
       password: "supersecret123",
-      rememberMe: false,
+      rememberMe: true,
     });
     expect(push).toHaveBeenCalledWith("/home");
   });
 
-  it("routes @handles to signIn.username, lowercased and stripped", async () => {
+  it("routes @handles to signIn.username, lowercased and stripped, honoring opt-out", async () => {
     const { result } = renderHook(() => useLoginPresenter());
     act(() => {
       result.current.setIdentifier("@TegaMaxwell");
       result.current.setPassword("supersecret123");
-      result.current.setRememberMe(true);
+      result.current.setRememberMe(false); // opt out of persistence (e.g. shared device)
     });
     await act(() => result.current.submit());
     expect(signInUsername).toHaveBeenCalledWith({
       username: "tegamaxwell",
       password: "supersecret123",
-      rememberMe: true,
+      rememberMe: false,
     });
   });
 
@@ -73,7 +74,7 @@ describe("useLoginPresenter", () => {
     expect(apiPost).toHaveBeenCalledWith("/auth-ext/sign-in-phone", {
       phone: "+2348035550142",
       password: "supersecret123",
-      rememberMe: false,
+      rememberMe: true,
     });
     expect(push).toHaveBeenCalledWith("/home");
   });
