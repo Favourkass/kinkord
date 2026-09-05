@@ -39,4 +39,18 @@ describe("AgeGateService", () => {
     ageGateService.confirm();
     expect(calls).toBe(2);
   });
+
+  it("marks age confirmed even if localStorage throws an error", () => {
+    const originalSetItem = localStorage.setItem;
+    localStorage.setItem = () => {
+      throw new Error("QuotaExceeded or Private Browsing Error");
+    };
+
+    try {
+      ageGateService.confirm();
+      expect(ageGateService.isConfirmed()).toBe(true);
+    } finally {
+      localStorage.setItem = originalSetItem;
+    }
+  });
 });

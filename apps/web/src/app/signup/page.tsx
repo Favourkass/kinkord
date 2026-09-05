@@ -122,9 +122,9 @@ export default function SignupPage() {
         </SignupShell>
       )}
 
-      {p.stage === "account" && (
-        <SignupShell step={p.step} badge="STEP 2 OF 5" showTagline={false} backHref={Routes.home}>
-          <section className="flex w-full max-w-[706px] flex-col items-center gap-5 lg:max-w-[1130px] lg:gap-7">
+      {(p.stage === "account" || p.stage === "about") && (
+        <SignupShell step={p.step} badge="STEP 2 OF 4" showTagline={false} onBack={p.backToCountry}>
+          <section className="flex w-full max-w-[706px] flex-col items-center gap-6 lg:max-w-[1130px] lg:gap-8">
             <StageHeading plain="CREATE YOUR" highlight="ACCOUNT" />
             <p className="text-center text-[12px] font-black text-[#cccccc] lg:text-[24px] lg:font-bold">
               Let&apos;s start with your account information.
@@ -216,14 +216,11 @@ export default function SignupPage() {
                 helper="Re-enter your password."
               />
             </div>
-            <GoldCta label="Next" onClick={p.accountStep.submit} />
-          </section>
-        </SignupShell>
-      )}
 
-      {p.stage === "about" && (
-        <SignupShell step={p.step} badge="STEP 2 OF 5">
-          <section className="flex w-full max-w-[706px] flex-col items-center gap-5 lg:max-w-[1130px] lg:gap-7">
+            <div className="my-2 flex w-full items-center justify-center lg:my-3">
+              <div className="h-px w-full bg-gradient-to-r from-transparent via-[#faab14]/40 to-transparent" />
+            </div>
+
             <StageHeading plain="TELL US" highlight="ABOUT YOU" />
             <div className="grid w-full gap-4 sm:grid-cols-2 lg:gap-6">
               <SelectField
@@ -289,7 +286,12 @@ export default function SignupPage() {
               )}
             </div>
             {p.topError && <p className="text-[13px] text-red-400 lg:text-[15px]">{p.topError}</p>}
-            <GoldCta label="Send OTP" onClick={p.aboutStep.submit} loading={p.busy} />
+            <GoldCta
+              label="Send OTP"
+              onClick={p.submitCombinedStep}
+              loading={p.busy}
+              className="max-w-[564px]"
+            />
             <div className="text-center text-[11px] text-kink-help lg:text-[16px]">
               <p>We&apos;ll send a 6-digit verification code to your phone.</p>
               <p>One number can only be linked to one Kinkord account.</p>
@@ -299,7 +301,7 @@ export default function SignupPage() {
       )}
 
       {p.stage === "verify" && (
-        <SignupShell step={p.step} badge="STEP 3 OF 5">
+        <SignupShell step={p.step} badge="STEP 3 OF 4">
           <section className="flex w-full max-w-[706px] flex-col items-center gap-5 text-center lg:gap-7">
             <StageHeading plain="PHONE" highlight="VERIFICATION" />
             <div className="relative grid h-[92px] w-[84px] place-items-center rounded-t-[16px] rounded-b-[42px] border-[3px] border-kink-gold-bright bg-[#1a1400] lg:h-[130px] lg:w-[118px] lg:rounded-b-[56px]">
@@ -340,7 +342,7 @@ export default function SignupPage() {
       )}
 
       {p.stage === "profile" && (
-        <SignupShell step={p.step} badge="STEP 4 OF 5">
+        <SignupShell step={p.step} badge="STEP 4 OF 4">
           <section className="flex w-full max-w-[706px] flex-col items-center gap-6 lg:max-w-[1130px] lg:gap-8">
             <StageHeading plain="BUILD YOUR" highlight="PROFILE" />
             <UploadTile
