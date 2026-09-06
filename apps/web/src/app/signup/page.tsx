@@ -203,7 +203,7 @@ export default function SignupPage() {
                 value={p.accountStep.draft.password}
                 onChange={(v) => p.accountStep.set({ ...p.accountStep.draft, password: v })}
                 error={p.accountStep.errors.password}
-                helper="Use 8+ characters with letters & numbers."
+                helper="Use 10+ characters with letters & numbers."
               />
               <TextField
                 label="Confirm password"

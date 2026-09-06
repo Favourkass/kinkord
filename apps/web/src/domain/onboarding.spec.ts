@@ -35,12 +35,13 @@ describe("validateAccount", () => {
         .password,
     ).toBeTruthy();
   });
-  it("accepts 8-character passwords with letters and numbers (design minimum)", () => {
-    expect(validateAccount(account({ password: "abcde123", confirmPassword: "abcde123" }))).toEqual(
-      {},
-    );
+  it("accepts 10-character passwords with letters and numbers (design minimum)", () => {
     expect(
-      validateAccount(account({ password: "abc1234", confirmPassword: "abc1234" })).password,
+      validateAccount(account({ password: "abcde12345", confirmPassword: "abcde12345" })),
+    ).toEqual({});
+    // 8 characters is now below the minimum and must be rejected.
+    expect(
+      validateAccount(account({ password: "abcde123", confirmPassword: "abcde123" })).password,
     ).toBeTruthy();
   });
 });
