@@ -5,6 +5,7 @@ import { AUTH, buildAuth } from "./auth.instance";
 import { AuthExtController } from "./auth-ext.controller";
 import { MeController } from "./me.controller";
 import { PhoneSignInService } from "./phone-sign-in.service";
+import { SignUpService } from "./sign-up.service";
 
 @Global()
 @Module({
@@ -16,6 +17,7 @@ import { PhoneSignInService } from "./phone-sign-in.service";
       useFactory: (db: Db, email: EmailService) => buildAuth(db, email),
     },
     PhoneSignInService,
+    SignUpService,
   ],
   exports: [AUTH],
 })
