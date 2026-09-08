@@ -36,6 +36,9 @@ export const updateProfileSchema = z.object({
   relationshipStatus: z.string().trim().min(1).max(60).nullable().optional(),
   lookingFor: z.array(z.string().trim().min(1).max(40)).max(10).optional(),
   interests: z.array(z.string().trim().min(1).max(40)).max(15).optional(),
+  orientation: z.string().trim().min(1).max(40).nullable().optional(),
+  bodyType: z.string().trim().min(1).max(40).nullable().optional(),
+  languages: z.array(z.string().trim().min(1).max(30)).max(10).optional(),
   location: z.string().trim().min(1).max(120).nullable().optional(),
   phone: z
     .string()
@@ -126,6 +129,9 @@ export class ProfilesService {
       relationshipStatus: row.relationshipStatus,
       lookingFor: row.lookingFor ?? [],
       interests: row.interests ?? [],
+      orientation: row.orientation,
+      bodyType: row.bodyType,
+      languages: row.languages ?? [],
       location: row.location,
       phone: row.phone,
       phoneVerified: row.phoneVerified,

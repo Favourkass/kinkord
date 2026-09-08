@@ -2,8 +2,11 @@ import type { ReactNode } from "react";
 import AppMobileHeader from "./AppMobileHeader";
 import AvatarCircle from "./AvatarCircle";
 import DesktopSidebar from "./DesktopSidebar";
-import MobileTabBar, { type AppTab } from "./MobileTabBar";
+import MobileTabBar from "./MobileTabBar";
+import type { AppNav, AppNavLabels, AppNavLinks, AppTab } from "./nav";
 import SidebarDrawer from "./SidebarDrawer";
+
+export type { AppNav, AppNavLabels, AppNavLinks, AppTab } from "./nav";
 
 export interface AppShellProps {
   brand: string;
@@ -13,15 +16,15 @@ export interface AppShellProps {
   handle: string;
   avatarUrl: string | null;
   membersCount: string;
-  activeTab: AppTab;
-  activeNav: "home" | "profile" | "settings";
+  /** Highlighted bottom tab; omit on screens outside the tab bar (e.g. Settings). */
+  activeTab?: AppTab;
+  activeNav: AppNav;
   drawerOpen: boolean;
   onMenu: () => void;
   onCloseDrawer: () => void;
   onLogout: () => void;
-  messagesHref: string;
-  profileHref: string;
-  settingsHref: string;
+  links: AppNavLinks;
+  labels: AppNavLabels;
   children: ReactNode;
 }
 
@@ -40,9 +43,8 @@ export default function AppShell({
   onMenu,
   onCloseDrawer,
   onLogout,
-  messagesHref,
-  profileHref,
-  settingsHref,
+  links,
+  labels,
   children,
 }: AppShellProps) {
   return (
@@ -50,23 +52,17 @@ export default function AppShell({
       {/* Mobile */}
       <div className="flex min-h-dvh flex-col bg-app-surface lg:hidden">
         <AppMobileHeader brand={brand} tagline={tagline} greeting={greeting} onMenu={onMenu} />
-        <main className="flex-1 pb-[130px] pt-[44px]">{children}</main>
-        <MobileTabBar
-          active={activeTab}
-          avatarUrl={avatarUrl}
-          messagesHref={messagesHref}
-          profileHref={profileHref}
-          settingsHref={settingsHref}
-        />
+        <main className="flex-1 pb-[110px] pt-[24px]">{children}</main>
+        <MobileTabBar active={activeTab} avatarUrl={avatarUrl} links={links} labels={labels} />
         <SidebarDrawer
           open={drawerOpen}
           onClose={onCloseDrawer}
           name={name}
           handle={handle}
           avatarUrl={avatarUrl}
-          membersLabel="Members"
           membersCount={membersCount}
-          logoutLabel="Log Out"
+          links={links}
+          labels={labels}
           onLogout={onLogout}
         />
       </div>
@@ -76,8 +72,8 @@ export default function AppShell({
         <DesktopSidebar
           tagline={tagline}
           active={activeNav}
-          profileHref={profileHref}
-          settingsHref={settingsHref}
+          links={links}
+          labels={labels}
           onLogout={onLogout}
         />
         <main className="min-h-dvh flex-1 rounded-[40px] bg-app-surface">
@@ -90,7 +86,7 @@ export default function AppShell({
             />
             <p className="text-[24px] font-normal text-app-text">{greeting}</p>
           </div>
-          <div className="pt-[56px]">{children}</div>
+          <div className="pt-[40px]">{children}</div>
         </main>
       </div>
     </div>

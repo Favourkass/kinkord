@@ -24,6 +24,13 @@ export const profile = pgTable("profile", {
   relationshipStatus: text("relationship_status"),
   lookingFor: jsonb("looking_for").$type<string[]>().notNull().default([]),
   interests: jsonb("interests").$type<string[]>().notNull().default([]),
+  /** Public-profile "About" rows (members flow); free-form labels, member-chosen. */
+  orientation: text("orientation"),
+  bodyType: text("body_type"),
+  languages: jsonb("languages").$type<string[]>().notNull().default([]),
+  /** Presence heartbeat: bumped (throttled) on authenticated API activity. Drives
+   *  online dots and "Last seen …"; deliberately NOT tied to updatedAt. */
+  lastSeenAt: timestamp("last_seen_at"),
   /** Free-text public whereabouts line, e.g. "Sapele, Delta State, Nigeria". */
   location: text("location"),
   /** Collected at signup; unverified until SMS returns. */

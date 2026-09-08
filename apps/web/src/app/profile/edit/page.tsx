@@ -3,11 +3,12 @@
 import EditProfileView from "@/components/app/EditProfileView";
 import { NG_LGAS } from "@/constants/nigeria";
 import { NG_STATES } from "@/constants/onboarding";
-import { Routes } from "@/constants/Routes";
+import { getAppShellNav } from "@/presenters/getAppShellNav";
 import { useEditProfilePresenter } from "@/presenters/useEditProfilePresenter";
 
 export default function EditProfilePage() {
   const vm = useEditProfilePresenter();
+  const nav = getAppShellNav();
 
   if (vm.loading) {
     return (
@@ -73,8 +74,8 @@ export default function EditProfilePage() {
       onLogout={vm.logout}
       onAvatarFile={(f) => void vm.uploadImage("avatar", f)}
       onCoverFile={(f) => void vm.uploadImage("cover", f)}
-      profileHref={Routes.profile}
-      settingsHref={Routes.settings}
+      links={nav.links}
+      labels={nav.labels}
     />
   );
 }

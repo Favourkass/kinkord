@@ -20,4 +20,12 @@ export const Routes = {
   resetPassword: "/reset-password",
   verifyEmail: "/verify-email",
   profile: "/profile",
+  // Members directory: country -> state -> members in that state.
+  members: "/members",
+  membersCountry: (country: string) => `/members/${country.toLowerCase()}`,
+  membersState: (country: string, state: string) =>
+    `/members/${country.toLowerCase()}/${encodeURIComponent(state)}`,
+  /** Another member's public profile. */
+  member: (username: string) => `/u/${encodeURIComponent(username.replace(/^@/, ""))}`,
+  notifications: "/notifications",
 } as const;
