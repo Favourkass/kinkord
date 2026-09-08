@@ -42,7 +42,13 @@ export default function ProfileHero({
           {vm.coverUrl && (
             // Presigned S3 URL — next/image would need a remote pattern per bucket.
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={vm.coverUrl} alt="" className="size-full object-cover" />
+            <img
+              src={vm.coverUrl}
+              alt=""
+              fetchPriority="high"
+              decoding="async"
+              className="size-full object-cover"
+            />
           )}
         </div>
         <div className="absolute left-[20px] top-[114px] size-[110px]">
@@ -52,6 +58,8 @@ export default function ProfileHero({
             <img
               src={vm.avatarUrl}
               alt={vm.displayName}
+              fetchPriority="high"
+              decoding="async"
               className="absolute left-[5px] top-[8px] size-[100px] rounded-full object-cover"
             />
           ) : (

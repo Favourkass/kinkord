@@ -37,7 +37,13 @@ export default function ProfileSideCard({
         <div className="h-[140px] w-full overflow-hidden bg-kink-gold-bright">
           {vm.coverUrl && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={vm.coverUrl} alt="" className="size-full object-cover" />
+            <img
+              src={vm.coverUrl}
+              alt=""
+              fetchPriority="high"
+              decoding="async"
+              className="size-full object-cover"
+            />
           )}
         </div>
         <div className="absolute left-[24px] top-[80px] size-[110px]">
@@ -47,6 +53,8 @@ export default function ProfileSideCard({
             <img
               src={vm.avatarUrl}
               alt={vm.displayName}
+              fetchPriority="high"
+              decoding="async"
               className="absolute left-[5px] top-[8px] size-[100px] rounded-full object-cover"
             />
           ) : (

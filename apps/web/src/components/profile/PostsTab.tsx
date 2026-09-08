@@ -30,7 +30,13 @@ export default function PostsTab({
           <span className="block size-[36px] overflow-hidden rounded-full bg-pf-surface-2">
             {authorAvatarUrl && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={authorAvatarUrl} alt="" className="size-full object-cover" />
+              <img
+                src={authorAvatarUrl}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                className="size-full object-cover"
+              />
             )}
           </span>
           <span className="text-[14px] font-semibold leading-[20px] text-pf-text">

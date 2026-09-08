@@ -30,7 +30,13 @@ export default function MemberCard({ vm, href, labels, onToggleFollow, busy }: M
         {vm.avatarUrl ? (
           // Presigned S3 URL — next/image would need a remote pattern per bucket.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={vm.avatarUrl} alt="" className="size-full object-cover" />
+          <img
+            src={vm.avatarUrl}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="size-full object-cover"
+          />
         ) : (
           <span className="grid size-full place-items-center text-[#97917f]">
             <MaskIcon name="people" width={22} />
