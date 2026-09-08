@@ -10,7 +10,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push, replace }) }));
 const get = vi.fn();
 const patch = vi.fn();
 const post = vi.fn();
-const uploadToPresignedUrl = vi.fn(async (..._a: unknown[]) => {});
+const uploadToPresignedUrl = vi.fn<(url: string, file: File) => Promise<void>>(async () => {});
 vi.mock("@/services/apiClient", () => {
   class ApiError extends Error {
     constructor(
@@ -31,9 +31,7 @@ vi.mock("@/services/apiClient", () => {
         return post(...a);
       },
     },
-    uploadToPresignedUrl: (...a: unknown[]) => {
-      return uploadToPresignedUrl(...a);
-    },
+    uploadToPresignedUrl: (url: string, file: File) => uploadToPresignedUrl(url, file),
   };
 });
 
