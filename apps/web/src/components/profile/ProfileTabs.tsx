@@ -9,12 +9,15 @@ export interface ProfileTabsProps {
   onSelect: (key: string) => void;
 }
 
-/** Posts | About | Media | Friends — gold underline marks the active tab. */
+/**
+ * Posts | About | Media | Friends. Mobile: Medium 15, evenly spread, 1.5px gold underline.
+ * Desktop: left-aligned, px16 py8, Bold gold with a 2px underline.
+ */
 export default function ProfileTabs({ tabs, active, onSelect }: ProfileTabsProps) {
   return (
     <div
       role="tablist"
-      className="mx-auto mt-[18px] flex w-full max-w-[600px] border-b border-app-line"
+      className="flex items-end justify-evenly border-b border-pf-border px-[10px] lg:justify-start lg:gap-[8px] lg:px-0"
     >
       {tabs.map((tab) => {
         const selected = tab.key === active;
@@ -25,8 +28,10 @@ export default function ProfileTabs({ tabs, active, onSelect }: ProfileTabsProps
             role="tab"
             aria-selected={selected}
             onClick={() => onSelect(tab.key)}
-            className={`-mb-px flex-1 border-b-2 pb-[10px] pt-[6px] text-[14px] font-semibold ${
-              selected ? "border-kink-amber text-kink-amber" : "border-transparent text-app-subtle"
+            className={`h-[26px] border-b-[1.5px] text-[15px] font-medium leading-[18px] lg:h-auto lg:border-b-2 lg:px-[16px] lg:py-[8px] ${
+              selected
+                ? "border-kink-gold-bright text-kink-gold-bright lg:font-bold"
+                : "border-transparent text-pf-muted"
             }`}
           >
             {tab.label}

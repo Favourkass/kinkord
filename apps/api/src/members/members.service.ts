@@ -8,6 +8,7 @@ import { StorageService } from "../storage/storage.service";
 import { FollowsService } from "./follows.service";
 
 export type MembersSort = "recent" | "followers" | "name";
+export type FriendsTab = "all" | "mutual";
 
 export interface ListMembersParams {
   country: string;
@@ -118,6 +119,7 @@ export class MembersService {
         avatarKey: profile.avatarKey,
         dateOfBirth: profile.dateOfBirth,
         gender: profile.gender,
+        roles: profile.roles,
         city: profile.city,
         state: profile.state,
         lastSeenAt: profile.lastSeenAt,
@@ -147,6 +149,8 @@ export class MembersService {
         avatarUrl: r.avatarKey ? await this.storage.presignDownload(r.avatarKey) : null,
         age: ageFromDob(r.dateOfBirth),
         gender: r.gender,
+        // CEO (2026-09-08): the card's second line is "19F • Submissive" — roles, not gender.
+        roles: r.roles ?? [],
         city: r.city,
         state: r.state,
         isOnline: Boolean(r.isOnline),
@@ -174,12 +178,14 @@ export class MembersService {
 
     const { u, p } = row;
     const isSelf = u.id === viewerId;
-    const [counts, isFollowing, avatarUrl, coverUrl] = await Promise.all([
+    const [followCounts, mutualFriends, isFollowing, avatarUrl, coverUrl] = await Promise.all([
       this.follows.counts(u.id),
+      isSelf ? Promise.resolve(0) : this.follows.mutualFriendsCount(u.id, viewerId),
       isSelf ? Promise.resolve(false) : this.follows.isFollowing(viewerId, u.id),
       p.avatarKey ? this.storage.presignDownload(p.avatarKey) : Promise.resolve(null),
       p.coverKey ? this.storage.presignDownload(p.coverKey) : Promise.resolve(null),
     ]);
+    const counts = { ...followCounts, mutualFriends };
 
     return {
       userId: u.id,
@@ -207,5 +213,31 @@ export class MembersService {
       isFollowing,
       isSelf,
     };
+  }
+
+  /** A member's friends ("all" = their mutual follows; "mutual" = friends in common with the viewer). */
+  async friends(
+    username: string,
+    viewerId: string,
+    tab: FriendsTab,
+    pageArg?: number,
+    limitArg?: number,
+  ) {
+    const targetId = await this.follows.resolveUserId(username);
+    const { page, limit, offset } = normalizePaging(pageArg, limitArg);
+    const result =
+      tab === "mutual"
+        ? await this.follows.mutualFriends(targetId, viewerId, limit, offset)
+        : await this.follows.friends(targetId, viewerId, limit, offset);
+    const items = await Promise.all(
+      result.items.map(async (r) => ({
+        userId: r.userId,
+        username: r.username,
+        displayName: r.displayName,
+        avatarUrl: r.avatarKey ? await this.storage.presignDownload(r.avatarKey) : null,
+        isFollowing: r.isFollowing,
+      })),
+    );
+    return { items, total: result.total, page, limit };
   }
 }

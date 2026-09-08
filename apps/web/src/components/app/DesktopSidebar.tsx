@@ -1,94 +1,93 @@
-import Image from "next/image";
 import Link from "next/link";
-import { Bell, House, LogOut, MessageSquare, Settings, User, Users } from "lucide-react";
+import AvatarCircle from "./AvatarCircle";
+import MaskIcon, { type MaskIconName } from "./MaskIcon";
 import type { AppNav, AppNavLabels, AppNavLinks } from "./nav";
 
 export interface DesktopSidebarProps {
-  tagline: string;
+  brand: string;
   active: AppNav;
+  avatarUrl: string | null;
   links: AppNavLinks;
   labels: AppNavLabels;
   onLogout: () => void;
 }
 
-/** Persistent desktop sidebar: horned wordmark, tagline, primary nav, settings, log out. */
+/**
+ * Desktop sidebar per the Figma "PC" frames (881:799 dark / 881:849 light): 333px
+ * panel, 48px gold wordmark, Home / Chat / Notifications / Profile, then a divider
+ * with "Settings and Privacy" and "Log Out" pinned to the bottom.
+ */
 export default function DesktopSidebar({
-  tagline,
+  brand,
   active,
+  avatarUrl,
   links,
   labels,
   onLogout,
 }: DesktopSidebarProps) {
-  const isActive = (key: AppNav) =>
-    active === key || (key === "profile" && active === "edit-profile");
-  const item = (key: AppNav) =>
-    `mx-[24px] flex items-center gap-[18px] rounded-[14px] px-[20px] py-[12px] text-[20px] font-medium ${
-      isActive(key)
-        ? "bg-app-members text-kink-amber"
-        : "text-app-text opacity-85 hover:opacity-100"
+  const items: Array<{
+    key: "home" | "chat" | "notifications";
+    icon: MaskIconName;
+    iconClass: string;
+  }> = [
+    { key: "home", icon: "home-solid", iconClass: "text-kink-amber" },
+    { key: "chat", icon: "chat", iconClass: "text-side-text" },
+    { key: "notifications", icon: "bell-outline", iconClass: "text-side-text" },
+  ];
+  const row = (isActive: boolean) =>
+    `flex h-[29px] items-center gap-[17px] pl-[38px] text-[22px] font-medium leading-none ${
+      isActive ? "text-kink-gold-bright" : "text-side-text"
     }`;
-  const primary: Array<{ key: Exclude<AppNav, "settings" | "edit-profile">; Icon: typeof House }> =
-    [
-      { key: "home", Icon: House },
-      { key: "members", Icon: Users },
-      { key: "chat", Icon: MessageSquare },
-      { key: "notifications", Icon: Bell },
-      { key: "profile", Icon: User },
-    ];
   return (
-    <aside className="flex w-[340px] shrink-0 flex-col bg-app-page pb-10">
-      <div className="pl-[49px] pt-[23px]">
-        <div className="relative h-[70px] w-[265px]">
-          <Image
-            src="/app/wordmark-light.png"
-            alt="Kinkord"
-            fill
-            priority
-            sizes="265px"
-            className="object-contain dark:hidden"
-          />
-          <Image
-            src="/app/wordmark-dark.png"
-            alt="Kinkord"
-            fill
-            priority
-            sizes="265px"
-            className="hidden object-contain dark:block"
-          />
-        </div>
-        <p className="pl-[24px] pt-[2px] text-[11px] font-semibold tracking-[2px] text-app-text">
-          {tagline}
-        </p>
-      </div>
-      <div className="ml-[24px] mt-[20px] w-[292px] border-t border-kink-amber/60" />
-      <nav className="mt-[22px] flex flex-col gap-[6px]">
-        {primary.map(({ key, Icon }) => (
+    <aside className="sticky top-0 flex h-dvh w-[333px] shrink-0 flex-col bg-side-bg pb-[49px] pt-[37px]">
+      <p className="pl-[38px] text-[48px] font-extrabold leading-[47px] tracking-[4.8px] text-kink-gold-bright">
+        {brand}
+      </p>
+      <nav className="mt-[46px] flex flex-col gap-[27px]">
+        {items.map((item) => (
           <Link
-            key={key}
-            href={links[key]}
-            aria-current={isActive(key) ? "page" : undefined}
-            className={item(key)}
+            key={item.key}
+            href={links[item.key]}
+            aria-current={active === item.key ? "page" : undefined}
+            className={row(active === item.key)}
           >
-            <Icon size={26} strokeWidth={1.75} aria-hidden />
-            {labels[key]}
+            <span className={`grid size-[29px] place-items-center ${item.iconClass}`}>
+              <MaskIcon
+                name={item.icon}
+                width={29}
+                height={item.icon === "bell-outline" ? 29 : 29}
+              />
+            </span>
+            {labels[item.key]}
           </Link>
         ))}
+        <Link
+          href={links.profile}
+          aria-current={active === "profile" || active === "edit-profile" ? "page" : undefined}
+          className={row(active === "profile" || active === "edit-profile")}
+        >
+          <span className="grid size-[29px] place-items-center">
+            <AvatarCircle src={avatarUrl} alt="" size={24} ringClassName="bg-kink-gold-bright" />
+          </span>
+          {labels.profile}
+        </Link>
       </nav>
-      <div className="mt-auto flex flex-col gap-[6px]">
+      <div className="mt-auto">
+        <div className="ml-[7px] w-[307px] border-t-[1.5px] border-side-divider" />
         <Link
           href={links.settings}
           aria-current={active === "settings" ? "page" : undefined}
-          className={item("settings")}
+          className={`mt-[28px] ${row(active === "settings")}`}
         >
-          <Settings size={26} strokeWidth={1.75} aria-hidden />
+          <span className="grid size-[29px] place-items-center text-side-text">
+            <MaskIcon name="settings" width={29} />
+          </span>
           {labels.settings}
         </Link>
-        <button
-          type="button"
-          onClick={onLogout}
-          className="mx-[24px] flex items-center gap-[18px] rounded-[14px] px-[20px] py-[12px] text-left text-[20px] font-medium text-app-logout-text"
-        >
-          <LogOut size={26} strokeWidth={1.75} className="text-app-logout-icon" aria-hidden />
+        <button type="button" onClick={onLogout} className={`mt-[24px] ${row(false)}`}>
+          <span className="grid size-[29px] place-items-center text-side-text">
+            <MaskIcon name="logout" width={29} />
+          </span>
           {labels.logout}
         </button>
       </div>

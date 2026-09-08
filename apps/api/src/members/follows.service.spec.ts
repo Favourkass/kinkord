@@ -86,3 +86,51 @@ describe("FollowsService", () => {
     await expect(svc.isFollowing("me", "u2")).resolves.toBe(false);
   });
 });
+
+describe("FollowsService friends lists", () => {
+  it("lists friends (mutual follows) with the viewer's follow state and the total", async () => {
+    const { db, select } = makeDb();
+    select.mockReturnValueOnce(
+      chain([
+        { userId: "u3", username: "kay", displayName: "Kay", avatarKey: null, isFollowing: 1 },
+      ]),
+    );
+    select.mockReturnValueOnce(chain([{ c: 1 }]));
+    const svc = new FollowsService(db);
+    await expect(svc.friends("u2", "me", 20, 0)).resolves.toEqual({
+      items: [
+        { userId: "u3", username: "kay", displayName: "Kay", avatarKey: null, isFollowing: true },
+      ],
+      total: 1,
+    });
+    expect(select).toHaveBeenCalledTimes(2);
+  });
+
+  it("lists mutual friends, which the viewer follows by definition", async () => {
+    const { db, select } = makeDb();
+    select.mockReturnValueOnce(
+      chain([{ userId: "u4", username: "vee", displayName: "Vee", avatarKey: "a.jpg" }]),
+    );
+    select.mockReturnValueOnce(chain([{ c: 1 }]));
+    const svc = new FollowsService(db);
+    await expect(svc.mutualFriends("u2", "me", 20, 0)).resolves.toEqual({
+      items: [
+        {
+          userId: "u4",
+          username: "vee",
+          displayName: "Vee",
+          avatarKey: "a.jpg",
+          isFollowing: true,
+        },
+      ],
+      total: 1,
+    });
+  });
+
+  it("has no mutual friends with yourself and skips the query", async () => {
+    const { db, select } = makeDb();
+    const svc = new FollowsService(db);
+    await expect(svc.mutualFriendsCount("me", "me")).resolves.toBe(0);
+    expect(select).not.toHaveBeenCalled();
+  });
+});

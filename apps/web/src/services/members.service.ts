@@ -20,6 +20,23 @@ export interface StateCountPM {
   membersCount: number;
 }
 
+export interface FriendPM {
+  userId: string;
+  username: string | null;
+  displayName: string;
+  avatarUrl: string | null;
+  isFollowing: boolean;
+}
+
+export interface FriendsPagePM {
+  items: FriendPM[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export type FriendsTab = "all" | "mutual";
+
 export interface MembersPagePM {
   items: MemberCardPM[];
   total: number;
@@ -27,12 +44,22 @@ export interface MembersPagePM {
   limit: number;
 }
 
+export type MembersSort = "recent" | "followers" | "name";
+const SORT_CYCLE: MembersSort[] = ["recent", "followers", "name"];
+
+/** Next mode when the user taps "Sort": newest → most followed → name → newest. */
+export function nextSort(mode: MembersSort): MembersSort {
+  return SORT_CYCLE[(SORT_CYCLE.indexOf(mode) + 1) % SORT_CYCLE.length];
+}
+
 export interface MembersPageParams {
   country: string;
   state: string;
-  region: string;
+  /** LGA / area filter; omit to list the whole state (CEO, 2026-09-08). */
+  region?: string | null;
   page: number;
   limit: number;
+  sort?: MembersSort;
 }
 
 export const membersApi = {
@@ -40,17 +67,19 @@ export const membersApi = {
   states: (country: string) =>
     api.get<StateCountPM[]>(`/members/states?country=${encodeURIComponent(country.toUpperCase())}`),
   page: (p: MembersPageParams) => {
-    const qs = new URLSearchParams({
-      country: p.country.toUpperCase(),
-      state: p.state,
-      lga: p.region,
-      page: String(p.page),
-      limit: String(p.limit),
-    });
+    const qs = new URLSearchParams({ country: p.country.toUpperCase(), state: p.state });
+    if (p.region) qs.set("lga", p.region);
+    qs.set("page", String(p.page));
+    qs.set("limit", String(p.limit));
+    if (p.sort) qs.set("sort", p.sort);
     return api.get<MembersPagePM>(`/members?${qs.toString()}`);
   },
   profile: (username: string) =>
     api.get<PublicProfilePM>(`/profiles/${encodeURIComponent(username.replace(/^@/, ""))}`),
+  friends: (username: string, tab: FriendsTab, page: number, limit: number) =>
+    api.get<FriendsPagePM>(
+      `/profiles/${encodeURIComponent(username.replace(/^@/, ""))}/friends?tab=${tab}&page=${page}&limit=${limit}`,
+    ),
   follow: (username: string) =>
     api.post<unknown>(`/follows/${encodeURIComponent(username.replace(/^@/, ""))}`, {}),
   unfollow: (username: string) =>
@@ -141,6 +170,11 @@ export function toggleFollowOnProfile(pm: PublicProfilePM): PublicProfilePM {
       followers: pm.isFollowing ? Math.max(0, pm.counts.followers - 1) : pm.counts.followers + 1,
     },
   };
+}
+
+/** Optimistic follow flip for a friends-list row (no follower count on the row). */
+export function toggleFollowOnFriend(pm: FriendPM): FriendPM {
+  return { ...pm, isFollowing: !pm.isFollowing };
 }
 
 export function hasMore(loaded: number, total: number): boolean {

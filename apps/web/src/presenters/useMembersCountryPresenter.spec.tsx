@@ -27,46 +27,52 @@ describe("useMembersCountryPresenter", () => {
     apiGet.mockReset().mockResolvedValue([{ code: "NG", name: "Nigeria", membersCount: 12_400 }]);
   });
 
-  it("lists only launched countries with an abbreviated live total and no bottom-nav concerns", async () => {
+  it("lists only launched countries with an abbreviated live total (Figma 881:730)", async () => {
     const { result } = renderHook(() => useMembersCountryPresenter());
     expect(result.current.rows[0]).toMatchObject({
       code: "NG",
-      subtitle: "…",
+      membersLabel: null,
+      comingSoon: false,
       href: "/members/ng",
     });
-    await waitFor(() => expect(result.current.rows[0].subtitle).toBe("12.4K Members"));
+    await waitFor(() => expect(result.current.rows[0].membersLabel).toBe("12.4K Members"));
     expect(result.current.rows).toHaveLength(1);
     expect(result.current.rows[0]).toMatchObject({
       name: "Nigeria",
-      flag: "/app/flag-ng.svg",
+      flag: "/app/members/flag-ng.svg",
       emoji: "🇳🇬",
-      badge: null,
     });
-    expect(result.current.heading).toBe("Available countries");
     expect(result.current.title).toBe("Select a Country");
-    expect(result.current.header.backHref).toBe("/home");
+    expect(result.current.subtitle).toMatch(/^Choose a country/);
+    expect(result.current.heading).toBe("AVAILABLE COUNTRIES");
+    expect(result.current.banner.title).toBe("More countries coming soon!");
+    expect(result.current.comingSoonLabel).toBe("COMING SOON");
     expect(result.current.noResults).toBeNull();
     expect(apiGet).toHaveBeenCalledWith("/members/countries");
   });
 
   it("reveals unlaunched countries as Coming Soon only when searched", async () => {
     const { result } = renderHook(() => useMembersCountryPresenter());
-    await waitFor(() => expect(result.current.rows[0].subtitle).toBe("12.4K Members"));
+    await waitFor(() => expect(result.current.rows[0].membersLabel).toBe("12.4K Members"));
     act(() => result.current.search.onChange("ghana"));
-    expect(result.current.heading).toBe("Results");
+    expect(result.current.heading).toBe("RESULTS");
     expect(result.current.rows).toEqual([
       {
         code: "GH",
         name: "Ghana",
         flag: null,
         emoji: "🇬🇭",
-        subtitle: "Coming Soon",
+        membersLabel: null,
+        comingSoon: true,
         href: null,
-        badge: "Coming Soon",
       },
     ]);
     act(() => result.current.search.onChange("nig"));
-    expect(result.current.rows[0]).toMatchObject({ code: "NG", href: "/members/ng", badge: null });
+    expect(result.current.rows[0]).toMatchObject({
+      code: "NG",
+      href: "/members/ng",
+      comingSoon: false,
+    });
     act(() => result.current.search.onChange("zzqx"));
     expect(result.current.rows).toEqual([]);
     expect(result.current.noResults).toBe("No country matches that search.");
@@ -82,6 +88,6 @@ describe("useMembersCountryPresenter", () => {
     const { result } = renderHook(() => useMembersCountryPresenter());
     await waitFor(() => expect(result.current.error).toMatch(/went wrong/));
     // Nigeria still renders (without a count) so the page stays usable.
-    expect(result.current.rows[0]).toMatchObject({ code: "NG", subtitle: "…" });
+    expect(result.current.rows[0]).toMatchObject({ code: "NG", membersLabel: null });
   });
 });

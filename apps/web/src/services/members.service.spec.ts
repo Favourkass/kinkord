@@ -18,11 +18,13 @@ import {
   hasMore,
   isCountryAvailable,
   membersApi,
+  nextSort,
   mergeStateCounts,
   regionsForState,
   searchCountries,
   statesForCountry,
   toggleFollowOnCard,
+  toggleFollowOnFriend,
   toggleFollowOnProfile,
 } from "./members.service";
 
@@ -37,14 +39,34 @@ describe("membersApi", () => {
     await membersApi.countries();
     await membersApi.states("ng");
     await membersApi.page({ country: "ng", state: "Akwa Ibom", region: "Uyo", page: 2, limit: 20 });
+    await membersApi.page({
+      country: "ng",
+      state: "Delta",
+      region: "Asaba",
+      page: 1,
+      limit: 20,
+      sort: "followers",
+    });
+    await membersApi.page({
+      country: "ng",
+      state: "Delta",
+      region: null,
+      page: 1,
+      limit: 20,
+      sort: "recent",
+    });
     await membersApi.profile("@Nene");
+    await membersApi.friends("@Nene", "mutual", 2, 20);
     await membersApi.follow("@nene");
     await membersApi.unfollow("nene");
     expect(apiGet.mock.calls.map((c) => c[0])).toEqual([
       "/members/countries",
       "/members/states?country=NG",
       "/members?country=NG&state=Akwa+Ibom&lga=Uyo&page=2&limit=20",
+      "/members?country=NG&state=Delta&lga=Asaba&page=1&limit=20&sort=followers",
+      "/members?country=NG&state=Delta&page=1&limit=20&sort=recent",
       "/profiles/Nene",
+      "/profiles/Nene/friends?tab=mutual&page=2&limit=20",
     ]);
     expect(apiPost).toHaveBeenCalledWith("/follows/nene", {});
     expect(apiDel).toHaveBeenCalledWith("/follows/nene");
@@ -59,7 +81,7 @@ describe("searchCountries", () => {
       {
         code: "NG",
         name: "Nigeria",
-        flag: "/app/flag-ng.svg",
+        flag: "/app/members/flag-ng.svg",
         membersCount: 12_400,
         available: true,
       },
@@ -125,6 +147,7 @@ describe("optimistic follow toggles", () => {
     avatarUrl: null,
     age: 25,
     gender: "Female",
+    roles: ["Submissive"],
     city: "Abraka",
     state: "Delta",
     isOnline: true,
@@ -146,12 +169,31 @@ describe("optimistic follow toggles", () => {
   it("does the same for a profile's counts", () => {
     const pm = {
       isFollowing: false,
-      counts: { friends: 1, followers: 10, following: 3 },
+      counts: { friends: 1, followers: 10, following: 3, mutualFriends: 0 },
     } as PublicProfilePM;
     const on = toggleFollowOnProfile(pm);
     expect(on.isFollowing).toBe(true);
-    expect(on.counts).toEqual({ friends: 1, followers: 11, following: 3 });
+    expect(on.counts).toEqual({ friends: 1, followers: 11, following: 3, mutualFriends: 0 });
     expect(toggleFollowOnProfile(on).counts.followers).toBe(10);
+  });
+
+  it("flips a friend row without touching anything else", () => {
+    const row = {
+      userId: "u1",
+      username: "kay",
+      displayName: "Kay",
+      avatarUrl: null,
+      isFollowing: false,
+    };
+    expect(toggleFollowOnFriend(row)).toEqual({ ...row, isFollowing: true });
+  });
+});
+
+describe("nextSort", () => {
+  it("cycles newest → most followed → name → newest", () => {
+    expect(nextSort("recent")).toBe("followers");
+    expect(nextSort("followers")).toBe("name");
+    expect(nextSort("name")).toBe("recent");
   });
 });
 

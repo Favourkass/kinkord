@@ -137,7 +137,6 @@ function AvatarWithEdit({
 /** Edit-profile screen — mobile sheet under a gold cover, desktop panel with sidebar. */
 export default function EditProfileView(props: EditProfileViewProps) {
   const {
-    tagline,
     title,
     avatarUrl,
     displayName,
@@ -221,8 +220,9 @@ export default function EditProfileView(props: EditProfileViewProps) {
       {/* Desktop */}
       <div className="hidden min-h-dvh lg:flex">
         <DesktopSidebar
-          tagline={tagline}
+          brand="KINKORD"
           active="edit-profile"
+          avatarUrl={avatarUrl}
           links={links}
           labels={labels}
           onLogout={onLogout}

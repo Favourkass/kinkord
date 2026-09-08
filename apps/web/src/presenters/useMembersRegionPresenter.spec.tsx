@@ -38,6 +38,7 @@ const member = (n: number, extra: Partial<MemberCardPM> = {}): MemberCardPM => (
   avatarUrl: null,
   age: 25,
   gender: "Female",
+  roles: ["Submissive", "Switch"],
   city: "Abraka",
   state: "Delta",
   isOnline: n === 1,
@@ -66,22 +67,25 @@ describe("useMembersRegionPresenter", () => {
     });
   });
 
-  it("defaults to the state's first region and renders the brief's heading + cards", async () => {
+  it("lists the whole state by default and renders the Figma list header + cards", async () => {
     const { result } = renderHook(() => useMembersRegionPresenter("ng", "Delta"));
     expect(result.current.title).toBe("Delta State");
-    expect(result.current.subtitle).toBe("Find kinksters in Delta State.");
-    expect(result.current.selector.value).toBe("Abraka");
-    expect(result.current.selector.options[0]).toBe("Abraka");
-    expect(result.current.header.backHref).toBe("/members/ng");
+    expect(result.current.subtitle).toBe("Discover like-minded members near you.");
+    expect(result.current.selector.value).toBe("All regions");
+    expect(result.current.selector.options.slice(0, 2)).toEqual(["All regions", "Abraka"]);
+    expect(result.current.selector.searchByRegionLabel).toBe("Search by Region");
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(apiGet).toHaveBeenCalledWith(
-      "/members?country=NG&state=Delta&lga=Abraka&page=1&limit=20",
+      "/members?country=NG&state=Delta&page=1&limit=20&sort=recent",
     );
-    expect(result.current.heading).toBe("Kinksters in Abraka (3)");
+    expect(result.current.count).toBe("3");
+    expect(result.current.foundLabel).toBe("Members Found");
+    expect(result.current.sortLabel).toBe("Sort");
     expect(result.current.rows).toHaveLength(2);
     expect(result.current.rows[0].card).toMatchObject({
       title: "kinkster1",
-      meta: "25F • Female",
+      ageTag: "25F",
+      roles: "Submissive | Switch",
       location: "Abraka, Delta State",
       isOnline: true,
       followers: "10",
@@ -98,7 +102,7 @@ describe("useMembersRegionPresenter", () => {
     act(() => result.current.loadMore());
     await waitFor(() => expect(result.current.rows).toHaveLength(3));
     expect(apiGet).toHaveBeenLastCalledWith(
-      "/members?country=NG&state=Delta&lga=Abraka&page=2&limit=20",
+      "/members?country=NG&state=Delta&page=2&limit=20&sort=recent",
     );
     expect(result.current.hasMore).toBe(false);
     expect(result.current.endText).toMatch(/met everyone/);
@@ -114,24 +118,44 @@ describe("useMembersRegionPresenter", () => {
     expect(result.current.selector.open).toBe(true);
     act(() => result.current.selector.onSelect("Asaba"));
     expect(result.current.selector.open).toBe(false);
-    await waitFor(() => expect(result.current.heading).toBe("Kinksters in Asaba (1)"));
+    expect(result.current.selector.value).toBe("Asaba");
+    await waitFor(() => expect(result.current.count).toBe("1"));
+    expect(apiGet).toHaveBeenLastCalledWith(
+      "/members?country=NG&state=Delta&lga=Asaba&page=1&limit=20&sort=recent",
+    );
     expect(result.current.rows[0].card.location).toBe("Asaba, Delta State");
+    act(() => result.current.selector.onSelect("All regions"));
+    expect(result.current.selector.value).toBe("All regions");
+    await waitFor(() => expect(result.current.count).toBe("3"));
+  });
+
+  it("cycles the sort mode and refetches with it", async () => {
+    const { result } = renderHook(() => useMembersRegionPresenter("ng", "Delta"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => result.current.onSort());
+    expect(result.current.sort).toBe("followers");
+    expect(result.current.sortAria).toBe("Sort: Most followed");
+    await waitFor(() =>
+      expect(apiGet).toHaveBeenLastCalledWith(
+        "/members?country=NG&state=Delta&page=1&limit=20&sort=followers",
+      ),
+    );
   });
 
   it("follows optimistically, updates the count, and reverts when the API rejects", async () => {
     const { result } = renderHook(() => useMembersRegionPresenter("ng", "Delta"));
     await waitFor(() => expect(result.current.loading).toBe(false));
-    act(() => result.current.toggleFollow(result.current.rows[0].card));
+    act(() => result.current.onToggleFollow(result.current.rows[0].card));
     expect(result.current.rows[0].card).toMatchObject({ isFollowing: true, followers: "11" });
     await waitFor(() => expect(result.current.rows[0].busy).toBe(false));
     expect(apiPost).toHaveBeenCalledWith("/follows/kinkster1", {});
 
-    act(() => result.current.toggleFollow(result.current.rows[0].card));
+    act(() => result.current.onToggleFollow(result.current.rows[0].card));
     await waitFor(() => expect(apiDel).toHaveBeenCalledWith("/follows/kinkster1"));
     await waitFor(() => expect(result.current.rows[0].card.isFollowing).toBe(false));
 
     apiPost.mockRejectedValueOnce(new Error("nope"));
-    act(() => result.current.toggleFollow(result.current.rows[1].card));
+    act(() => result.current.onToggleFollow(result.current.rows[1].card));
     expect(result.current.rows[1].card.isFollowing).toBe(true);
     await waitFor(() => expect(result.current.rows[1].card.isFollowing).toBe(false));
     expect(result.current.rows[1].card.followers).toBe("10");
@@ -146,7 +170,7 @@ describe("useMembersRegionPresenter", () => {
     const empty = renderHook(() => useMembersRegionPresenter("ng", "Akwa%20Ibom"));
     expect(empty.result.current.title).toBe("Akwa Ibom State");
     await waitFor(() => expect(empty.result.current.loading).toBe(false));
-    expect(empty.result.current.empty).toBe("No kinksters in Abak yet. Be the first.");
+    expect(empty.result.current.empty).toBe("No members in Akwa Ibom State yet. Be the first.");
 
     const { ApiError } = await import("@/services/apiClient");
     apiGet.mockRejectedValue(new ApiError(401, {}));
