@@ -25,7 +25,13 @@ export default function SuggestedFriends(p: SuggestedFriendsProps) {
                 <span className="block size-[36px] overflow-hidden rounded-[18px] bg-pf-surface-2">
                   {r.avatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={r.avatarUrl} alt="" className="size-full object-cover" />
+                    <img
+                      src={r.avatarUrl}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className="size-full object-cover"
+                    />
                   ) : (
                     <span className="grid size-full place-items-center text-pf-muted">
                       <MaskIcon name="people" width={16} />

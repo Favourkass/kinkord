@@ -1,9 +1,29 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { compressImage } from "./image";
+import { IMAGE_UPLOAD_PRESETS, compressImage } from "./image";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("IMAGE_UPLOAD_PRESETS", () => {
+  it("keeps avatars far smaller than covers and both within the API's byte caps", () => {
+    expect(IMAGE_UPLOAD_PRESETS.avatar.maxDim).toBeLessThan(IMAGE_UPLOAD_PRESETS.cover.maxDim);
+    expect(IMAGE_UPLOAD_PRESETS.avatar.maxBytes).toBeLessThan(IMAGE_UPLOAD_PRESETS.cover.maxBytes);
+    // API caps: avatar 5MB, cover 10MB — presets must sit well below them.
+    expect(IMAGE_UPLOAD_PRESETS.avatar.maxBytes).toBeLessThan(5 * 1024 * 1024);
+    expect(IMAGE_UPLOAD_PRESETS.cover.maxBytes).toBeLessThan(10 * 1024 * 1024);
+  });
+
+  it("returns an already-small file untouched under the avatar preset", async () => {
+    // Below maxBytes and (as far as decode is concerned) already within maxDim.
+    vi.stubGlobal(
+      "createImageBitmap",
+      vi.fn(async () => ({ width: 400, height: 400, close() {} })),
+    );
+    const small = new File([new Uint8Array(20_000)], "me.jpg", { type: "image/jpeg" });
+    expect(await compressImage(small, IMAGE_UPLOAD_PRESETS.avatar)).toBe(small);
+  });
 });
 
 describe("compressImage", () => {

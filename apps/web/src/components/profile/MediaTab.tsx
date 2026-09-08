@@ -43,7 +43,13 @@ export default function MediaTab(p: MediaTabProps) {
               className={`relative overflow-hidden rounded-[8px] ${photo.featured ? "col-span-2 row-span-1 aspect-[2/1]" : "aspect-square"}`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={photo.url} alt="" className="size-full object-cover" />
+              <img
+                src={photo.url}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                className="size-full object-cover"
+              />
               {photo.featured && (
                 <span className="absolute left-[8px] top-[8px] rounded-full bg-kink-gold-bright px-[8px] py-[2px] text-[10px] font-semibold leading-[15px] text-[#0a0a0a]">
                   {p.featuredLabel}

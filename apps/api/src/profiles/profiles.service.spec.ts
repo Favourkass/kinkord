@@ -89,12 +89,18 @@ describe("ProfilesService", () => {
     const storage = {
       presignUpload: vi.fn(async () => "https://s3/upload"),
       presignDownload: vi.fn(async () => "https://s3/download"),
-    } as unknown as StorageService;
-    return new ProfilesService(db, storage);
+      describe: vi.fn(async () => ({ size: 120_000, contentType: "image/jpeg" })),
+      remove: vi.fn(async () => undefined),
+    };
+    return {
+      service: new ProfilesService(db, storage as unknown as StorageService),
+      storage,
+      db,
+    };
   };
 
   it("rejects avatar and cover keys that belong to another user", async () => {
-    const service = makeService();
+    const { service } = makeService();
     await expect(
       service.updateOwn("u1", { avatarKey: "avatars/other/pic.png" }, "Favour"),
     ).rejects.toThrow(/does not belong/);
@@ -103,13 +109,55 @@ describe("ProfilesService", () => {
     ).rejects.toThrow(/does not belong/);
   });
 
+  it("stores an uploaded key only after S3 confirms a valid, in-limit image", async () => {
+    const { service, storage, db } = makeService();
+    await service.updateOwn("u1", { avatarKey: "avatars/u1/pic.jpg" }, "Favour");
+    expect(storage.describe).toHaveBeenCalledWith("avatars/u1/pic.jpg");
+    expect(storage.remove).not.toHaveBeenCalled();
+    expect(db.update).toHaveBeenCalled();
+  });
+
+  it("rejects a PATCH whose key was never uploaded", async () => {
+    const { service, storage, db } = makeService();
+    storage.describe.mockResolvedValueOnce(null);
+    await expect(
+      service.updateOwn("u1", { coverKey: "covers/u1/missing.jpg" }, "Favour"),
+    ).rejects.toThrow(/upload not found/);
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it("deletes and rejects an oversized upload (server-side size cap)", async () => {
+    const { service, storage, db } = makeService();
+    storage.describe.mockResolvedValueOnce({ size: 6 * 1024 * 1024, contentType: "image/jpeg" });
+    await expect(
+      service.updateOwn("u1", { avatarKey: "avatars/u1/huge.jpg" }, "Favour"),
+    ).rejects.toThrow(/too large — max 5MB/);
+    expect(storage.remove).toHaveBeenCalledWith("avatars/u1/huge.jpg");
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it("deletes and rejects an upload that is not an allowed image type", async () => {
+    const { service, storage } = makeService();
+    storage.describe.mockResolvedValueOnce({ size: 1000, contentType: "application/pdf" });
+    await expect(
+      service.updateOwn("u1", { coverKey: "covers/u1/doc.pdf" }, "Favour"),
+    ).rejects.toThrow(/contentType must be one of/);
+    expect(storage.remove).toHaveBeenCalledWith("covers/u1/doc.pdf");
+  });
+
+  it("skips the S3 check when no image key is being changed", async () => {
+    const { service, storage } = makeService();
+    await service.updateOwn("u1", { bio: "hi" }, "Favour");
+    expect(storage.describe).not.toHaveBeenCalled();
+  });
+
   it("exposes phoneVerified=false in the VM until SMS verification exists", async () => {
-    const vm = await makeService().getOwn("u1", "Favour");
+    const vm = await makeService().service.getOwn("u1", "Favour");
     expect(vm.phoneVerified).toBe(false);
   });
 
   it("maps the persona fields into the VM with array defaults", async () => {
-    const vm = await makeService().getOwn("u1", "Favour");
+    const vm = await makeService().service.getOwn("u1", "Favour");
     expect(vm.relationshipStatus).toBeNull();
     expect(vm.lookingFor).toEqual([]);
     expect(vm.interests).toEqual([]);
@@ -117,7 +165,7 @@ describe("ProfilesService", () => {
   });
 
   it("presigns avatar and cover uploads under per-user prefixes", async () => {
-    const service = makeService();
+    const { service } = makeService();
     const avatar = await service.presignImageUpload("u1", "avatar", "image/png");
     expect(avatar.key).toMatch(/^avatars\/u1\/[0-9a-f-]+\.png$/);
     expect(avatar.maxSizeMb).toBe(5);
@@ -126,9 +174,25 @@ describe("ProfilesService", () => {
     expect(cover.maxSizeMb).toBe(10);
   });
 
-  it("rejects unsupported content types", async () => {
-    await expect(makeService().presignImageUpload("u1", "avatar", "image/gif")).rejects.toThrow(
-      /contentType/,
+  it("signs a declared byte size into the upload and refuses one over the cap", async () => {
+    const { service, storage } = makeService();
+    await service.presignImageUpload("u1", "avatar", "image/jpeg", 300_000);
+    expect(storage.presignUpload).toHaveBeenCalledWith(
+      expect.stringMatching(/^avatars\/u1\//),
+      "image/jpeg",
+      300_000,
     );
+    await expect(
+      service.presignImageUpload("u1", "avatar", "image/jpeg", 5 * 1024 * 1024 + 1),
+    ).rejects.toThrow(/too large — max 5MB/);
+    await expect(
+      service.presignImageUpload("u1", "cover", "image/jpeg", 11 * 1024 * 1024),
+    ).rejects.toThrow(/too large — max 10MB/);
+  });
+
+  it("rejects unsupported content types", async () => {
+    await expect(
+      makeService().service.presignImageUpload("u1", "avatar", "image/gif"),
+    ).rejects.toThrow(/contentType/);
   });
 });

@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, uploadToPresignedUrl } from "@/services/apiClient";
-import { compressImage } from "@/util/image";
+import { IMAGE_UPLOAD_PRESETS, compressImage } from "@/util/image";
 import {
   validateAccount,
   validateAbout,
@@ -127,10 +127,10 @@ export function useSignupWizardPresenter() {
     setProfileError(null);
     try {
       // Shrink phone photos before upload so they survive slow connections.
-      const file = await compressImage(rawFile);
+      const file = await compressImage(rawFile, IMAGE_UPLOAD_PRESETS[kind]);
       const spec = await api.post<{ key: string; uploadUrl: string; maxSizeMb: number }>(
         "/profile/upload-url",
-        { kind, contentType: file.type },
+        { kind, contentType: file.type, contentLength: file.size },
       );
       if (file.size > spec.maxSizeMb * 1024 * 1024) {
         throw new Error(`Image is too large — max ${spec.maxSizeMb}MB.`);

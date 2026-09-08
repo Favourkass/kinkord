@@ -9,6 +9,8 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push, replace }) }));
 
 const get = vi.fn();
 const patch = vi.fn();
+const post = vi.fn();
+const uploadToPresignedUrl = vi.fn(async () => {});
 vi.mock("@/services/apiClient", () => {
   class ApiError extends Error {
     constructor(
@@ -23,11 +25,18 @@ vi.mock("@/services/apiClient", () => {
     api: {
       get: (...a: unknown[]) => get(...a),
       patch: (...a: unknown[]) => patch(...a),
-      post: vi.fn(),
+      post: (...a: unknown[]) => post(...a),
     },
-    uploadToPresignedUrl: vi.fn(async () => {}),
+    uploadToPresignedUrl: (...a: unknown[]) => uploadToPresignedUrl(...a),
   };
 });
+
+// Canvas is unavailable in jsdom, so stand in for the compressor and hand back a smaller file.
+const compressImage = vi.fn();
+vi.mock("@/util/image", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/util/image")>()),
+  compressImage: (...a: unknown[]) => compressImage(...a),
+}));
 
 const twoFactorEnable = vi.fn();
 const verifyTotp = vi.fn();
@@ -94,6 +103,60 @@ describe("useProfilePresenter", () => {
     });
     await waitFor(() => expect(result.current.notice).toMatch(/saved/i));
     expect(patch).toHaveBeenCalledWith("/profile", expect.objectContaining({ bio: "hello" }));
+  });
+
+  describe("uploadImage", () => {
+    const raw = new File([new Uint8Array(4_000_000)], "IMG_0042.HEIC.jpg", { type: "image/jpeg" });
+    const small = new File([new Uint8Array(180_000)], "IMG_0042.jpg", { type: "image/jpeg" });
+
+    beforeEach(() => {
+      compressImage.mockReset().mockResolvedValue(small);
+      uploadToPresignedUrl.mockClear();
+      post.mockReset().mockResolvedValue({
+        key: "avatars/u1/abc.jpg",
+        uploadUrl: "https://s3/put",
+        maxSizeMb: 5,
+      });
+    });
+
+    it("compresses with the avatar preset, declares the size, uploads the small file and saves the key", async () => {
+      const { IMAGE_UPLOAD_PRESETS } = await import("@/util/image");
+      const { result } = renderHook(() => useProfilePresenter());
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      await act(() => result.current.uploadImage("avatar", raw));
+
+      expect(compressImage).toHaveBeenCalledWith(raw, IMAGE_UPLOAD_PRESETS.avatar);
+      expect(post).toHaveBeenCalledWith("/profile/upload-url", {
+        kind: "avatar",
+        contentType: "image/jpeg",
+        contentLength: small.size,
+      });
+      expect(uploadToPresignedUrl).toHaveBeenCalledWith("https://s3/put", small);
+      expect(patch).toHaveBeenCalledWith("/profile", { avatarKey: "avatars/u1/abc.jpg" });
+      expect(result.current.error).toBeNull();
+      expect(result.current.uploading).toBeNull();
+    });
+
+    it("uses the cover preset for covers", async () => {
+      const { IMAGE_UPLOAD_PRESETS } = await import("@/util/image");
+      const { result } = renderHook(() => useProfilePresenter());
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      await act(() => result.current.uploadImage("cover", raw));
+      expect(compressImage).toHaveBeenCalledWith(raw, IMAGE_UPLOAD_PRESETS.cover);
+      expect(patch).toHaveBeenCalledWith("/profile", { coverKey: "avatars/u1/abc.jpg" });
+    });
+
+    it("stops before uploading when even the compressed file is over the API's cap", async () => {
+      compressImage.mockResolvedValue(
+        new File([new Uint8Array(6 * 1024 * 1024)], "huge.jpg", { type: "image/jpeg" }),
+      );
+      const { result } = renderHook(() => useProfilePresenter());
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      await act(() => result.current.uploadImage("avatar", raw));
+      expect(result.current.error).toMatch(/too large — max 5MB/);
+      expect(uploadToPresignedUrl).not.toHaveBeenCalled();
+      expect(patch).not.toHaveBeenCalled();
+    });
   });
 });
 
