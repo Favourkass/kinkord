@@ -7,6 +7,15 @@ export interface CompressOptions {
   maxBytes?: number;
 }
 
+/**
+ * Per-kind upload presets. Avatars never render above 110px (330px on a 3x
+ * phone) and covers never above 1440px, so anything larger is wasted bytes.
+ */
+export const IMAGE_UPLOAD_PRESETS = {
+  avatar: { maxDim: 512, quality: 0.85, maxBytes: 300 * 1024 },
+  cover: { maxDim: 1600, quality: 0.82, maxBytes: 800 * 1024 },
+} as const satisfies Record<"avatar" | "cover", CompressOptions>;
+
 async function loadBitmap(file: File): Promise<ImageBitmap | HTMLImageElement> {
   if (typeof createImageBitmap === "function") {
     return createImageBitmap(file);
