@@ -28,6 +28,13 @@ describe("api.request", () => {
     await expect(api.get("/me")).rejects.toBeInstanceOf(ApiError);
     await expect(api.get("/me")).rejects.toMatchObject({ status: 401 });
   });
+
+  it("sends DELETE for api.del", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(okJson({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(api.del("/follows/nene")).resolves.toEqual({ ok: true });
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: "DELETE" });
+  });
 });
 
 describe("uploadToPresignedUrl", () => {

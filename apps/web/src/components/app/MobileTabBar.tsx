@@ -1,41 +1,50 @@
 import Link from "next/link";
+import { Bell, House, MessageSquare } from "lucide-react";
 import AvatarCircle from "./AvatarCircle";
-import { MessageIcon, SettingsIcon } from "./icons";
+import type { AppNavLabels, AppNavLinks, AppTab } from "./nav";
 
-export type AppTab = "messages" | "profile" | "settings";
+export type { AppTab } from "./nav";
 
 export interface MobileTabBarProps {
-  active: AppTab;
+  /** Undefined when the current screen isn't one of the tabs (e.g. Settings). */
+  active?: AppTab;
   avatarUrl: string | null;
-  messagesHref: string;
-  profileHref: string;
-  settingsHref: string;
+  links: Pick<AppNavLinks, "home" | "chat" | "notifications" | "profile">;
+  labels: Pick<AppNavLabels, "home" | "chat" | "notifications" | "profile">;
 }
 
-/** Bottom tab bar: Messages, Profile (live avatar), Settings. */
-export default function MobileTabBar({
-  active,
-  avatarUrl,
-  messagesHref,
-  profileHref,
-  settingsHref,
-}: MobileTabBarProps) {
-  const label = (tab: AppTab) =>
-    `text-[14px] font-medium text-app-text ${active === tab ? "" : "opacity-80"}`;
+/** Bottom tab bar: Home, Chat, Notifications, Profile (live avatar). */
+export default function MobileTabBar({ active, avatarUrl, links, labels }: MobileTabBarProps) {
+  const tone = (tab: AppTab) => (active === tab ? "text-kink-amber" : "text-app-text opacity-80");
+  const label = (tab: AppTab) => `text-[12px] font-medium ${tone(tab)}`;
+  const tab = (key: Exclude<AppTab, "profile">, Icon: typeof House) => (
+    <Link
+      href={links[key]}
+      aria-current={active === key ? "page" : undefined}
+      className="flex flex-col items-center gap-[6px]"
+    >
+      <Icon size={28} strokeWidth={1.75} className={tone(key)} aria-hidden />
+      <span className={label(key)}>{labels[key]}</span>
+    </Link>
+  );
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-app-line bg-app-surface pb-[20px] pt-[21px]">
-      <div className="grid grid-cols-3 items-end">
-        <Link href={messagesHref} className="flex flex-col items-center gap-[8px]">
-          <MessageIcon className="text-app-text" />
-          <span className={label("messages")}>Messages</span>
-        </Link>
-        <Link href={profileHref} className="flex flex-col items-center gap-[6px]">
-          <AvatarCircle src={avatarUrl} alt="Your profile" size={44} />
-          <span className={label("profile")}>Profile</span>
-        </Link>
-        <Link href={settingsHref} className="flex flex-col items-center gap-[8px]">
-          <SettingsIcon className="text-app-text" />
-          <span className={label("settings")}>Settings</span>
+    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-app-line bg-app-surface pb-[max(16px,env(safe-area-inset-bottom))] pt-[12px]">
+      <div className="grid grid-cols-4 items-end">
+        {tab("home", House)}
+        {tab("chat", MessageSquare)}
+        {tab("notifications", Bell)}
+        <Link
+          href={links.profile}
+          aria-current={active === "profile" ? "page" : undefined}
+          className="flex flex-col items-center gap-[4px]"
+        >
+          <AvatarCircle
+            src={avatarUrl}
+            alt={labels.profile}
+            size={32}
+            ringClassName={active === "profile" ? "bg-kink-amber" : undefined}
+          />
+          <span className={label("profile")}>{labels.profile}</span>
         </Link>
       </div>
     </nav>

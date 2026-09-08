@@ -2,11 +2,12 @@
 
 import AppShell from "@/components/app/AppShell";
 import ComingSoonPanel from "@/components/app/ComingSoonPanel";
-import { Routes } from "@/constants/Routes";
+import { getAppShellNav } from "@/presenters/getAppShellNav";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
 
 export default function MessagesPage() {
   const vm = useHomePresenter();
+  const nav = getAppShellNav();
 
   return (
     <AppShell
@@ -17,15 +18,14 @@ export default function MessagesPage() {
       handle={vm.handle}
       avatarUrl={vm.avatarUrl}
       membersCount={vm.membersCount}
-      activeTab="messages"
-      activeNav="home"
+      activeTab="chat"
+      activeNav="chat"
       drawerOpen={vm.drawerOpen}
       onMenu={vm.openDrawer}
       onCloseDrawer={vm.closeDrawer}
       onLogout={vm.logout}
-      messagesHref={Routes.messages}
-      profileHref={Routes.profile}
-      settingsHref={Routes.settings}
+      links={nav.links}
+      labels={nav.labels}
     >
       <ComingSoonPanel
         headline="COMING SOON"

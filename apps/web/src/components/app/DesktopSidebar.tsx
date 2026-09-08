@@ -1,38 +1,50 @@
 import Image from "next/image";
 import Link from "next/link";
-import { LogoutIcon, SettingsIcon, UserIcon } from "./icons";
+import { Bell, House, LogOut, MessageSquare, Settings, User, Users } from "lucide-react";
+import type { AppNav, AppNavLabels, AppNavLinks } from "./nav";
 
 export interface DesktopSidebarProps {
   tagline: string;
-  active: "home" | "profile" | "settings" | "edit-profile";
-  profileHref: string;
-  settingsHref: string;
+  active: AppNav;
+  links: AppNavLinks;
+  labels: AppNavLabels;
   onLogout: () => void;
 }
 
-/** Persistent desktop sidebar: horned wordmark, tagline, nav, log out. */
+/** Persistent desktop sidebar: horned wordmark, tagline, primary nav, settings, log out. */
 export default function DesktopSidebar({
   tagline,
   active,
-  profileHref,
-  settingsHref,
+  links,
+  labels,
   onLogout,
 }: DesktopSidebarProps) {
-  const item = (isActive: boolean) =>
-    `flex items-center gap-[34px] pl-[53px] text-[36px] font-medium text-app-text ${
-      isActive ? "" : "opacity-85 hover:opacity-100"
+  const isActive = (key: AppNav) =>
+    active === key || (key === "profile" && active === "edit-profile");
+  const item = (key: AppNav) =>
+    `mx-[24px] flex items-center gap-[18px] rounded-[14px] px-[20px] py-[12px] text-[20px] font-medium ${
+      isActive(key)
+        ? "bg-app-members text-kink-amber"
+        : "text-app-text opacity-85 hover:opacity-100"
     }`;
-  const onEditScreen = active === "edit-profile";
+  const primary: Array<{ key: Exclude<AppNav, "settings" | "edit-profile">; Icon: typeof House }> =
+    [
+      { key: "home", Icon: House },
+      { key: "members", Icon: Users },
+      { key: "chat", Icon: MessageSquare },
+      { key: "notifications", Icon: Bell },
+      { key: "profile", Icon: User },
+    ];
   return (
-    <aside className="flex w-[385px] shrink-0 flex-col bg-app-page pb-10">
+    <aside className="flex w-[340px] shrink-0 flex-col bg-app-page pb-10">
       <div className="pl-[49px] pt-[23px]">
-        <div className="relative h-[83px] w-[315px]">
+        <div className="relative h-[70px] w-[265px]">
           <Image
             src="/app/wordmark-light.png"
             alt="Kinkord"
             fill
             priority
-            sizes="315px"
+            sizes="265px"
             className="object-contain dark:hidden"
           />
           <Image
@@ -40,35 +52,46 @@ export default function DesktopSidebar({
             alt="Kinkord"
             fill
             priority
-            sizes="315px"
+            sizes="265px"
             className="hidden object-contain dark:block"
           />
         </div>
-        <p className="pl-[29px] pt-[2px] text-[12px] font-semibold tracking-[2px] text-app-text">
+        <p className="pl-[24px] pt-[2px] text-[11px] font-semibold tracking-[2px] text-app-text">
           {tagline}
         </p>
       </div>
-      <div className="ml-[33px] mt-[24px] w-[348px] border-t border-app-line" />
-      <nav className="mt-[36px] flex flex-col gap-[35px]">
-        <Link href={profileHref} className={item(onEditScreen || active === "profile")}>
-          <UserIcon className="text-app-text" />
-          {onEditScreen ? "Edit Profile" : "Profile"}
-        </Link>
-        <Link href={settingsHref} className={item(active === "settings")}>
-          <SettingsIcon size={67} className="text-app-text" />
-          Settings
-        </Link>
+      <div className="ml-[24px] mt-[20px] w-[292px] border-t border-kink-amber/60" />
+      <nav className="mt-[22px] flex flex-col gap-[6px]">
+        {primary.map(({ key, Icon }) => (
+          <Link
+            key={key}
+            href={links[key]}
+            aria-current={isActive(key) ? "page" : undefined}
+            className={item(key)}
+          >
+            <Icon size={26} strokeWidth={1.75} aria-hidden />
+            {labels[key]}
+          </Link>
+        ))}
       </nav>
-      <button
-        type="button"
-        onClick={onLogout}
-        className="mt-auto flex items-center gap-[34px] pl-[53px] text-[36px] font-medium text-app-logout-text"
-      >
-        <span className="grid size-[67px] place-items-center text-app-logout-icon">
-          <LogoutIcon size={54} />
-        </span>
-        Log Out
-      </button>
+      <div className="mt-auto flex flex-col gap-[6px]">
+        <Link
+          href={links.settings}
+          aria-current={active === "settings" ? "page" : undefined}
+          className={item("settings")}
+        >
+          <Settings size={26} strokeWidth={1.75} aria-hidden />
+          {labels.settings}
+        </Link>
+        <button
+          type="button"
+          onClick={onLogout}
+          className="mx-[24px] flex items-center gap-[18px] rounded-[14px] px-[20px] py-[12px] text-left text-[20px] font-medium text-app-logout-text"
+        >
+          <LogOut size={26} strokeWidth={1.75} className="text-app-logout-icon" aria-hidden />
+          {labels.logout}
+        </button>
+      </div>
     </aside>
   );
 }
