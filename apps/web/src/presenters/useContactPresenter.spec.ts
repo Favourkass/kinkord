@@ -65,6 +65,10 @@ describe("useContactPresenter", () => {
     const problem = result.current.topics.find((t) => t.id === "problem");
     expect(problem?.isAlert).toBe(true);
     expect(problem?.href).toContain("mailto:support@kinkord.com");
+
+    // Desktop sidebar links only — this page must not ship a mobile bottom bar (2026-09-08).
+    expect(result.current.sidebarNav.homeHref).toBe("/home");
+    expect("bottomNav" in result.current).toBe(false);
   });
 
   it("handles drawer open and close transitions", () => {

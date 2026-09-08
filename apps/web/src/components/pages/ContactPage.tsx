@@ -260,7 +260,7 @@ function TicketIcon() {
   );
 }
 
-/* --- Navigation Icons for Sidebar & TabBar --- */
+/* --- Navigation Icons for the desktop sidebar (this page has no bottom tab bar) --- */
 
 function HomeNavIcon() {
   return (
@@ -374,7 +374,7 @@ export default function ContactPage({
   openDrawer,
   closeDrawer,
   navLinks,
-  bottomNav,
+  sidebarNav,
   selectedTopic,
   selectTopic,
   handleTopicClick,
@@ -421,7 +421,7 @@ export default function ContactPage({
       <aside className="hidden w-[280px] shrink-0 sticky top-0 h-screen flex-col bg-[#1e1e1e] pt-[44px] pb-[44px] px-[36px] z-20 lg:flex">
         {/* Brand */}
         <Link
-          href={bottomNav.homeHref}
+          href={sidebarNav.homeHref}
           className="text-[34px] font-black tracking-[2px] text-[#ffba1f] transition-opacity hover:opacity-90 mb-[44px]"
         >
           {brand}
@@ -430,7 +430,7 @@ export default function ContactPage({
         {/* Navigation Items */}
         <nav className="flex flex-col gap-[28px]">
           <Link
-            href={bottomNav.homeHref}
+            href={sidebarNav.homeHref}
             className="flex items-center gap-[18px] text-[20px] font-medium text-white transition-opacity hover:opacity-80"
           >
             <HomeNavIcon />
@@ -438,7 +438,7 @@ export default function ContactPage({
           </Link>
 
           <Link
-            href={bottomNav.messagesHref}
+            href={sidebarNav.messagesHref}
             className="flex items-center gap-[18px] text-[20px] font-medium text-white transition-opacity hover:opacity-80"
           >
             <ChatNavIcon />
@@ -446,7 +446,7 @@ export default function ContactPage({
           </Link>
 
           <Link
-            href={bottomNav.settingsHref}
+            href={sidebarNav.settingsHref}
             className="flex items-center gap-[18px] text-[20px] font-medium text-white transition-opacity hover:opacity-80"
           >
             <SettingsNavIcon />
@@ -454,10 +454,10 @@ export default function ContactPage({
           </Link>
 
           <Link
-            href={bottomNav.profileHref}
+            href={sidebarNav.profileHref}
             className="flex items-center gap-[18px] text-[20px] font-medium text-white transition-opacity hover:opacity-80"
           >
-            <ProfileAvatarIcon avatarUrl={bottomNav.avatarUrl} />
+            <ProfileAvatarIcon avatarUrl={sidebarNav.avatarUrl} />
             <span>Profile</span>
           </Link>
         </nav>
@@ -531,7 +531,7 @@ export default function ContactPage({
       )}
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto px-4 pt-4 pb-28 lg:px-14 lg:py-12">
+      <main className="flex-1 overflow-y-auto px-4 pt-4 pb-10 lg:px-14 lg:py-12">
         <div className="mx-auto w-full max-w-[880px]">
           {/* Mobile Top Header (hidden on lg+) */}
           <header className="flex items-center gap-4 py-2 lg:hidden">
@@ -684,7 +684,7 @@ export default function ContactPage({
           {/* Selected Topic Feedback Notice (if active) */}
           {selectedTopic && (
             <div
-              className="fixed inset-x-4 bottom-24 z-40 mx-auto max-w-sm rounded-xl border border-[#ffba1f]/50 bg-[#141414] p-4 shadow-xl backdrop-blur-md"
+              className="fixed inset-x-4 bottom-6 z-40 mx-auto max-w-sm rounded-xl border border-[#ffba1f]/50 bg-[#141414] p-4 shadow-xl backdrop-blur-md"
               role="status"
               aria-live="polite"
             >
@@ -709,43 +709,6 @@ export default function ContactPage({
           )}
         </div>
       </main>
-
-      {/* Bottom Navigation Bar (Visible on mobile/tablet, hidden on lg+) */}
-      <nav
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-neutral-800/80 bg-black/95 px-6 py-3.5 backdrop-blur-md lg:hidden"
-        aria-label="Bottom Navigation"
-      >
-        <div className="mx-auto flex max-w-[480px] items-center justify-around">
-          <Link
-            href={bottomNav.homeHref}
-            className="flex flex-col items-center gap-1 transition-opacity hover:opacity-80"
-            aria-label="Home"
-          >
-            <HomeNavIcon />
-          </Link>
-          <Link
-            href={bottomNav.messagesHref}
-            className="flex flex-col items-center gap-1 transition-opacity hover:opacity-80"
-            aria-label="Messages"
-          >
-            <ChatNavIcon />
-          </Link>
-          <Link
-            href={bottomNav.settingsHref}
-            className="flex flex-col items-center gap-1 transition-opacity hover:opacity-80"
-            aria-label="Settings"
-          >
-            <SettingsNavIcon />
-          </Link>
-          <Link
-            href={bottomNav.profileHref}
-            className="flex flex-col items-center gap-1 transition-opacity hover:opacity-80"
-            aria-label="Profile"
-          >
-            <ProfileAvatarIcon avatarUrl={bottomNav.avatarUrl} />
-          </Link>
-        </div>
-      </nav>
     </div>
   );
 }

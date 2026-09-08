@@ -33,12 +33,12 @@ export interface NavLinkVM {
   href: string;
 }
 
-export interface BottomNavVM {
+/** Desktop sidebar links + avatar. The contact page deliberately has no mobile bottom bar. */
+export interface SidebarNavVM {
   homeHref: string;
   messagesHref: string;
   settingsHref: string;
   profileHref: string;
-  activeTab: "home" | "messages" | "settings" | "profile" | null;
   avatarUrl: string | null;
 }
 
@@ -59,7 +59,7 @@ export interface ContactVM {
   openDrawer: () => void;
   closeDrawer: () => void;
   navLinks: NavLinkVM[];
-  bottomNav: BottomNavVM;
+  sidebarNav: SidebarNavVM;
   selectedTopic: SupportTopicVM | null;
   selectTopic: (topic: SupportTopicVM | null) => void;
   handleTopicClick: (topic: SupportTopicVM) => void;
@@ -123,12 +123,11 @@ export function useContactPresenter(): ContactVM {
     { label: "My Profile", href: Routes.profile },
   ];
 
-  const bottomNav: BottomNavVM = {
+  const sidebarNav: SidebarNavVM = {
     homeHref: Routes.appHome,
     messagesHref: Routes.messages,
     settingsHref: Routes.settings,
     profileHref: Routes.profile,
-    activeTab: null,
     avatarUrl,
   };
 
@@ -149,7 +148,7 @@ export function useContactPresenter(): ContactVM {
     openDrawer,
     closeDrawer,
     navLinks,
-    bottomNav,
+    sidebarNav,
     selectedTopic,
     selectTopic: setSelectedTopic,
     handleTopicClick,
