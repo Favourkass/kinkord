@@ -1,4 +1,4 @@
-import { Check, ChevronDown, MapPin } from "lucide-react";
+import MaskIcon from "@/components/app/MaskIcon";
 
 export interface RegionSelectorProps {
   label: string;
@@ -10,11 +10,12 @@ export interface RegionSelectorProps {
   onSelect: (region: string) => void;
   sheetTitle: string;
   closeLabel: string;
+  searchByRegionLabel: string;
 }
 
 /**
- * Tap-only region picker (CEO brief: no typing). The trigger shows the current
- * region; tapping opens a scrollable sheet of the state's configured regions.
+ * Figma 907:1410 / 907:1624: a pill dropdown (location glyph + region + chevron) and a
+ * gold "Search by Region" link underneath. Both open the tap-only region sheet.
  */
 export default function RegionSelector({
   label,
@@ -26,6 +27,7 @@ export default function RegionSelector({
   onSelect,
   sheetTitle,
   closeLabel,
+  searchByRegionLabel,
 }: RegionSelectorProps) {
   return (
     <>
@@ -35,11 +37,40 @@ export default function RegionSelector({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={`${label}: ${value}`}
-        className="flex h-[52px] w-full items-center gap-[10px] rounded-[14px] border border-kink-amber/60 bg-app-card px-[14px] text-left"
+        className="flex h-[48px] w-[309px] max-w-full items-center rounded-[50px] border border-mem-dropdown-border bg-mem-dropdown pl-[16px] pr-[20px] text-left lg:h-[54px] lg:w-[502px] lg:pr-[41px]"
       >
-        <MapPin size={20} className="shrink-0 text-kink-amber" aria-hidden />
-        <span className="flex-1 truncate text-[17px] font-semibold text-app-text">{value}</span>
-        <ChevronDown size={20} className="shrink-0 text-kink-amber" aria-hidden />
+        <span className="shrink-0 text-kink-gold-bright">
+          <span className="lg:hidden">
+            <MaskIcon name="location-outline" width={24} />
+          </span>
+          <span className="hidden lg:block">
+            <MaskIcon name="location-outline" width={32} />
+          </span>
+        </span>
+        <span className="truncate pl-[9px] text-[13px] font-medium text-mem-list-text lg:pl-[12px] lg:text-[24px]">
+          {value}
+        </span>
+        <span className="ml-auto shrink-0 rotate-90 text-mem-chevron">
+          <span className="lg:hidden">
+            <MaskIcon name="chevron-right-24" width={24} />
+          </span>
+          <span className="hidden lg:block">
+            <MaskIcon name="chevron-right-24" width={32} />
+          </span>
+        </span>
+      </button>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="mt-[14px] flex items-center gap-[4px] text-[14px] font-medium text-kink-gold-bright lg:mt-[20px] lg:gap-[9px] lg:text-[20px]"
+      >
+        <span className="lg:hidden">
+          <MaskIcon name="filter" width={24} />
+        </span>
+        <span className="hidden lg:block">
+          <MaskIcon name="filter" width={26} />
+        </span>
+        {searchByRegionLabel}
       </button>
 
       {open && (
@@ -53,9 +84,9 @@ export default function RegionSelector({
           <div
             role="listbox"
             aria-label={sheetTitle}
-            className="absolute inset-x-0 bottom-0 max-h-[70dvh] overflow-y-auto rounded-t-[24px] border-t-2 border-kink-amber/70 bg-app-drawer pb-[max(16px,env(safe-area-inset-bottom))] lg:inset-auto lg:left-1/2 lg:top-1/2 lg:w-[420px] lg:-translate-x-1/2 lg:-translate-y-1/2 lg:rounded-[24px] lg:border-2"
+            className="absolute inset-x-0 bottom-0 max-h-[70dvh] overflow-y-auto rounded-t-[24px] border-t border-mem-list-border bg-mem-card pb-[max(16px,env(safe-area-inset-bottom))] lg:inset-auto lg:left-1/2 lg:top-1/2 lg:w-[420px] lg:-translate-x-1/2 lg:-translate-y-1/2 lg:rounded-[24px] lg:border"
           >
-            <p className="px-[20px] pb-[6px] pt-[18px] text-[13px] font-bold uppercase tracking-[2px] text-kink-amber">
+            <p className="px-[20px] pb-[6px] pt-[18px] text-[12px] font-extrabold uppercase tracking-[1px] text-kink-gold-bright">
               {sheetTitle}
             </p>
             {options.map((option) => {
@@ -67,12 +98,14 @@ export default function RegionSelector({
                   role="option"
                   aria-selected={selected}
                   onClick={() => onSelect(option)}
-                  className={`flex h-[50px] w-full items-center justify-between px-[20px] text-left text-[16px] ${
-                    selected ? "font-bold text-kink-amber" : "text-app-name"
+                  className={`flex h-[48px] w-full items-center justify-between px-[20px] text-left text-[14px] ${
+                    selected ? "font-bold text-kink-gold-bright" : "font-medium text-mem-text"
                   }`}
                 >
                   {option}
-                  {selected && <Check size={18} aria-hidden />}
+                  {selected && (
+                    <MaskIcon name="chevron-right-14" width={14} className="rotate-90" />
+                  )}
                 </button>
               );
             })}

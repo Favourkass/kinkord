@@ -1,38 +1,27 @@
-import { HamburgerIcon } from "./icons";
+import MaskIcon from "./MaskIcon";
 
 export interface AppMobileHeaderProps {
   brand: string;
-  tagline: string;
-  greeting: string;
   onMenu: () => void;
+  menuLabel?: string;
 }
 
-/** Mobile top bar: hamburger, gold wordmark, tagline, greeting row, hairline. */
+/**
+ * Compact post-login header (Figma 864:53 / 881:730): hamburger 35px + gold
+ * wordmark 30px on one row, hairline underneath. Content starts 22px down and
+ * the hairline sits at 79px, as drawn.
+ */
 export default function AppMobileHeader({
   brand,
-  tagline,
-  greeting,
   onMenu,
+  menuLabel = "Open menu",
 }: AppMobileHeaderProps) {
   return (
-    <header className="relative border-b border-app-line bg-app-surface pb-[9px]">
-      <button
-        type="button"
-        aria-label="Open menu"
-        onClick={onMenu}
-        className="absolute left-[15px] top-[29px] text-app-text"
-      >
-        <HamburgerIcon />
+    <header className="flex h-[80px] shrink-0 items-center gap-[12px] border-b border-mem-hairline bg-mem-header px-[18px] pb-[22px] pt-[22px]">
+      <button type="button" aria-label={menuLabel} onClick={onMenu} className="text-mem-icon">
+        <MaskIcon name="hamburger" width={35} />
       </button>
-      <p className="pt-[23px] text-center text-[48px] font-extrabold leading-none tracking-[4.8px] text-kink-amber">
-        {brand}
-      </p>
-      <p className="text-center text-[10px] font-semibold tracking-[2px] text-app-text">
-        {tagline}
-      </p>
-      <p className="pl-[15px] pt-[8px] text-[12px] font-normal text-app-text">
-        {greeting} <span aria-hidden>🤗</span>
-      </p>
+      <p className="text-[30px] font-extrabold leading-none text-kink-gold-bright">{brand}</p>
     </header>
   );
 }

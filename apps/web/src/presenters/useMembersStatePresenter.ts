@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MEMBERS_COPY } from "@/constants/members";
 import { Routes } from "@/constants/Routes";
+import type { StateRowVM } from "@/domain/member";
 import { ApiError } from "@/services/apiClient";
 import {
   filterStates,
@@ -13,21 +14,16 @@ import {
   statesForCountry,
   type StateCountPM,
 } from "@/services/members.service";
-import { compactNumber, countryName, flagEmoji } from "@/util/format";
+import { compactNumber, countryName } from "@/util/format";
 
-export interface StateRowVM {
-  state: string;
-  subtitle: string;
-  href: string;
-}
-
-/** Members → {Country} → choose a state. Every configured state shows with its live count. */
+/** Members → {Country}: pick a state (radio rows) then Continue — Figma 886:1076. */
 export function useMembersStatePresenter(countryParam: string) {
   const router = useRouter();
   const copy = MEMBERS_COPY.state;
   const country = countryParam.toUpperCase();
   const available = isCountryAvailable(country);
   const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<string | null>(null);
   const [counts, setCounts] = useState<StateCountPM[]>([]);
   const [loading, setLoading] = useState(available);
   const [error, setError] = useState<string | null>(null);
@@ -60,20 +56,18 @@ export function useMembersStatePresenter(countryParam: string) {
     () =>
       filterStates(mergeStateCounts(statesForCountry(country), counts), query).map((r) => ({
         state: r.state,
-        subtitle: `${compactNumber(r.membersCount)} ${copy.membersSuffix}`,
-        href: Routes.membersState(country, r.state),
+        count: compactNumber(r.membersCount),
+        selected: r.state === selected,
       })),
-    [country, counts, query, copy.membersSuffix],
+    [country, counts, query, selected],
   );
 
+  const onContinue = useCallback(() => {
+    if (selected) router.push(Routes.membersState(country, selected));
+  }, [router, country, selected]);
+
   return {
-    header: {
-      ...MEMBERS_COPY.header,
-      backHref: Routes.members,
-      backLabel: MEMBERS_COPY.header.back,
-    },
     title: countryName(country) ?? country,
-    flag: flagEmoji(country),
     subtitle: copy.subtitle,
     available,
     notAvailable: available ? null : copy.notAvailable,
@@ -84,6 +78,13 @@ export function useMembersStatePresenter(countryParam: string) {
       label: copy.searchLabel,
     },
     rows,
+    membersSuffix: copy.membersSuffix,
+    selected,
+    onSelect: setSelected,
+    selectLabel: copy.selectLabel,
+    continueLabel: copy.continueLabel,
+    canContinue: selected !== null,
+    onContinue,
     noResults: query.trim() && rows.length === 0 ? copy.noResults : null,
     loading,
     error,

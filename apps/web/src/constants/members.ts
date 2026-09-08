@@ -1,59 +1,67 @@
 /**
  * Display copy for the Members directory + public member profile.
- * Sources: Figma "Members 1" canvas + the CEO briefs for the Country page and the
- * State → Region → Kinksters page (2026-09-08), which supersede the mock where
- * they differ (back-button header, no bottom nav, tap-only region selector,
- * online-first cards, infinite scroll, coming-soon countries only via search).
+ * Source of truth: Figma "Members 1" canvas (node 864:30) — copy is verbatim from
+ * the frames; behaviours that the frames don't show (online-first ordering,
+ * infinite scroll, coming-soon search) follow the CEO briefs of 2026-09-08.
  */
 export const MEMBERS_COPY = {
-  header: {
-    brand: "KINKORD",
-    tagline: "THE WORLD'S #1 KINK COMMUNITY",
-    back: "Back",
-  },
+  header: { brand: "KINKORD", menu: "Open menu" },
   common: {
     loading: "Loading…",
     error: "Something went wrong. Please try again.",
   },
   country: {
     title: "Select a Country",
+    subtitle: "Choose a country to deliver and connect with kinky people near you.",
     searchPlaceholder: "Search for a country",
     searchLabel: "Search for a country",
-    availableHeading: "Available countries",
-    resultsHeading: "Results",
+    availableHeading: "AVAILABLE COUNTRIES",
+    resultsHeading: "RESULTS",
     membersSuffix: "Members",
-    comingSoon: "Coming Soon",
+    comingSoon: "COMING SOON",
     noResults: "No country matches that search.",
+    banner: {
+      title: "More countries coming soon!",
+      body: "We’re expanding globally. Stay tuned.",
+      badge: "COMING SOON",
+    },
   },
   state: {
     subtitle: "Choose your state to find kinksters near you",
     searchPlaceholder: "Search for a state",
     searchLabel: "Search for a state",
     membersSuffix: "Members",
+    continueLabel: "Continue",
     noResults: "No states match that search.",
-    notAvailable: "Kinkord isn't in this country yet — it's coming soon.",
+    notAvailable: "Kinkord isn’t in this country yet — it’s coming soon.",
+    selectLabel: (state: string) => `Select ${state}`,
   },
   region: {
-    /** "Find kinksters in Delta State." */
-    subtitle: (state: string) => `Find kinksters in ${state}.`,
+    subtitle: "Discover like-minded members near you.",
     selectorLabel: "Region",
+    /** Dropdown value before an LGA is picked: the whole state is listed. */
+    allRegions: "All regions",
+    searchByRegion: "Search by Region",
     sheetTitle: "Choose a region",
     closeSheet: "Close",
-    /** "Kinksters in Abraka (482)" */
-    heading: (region: string, count: string) => `Kinksters in ${region} (${count})`,
-    online: "Online",
-    offline: "Offline",
+    found: "Members Found",
+    sort: "Sort",
+    sortLabel: (mode: string) => `Sort: ${mode}`,
+    sortModes: { recent: "Newest", followers: "Most followed", name: "Name" },
+    viewList: "List view",
     posts: "Posts",
     followers: "Followers",
     follow: "Follow",
     following: "Following",
-    loadingMore: "Loading more kinksters…",
+    loadingMore: "Loading more members…",
     end: "You’ve met everyone here — for now.",
-    empty: (region: string) => `No kinksters in ${region} yet. Be the first.`,
+    empty: (place: string) => `No members in ${place} yet. Be the first.`,
     openProfile: (name: string) => `Open ${name}’s profile`,
     unknownState: "We don’t know that state yet.",
   },
   profile: {
+    brand: "KINKORD",
+    actions: { search: "Search members", more: "More options", share: "Share profile" },
     tabs: { posts: "Posts", about: "About", media: "Media", friends: "Friends" },
     follow: "Follow",
     following: "Following",
@@ -75,17 +83,42 @@ export const MEMBERS_COPY = {
       joined: "Joined",
       notShared: "Not shared",
     },
-    empty: {
-      posts: { title: "No posts yet", body: "Posts are coming soon to Kinkord." },
-      media: { title: "No media yet", body: "Photo galleries are coming soon." },
-      friends: {
-        title: "Friends are coming soon",
-        body: "Follow members you vibe with — when they follow back, you’re friends.",
-      },
+    friends: {
+      heading: "Friends",
+      all: (n: string) => `All Friends (${n})`,
+      mutual: (n: string) => `Mutual Friends (${n})`,
+      follow: "Follow",
+      following: "Following",
+      more: "More",
+      empty: "No friends to show yet.",
+    },
+    posts: {
+      empty: "No posts yet.",
+      like: "Like",
+      comment: "Comment",
+      share: "Share",
+    },
+    media: {
+      heading: "Photos",
+      count: (n: number) => `${n} ${n === 1 ? "photo" : "photos"}`,
+      filters: { all: "All", profile: "Profile", recent: "Recent" },
+      empty: "No photos yet.",
+      featured: "Featured",
     },
     notFound: "We couldn’t find that member.",
     yourself: "This is you",
     editProfile: "Edit profile",
+    /** Desktop-only chrome (Figma desktop-profile-* frames). */
+    desktop: {
+      searchPlaceholder: "Search friends, kinks, groups...",
+      account: "My Account",
+      tagsHeading: "Profile Bio & Tags",
+      friendsList: "Friends List",
+      suggested: "Suggested Friends",
+      add: "Add",
+      added: "Added",
+      noSuggestions: "No suggestions yet.",
+    },
   },
   nav: {
     home: "Home",
@@ -106,8 +139,8 @@ export const MEMBERS_COPY = {
 
 /** Countries the directory serves today; every other country is "Coming Soon". */
 export const AVAILABLE_COUNTRIES = [
-  { code: "NG", name: "Nigeria", flag: "/app/flag-ng.svg" },
+  { code: "NG", name: "Nigeria", flag: "/app/members/flag-ng.svg" },
 ] as const;
 
-/** Page size for the infinite-scrolling kinksters list. */
+/** Page size for the infinite-scrolling members list. */
 export const MEMBERS_PAGE_SIZE = 20;

@@ -13,6 +13,7 @@ const card: MemberCardPM = {
   avatarUrl: "https://s3/neze.jpg",
   age: 25,
   gender: "Female",
+  roles: ["Submissive", "Switch"],
   city: "Abraka",
   state: "Delta",
   isOnline: true,
@@ -23,13 +24,14 @@ const card: MemberCardPM = {
 };
 
 describe("toMemberCardVM", () => {
-  it("formats the brief's card: handle title, '25F • Female', 'Abraka, Delta State', compact counts", () => {
+  it("formats the card: handle title, '25F' + roles, 'Abraka, Delta State', compact counts", () => {
     expect(toMemberCardVM(card)).toEqual({
       userId: "u1",
       username: "naughty_neze",
       title: "naughty_neze",
       avatarUrl: "https://s3/neze.jpg",
-      meta: "25F • Female",
+      ageTag: "25F",
+      roles: "Submissive | Switch",
       location: "Abraka, Delta State",
       isOnline: true,
       posts: "24",
@@ -44,12 +46,14 @@ describe("toMemberCardVM", () => {
       username: null,
       age: null,
       gender: null,
+      roles: [],
       city: null,
       state: null,
       isOnline: false,
     });
     expect(vm.title).toBe("Naughty Neze");
-    expect(vm.meta).toBe("");
+    expect(vm.ageTag).toBeNull();
+    expect(vm.roles).toBeNull();
     expect(vm.location).toBeNull();
     expect(vm.isOnline).toBe(false);
   });
@@ -78,7 +82,7 @@ const profile: PublicProfilePM = {
   joinedAt: "2023-03-10T09:00:00.000Z",
   lastSeenAt: "2026-09-08T11:00:00.000Z",
   isOnline: false,
-  counts: { friends: 1200, followers: 2300, following: 980 },
+  counts: { friends: 1200, followers: 2300, following: 980, mutualFriends: 86 },
   isFollowing: true,
   isSelf: false,
 };
@@ -87,7 +91,12 @@ describe("toPublicProfileVM", () => {
   it("builds the header lines from the design: handle, stats, location, tag line, presence", () => {
     const vm = toPublicProfileVM(profile, now);
     expect(vm.handle).toBe("@nene");
-    expect(vm.stats).toEqual({ friends: "1.2K", followers: "2.3K", following: "980" });
+    expect(vm.stats).toEqual({
+      friends: "1.2K",
+      followers: "2.3K",
+      following: "980",
+      mutualFriends: "86",
+    });
     expect(vm.locationLine).toBe("Abraka, Delta State, Nigeria");
     expect(vm.tagLine).toBe("25F · Dominant | Sadist");
     expect(vm.lastSeenAgo).toBe("an hour ago");

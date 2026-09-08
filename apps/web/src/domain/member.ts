@@ -20,6 +20,8 @@ export interface MemberCardPM {
   avatarUrl: string | null;
   age: number | null;
   gender: string | null;
+  /** Kink roles ("Submissive", "Switch"…) — shown on the card instead of gender (CEO, 2026-09-08). */
+  roles: string[];
   city: string | null;
   state: string | null;
   isOnline: boolean;
@@ -35,8 +37,10 @@ export interface MemberCardVM {
   /** Card title: the handle per the kinksters brief, falling back to display name. */
   title: string;
   avatarUrl: string | null;
-  /** "25F • Female" — whichever parts are known. */
-  meta: string;
+  /** "19F" — age plus sex initial; null when the age is unknown. */
+  ageTag: string | null;
+  /** "Submissive | Switch" — roles joined like the profile tag line; null when none. */
+  roles: string | null;
   /** "Abraka, Delta State" or null when nothing is known. */
   location: string | null;
   isOnline: boolean;
@@ -46,15 +50,16 @@ export interface MemberCardVM {
 }
 
 export function toMemberCardVM(pm: MemberCardPM): MemberCardVM {
-  const ageTag = pm.age === null ? "" : `${pm.age}${genderInitial(pm.gender)}`;
-  const meta = [ageTag, pm.gender].filter(Boolean).join(" • ");
+  const ageTag = pm.age === null ? null : `${pm.age}${genderInitial(pm.gender)}`;
+  const roles = pm.roles.length > 0 ? pm.roles.join(" | ") : null;
   const location = [pm.city, displayState(pm.state)].filter(Boolean).join(", ") || null;
   return {
     userId: pm.userId,
     username: pm.username,
     title: pm.username ?? pm.displayName,
     avatarUrl: pm.avatarUrl,
-    meta,
+    ageTag,
+    roles,
     location,
     isOnline: pm.isOnline,
     posts: compactNumber(pm.postsCount),
@@ -85,7 +90,7 @@ export interface PublicProfilePM {
   joinedAt: string;
   lastSeenAt: string | null;
   isOnline: boolean;
-  counts: { friends: number; followers: number; following: number };
+  counts: { friends: number; followers: number; following: number; mutualFriends: number };
   isFollowing: boolean;
   isSelf: boolean;
 }
@@ -101,7 +106,7 @@ export interface PublicProfileVM {
   isOnline: boolean;
   /** Relative "an hour ago" for the "Last seen …" line; null when never seen. */
   lastSeenAgo: string | null;
-  stats: { friends: string; followers: string; following: string };
+  stats: { friends: string; followers: string; following: string; mutualFriends: string };
   /** "Abraka, Delta State, Nigeria" */
   locationLine: string | null;
   /** "25F · Dominant | Sadist" */
@@ -143,6 +148,7 @@ export function toPublicProfileVM(pm: PublicProfilePM, now = new Date()): Public
       friends: compactNumber(pm.counts.friends),
       followers: compactNumber(pm.counts.followers),
       following: compactNumber(pm.counts.following),
+      mutualFriends: compactNumber(pm.counts.mutualFriends),
     },
     locationLine,
     tagLine,
@@ -161,4 +167,45 @@ export function toPublicProfileVM(pm: PublicProfilePM, now = new Date()): Public
     isFollowing: pm.isFollowing,
     isSelf: pm.isSelf,
   };
+}
+
+/* ---- Row view-models shared by the members screens and their presenters ---- */
+
+/** Country picker row (Figma 881:730). */
+export interface CountryRowVM {
+  code: string;
+  name: string;
+  flag: string | null;
+  emoji: string;
+  /** "12.4K Members" for launched countries; null for coming-soon ones. */
+  membersLabel: string | null;
+  comingSoon: boolean;
+  href: string | null;
+}
+
+/** State picker radio row (Figma 886:1076). */
+export interface StateRowVM {
+  state: string;
+  /** "950" */
+  count: string;
+  selected: boolean;
+}
+
+/** Members-list row: the card plus its navigation/loading state (Figma 907:1410). */
+export interface RegionRowVM {
+  card: MemberCardVM;
+  href: string;
+  openProfileLabel: string;
+  busy: boolean;
+}
+
+/** Friends-tab row (Figma 926:818). */
+export interface FriendRowVM {
+  userId: string;
+  username: string | null;
+  displayName: string;
+  handle: string | null;
+  avatarUrl: string | null;
+  isFollowing: boolean;
+  busy: boolean;
 }
