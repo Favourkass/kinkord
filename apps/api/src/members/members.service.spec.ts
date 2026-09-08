@@ -24,12 +24,37 @@ const makeService = () => {
   const storage = { presignDownload } as unknown as StorageService;
   const counts = vi.fn(async () => ({ friends: 2, followers: 30, following: 9 }));
   const isFollowing = vi.fn(async () => true);
-  const follows = { counts, isFollowing } as unknown as FollowsService;
+  const mutualFriendsCount = vi.fn(async () => 5);
+  const resolveUserId = vi.fn(async () => "u2");
+  const friends = vi.fn(async () => ({
+    items: [
+      {
+        userId: "u3",
+        username: "kay",
+        displayName: "Kay",
+        avatarKey: "avatars/kay.jpg",
+        isFollowing: false,
+      },
+    ],
+    total: 1,
+  }));
+  const mutualFriends = vi.fn(async () => ({ items: [], total: 0 }));
+  const follows = {
+    counts,
+    isFollowing,
+    mutualFriendsCount,
+    resolveUserId,
+    friends,
+    mutualFriends,
+  } as unknown as FollowsService;
   return {
     service: new MembersService(db, storage, follows),
     select,
     presignDownload,
     isFollowing,
+    mutualFriendsCount,
+    friends,
+    mutualFriends,
   };
 };
 
@@ -93,6 +118,7 @@ describe("MembersService", () => {
             avatarKey: "avatars/u2/a.jpg",
             dateOfBirth: "1998-05-01",
             gender: "Female",
+            roles: ["Submissive", "Switch"],
             city: "Asaba",
             state: "Delta",
             lastSeenAt: new Date("2026-09-08T11:59:00Z"),
@@ -117,6 +143,7 @@ describe("MembersService", () => {
     expect(card.isFollowing).toBe(false);
     expect(card.postsCount).toBe(0);
     expect(card.isOnline).toBe(true);
+    expect(card.roles).toEqual(["Submissive", "Switch"]);
     expect(card.lastSeenAt).toBe("2026-09-08T11:59:00.000Z");
     expect(typeof card.age).toBe("number");
     expect(presignDownload).toHaveBeenCalledWith("avatars/u2/a.jpg");
@@ -166,7 +193,7 @@ describe("MembersService", () => {
     expect(vm.username).toBe("nene");
     expect(vm.coverUrl).toBe("https://s3/covers/u2/c.jpg");
     expect(vm.avatarUrl).toBeNull();
-    expect(vm.counts).toEqual({ friends: 2, followers: 30, following: 9 });
+    expect(vm.counts).toEqual({ friends: 2, followers: 30, following: 9, mutualFriends: 5 });
     expect(vm.isFollowing).toBe(true);
     expect(vm.isSelf).toBe(false);
     expect(vm.joinedAt).toBe("2023-03-10T09:00:00.000Z");
@@ -176,7 +203,7 @@ describe("MembersService", () => {
   });
 
   it("marks your own profile as self and skips the follow lookup", async () => {
-    const { service, select, isFollowing } = makeService();
+    const { service, select, isFollowing, mutualFriendsCount } = makeService();
     select.mockReturnValueOnce(
       chain([
         {
@@ -208,5 +235,31 @@ describe("MembersService", () => {
     expect(vm.isSelf).toBe(true);
     expect(vm.isFollowing).toBe(false);
     expect(isFollowing).not.toHaveBeenCalled();
+    expect(vm.counts.mutualFriends).toBe(0);
+    expect(mutualFriendsCount).not.toHaveBeenCalled();
+  });
+});
+
+describe("MembersService.friends", () => {
+  it("resolves the handle, pages the requested tab and presigns avatars", async () => {
+    const { service, friends, mutualFriends } = makeService();
+    const page = await service.friends("@Nene", "me", "all", 2, 10);
+    expect(friends).toHaveBeenCalledWith("u2", "me", 10, 10);
+    expect(page).toEqual({
+      items: [
+        {
+          userId: "u3",
+          username: "kay",
+          displayName: "Kay",
+          avatarUrl: "https://s3/avatars/kay.jpg",
+          isFollowing: false,
+        },
+      ],
+      total: 1,
+      page: 2,
+      limit: 10,
+    });
+    await service.friends("nene", "me", "mutual");
+    expect(mutualFriends).toHaveBeenCalledWith("u2", "me", 20, 0);
   });
 });

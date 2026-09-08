@@ -25,3 +25,22 @@ describe("PublicProfilesController", () => {
     expect(publicProfile).toHaveBeenCalledWith("@Nene", "me");
   });
 });
+
+describe("PublicProfilesController.friends", () => {
+  it("defaults to the All tab and forwards paging", async () => {
+    const friends = vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, limit: 20 });
+    const controller = new PublicProfilesController({ friends } as unknown as MembersService);
+    await controller.friends(req, "nene", {});
+    expect(friends).toHaveBeenCalledWith("nene", "me", "all", undefined, undefined);
+    await controller.friends(req, "nene", { tab: "mutual", page: "2", limit: "10" });
+    expect(friends).toHaveBeenLastCalledWith("nene", "me", "mutual", 2, 10);
+  });
+
+  it("rejects an unknown tab or a malformed handle", () => {
+    const friends = vi.fn();
+    const controller = new PublicProfilesController({ friends } as unknown as MembersService);
+    expect(() => controller.friends(req, "nene", { tab: "enemies" })).toThrow(BadRequestException);
+    expect(() => controller.friends(req, "bad handle", {})).toThrow(BadRequestException);
+    expect(friends).not.toHaveBeenCalled();
+  });
+});
