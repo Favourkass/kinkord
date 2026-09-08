@@ -10,7 +10,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push, replace }) }));
 const get = vi.fn();
 const patch = vi.fn();
 const post = vi.fn();
-const uploadToPresignedUrl = vi.fn(async () => {});
+const uploadToPresignedUrl = vi.fn(async (..._a: unknown[]) => {});
 vi.mock("@/services/apiClient", () => {
   class ApiError extends Error {
     constructor(
@@ -24,10 +24,16 @@ vi.mock("@/services/apiClient", () => {
     ApiError,
     api: {
       get: (...a: unknown[]) => get(...a),
-      patch: (...a: unknown[]) => patch(...a),
-      post: (...a: unknown[]) => post(...a),
+      patch: (...a: unknown[]) => {
+        return patch(...a);
+      },
+      post: (...a: unknown[]) => {
+        return post(...a);
+      },
     },
-    uploadToPresignedUrl: (...a: unknown[]) => uploadToPresignedUrl(...a),
+    uploadToPresignedUrl: (...a: unknown[]) => {
+      return uploadToPresignedUrl(...a);
+    },
   };
 });
 
@@ -35,7 +41,10 @@ vi.mock("@/services/apiClient", () => {
 const compressImage = vi.fn();
 vi.mock("@/util/image", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/util/image")>()),
-  compressImage: (...a: unknown[]) => compressImage(...a),
+  compressImage: (...a: unknown[]) => {
+    const r = compressImage(...a);
+    return r;
+  },
 }));
 
 const twoFactorEnable = vi.fn();
@@ -123,7 +132,10 @@ describe("useProfilePresenter", () => {
       const { IMAGE_UPLOAD_PRESETS } = await import("@/util/image");
       const { result } = renderHook(() => useProfilePresenter());
       await waitFor(() => expect(result.current.loading).toBe(false));
-      await act(() => result.current.uploadImage("avatar", raw));
+      act(() => {
+        void result.current.uploadImage("avatar", raw);
+      });
+      await waitFor(() => expect(result.current.uploading).toBeNull());
 
       expect(compressImage).toHaveBeenCalledWith(raw, IMAGE_UPLOAD_PRESETS.avatar);
       expect(post).toHaveBeenCalledWith("/profile/upload-url", {
@@ -134,14 +146,16 @@ describe("useProfilePresenter", () => {
       expect(uploadToPresignedUrl).toHaveBeenCalledWith("https://s3/put", small);
       expect(patch).toHaveBeenCalledWith("/profile", { avatarKey: "avatars/u1/abc.jpg" });
       expect(result.current.error).toBeNull();
-      expect(result.current.uploading).toBeNull();
     });
 
     it("uses the cover preset for covers", async () => {
       const { IMAGE_UPLOAD_PRESETS } = await import("@/util/image");
       const { result } = renderHook(() => useProfilePresenter());
       await waitFor(() => expect(result.current.loading).toBe(false));
-      await act(() => result.current.uploadImage("cover", raw));
+      act(() => {
+        void result.current.uploadImage("cover", raw);
+      });
+      await waitFor(() => expect(patch).toHaveBeenCalled());
       expect(compressImage).toHaveBeenCalledWith(raw, IMAGE_UPLOAD_PRESETS.cover);
       expect(patch).toHaveBeenCalledWith("/profile", { coverKey: "avatars/u1/abc.jpg" });
     });
@@ -152,8 +166,10 @@ describe("useProfilePresenter", () => {
       );
       const { result } = renderHook(() => useProfilePresenter());
       await waitFor(() => expect(result.current.loading).toBe(false));
-      await act(() => result.current.uploadImage("avatar", raw));
-      expect(result.current.error).toMatch(/too large — max 5MB/);
+      act(() => {
+        void result.current.uploadImage("avatar", raw);
+      });
+      await waitFor(() => expect(result.current.error).toMatch(/too large — max 5MB/));
       expect(uploadToPresignedUrl).not.toHaveBeenCalled();
       expect(patch).not.toHaveBeenCalled();
     });
