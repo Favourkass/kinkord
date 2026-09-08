@@ -6,7 +6,9 @@ import { DbModule } from "./db/db.module";
 import { EmailModule } from "./email/email.module";
 import { HealthController } from "./health/health.controller";
 import { HealthService } from "./health/health.service";
+import { MembersModule } from "./members/members.module";
 import { MessagingModule } from "./messaging/messaging.module";
+import { PresenceModule } from "./presence/presence.module";
 import { ProfilesModule } from "./profiles/profiles.module";
 import { StorageModule } from "./storage/storage.module";
 
@@ -15,11 +17,13 @@ import { StorageModule } from "./storage/storage.module";
     ConfigModule.forRoot({ isGlobal: true }),
     DbModule,
     EmailModule,
+    PresenceModule,
     AuthModule,
     MessagingModule,
     StorageModule,
     ProfilesModule,
     CommunityModule,
+    MembersModule,
   ],
   controllers: [HealthController],
   providers: [HealthService],

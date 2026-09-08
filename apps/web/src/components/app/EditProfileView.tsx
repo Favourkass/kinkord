@@ -3,6 +3,7 @@ import type { ChangeEvent } from "react";
 import AvatarCircle from "./AvatarCircle";
 import DesktopSidebar from "./DesktopSidebar";
 import { BackChevronIcon, PencilBadge } from "./icons";
+import type { AppNavLabels, AppNavLinks } from "./nav";
 
 export interface EditProfileField {
   key: string;
@@ -32,8 +33,8 @@ export interface EditProfileViewProps {
   onLogout: () => void;
   onAvatarFile: (file: File) => void;
   onCoverFile: (file: File) => void;
-  profileHref: string;
-  settingsHref: string;
+  links: AppNavLinks;
+  labels: AppNavLabels;
 }
 
 function fileHandler(onFile: (file: File) => void) {
@@ -151,8 +152,8 @@ export default function EditProfileView(props: EditProfileViewProps) {
     onSave,
     onBack,
     onLogout,
-    profileHref,
-    settingsHref,
+    links,
+    labels,
   } = props;
 
   const status = (
@@ -222,8 +223,8 @@ export default function EditProfileView(props: EditProfileViewProps) {
         <DesktopSidebar
           tagline={tagline}
           active="edit-profile"
-          profileHref={profileHref}
-          settingsHref={settingsHref}
+          links={links}
+          labels={labels}
           onLogout={onLogout}
         />
         <main className="relative min-h-dvh flex-1">

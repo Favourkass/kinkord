@@ -5,6 +5,7 @@ import Link from "next/link";
 import AppShell from "@/components/app/AppShell";
 import { ChevronRightIcon } from "@/components/app/icons";
 import { Routes } from "@/constants/Routes";
+import { getAppShellNav } from "@/presenters/getAppShellNav";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
 import { usePwaPresenter } from "@/presenters/usePwaPresenter";
 import { getTheme, setTheme, type Theme } from "@/util/theme";
@@ -12,6 +13,7 @@ import { getTheme, setTheme, type Theme } from "@/util/theme";
 export default function SettingsPage() {
   const vm = useHomePresenter();
   const pwa = usePwaPresenter();
+  const nav = getAppShellNav();
   const [theme, setThemeState] = useState<Theme>(() =>
     typeof document === "undefined" ? "light" : getTheme(),
   );
@@ -45,15 +47,13 @@ export default function SettingsPage() {
       handle={vm.handle}
       avatarUrl={vm.avatarUrl}
       membersCount={vm.membersCount}
-      activeTab="settings"
       activeNav="settings"
       drawerOpen={vm.drawerOpen}
       onMenu={vm.openDrawer}
       onCloseDrawer={vm.closeDrawer}
       onLogout={vm.logout}
-      messagesHref={Routes.messages}
-      profileHref={Routes.profile}
-      settingsHref={Routes.settings}
+      links={nav.links}
+      labels={nav.labels}
     >
       <div className="mx-auto w-full max-w-[440px] px-[29px]">
         <h1 className="text-[24px] font-medium text-app-value">Settings</h1>
