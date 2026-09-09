@@ -1,5 +1,5 @@
 import { Routes } from "./Routes";
-import { COPYRIGHT_LINE, ALL_RIGHTS_RESERVED, POLICY_LINKS, PolicyLink } from "./landing";
+import { COPYRIGHT_LINE, ALL_RIGHTS_RESERVED, type PolicyLink } from "./landing";
 
 export interface TeamMemberData {
   id: string;
@@ -69,6 +69,8 @@ export interface FounderTopic {
   closingNote?: string;
   journalEntries?: readonly JournalEntry[];
   principles?: readonly PrincipleItem[];
+  /** Still being written — kept out of the published list. */
+  draft?: boolean;
 }
 
 export const FOUNDER_TOPICS: readonly FounderTopic[] = [
@@ -226,7 +228,7 @@ export const FOUNDER_TOPICS: readonly FounderTopic[] = [
         name: "Kinkord App",
         handle: "@tegamaxwell",
         description: "Connect with me directly on Kinkord.",
-        href: "/profile",
+        href: Routes.member("tegamaxwell"),
       },
       {
         icon: "💬",
@@ -281,7 +283,8 @@ export const FOUNDER_TOPICS: readonly FounderTopic[] = [
         icon: "📅",
         name: "Book a Meeting",
         handle: "Schedule a Session",
-        description: "Have something important to discuss? Schedule a meeting for business, partnerships, or collaboration.",
+        description:
+          "Have something important to discuss? Schedule a meeting for business, partnerships, or collaboration.",
         href: "mailto:maxihandsome@gmail.com?subject=Meeting%20Request%20-%20Tega%20Maxwell",
       },
       {
@@ -292,15 +295,15 @@ export const FOUNDER_TOPICS: readonly FounderTopic[] = [
         href: "https://youtube.com/@Sirtegamaxwell",
       },
     ],
-    closingNote: "🤝 Let's Connect\n\nI may not be able to respond immediately to every message, but I value genuine conversations and meaningful opportunities.\n\nThank you for taking the time to reach out.",
+    closingNote:
+      "🤝 Let's Connect\n\nI may not be able to respond immediately to every message, but I value genuine conversations and meaningful opportunities.\n\nThank you for taking the time to reach out.",
   },
   {
     id: "work-with-me",
     title: "Work with Me",
     badge: "Collaboration & Careers",
-    paragraphs: [
-      "Content for Work with Me will be provided here.",
-    ],
+    draft: true,
+    paragraphs: ["Content for Work with Me will be provided here."],
   },
   {
     id: "my-message-to-the-community",
@@ -318,9 +321,7 @@ export const FOUNDER_TOPICS: readonly FounderTopic[] = [
     id: "founders-principle",
     title: "Founder's Principles",
     badge: "Core Principles",
-    paragraphs: [
-      "These are the principles I will carry with me as I build Kinkord.",
-    ],
+    paragraphs: ["These are the principles I will carry with me as I build Kinkord."],
     principles: [
       {
         number: 1,
@@ -340,8 +341,7 @@ export const FOUNDER_TOPICS: readonly FounderTopic[] = [
         number: 3,
         icon: "❤️",
         title: "Community Before Ego",
-        description:
-          "Kinkord exists to serve its community, not the ego of its Founder.",
+        description: "Kinkord exists to serve its community, not the ego of its Founder.",
       },
       {
         number: 4,
@@ -361,8 +361,7 @@ export const FOUNDER_TOPICS: readonly FounderTopic[] = [
         number: 6,
         icon: "⚖️",
         title: "Accountability Over Excuses",
-        description:
-          "When we get something wrong, we acknowledge it, learn from it and do better.",
+        description: "When we get something wrong, we acknowledge it, learn from it and do better.",
       },
       {
         number: 7,

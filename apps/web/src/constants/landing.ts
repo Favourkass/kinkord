@@ -43,7 +43,7 @@ export const AGE_GATE_MODAL = {
 
 import { Routes } from "./Routes";
 
-export const WHATSAPP_COMMUNITY_URL = "https://chat.whatsapp.com/invite";
+export const WHATSAPP_COMMUNITY_URL = "https://wa.me/2349127883266";
 
 export interface PolicyLink {
   label: string;
@@ -72,7 +72,7 @@ export const POLICY_LINKS: readonly PolicyLink[] = [
   { label: "Contact Us", href: Routes.contact, icon: "contact" },
   { label: "Invest in Kinkord", href: Routes.invest, icon: "invest" },
   {
-    label: "Join our WhatsApp Community",
+    label: "Chat with us on WhatsApp",
     href: WHATSAPP_COMMUNITY_URL,
     icon: "whatsapp",
   },

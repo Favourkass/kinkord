@@ -3,12 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Routes } from "@/constants/Routes";
-import { POLICY_LINKS } from "@/constants/landing";
+import { POLICY_LINKS, type PolicyLink } from "@/constants/landing";
 import { ABOUT_PAGE_DATA, TeamMemberData, FounderTopic, FounderTopicId } from "@/constants/about";
 import { authClient } from "@/services/authClient";
 import { api } from "@/services/apiClient";
-import type { PolicyItem } from "@/components/landing/SplashScreen";
-import type { NavLinkVM, BottomNavVM } from "./useAboutPresenter";
+import type { NavLinkVM, SidebarNavVM } from "./useAboutPresenter";
 
 export interface TeamVM {
   brand: string;
@@ -17,6 +16,7 @@ export interface TeamVM {
   memberProfileTitle: string;
   joinTeamCta: string;
   joinTeamSubtitle: string;
+  joinTeamHref: string;
   founderMessage: typeof ABOUT_PAGE_DATA.founderMessage;
   ceo: TeamMemberData;
   founderTopics: readonly FounderTopic[];
@@ -24,7 +24,7 @@ export interface TeamVM {
   selectedTopic: FounderTopic | null;
   selectTopic: (id: FounderTopicId) => void;
   clearTopic: () => void;
-  policyLinks: PolicyItem[];
+  policyLinks: PolicyLink[];
   copyright: string;
   allRightsReserved: string;
   drawerOpen: boolean;
@@ -32,7 +32,7 @@ export interface TeamVM {
   closeDrawer: () => void;
   onLogout: () => Promise<void>;
   navLinks: NavLinkVM[];
-  bottomNav: BottomNavVM;
+  sidebarNav: SidebarNavVM;
   showProfile: boolean;
   openProfile: () => void;
   closeProfile: () => void;
@@ -123,17 +123,18 @@ export function useTeamPresenter(): TeamVM {
         { label: "Sign Up", href: Routes.signup },
       ];
 
-  const bottomNav: BottomNavVM = {
+  const sidebarNav: SidebarNavVM = {
     homeHref: isLoggedIn ? Routes.appHome : Routes.home,
     messagesHref: Routes.messages,
     settingsHref: Routes.settings,
     profileHref: Routes.profile,
-    activeTab: null,
     avatarUrl,
   };
 
+  const founderTopics = ABOUT_PAGE_DATA.founderTopics.filter((t) => !t.draft);
+
   const selectedTopic = selectedTopicId
-    ? ABOUT_PAGE_DATA.founderTopics.find((t) => t.id === selectedTopicId) ?? null
+    ? (ABOUT_PAGE_DATA.founderTopics.find((t) => t.id === selectedTopicId) ?? null)
     : null;
 
   return {
@@ -143,9 +144,10 @@ export function useTeamPresenter(): TeamVM {
     memberProfileTitle: ABOUT_PAGE_DATA.memberProfileTitle,
     joinTeamCta: ABOUT_PAGE_DATA.joinTeamCta,
     joinTeamSubtitle: ABOUT_PAGE_DATA.joinTeamSubtitle,
+    joinTeamHref: Routes.contact,
     founderMessage: ABOUT_PAGE_DATA.founderMessage,
     ceo: ABOUT_PAGE_DATA.ceo,
-    founderTopics: ABOUT_PAGE_DATA.founderTopics,
+    founderTopics,
     selectedTopicId,
     selectedTopic,
     selectTopic,
@@ -158,7 +160,7 @@ export function useTeamPresenter(): TeamVM {
     closeDrawer,
     onLogout,
     navLinks,
-    bottomNav,
+    sidebarNav,
     showProfile,
     openProfile,
     closeProfile,

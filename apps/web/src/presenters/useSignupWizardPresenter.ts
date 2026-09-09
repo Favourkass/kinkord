@@ -14,7 +14,6 @@ import {
   type AboutDraft,
 } from "@/domain/onboarding";
 import { Routes } from "@/constants/Routes";
-import { authClient } from "@/services/authClient";
 
 export type WizardStage = "country" | "account" | "about" | "verify" | "profile" | "welcome";
 const STAGE_STEP: Record<WizardStage, number> = {
@@ -90,39 +89,6 @@ export function useSignupWizardPresenter() {
    * account and writes the about-fields, rolling the account back if the second
    * half fails — so a retry never hits "email already exists".
    */
-  // const submitCombinedStep = useCallback(async () => {
-  //   const accErrors = validateAccount(account);
-  //   const abtErrors = validateAbout(about);
-  //   setAccountErrors(accErrors);
-  //   setAboutErrors(abtErrors);
-  //   if (Object.keys(accErrors).length > 0 || Object.keys(abtErrors).length > 0) return;
-  //   setBusy(true);
-  //   setTopError(null);
-  //   try {
-  //     await api.post("/auth-ext/sign-up", {
-  //       email: account.email.trim(),
-  //       password: account.password,
-  //       displayName: account.displayName.trim(),
-  //       username: account.username.replace(/^@/, "").toLowerCase(),
-  //       country,
-  //       state: about.state,
-  //       city: about.city.trim() || null,
-  //       dateOfBirth: dobToIso(about),
-  //       gender: about.gender,
-  //       phone: account.phoneLocal.trim()
-  //         ? toE164(account.phoneCountryCode, account.phoneLocal)
-  //         : null,
-  //     });
-  //     setStage("verify");
-  //   } catch (e) {
-  //     setTopError(e instanceof Error ? e.message : "Something went wrong. Try again.");
-  //   } finally {
-  //     setBusy(false);
-  //   }
-  // }, [about, account, country]);
-
-  // const backToCountry = useCallback(() => setStage("country"), []);
-
   const submitCombinedStep = useCallback(async () => {
     const accErrors = validateAccount(account);
     const abtErrors = validateAbout(about);
@@ -132,15 +98,11 @@ export function useSignupWizardPresenter() {
     setBusy(true);
     setTopError(null);
     try {
-      const { error } = await authClient.signUp.email({
+      await api.post("/auth-ext/sign-up", {
         email: account.email.trim(),
         password: account.password,
-        name: account.displayName.trim(),
+        displayName: account.displayName.trim(),
         username: account.username.replace(/^@/, "").toLowerCase(),
-        ageAttested: true,
-      } as Parameters<typeof authClient.signUp.email>[0]);
-      if (error) throw new Error(error.message ?? "Sign up failed");
-      await api.patch("/profile", {
         country,
         state: about.state,
         city: about.city.trim() || null,

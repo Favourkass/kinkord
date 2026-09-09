@@ -3,23 +3,22 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Routes } from "@/constants/Routes";
-import { POLICY_LINKS } from "@/constants/landing";
+import { POLICY_LINKS, type PolicyLink } from "@/constants/landing";
 import { ABOUT_PAGE_DATA } from "@/constants/about";
 import { authClient } from "@/services/authClient";
 import { api } from "@/services/apiClient";
-import type { PolicyItem } from "@/components/landing/SplashScreen";
 
 export interface NavLinkVM {
   label: string;
   href: string;
 }
 
-export interface BottomNavVM {
+/** Desktop sidebar links + avatar (signed-in only); public pages have no mobile bottom bar. */
+export interface SidebarNavVM {
   homeHref: string;
   messagesHref: string;
   settingsHref: string;
   profileHref: string;
-  activeTab: "home" | "messages" | "settings" | "profile" | null;
   avatarUrl: string | null;
 }
 
@@ -30,7 +29,7 @@ export interface AboutVM {
   meetTeamCta: string;
   meetTeamSubtitle: string;
   teamHref: string;
-  policyLinks: PolicyItem[];
+  policyLinks: PolicyLink[];
   copyright: string;
   allRightsReserved: string;
   drawerOpen: boolean;
@@ -38,7 +37,7 @@ export interface AboutVM {
   closeDrawer: () => void;
   onLogout: () => Promise<void>;
   navLinks: NavLinkVM[];
-  bottomNav: BottomNavVM;
+  sidebarNav: SidebarNavVM;
   isLoggedIn: boolean;
   loginHref: string;
   signupHref: string;
@@ -110,12 +109,11 @@ export function useAboutPresenter(): AboutVM {
         { label: "Sign Up", href: Routes.signup },
       ];
 
-  const bottomNav: BottomNavVM = {
+  const sidebarNav: SidebarNavVM = {
     homeHref: isLoggedIn ? Routes.appHome : Routes.home,
     messagesHref: Routes.messages,
     settingsHref: Routes.settings,
     profileHref: Routes.profile,
-    activeTab: null,
     avatarUrl,
   };
 
@@ -134,7 +132,7 @@ export function useAboutPresenter(): AboutVM {
     closeDrawer,
     onLogout,
     navLinks,
-    bottomNav,
+    sidebarNav,
     isLoggedIn,
     loginHref: Routes.login,
     signupHref: Routes.signup,

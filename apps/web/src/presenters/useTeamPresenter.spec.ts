@@ -77,7 +77,7 @@ describe("useTeamPresenter", () => {
   it("handles topic selection and clearing for in-page content changes", () => {
     const { result } = renderHook(() => useTeamPresenter());
 
-    expect(result.current.founderTopics).toHaveLength(12);
+    expect(result.current.founderTopics).toHaveLength(11);
     expect(result.current.selectedTopicId).toBeNull();
     expect(result.current.selectedTopic).toBeNull();
 

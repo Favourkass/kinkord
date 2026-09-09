@@ -132,7 +132,10 @@ function ChevronIcon() {
 
 function PolicyChevron() {
   return (
-    <span aria-hidden className="grid size-4 sm:size-5 shrink-0 place-items-center text-[#faab14] ml-1">
+    <span
+      aria-hidden
+      className="grid size-4 sm:size-5 shrink-0 place-items-center text-[#faab14] ml-1"
+    >
       <svg width="7" height="12" viewBox="0 0 8 14" fill="none" overflow="visible">
         <path
           d="M1 1L7 7L1 13"

@@ -82,7 +82,17 @@ function BriefcaseIcon({ className = "size-3.5" }: { className?: string }) {
 
 function HomeNavIcon() {
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#ffffff"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
       <polyline points="9 22 9 12 15 12 15 22" />
     </svg>
@@ -91,7 +101,17 @@ function HomeNavIcon() {
 
 function ChatNavIcon() {
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#ffffff"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
     </svg>
   );
@@ -99,7 +119,17 @@ function ChatNavIcon() {
 
 function SettingsNavIcon() {
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#ffffff"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
@@ -108,7 +138,17 @@ function SettingsNavIcon() {
 
 function LogoutNavIcon() {
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#ffffff"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
       <polyline points="16 17 21 12 16 7" />
       <line x1="21" y1="12" x2="9" y2="12" />
@@ -134,19 +174,46 @@ function TopicIcon({ id, className = "size-4 sm:size-4.5" }: { id: string; class
   switch (id) {
     case "my-kink-identity":
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+          aria-hidden="true"
+        >
           <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
         </svg>
       );
     case "what-i-believe":
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+          aria-hidden="true"
+        >
           <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
         </svg>
       );
     case "the-journey-so-far":
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+          aria-hidden="true"
+        >
           <circle cx="6" cy="19" r="3" />
           <path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" />
           <circle cx="18" cy="5" r="3" />
@@ -154,14 +221,32 @@ function TopicIcon({ id, className = "size-4 sm:size-4.5" }: { id: string; class
       );
     case "lesson-setback-growth":
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+          aria-hidden="true"
+        >
           <path d="m2 20 7-7 4 4 9-9" />
           <path d="M14 8h8v8" />
         </svg>
       );
     case "my-mission":
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+          aria-hidden="true"
+        >
           <circle cx="12" cy="12" r="10" />
           <circle cx="12" cy="12" r="6" />
           <circle cx="12" cy="12" r="2" />
@@ -169,14 +254,32 @@ function TopicIcon({ id, className = "size-4 sm:size-4.5" }: { id: string; class
       );
     case "my-vision":
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+          aria-hidden="true"
+        >
           <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
           <circle cx="12" cy="12" r="3" />
         </svg>
       );
     case "what-im-building":
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+          aria-hidden="true"
+        >
           <rect width="8" height="8" x="3" y="3" rx="1" />
           <rect width="8" height="8" x="13" y="3" rx="1" />
           <rect width="8" height="8" x="8" y="13" rx="1" />
@@ -184,20 +287,47 @@ function TopicIcon({ id, className = "size-4 sm:size-4.5" }: { id: string; class
       );
     case "founders-journey":
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+          aria-hidden="true"
+        >
           <path d="m8 3 4 8 5-5 5 15H2L8 3z" />
         </svg>
       );
     case "contact-the-founder":
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+          aria-hidden="true"
+        >
           <rect width="20" height="16" x="2" y="4" rx="2" />
           <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
         </svg>
       );
     case "work-with-me":
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+          aria-hidden="true"
+        >
           <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
           <circle cx="9" cy="7" r="4" />
           <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
@@ -206,20 +336,47 @@ function TopicIcon({ id, className = "size-4 sm:size-4.5" }: { id: string; class
       );
     case "my-message-to-the-community":
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+          aria-hidden="true"
+        >
           <path d="m3 11 18-5v12L3 13v-2z" />
           <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
         </svg>
       );
     case "founders-principle":
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+          aria-hidden="true"
+        >
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
         </svg>
       );
     default:
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+          aria-hidden="true"
+        >
           <circle cx="12" cy="12" r="10" />
           <path d="m10 15 5-3-5-3v6z" />
         </svg>
@@ -234,10 +391,10 @@ export default function TeamPage({
   memberProfileTitle,
   joinTeamCta,
   joinTeamSubtitle,
+  joinTeamHref,
   founderMessage,
   ceo,
   founderTopics,
-  selectedTopicId,
   selectedTopic,
   selectTopic,
   clearTopic,
@@ -249,7 +406,7 @@ export default function TeamPage({
   closeDrawer,
   onLogout,
   navLinks,
-  bottomNav,
+  sidebarNav,
   showProfile,
   openProfile,
   closeProfile,
@@ -263,7 +420,7 @@ export default function TeamPage({
       {isLoggedIn && (
         <aside className="hidden w-[280px] shrink-0 sticky top-0 h-screen flex-col bg-[#1e1e1e] pt-[44px] pb-[44px] px-[36px] z-20 lg:flex">
           <Link
-            href={bottomNav.homeHref}
+            href={sidebarNav.homeHref}
             className="text-[34px] font-black tracking-[2px] text-[#ffba1f] transition-opacity hover:opacity-90 mb-[44px]"
           >
             {brand}
@@ -271,7 +428,7 @@ export default function TeamPage({
 
           <nav className="flex flex-col gap-[28px]">
             <Link
-              href={bottomNav.homeHref}
+              href={sidebarNav.homeHref}
               className="flex items-center gap-[18px] text-[20px] font-medium text-white transition-opacity hover:opacity-80"
             >
               <HomeNavIcon />
@@ -279,7 +436,7 @@ export default function TeamPage({
             </Link>
 
             <Link
-              href={bottomNav.messagesHref}
+              href={sidebarNav.messagesHref}
               className="flex items-center gap-[18px] text-[20px] font-medium text-white transition-opacity hover:opacity-80"
             >
               <ChatNavIcon />
@@ -287,7 +444,7 @@ export default function TeamPage({
             </Link>
 
             <Link
-              href={bottomNav.settingsHref}
+              href={sidebarNav.settingsHref}
               className="flex items-center gap-[18px] text-[20px] font-medium text-white transition-opacity hover:opacity-80"
             >
               <SettingsNavIcon />
@@ -295,10 +452,10 @@ export default function TeamPage({
             </Link>
 
             <Link
-              href={bottomNav.profileHref}
+              href={sidebarNav.profileHref}
               className="flex items-center gap-[18px] text-[20px] font-medium text-white transition-opacity hover:opacity-80"
             >
-              <ProfileAvatarIcon avatarUrl={bottomNav.avatarUrl} />
+              <ProfileAvatarIcon avatarUrl={sidebarNav.avatarUrl} />
               <span>Profile</span>
             </Link>
           </nav>
@@ -331,7 +488,14 @@ export default function TeamPage({
                 className="p-1 text-neutral-400 hover:text-white transition-colors"
                 aria-label="Close menu"
               >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <path d="M18 6 6 18M6 6l12 12" />
                 </svg>
               </button>
@@ -389,7 +553,9 @@ export default function TeamPage({
             </header>
           ) : (
             /* Standard Mobile Header */
-            <header className={`flex items-center justify-between py-2 mb-6 ${isLoggedIn ? "lg:hidden" : ""}`}>
+            <header
+              className={`flex items-center justify-between py-2 mb-6 ${isLoggedIn ? "lg:hidden" : ""}`}
+            >
               <div className="flex items-center gap-4">
                 <button
                   type="button"
@@ -399,7 +565,10 @@ export default function TeamPage({
                 >
                   <HamburgerMenuIcon />
                 </button>
-                <Link href={bottomNav.homeHref} className="text-2xl font-black tracking-wider text-[#ffba1f]">
+                <Link
+                  href={sidebarNav.homeHref}
+                  className="text-2xl font-black tracking-wider text-[#ffba1f]"
+                >
                   {brand}
                 </Link>
               </div>
@@ -440,7 +609,7 @@ export default function TeamPage({
                 {/* The Key Component: Gold Kinkord Emblem Logo */}
                 <div className="relative size-[90px] sm:size-[110px] shrink-0 drop-shadow-[0_0_20px_rgba(250,171,20,0.35)]">
                   <Image
-                    src="/brand/k-logo-badge.png"
+                    src="/brand/logo-badge.png"
                     alt="Kinkord Key Emblem"
                     fill
                     priority
@@ -462,7 +631,9 @@ export default function TeamPage({
                   ))}
                 </div>
                 <div className="mt-5">
-                  <p className="text-[15px] font-bold text-[#ffba1f]">{founderMessage.founderName}</p>
+                  <p className="text-[15px] font-bold text-[#ffba1f]">
+                    {founderMessage.founderName}
+                  </p>
                   <p className="text-[12px] text-neutral-400">{founderMessage.founderRole}</p>
                 </div>
               </section>
@@ -519,7 +690,7 @@ export default function TeamPage({
               {/* Join Kinkord Team CTA */}
               <div className="my-4 w-full text-center">
                 <Link
-                  href="/contact"
+                  href={joinTeamHref}
                   className="w-full h-[58px] rounded-[24px] bg-[#faab14] hover:bg-[#ffba1f] text-black font-extrabold text-[17px] sm:text-[18px] tracking-wider shadow-[0_4px_24px_rgba(250,171,20,0.4)] transition-all hover:scale-[1.01] active:scale-[0.98] cursor-pointer grid place-items-center"
                 >
                   {joinTeamCta}
@@ -561,7 +732,9 @@ export default function TeamPage({
                 <div className="flex items-center justify-center gap-4 text-[13px] sm:text-[14px] text-neutral-400">
                   <span>{ceo.location}</span>
                   <span>•</span>
-                  <span>{ceo.gender}, {ceo.age}</span>
+                  <span>
+                    {ceo.gender}, {ceo.age}
+                  </span>
                 </div>
               </div>
 
@@ -585,7 +758,7 @@ export default function TeamPage({
                 <div className="flex items-center gap-2 mb-3">
                   <span className="h-4 w-1.5 rounded-full bg-[#faab14]" />
                   <h3 className="text-[14px] sm:text-[15px] font-bold tracking-wider text-white uppercase">
-                    FOUNDER'S PERSPECTIVES
+                    FOUNDER&apos;S PERSPECTIVES
                   </h3>
                 </div>
 
@@ -651,10 +824,14 @@ export default function TeamPage({
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[14px] sm:text-[15px] font-bold text-white">{ceo.name}</span>
+                      <span className="text-[14px] sm:text-[15px] font-bold text-white">
+                        {ceo.name}
+                      </span>
                       <VerifiedBadgeIcon />
                     </div>
-                    <p className="text-[12px] text-[#faab14] font-medium">{ceo.role} • {ceo.handle}</p>
+                    <p className="text-[12px] text-[#faab14] font-medium">
+                      {ceo.role} • {ceo.handle}
+                    </p>
                   </div>
                 </div>
                 <span className="rounded-full bg-neutral-800/90 px-2.5 py-1 text-[11px] font-semibold text-[#faab14] border border-[#faab14]/20">
@@ -670,7 +847,7 @@ export default function TeamPage({
                   </div>
                   <div>
                     <span className="text-[11px] uppercase tracking-wider text-[#faab14] font-bold">
-                      Founder's Perspective
+                      Founder&apos;s Perspective
                     </span>
                     <h2 className="text-xl sm:text-2xl font-black text-white leading-tight">
                       {selectedTopic.title}
@@ -725,7 +902,9 @@ export default function TeamPage({
 
                   {/* Remaining paragraphs (if any) */}
                   {selectedTopic.paragraphs.slice(1).map((para, i) => (
-                    <p key={i} className="whitespace-pre-line">{para}</p>
+                    <p key={i} className="whitespace-pre-line">
+                      {para}
+                    </p>
                   ))}
                 </div>
 
@@ -754,7 +933,9 @@ export default function TeamPage({
 
                         <div className="space-y-2.5 text-[13.5px] sm:text-[14px] leading-relaxed text-neutral-300">
                           {entry.paragraphs.map((para, pIdx) => (
-                            <p key={pIdx} className="whitespace-pre-line">{para}</p>
+                            <p key={pIdx} className="whitespace-pre-line">
+                              {para}
+                            </p>
                           ))}
                         </div>
 
@@ -778,7 +959,9 @@ export default function TeamPage({
                               rel="noopener noreferrer"
                               className="w-full h-[50px] rounded-[16px] bg-[#25D366] hover:bg-[#20bd5a] text-black font-extrabold text-[14px] sm:text-[15px] tracking-wide shadow-[0_4px_20px_rgba(37,211,102,0.3)] transition-all flex items-center justify-center gap-2 cursor-pointer"
                             >
-                              <span className="text-lg" aria-hidden="true">💬</span>
+                              <span className="text-lg" aria-hidden="true">
+                                💬
+                              </span>
                               <span>{entry.whatsappLabel || "Contact on WhatsApp"}</span>
                             </a>
                           </div>
@@ -869,7 +1052,9 @@ export default function TeamPage({
                       rel="noopener noreferrer"
                       className="w-full h-[54px] rounded-[20px] bg-[#25D366] hover:bg-[#20bd5a] text-black font-extrabold text-[15px] sm:text-[16px] tracking-wide shadow-[0_4px_24px_rgba(37,211,102,0.35)] transition-all flex items-center justify-center gap-2.5 cursor-pointer"
                     >
-                      <span className="text-xl" aria-hidden="true">💬</span>
+                      <span className="text-xl" aria-hidden="true">
+                        💬
+                      </span>
                       <span>{selectedTopic.whatsappLabel || "Contact on WhatsApp"}</span>
                     </a>
                   </div>

@@ -105,38 +105,17 @@ describe("useSignupWizardPresenter", () => {
     expect(result.current.stage).toBe("profile");
   });
 
-  it("submits joined account and about step in one action", async () => {
+  it("surfaces a server error on the combined step without advancing", async () => {
+    post.mockRejectedValue(new Error("Email already exists"));
     const { result } = renderHook(() => useSignupWizardPresenter());
-    act(() => {
-      result.current.stepOne.setCountry("NG");
-      result.current.stepOne.setAgeAttested(true);
-      result.current.stepOne.setTermsAccepted(true);
-    });
-    act(() => result.current.stepOne.submit());
-    expect(result.current.stage).toBe("account");
-
-    await act(() => result.current.submitCombinedStep());
-    expect(result.current.stage).toBe("account");
-    expect(Object.keys(result.current.accountStep.errors).length).toBeGreaterThan(0);
-    expect(Object.keys(result.current.aboutStep.errors).length).toBeGreaterThan(0);
-
+    reachCombinedStep(result);
     fillAccount(result);
-    act(() =>
-      result.current.aboutStep.set({
-        state: "Delta",
-        city: "Sapele",
-        dobDay: 4,
-        dobMonth: 8,
-        dobYear: 1999,
-        gender: "male",
-      }),
-    );
+    fillAbout(result);
 
     await act(() => result.current.submitCombinedStep());
-    expect(post).toHaveBeenCalledWith(
-      expect.objectContaining({ username: "tegamaxwell", ageAttested: true, name: "Sir T" }),
-    );
-    expect(result.current.stage).toBe("verify");
+
+    expect(result.current.topError).toBe("Email already exists");
+    expect(result.current.stage).toBe("account");
   });
 
   it("refuses to complete the profile without both images and confirmations", async () => {

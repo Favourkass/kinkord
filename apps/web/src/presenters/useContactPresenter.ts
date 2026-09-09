@@ -18,11 +18,11 @@ import { authClient } from "@/services/authClient";
 import { api } from "@/services/apiClient";
 import type { ProfileVM } from "./useProfilePresenter";
 
-export interface ContactChannelVM extends ContactChannel {}
+export type ContactChannelVM = ContactChannel;
 
-export interface OfficeVM extends OfficeInfo {}
+export type OfficeVM = OfficeInfo;
 
-export interface NoticeVM extends NoticeCard {}
+export type NoticeVM = NoticeCard;
 
 export interface SupportTopicVM extends SupportTopic {
   href: string;
@@ -33,12 +33,12 @@ export interface NavLinkVM {
   href: string;
 }
 
-export interface BottomNavVM {
+/** Desktop sidebar links + avatar (signed-in only). The contact page deliberately has no mobile bottom bar (Favour, 2026-09-08). */
+export interface SidebarNavVM {
   homeHref: string;
   messagesHref: string;
   settingsHref: string;
   profileHref: string;
-  activeTab: "home" | "messages" | "settings" | "profile" | null;
   avatarUrl: string | null;
 }
 
@@ -59,7 +59,7 @@ export interface ContactVM {
   openDrawer: () => void;
   closeDrawer: () => void;
   navLinks: NavLinkVM[];
-  bottomNav: BottomNavVM;
+  sidebarNav: SidebarNavVM;
   selectedTopic: SupportTopicVM | null;
   selectTopic: (topic: SupportTopicVM | null) => void;
   handleTopicClick: (topic: SupportTopicVM) => void;
@@ -147,12 +147,11 @@ export function useContactPresenter(): ContactVM {
         { label: "Sign Up", href: Routes.signup },
       ];
 
-  const bottomNav: BottomNavVM = {
+  const sidebarNav: SidebarNavVM = {
     homeHref: isLoggedIn ? Routes.appHome : Routes.home,
     messagesHref: Routes.messages,
     settingsHref: Routes.settings,
     profileHref: Routes.profile,
-    activeTab: null,
     avatarUrl,
   };
 
@@ -173,7 +172,7 @@ export function useContactPresenter(): ContactVM {
     openDrawer,
     closeDrawer,
     navLinks,
-    bottomNav,
+    sidebarNav,
     selectedTopic,
     selectTopic: setSelectedTopic,
     handleTopicClick,

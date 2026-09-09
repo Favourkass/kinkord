@@ -23,7 +23,17 @@ function HamburgerMenuIcon() {
 
 function HomeNavIcon() {
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#ffffff"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
       <polyline points="9 22 9 12 15 12 15 22" />
     </svg>
@@ -32,7 +42,17 @@ function HomeNavIcon() {
 
 function ChatNavIcon() {
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#ffffff"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
     </svg>
   );
@@ -40,7 +60,17 @@ function ChatNavIcon() {
 
 function SettingsNavIcon() {
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#ffffff"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
@@ -49,7 +79,17 @@ function SettingsNavIcon() {
 
 function LogoutNavIcon() {
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#ffffff"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
       <polyline points="16 17 21 12 16 7" />
       <line x1="21" y1="12" x2="9" y2="12" />
@@ -86,7 +126,7 @@ export default function AboutPage({
   closeDrawer,
   onLogout,
   navLinks,
-  bottomNav,
+  sidebarNav,
   isLoggedIn,
   loginHref,
   signupHref,
@@ -97,7 +137,7 @@ export default function AboutPage({
       {isLoggedIn && (
         <aside className="hidden w-[280px] shrink-0 sticky top-0 h-screen flex-col bg-[#1e1e1e] pt-[44px] pb-[44px] px-[36px] z-20 lg:flex">
           <Link
-            href={bottomNav.homeHref}
+            href={sidebarNav.homeHref}
             className="text-[34px] font-black tracking-[2px] text-[#ffba1f] transition-opacity hover:opacity-90 mb-[44px]"
           >
             {brand}
@@ -105,7 +145,7 @@ export default function AboutPage({
 
           <nav className="flex flex-col gap-[28px]">
             <Link
-              href={bottomNav.homeHref}
+              href={sidebarNav.homeHref}
               className="flex items-center gap-[18px] text-[20px] font-medium text-white transition-opacity hover:opacity-80"
             >
               <HomeNavIcon />
@@ -113,7 +153,7 @@ export default function AboutPage({
             </Link>
 
             <Link
-              href={bottomNav.messagesHref}
+              href={sidebarNav.messagesHref}
               className="flex items-center gap-[18px] text-[20px] font-medium text-white transition-opacity hover:opacity-80"
             >
               <ChatNavIcon />
@@ -121,7 +161,7 @@ export default function AboutPage({
             </Link>
 
             <Link
-              href={bottomNav.settingsHref}
+              href={sidebarNav.settingsHref}
               className="flex items-center gap-[18px] text-[20px] font-medium text-white transition-opacity hover:opacity-80"
             >
               <SettingsNavIcon />
@@ -129,10 +169,10 @@ export default function AboutPage({
             </Link>
 
             <Link
-              href={bottomNav.profileHref}
+              href={sidebarNav.profileHref}
               className="flex items-center gap-[18px] text-[20px] font-medium text-white transition-opacity hover:opacity-80"
             >
-              <ProfileAvatarIcon avatarUrl={bottomNav.avatarUrl} />
+              <ProfileAvatarIcon avatarUrl={sidebarNav.avatarUrl} />
               <span>Profile</span>
             </Link>
           </nav>
@@ -165,7 +205,14 @@ export default function AboutPage({
                 className="p-1 text-neutral-400 hover:text-white transition-colors"
                 aria-label="Close menu"
               >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <path d="M18 6 6 18M6 6l12 12" />
                 </svg>
               </button>
@@ -204,7 +251,9 @@ export default function AboutPage({
       <main className="flex-1 overflow-y-auto px-4 pt-4 pb-20 lg:px-14 lg:py-12">
         <div className="mx-auto w-full max-w-[480px] sm:max-w-[560px] lg:max-w-[760px]">
           {/* Top Header */}
-          <header className={`flex items-center justify-between py-2 mb-6 ${isLoggedIn ? "lg:hidden" : ""}`}>
+          <header
+            className={`flex items-center justify-between py-2 mb-6 ${isLoggedIn ? "lg:hidden" : ""}`}
+          >
             <div className="flex items-center gap-4">
               <button
                 type="button"
@@ -214,7 +263,10 @@ export default function AboutPage({
               >
                 <HamburgerMenuIcon />
               </button>
-              <Link href={bottomNav.homeHref} className="text-2xl font-black tracking-wider text-[#ffba1f]">
+              <Link
+                href={sidebarNav.homeHref}
+                className="text-2xl font-black tracking-wider text-[#ffba1f]"
+              >
                 {brand}
               </Link>
             </div>
@@ -252,7 +304,7 @@ export default function AboutPage({
               {/* The Key Component: Gold Kinkord Emblem Logo */}
               <div className="relative size-[90px] sm:size-[110px] shrink-0 drop-shadow-[0_0_20px_rgba(250,171,20,0.35)]">
                 <Image
-                  src="/brand/k-logo-badge.png"
+                  src="/brand/logo-badge.png"
                   alt="Kinkord Key Emblem"
                   fill
                   priority

@@ -50,7 +50,7 @@ describe("getLandingVM", () => {
       "About Kinkord",
       "Contact Us",
       "Invest in Kinkord",
-      "Join our WhatsApp Community",
+      "Chat with us on WhatsApp",
     ]);
     expect(vm.allRightsReserved).toBe("All rights reserved.");
   });

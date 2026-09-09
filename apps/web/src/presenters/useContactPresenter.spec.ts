@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { renderHook, act } from "@testing-library/react";
+import { renderHook, act, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { useContactPresenter } from "./useContactPresenter";
 
@@ -8,17 +8,12 @@ const router = { push, replace: vi.fn() };
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 
 const signOut = vi.fn();
-<<<<<<< HEAD
 const getSession = vi.fn();
 vi.mock("@/services/authClient", () => ({
   authClient: {
     signOut: (...a: unknown[]) => signOut(...a),
     getSession: (...a: unknown[]) => getSession(...a),
   },
-=======
-vi.mock("@/services/authClient", () => ({
-  authClient: { signOut: (...a: unknown[]) => signOut(...a) },
->>>>>>> 652a295e9cdf556a95883eabda83f8d265da31a7
 }));
 
 vi.mock("@/services/apiClient", () => ({
@@ -29,22 +24,16 @@ describe("useContactPresenter", () => {
   beforeEach(() => {
     push.mockClear();
     signOut.mockReset().mockResolvedValue({});
-<<<<<<< HEAD
     getSession.mockReset().mockResolvedValue({ data: null });
-=======
->>>>>>> 652a295e9cdf556a95883eabda83f8d265da31a7
   });
 
   it("provides complete view model data matching mockup requirements", () => {
     const { result } = renderHook(() => useContactPresenter());
 
     expect(result.current.brand).toBe("KINKORD");
-<<<<<<< HEAD
     expect(result.current.isLoggedIn).toBe(false);
     expect(result.current.loginHref).toBe("/login");
     expect(result.current.signupHref).toBe("/signup");
-=======
->>>>>>> 652a295e9cdf556a95883eabda83f8d265da31a7
     expect(result.current.headline).toBe("CONTACT US");
     expect(result.current.lead).toBe("We're here to help.");
     expect(result.current.subcopy).toContain("Reach out to us for support");
@@ -71,13 +60,9 @@ describe("useContactPresenter", () => {
 
     // Office
     expect(result.current.office.company).toBe("Kinkord Limited");
-<<<<<<< HEAD
-    expect(result.current.office.addressLines).toContain("13 Obire Street, Sapele, Delta State, Nigeria");
-=======
     expect(result.current.office.addressLines).toContain(
       "13 Obire Street, Sapele, Delta State, Nigeria",
     );
->>>>>>> 652a295e9cdf556a95883eabda83f8d265da31a7
 
     // Notices
     expect(result.current.safetyNotice.title).toBe("SAFETY NOTICE");
@@ -88,13 +73,30 @@ describe("useContactPresenter", () => {
     const problem = result.current.topics.find((t) => t.id === "problem");
     expect(problem?.isAlert).toBe(true);
     expect(problem?.href).toContain("mailto:support@kinkord.com");
-<<<<<<< HEAD
-=======
 
     // Desktop sidebar links only — this page must not ship a mobile bottom bar (2026-09-08).
-    expect(result.current.sidebarNav.homeHref).toBe("/home");
+    expect(result.current.sidebarNav.homeHref).toBe("/");
     expect("bottomNav" in result.current).toBe(false);
->>>>>>> 652a295e9cdf556a95883eabda83f8d265da31a7
+  });
+
+  it("offers guests Log In / Sign Up and signed-in members Settings / My Profile", async () => {
+    const guest = renderHook(() => useContactPresenter());
+    await waitFor(() => expect(getSession).toHaveBeenCalled());
+    expect(guest.result.current.navLinks.map((l) => l.label)).toEqual(
+      expect.arrayContaining(["Log In", "Sign Up"]),
+    );
+    expect(guest.result.current.navLinks.map((l) => l.label)).not.toContain("My Profile");
+
+    getSession.mockResolvedValue({ data: { session: { id: "s1" } } });
+    const member = renderHook(() => useContactPresenter());
+    await waitFor(() => expect(member.result.current.isLoggedIn).toBe(true));
+    expect(member.result.current.sidebarNav.homeHref).toBe("/home");
+    expect(member.result.current.navLinks.map((l) => l.label)).toEqual(
+      expect.arrayContaining(["Settings", "My Profile"]),
+    );
+    await waitFor(() =>
+      expect(member.result.current.sidebarNav.avatarUrl).toBe("https://avatar.png"),
+    );
   });
 
   it("handles drawer open and close transitions", () => {
