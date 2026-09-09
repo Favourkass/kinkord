@@ -2,38 +2,18 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  CONTACT_CHANNELS,
-  IMPORTANT_NOTICE,
-  OFFICE_INFO,
-  SAFETY_NOTICE,
-  SUPPORT_TOPICS,
-  type ContactChannel,
-  type NoticeCard,
-  type OfficeInfo,
-  type SupportTopic,
-} from "@/constants/contact";
 import { Routes } from "@/constants/Routes";
+import { POLICY_LINKS, type PolicyLink } from "@/constants/landing";
+import { ABOUT_PAGE_DATA } from "@/constants/about";
 import { authClient } from "@/services/authClient";
 import { api } from "@/services/apiClient";
-import type { ProfileVM } from "./useProfilePresenter";
-
-export type ContactChannelVM = ContactChannel;
-
-export type OfficeVM = OfficeInfo;
-
-export type NoticeVM = NoticeCard;
-
-export interface SupportTopicVM extends SupportTopic {
-  href: string;
-}
 
 export interface NavLinkVM {
   label: string;
   href: string;
 }
 
-/** Desktop sidebar links + avatar (signed-in only). The contact page deliberately has no mobile bottom bar (Favour, 2026-09-08). */
+/** Desktop sidebar links + avatar (signed-in only); public pages have no mobile bottom bar. */
 export interface SidebarNavVM {
   homeHref: string;
   messagesHref: string;
@@ -42,37 +22,30 @@ export interface SidebarNavVM {
   avatarUrl: string | null;
 }
 
-export interface ContactVM {
+export interface AboutVM {
   brand: string;
-  headline: string;
-  lead: string;
-  subcopy: string;
-  getInTouchHeading: string;
-  channels: ContactChannelVM[];
-  office: OfficeVM;
-  safetyNotice: NoticeVM;
-  importantNotice: NoticeVM;
-  chooseTopicHeading: string;
-  chooseTopicSubcopy: string;
-  topics: SupportTopicVM[];
+  aboutTitle: string;
+  aboutTitleAccent: string;
+  meetTeamCta: string;
+  meetTeamSubtitle: string;
+  teamHref: string;
+  policyLinks: PolicyLink[];
+  copyright: string;
+  allRightsReserved: string;
   drawerOpen: boolean;
   openDrawer: () => void;
   closeDrawer: () => void;
+  onLogout: () => Promise<void>;
   navLinks: NavLinkVM[];
   sidebarNav: SidebarNavVM;
-  selectedTopic: SupportTopicVM | null;
-  selectTopic: (topic: SupportTopicVM | null) => void;
-  handleTopicClick: (topic: SupportTopicVM) => void;
-  onLogout: () => void;
   isLoggedIn: boolean;
   loginHref: string;
   signupHref: string;
 }
 
-export function useContactPresenter(): ContactVM {
+export function useAboutPresenter(): AboutVM {
   const router = useRouter();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedTopic, setSelectedTopic] = useState<SupportTopicVM | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
@@ -86,12 +59,12 @@ export function useContactPresenter(): ContactVM {
         setIsLoggedIn(loggedIn);
         if (loggedIn) {
           try {
-            const prof = await api.get<ProfileVM>("/profile");
-            if (!cancelled && prof?.avatarUrl) {
-              setAvatarUrl(prof.avatarUrl);
+            const profile = await api.get<{ avatarUrl?: string | null }>("/profile");
+            if (!cancelled && profile?.avatarUrl) {
+              setAvatarUrl(profile.avatarUrl);
             }
           } catch {
-            // Guest user or unauthenticated
+            // Unauthenticated or network error — fallback avatar is safe
           }
         }
       } catch {
@@ -110,27 +83,16 @@ export function useContactPresenter(): ContactVM {
     try {
       await authClient.signOut();
     } catch {
-      // Continue to login even if signOut network fails
+      // Proceed even on failure
     }
     router.push(Routes.login);
   }, [router]);
-
-  const topics: SupportTopicVM[] = SUPPORT_TOPICS.map((topic) => ({
-    ...topic,
-    href: `mailto:support@kinkord.com?subject=${encodeURIComponent(topic.subject)}`,
-  }));
-
-  const handleTopicClick = useCallback((topic: SupportTopicVM) => {
-    setSelectedTopic(topic);
-    if (typeof window !== "undefined" && topic.href) {
-      window.location.href = topic.href;
-    }
-  }, []);
 
   const baseNavLinks: NavLinkVM[] = [
     { label: "Home", href: Routes.home },
     { label: "Kinkopedia", href: Routes.kinkopedia },
     { label: "About Kinkord", href: Routes.about },
+    { label: "Meet the Team", href: Routes.team },
     { label: "Contact Us", href: Routes.contact },
     { label: "Invest in Kinkord", href: Routes.invest },
   ];
@@ -156,27 +118,21 @@ export function useContactPresenter(): ContactVM {
   };
 
   return {
-    brand: "KINKORD",
-    headline: "CONTACT US",
-    lead: "We're here to help.",
-    subcopy: "Reach out to us for support, inquiries, or to report any issues.",
-    getInTouchHeading: "GET IN TOUCH",
-    channels: [...CONTACT_CHANNELS],
-    office: { ...OFFICE_INFO },
-    safetyNotice: { ...SAFETY_NOTICE },
-    importantNotice: { ...IMPORTANT_NOTICE },
-    chooseTopicHeading: "CHOOSE A TOPIC",
-    chooseTopicSubcopy: "Choose a topic below to get the right help faster.",
-    topics,
+    brand: ABOUT_PAGE_DATA.brand,
+    aboutTitle: ABOUT_PAGE_DATA.aboutTitle,
+    aboutTitleAccent: ABOUT_PAGE_DATA.aboutTitleAccent,
+    meetTeamCta: ABOUT_PAGE_DATA.meetTeamCta,
+    meetTeamSubtitle: ABOUT_PAGE_DATA.meetTeamSubtitle,
+    teamHref: Routes.team,
+    policyLinks: POLICY_LINKS.map((p) => ({ ...p })),
+    copyright: ABOUT_PAGE_DATA.copyright,
+    allRightsReserved: ABOUT_PAGE_DATA.allRightsReserved,
     drawerOpen,
     openDrawer,
     closeDrawer,
+    onLogout,
     navLinks,
     sidebarNav,
-    selectedTopic,
-    selectTopic: setSelectedTopic,
-    handleTopicClick,
-    onLogout,
     isLoggedIn,
     loginHref: Routes.login,
     signupHref: Routes.signup,
