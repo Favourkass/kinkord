@@ -13,7 +13,7 @@ describe("getLandingVM", () => {
 
   it("points the auth CTAs at the signup and login routes", () => {
     expect(vm.signUp).toEqual({ label: "SIGN UP", href: Routes.signup });
-    expect(vm.signIn).toEqual({ label: "LOG IN", href: Routes.login });
+    expect(vm.signIn).toEqual({ label: "LOGIN", href: Routes.login });
     expect(vm.downloadCta.href).toBe(Routes.signup);
   });
 
@@ -38,8 +38,8 @@ describe("getLandingVM", () => {
     expect(vm.joinAgeDisclaimer).toBe("You must be 18 years or older to join.");
   });
 
-  it("exposes the 6 policy links for the footer buttons", () => {
-    expect(vm.policyLinks).toHaveLength(6);
+  it("exposes the 10 policy links for the footer buttons", () => {
+    expect(vm.policyLinks).toHaveLength(10);
     expect(vm.policyLinks.map((p) => p.label)).toEqual([
       "Privacy Policy",
       "Terms of Service",
@@ -47,6 +47,10 @@ describe("getLandingVM", () => {
       "Cookie Policy",
       "Safety & Reporting",
       "Copyright Policy",
+      "About Kinkord",
+      "Contact Us",
+      "Invest in Kinkord",
+      "Join our WhatsApp Community",
     ]);
     expect(vm.allRightsReserved).toBe("All rights reserved.");
   });

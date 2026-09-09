@@ -41,10 +41,24 @@ export const AGE_GATE_MODAL = {
   declineLabel: "🚪 I AM UNDER 18 — EXIT",
 } as const;
 
+import { Routes } from "./Routes";
+
+export const WHATSAPP_COMMUNITY_URL = "https://chat.whatsapp.com/invite";
+
 export interface PolicyLink {
   label: string;
   href: string;
-  icon: "privacy" | "terms" | "guidelines" | "cookie" | "safety" | "copyright";
+  icon:
+    | "privacy"
+    | "terms"
+    | "guidelines"
+    | "cookie"
+    | "safety"
+    | "copyright"
+    | "about"
+    | "contact"
+    | "invest"
+    | "whatsapp";
 }
 
 export const POLICY_LINKS: readonly PolicyLink[] = [
@@ -54,6 +68,14 @@ export const POLICY_LINKS: readonly PolicyLink[] = [
   { label: "Cookie Policy", href: "#", icon: "cookie" },
   { label: "Safety & Reporting", href: "#", icon: "safety" },
   { label: "Copyright Policy", href: "#", icon: "copyright" },
+  { label: "About Kinkord", href: Routes.about, icon: "about" },
+  { label: "Contact Us", href: Routes.contact, icon: "contact" },
+  { label: "Invest in Kinkord", href: Routes.invest, icon: "invest" },
+  {
+    label: "Join our WhatsApp Community",
+    href: WHATSAPP_COMMUNITY_URL,
+    icon: "whatsapp",
+  },
 ];
 
 export const SOCIALS = [

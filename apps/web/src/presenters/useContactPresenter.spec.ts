@@ -8,8 +8,12 @@ const router = { push, replace: vi.fn() };
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 
 const signOut = vi.fn();
+const getSession = vi.fn();
 vi.mock("@/services/authClient", () => ({
-  authClient: { signOut: (...a: unknown[]) => signOut(...a) },
+  authClient: {
+    signOut: (...a: unknown[]) => signOut(...a),
+    getSession: (...a: unknown[]) => getSession(...a),
+  },
 }));
 
 vi.mock("@/services/apiClient", () => ({
@@ -20,12 +24,16 @@ describe("useContactPresenter", () => {
   beforeEach(() => {
     push.mockClear();
     signOut.mockReset().mockResolvedValue({});
+    getSession.mockReset().mockResolvedValue({ data: null });
   });
 
   it("provides complete view model data matching mockup requirements", () => {
     const { result } = renderHook(() => useContactPresenter());
 
     expect(result.current.brand).toBe("KINKORD");
+    expect(result.current.isLoggedIn).toBe(false);
+    expect(result.current.loginHref).toBe("/login");
+    expect(result.current.signupHref).toBe("/signup");
     expect(result.current.headline).toBe("CONTACT US");
     expect(result.current.lead).toBe("We're here to help.");
     expect(result.current.subcopy).toContain("Reach out to us for support");

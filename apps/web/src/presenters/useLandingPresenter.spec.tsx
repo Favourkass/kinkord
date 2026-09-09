@@ -26,7 +26,7 @@ describe("useLandingPresenter", () => {
     expect(result.current.downloadCta.label).toBe("Download Kinkord");
     expect(result.current.ageDisclaimer.lead).toBe("18+ Only.");
     expect(result.current.joinAgeDisclaimer).toBe("You must be 18 years or older to join.");
-    expect(result.current.policyLinks).toHaveLength(6);
+    expect(result.current.policyLinks).toHaveLength(10);
     expect(result.current.allRightsReserved).toBe("All rights reserved.");
     expect(typeof result.current.onDownload).toBe("function");
     expect(typeof result.current.downloadCta.onClick).toBe("function");
