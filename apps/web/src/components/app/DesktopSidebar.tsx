@@ -1,74 +1,96 @@
-import Image from "next/image";
 import Link from "next/link";
-import { LogoutIcon, SettingsIcon, UserIcon } from "./icons";
+import AvatarCircle from "./AvatarCircle";
+import MaskIcon, { type MaskIconName } from "./MaskIcon";
+import type { AppNav, AppNavLabels, AppNavLinks } from "./nav";
 
 export interface DesktopSidebarProps {
-  tagline: string;
-  active: "home" | "profile" | "settings" | "edit-profile";
-  profileHref: string;
-  settingsHref: string;
+  brand: string;
+  active: AppNav;
+  avatarUrl: string | null;
+  links: AppNavLinks;
+  labels: AppNavLabels;
   onLogout: () => void;
 }
 
-/** Persistent desktop sidebar: horned wordmark, tagline, nav, log out. */
+/**
+ * Desktop sidebar per the Figma "PC" frames (881:799 dark / 881:849 light): 333px
+ * panel, 48px gold wordmark, Home / Chat / Notifications / Profile, then a divider
+ * with "Settings and Privacy" and "Log Out" pinned to the bottom.
+ */
 export default function DesktopSidebar({
-  tagline,
+  brand,
   active,
-  profileHref,
-  settingsHref,
+  avatarUrl,
+  links,
+  labels,
   onLogout,
 }: DesktopSidebarProps) {
-  const item = (isActive: boolean) =>
-    `flex items-center gap-[34px] pl-[53px] text-[36px] font-medium text-app-text ${
-      isActive ? "" : "opacity-85 hover:opacity-100"
+  const items: Array<{
+    key: "home" | "chat" | "notifications";
+    icon: MaskIconName;
+    iconClass: string;
+  }> = [
+    { key: "home", icon: "home-solid", iconClass: "text-kink-amber" },
+    { key: "chat", icon: "chat", iconClass: "text-side-text" },
+    { key: "notifications", icon: "bell-outline", iconClass: "text-side-text" },
+  ];
+  const row = (isActive: boolean) =>
+    `flex h-[29px] items-center gap-[17px] pl-[38px] text-[22px] font-medium leading-none ${
+      isActive ? "text-kink-gold-bright" : "text-side-text"
     }`;
-  const onEditScreen = active === "edit-profile";
   return (
-    <aside className="flex w-[385px] shrink-0 flex-col bg-app-page pb-10">
-      <div className="pl-[49px] pt-[23px]">
-        <div className="relative h-[83px] w-[315px]">
-          <Image
-            src="/app/wordmark-light.png"
-            alt="Kinkord"
-            fill
-            priority
-            sizes="315px"
-            className="object-contain dark:hidden"
-          />
-          <Image
-            src="/app/wordmark-dark.png"
-            alt="Kinkord"
-            fill
-            priority
-            sizes="315px"
-            className="hidden object-contain dark:block"
-          />
-        </div>
-        <p className="pl-[29px] pt-[2px] text-[12px] font-semibold tracking-[2px] text-app-text">
-          {tagline}
-        </p>
-      </div>
-      <div className="ml-[33px] mt-[24px] w-[348px] border-t border-app-line" />
-      <nav className="mt-[36px] flex flex-col gap-[35px]">
-        <Link href={profileHref} className={item(onEditScreen || active === "profile")}>
-          <UserIcon className="text-app-text" />
-          {onEditScreen ? "Edit Profile" : "Profile"}
-        </Link>
-        <Link href={settingsHref} className={item(active === "settings")}>
-          <SettingsIcon size={67} className="text-app-text" />
-          Settings
+    <aside className="sticky top-0 flex h-dvh w-[333px] shrink-0 flex-col bg-side-bg pb-[49px] pt-[37px]">
+      <p className="pl-[38px] text-[48px] font-extrabold leading-[47px] tracking-[4.8px] text-kink-gold-bright">
+        {brand}
+      </p>
+      <nav className="mt-[46px] flex flex-col gap-[27px]">
+        {items.map((item) => (
+          <Link
+            key={item.key}
+            href={links[item.key]}
+            aria-current={active === item.key ? "page" : undefined}
+            className={row(active === item.key)}
+          >
+            <span className={`grid size-[29px] place-items-center ${item.iconClass}`}>
+              <MaskIcon
+                name={item.icon}
+                width={29}
+                height={item.icon === "bell-outline" ? 29 : 29}
+              />
+            </span>
+            {labels[item.key]}
+          </Link>
+        ))}
+        <Link
+          href={links.profile}
+          aria-current={active === "profile" || active === "edit-profile" ? "page" : undefined}
+          className={row(active === "profile" || active === "edit-profile")}
+        >
+          <span className="grid size-[29px] place-items-center">
+            <AvatarCircle src={avatarUrl} alt="" size={24} ringClassName="bg-kink-gold-bright" />
+          </span>
+          {labels.profile}
         </Link>
       </nav>
-      <button
-        type="button"
-        onClick={onLogout}
-        className="mt-auto flex items-center gap-[34px] pl-[53px] text-[36px] font-medium text-app-logout-text"
-      >
-        <span className="grid size-[67px] place-items-center text-app-logout-icon">
-          <LogoutIcon size={54} />
-        </span>
-        Log Out
-      </button>
+      <div className="mt-auto">
+        <div className="ml-[7px] w-[307px] border-t-[1.5px] border-side-divider" />
+        <Link
+          href={links.settings}
+          aria-current={active === "settings" ? "page" : undefined}
+          className={`mt-[28px] ${row(active === "settings")}`}
+        >
+          <span className="grid size-[29px] place-items-center text-side-text">
+            <MaskIcon name="settings" width={29} />
+          </span>
+          {labels.settings}
+        </Link>
+        <button type="button" onClick={onLogout} className={`mt-[24px] ${row(false)}`}>
+          <span className="grid size-[29px] place-items-center text-side-text">
+            <MaskIcon name="logout" width={29} />
+          </span>
+          {labels.logout}
+        </button>
+      </div>
     </aside>
   );
 }

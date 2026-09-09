@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import type { Request } from "express";
 import { fromNodeHeaders } from "better-auth/node";
+import { PresenceService } from "../presence/presence.service";
 import { AUTH, Auth } from "./auth.instance";
 
 export interface AuthedRequest extends Request {
@@ -16,7 +17,10 @@ export interface AuthedRequest extends Request {
 
 @Injectable()
 export class AuthGuard implements CanActivate {
-  constructor(@Inject(AUTH) private readonly auth: Auth) {}
+  constructor(
+    @Inject(AUTH) private readonly auth: Auth,
+    private readonly presence: PresenceService,
+  ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
     const req = ctx.switchToHttp().getRequest<AuthedRequest>();
@@ -26,6 +30,8 @@ export class AuthGuard implements CanActivate {
     if (!result) throw new UnauthorizedException("Not signed in");
     req.user = result.user;
     req.session = result.session;
+    // Presence heartbeat: throttled and fire-and-forget, so it can never slow or fail a request.
+    this.presence.touch(result.user.id);
     return true;
   }
 }

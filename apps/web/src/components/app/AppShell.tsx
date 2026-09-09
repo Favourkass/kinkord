@@ -2,8 +2,11 @@ import type { ReactNode } from "react";
 import AppMobileHeader from "./AppMobileHeader";
 import AvatarCircle from "./AvatarCircle";
 import DesktopSidebar from "./DesktopSidebar";
-import MobileTabBar, { type AppTab } from "./MobileTabBar";
+import MobileTabBar from "./MobileTabBar";
+import type { AppNav, AppNavLabels, AppNavLinks, AppTab } from "./nav";
 import SidebarDrawer from "./SidebarDrawer";
+
+export type { AppNav, AppNavLabels, AppNavLinks, AppTab } from "./nav";
 
 export interface AppShellProps {
   brand: string;
@@ -13,25 +16,27 @@ export interface AppShellProps {
   handle: string;
   avatarUrl: string | null;
   membersCount: string;
-  activeTab: AppTab;
-  activeNav: "home" | "profile" | "settings";
+  /** Highlighted bottom tab; omit on screens outside the tab bar (e.g. Settings). */
+  activeTab?: AppTab;
+  activeNav: AppNav;
   drawerOpen: boolean;
   onMenu: () => void;
   onCloseDrawer: () => void;
   onLogout: () => void;
-  messagesHref: string;
-  profileHref: string;
-  settingsHref: string;
+  links: AppNavLinks;
+  labels: AppNavLabels;
+  /** Page background; the members directory screens use the Figma `mem-page` tone. */
+  mobileTone?: "surface" | "members";
+  /** Desktop greeting strip (avatar + "Hi …"); the directory screens don't have one in the PC frames. */
+  desktopGreeting?: boolean;
   children: ReactNode;
 }
 
-/** Post-login chrome: mobile header/tab-bar/drawer, desktop sidebar + panel. */
+/** Post-login chrome: compact mobile header / icon tab bar / drawer, desktop sidebar + panel. */
 export default function AppShell({
   brand,
-  tagline,
   greeting,
   name,
-  handle,
   avatarUrl,
   membersCount,
   activeTab,
@@ -40,57 +45,59 @@ export default function AppShell({
   onMenu,
   onCloseDrawer,
   onLogout,
-  messagesHref,
-  profileHref,
-  settingsHref,
+  links,
+  labels,
+  mobileTone = "surface",
+  desktopGreeting = true,
   children,
 }: AppShellProps) {
+  const tone = mobileTone === "members" ? "bg-mem-page" : "bg-app-surface";
   return (
     <div className="min-h-dvh bg-app-page">
       {/* Mobile */}
-      <div className="flex min-h-dvh flex-col bg-app-surface lg:hidden">
-        <AppMobileHeader brand={brand} tagline={tagline} greeting={greeting} onMenu={onMenu} />
-        <main className="flex-1 pb-[130px] pt-[44px]">{children}</main>
-        <MobileTabBar
-          active={activeTab}
-          avatarUrl={avatarUrl}
-          messagesHref={messagesHref}
-          profileHref={profileHref}
-          settingsHref={settingsHref}
-        />
+      <div className={`flex min-h-dvh flex-col lg:hidden ${tone}`}>
+        <AppMobileHeader brand={brand} onMenu={onMenu} />
+        <main className="flex flex-1 flex-col pb-[calc(57px+env(safe-area-inset-bottom))]">
+          {children}
+        </main>
+        <MobileTabBar active={activeTab} avatarUrl={avatarUrl} links={links} labels={labels} />
         <SidebarDrawer
           open={drawerOpen}
           onClose={onCloseDrawer}
           name={name}
-          handle={handle}
           avatarUrl={avatarUrl}
-          membersLabel="Members"
           membersCount={membersCount}
-          logoutLabel="Log Out"
+          links={links}
+          labels={labels}
           onLogout={onLogout}
         />
       </div>
 
-      {/* Desktop */}
+      {/* Desktop (Figma "PC" frames: 333px sidebar, content column from x=363) */}
       <div className="hidden min-h-dvh lg:flex">
         <DesktopSidebar
-          tagline={tagline}
+          brand={brand}
           active={activeNav}
-          profileHref={profileHref}
-          settingsHref={settingsHref}
+          avatarUrl={avatarUrl}
+          links={links}
+          labels={labels}
           onLogout={onLogout}
         />
-        <main className="min-h-dvh flex-1 rounded-[40px] bg-app-surface">
-          <div className="flex items-center gap-[23px] pl-[21px] pt-[17px]">
-            <AvatarCircle
-              src={avatarUrl}
-              alt={name}
-              size={80}
-              ringClassName="bg-kink-gold-bright"
-            />
-            <p className="text-[24px] font-normal text-app-text">{greeting}</p>
+        <main className={`flex min-h-dvh min-w-0 flex-1 flex-col ${tone}`}>
+          {desktopGreeting && (
+            <div className="flex items-center gap-[23px] pl-[21px] pt-[17px]">
+              <AvatarCircle
+                src={avatarUrl}
+                alt={name}
+                size={80}
+                ringClassName="bg-kink-gold-bright"
+              />
+              <p className="text-[24px] font-normal text-app-text">{greeting}</p>
+            </div>
+          )}
+          <div className={`flex flex-1 flex-col ${desktopGreeting ? "pt-[40px]" : "px-[30px]"}`}>
+            {children}
           </div>
-          <div className="pt-[56px]">{children}</div>
         </main>
       </div>
     </div>

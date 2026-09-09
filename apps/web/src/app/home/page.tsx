@@ -2,11 +2,12 @@
 
 import AppShell from "@/components/app/AppShell";
 import ComingSoonPanel from "@/components/app/ComingSoonPanel";
-import { Routes } from "@/constants/Routes";
+import { getAppShellNav } from "@/presenters/getAppShellNav";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
 
 export default function HomePage() {
   const vm = useHomePresenter();
+  const nav = getAppShellNav();
 
   return (
     <AppShell
@@ -17,15 +18,14 @@ export default function HomePage() {
       handle={vm.handle}
       avatarUrl={vm.avatarUrl}
       membersCount={vm.membersCount}
-      activeTab="profile"
+      activeTab="home"
       activeNav="home"
       drawerOpen={vm.drawerOpen}
       onMenu={vm.openDrawer}
       onCloseDrawer={vm.closeDrawer}
       onLogout={vm.logout}
-      messagesHref={Routes.messages}
-      profileHref={Routes.profile}
-      settingsHref={Routes.settings}
+      links={nav.links}
+      labels={nav.labels}
     >
       {vm.error ? (
         <p className="text-center text-[15px] font-semibold text-app-subtle">{vm.error}</p>

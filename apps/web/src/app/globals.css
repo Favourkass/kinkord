@@ -24,6 +24,12 @@
   --app-logout-icon: #b8850f;
   --app-people-icon: #b8850f;
   --app-glow: rgba(255, 148, 13, 0.25);
+  /* Members directory + profile (CEO briefs 2026-09-08) */
+  --app-card: #ffffff;
+  --app-card-border: #e9e9e9;
+  --app-muted: #8a8a8a;
+  --app-online: #22c55e;
+  --app-offline: #9a9a9a;
 }
 
 html[data-theme="dark"] {
@@ -45,6 +51,11 @@ html[data-theme="dark"] {
   --app-logout-icon: #d08464;
   --app-people-icon: #ffba1f;
   --app-glow: rgba(255, 148, 13, 0.5);
+  --app-card: #141311;
+  --app-card-border: #2a2823;
+  --app-muted: #8c8778;
+  --app-online: #22c55e;
+  --app-offline: #4b4b4b;
 }
 
 :root {
@@ -111,6 +122,11 @@ html[data-theme="dark"] {
   --color-app-logout-text: var(--app-logout-text);
   --color-app-logout-icon: var(--app-logout-icon);
   --color-app-people-icon: var(--app-people-icon);
+  --color-app-card: var(--app-card);
+  --color-app-card-border: var(--app-card-border);
+  --color-app-muted: var(--app-muted);
+  --color-app-online: var(--app-online);
+  --color-app-offline: var(--app-offline);
 }
 
 * {
@@ -163,4 +179,181 @@ body {
 ::-webkit-scrollbar-thumb {
   background: var(--gold-dark);
   border-radius: 2px;
+}
+
+/* ---- Members directory + public profile (Figma "Members 1" canvas, 2026-09-08) ----
+   Exact hexes lifted from the light/dark frames; `mem-*` = directory screens + drawer,
+   `pf-*` = public profile screens (which use a cooler gray palette in the design). */
+:root {
+  --mem-page: #fdfbf7;
+  --mem-header: #ffffff;
+  --mem-hairline: #eae6dc;
+  --mem-card: #f5f1e8;
+  --mem-card-border: #eae6dc;
+  --mem-row: #fff6e4;
+  --mem-row-border: #ead69c;
+  --mem-title: #1f1f1d;
+  --mem-text: #1f1f1d;
+  --mem-muted: #97917f;
+  --mem-placeholder: #b0a891;
+  --mem-pill-bg: #ffefc2;
+  --mem-pill-border: #b8850f;
+  --mem-pill-text: #b8850f;
+  --mem-pill-text-2: #b0a891;
+  --mem-radio: #c9a94d;
+  --mem-dropdown: #fdfbf7;
+  --mem-dropdown-border: #e6e1d7;
+  --mem-list-card: #fdfbf7;
+  --mem-list-border: #e6e1d7;
+  --mem-list-text: #1c1b18;
+  --mem-list-muted: #6b6962;
+  --mem-dot: #1c1b18;
+  --mem-icon: #1f1f1d;
+  --mem-search-icon: #b0a891;
+  --mem-chevron: #c9a94d;
+  --mem-tab-icon: #1f1f1d;
+  --mem-subtitle: #97917f;
+  --drawer-identity-border: #e6e1d7;
+  --drawer-settings: #fff6e4;
+  --drawer-text: #1f1f1d;
+  --side-bg: #f6f6f6;
+  --side-text: #000000;
+  --side-divider: #e6e1d7;
+  --pf-card: #ffffff;
+  --pf-card-border: #e5e7eb;
+  --pf-chip-2: #ffffff;
+  --pf-heading: #111827;
+  --pf-page: #f9fafb;
+  --pf-nav: #ffffff;
+  --pf-border: #e5e7eb;
+  --pf-surface: #ffffff;
+  --pf-surface-2: #f3f4f6;
+  --pf-text: #111827;
+  --pf-muted: #6b7280;
+  --pf-muted-2: #6b7280;
+  --pf-body: #374151;
+  --pf-chip: #ffffff;
+  --pf-chip-text: #111827;
+  --pf-icon: #111827;
+  --pf-post-border: #e5e7eb;
+  --pf-post-text: #374151;
+  --pf-post-muted: #6b7280;
+  --pf-pill: #e5e7eb;
+  --pf-pill-text: #6b7280;
+}
+
+html[data-theme="dark"] {
+  --mem-page: #000000;
+  --mem-header: #000000;
+  --mem-hairline: #464242;
+  --mem-card: #1c1b18;
+  --mem-card-border: transparent;
+  --mem-row: #1c1b18;
+  --mem-row-border: transparent;
+  --mem-title: #ffffff;
+  --mem-text: #f2efe8;
+  --mem-muted: #97917f;
+  --mem-placeholder: #f2efe8;
+  --mem-pill-bg: #000000;
+  --mem-pill-border: #ffba1f;
+  --mem-pill-text: #ffba1f;
+  --mem-pill-text-2: #ffffff;
+  --mem-radio: #ffba1f;
+  --mem-dropdown: #1c1b18;
+  --mem-dropdown-border: transparent;
+  --mem-list-card: #141310;
+  --mem-list-border: #35332e;
+  --mem-list-text: #f2efe8;
+  --mem-list-muted: #97917f;
+  --mem-dot: #d9d9d9;
+  --mem-icon: #f5f5f4;
+  --mem-search-icon: #ffffff;
+  --mem-chevron: #ffffff;
+  --mem-tab-icon: #f5f5f4;
+  --mem-subtitle: #f2efe8;
+  --drawer-identity-border: #35332e;
+  --drawer-settings: #1f1f24;
+  --drawer-text: #f2efe8;
+  --side-bg: #1c1b18;
+  --side-text: #ffffff;
+  --side-divider: #35332e;
+  --pf-card: #0c0e12;
+  --pf-card-border: #1e2630;
+  --pf-chip-2: #12161c;
+  --pf-heading: #f3f4f6;
+  --pf-page: #0b0f14;
+  --pf-nav: #0b0f14;
+  --pf-border: #1f2937;
+  --pf-surface: #111827;
+  --pf-surface-2: #111827;
+  --pf-text: #f9fafb;
+  --pf-muted: #9ca3af;
+  --pf-muted-2: #8e8e93;
+  --pf-body: #9ca3af;
+  --pf-chip: #111827;
+  --pf-chip-text: #ffba1f;
+  --pf-icon: #f9fafb;
+  --pf-post-border: #222222;
+  --pf-post-text: #dddddd;
+  --pf-post-muted: #8a8a8a;
+  --pf-pill: #2a2a2a;
+  --pf-pill-text: #aaaaaa;
+}
+
+@theme inline {
+  --color-mem-page: var(--mem-page);
+  --color-mem-header: var(--mem-header);
+  --color-mem-hairline: var(--mem-hairline);
+  --color-mem-card: var(--mem-card);
+  --color-mem-card-border: var(--mem-card-border);
+  --color-mem-row: var(--mem-row);
+  --color-mem-row-border: var(--mem-row-border);
+  --color-mem-title: var(--mem-title);
+  --color-mem-text: var(--mem-text);
+  --color-mem-muted: var(--mem-muted);
+  --color-mem-placeholder: var(--mem-placeholder);
+  --color-mem-pill-bg: var(--mem-pill-bg);
+  --color-mem-pill-border: var(--mem-pill-border);
+  --color-mem-pill-text: var(--mem-pill-text);
+  --color-mem-pill-text-2: var(--mem-pill-text-2);
+  --color-mem-radio: var(--mem-radio);
+  --color-mem-dropdown: var(--mem-dropdown);
+  --color-mem-dropdown-border: var(--mem-dropdown-border);
+  --color-mem-list-card: var(--mem-list-card);
+  --color-mem-list-border: var(--mem-list-border);
+  --color-mem-list-text: var(--mem-list-text);
+  --color-mem-list-muted: var(--mem-list-muted);
+  --color-mem-dot: var(--mem-dot);
+  --color-mem-icon: var(--mem-icon);
+  --color-mem-search-icon: var(--mem-search-icon);
+  --color-mem-chevron: var(--mem-chevron);
+  --color-mem-tab-icon: var(--mem-tab-icon);
+  --color-mem-subtitle: var(--mem-subtitle);
+  --color-drawer-identity-border: var(--drawer-identity-border);
+  --color-drawer-settings: var(--drawer-settings);
+  --color-drawer-text: var(--drawer-text);
+  --color-side-bg: var(--side-bg);
+  --color-side-text: var(--side-text);
+  --color-side-divider: var(--side-divider);
+  --color-pf-card: var(--pf-card);
+  --color-pf-card-border: var(--pf-card-border);
+  --color-pf-chip-2: var(--pf-chip-2);
+  --color-pf-heading: var(--pf-heading);
+  --color-pf-page: var(--pf-page);
+  --color-pf-nav: var(--pf-nav);
+  --color-pf-border: var(--pf-border);
+  --color-pf-surface: var(--pf-surface);
+  --color-pf-surface-2: var(--pf-surface-2);
+  --color-pf-text: var(--pf-text);
+  --color-pf-muted: var(--pf-muted);
+  --color-pf-muted-2: var(--pf-muted-2);
+  --color-pf-body: var(--pf-body);
+  --color-pf-chip: var(--pf-chip);
+  --color-pf-chip-text: var(--pf-chip-text);
+  --color-pf-icon: var(--pf-icon);
+  --color-pf-post-border: var(--pf-post-border);
+  --color-pf-post-text: var(--pf-post-text);
+  --color-pf-post-muted: var(--pf-post-muted);
+  --color-pf-pill: var(--pf-pill);
+  --color-pf-pill-text: var(--pf-pill-text);
 }

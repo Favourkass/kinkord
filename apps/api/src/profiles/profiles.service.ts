@@ -36,6 +36,9 @@ export const updateProfileSchema = z.object({
   relationshipStatus: z.string().trim().min(1).max(60).nullable().optional(),
   lookingFor: z.array(z.string().trim().min(1).max(40)).max(10).optional(),
   interests: z.array(z.string().trim().min(1).max(40)).max(15).optional(),
+  orientation: z.string().trim().min(1).max(40).nullable().optional(),
+  bodyType: z.string().trim().min(1).max(40).nullable().optional(),
+  languages: z.array(z.string().trim().min(1).max(30)).max(10).optional(),
   location: z.string().trim().min(1).max(120).nullable().optional(),
   phone: z
     .string()
@@ -59,6 +62,9 @@ const IMAGE_TYPES: Record<string, string> = {
   "image/png": "png",
   "image/webp": "webp",
 };
+
+const maxBytes = (spec: { maxMb: number }) => spec.maxMb * 1024 * 1024;
+const tooLarge = (spec: { maxMb: number }) => `Image is too large — max ${spec.maxMb}MB.`;
 
 @Injectable()
 export class ProfilesService {
@@ -90,6 +96,7 @@ export class ProfilesService {
         throw new BadRequestException(`${field} does not belong to this user`);
       }
     }
+    await this.verifyUploads(input);
     const [row] = await this.db
       .update(profile)
       .set(input)
@@ -98,7 +105,16 @@ export class ProfilesService {
     return this.toVM(row);
   }
 
-  async presignImageUpload(userId: string, kind: UploadKind, contentType: string) {
+  /**
+   * Presigned upload slot. A declared `contentLength` is checked against the cap
+   * and signed into the URL, so S3 itself rejects a larger body.
+   */
+  async presignImageUpload(
+    userId: string,
+    kind: UploadKind,
+    contentType: string,
+    contentLength?: number,
+  ) {
     const spec = UPLOAD_KINDS[kind];
     if (!spec) throw new BadRequestException("kind must be avatar or cover");
     const ext = IMAGE_TYPES[contentType];
@@ -107,9 +123,40 @@ export class ProfilesService {
         `contentType must be one of: ${Object.keys(IMAGE_TYPES).join(", ")}`,
       );
     }
+    if (contentLength !== undefined && (contentLength <= 0 || contentLength > maxBytes(spec))) {
+      throw new BadRequestException(tooLarge(spec));
+    }
     const key = `${spec.prefix}/${userId}/${randomUUID()}.${ext}`;
-    const uploadUrl = await this.storage.presignUpload(key, contentType);
+    const uploadUrl = await this.storage.presignUpload(key, contentType, contentLength);
     return { key, uploadUrl, expiresInSeconds: 600, maxSizeMb: spec.maxMb };
+  }
+
+  /**
+   * Server-side half of the upload limits: a key only becomes the avatar/cover
+   * once S3 confirms the object exists, is an allowed image type and is within
+   * the size cap. Anything else is deleted and the update rejected.
+   */
+  private async verifyUploads(input: UpdateProfileInput) {
+    for (const [field, kind] of [
+      ["avatarKey", "avatar"],
+      ["coverKey", "cover"],
+    ] as const) {
+      const key = input[field];
+      if (!key) continue;
+      const spec = UPLOAD_KINDS[kind];
+      const info = await this.storage.describe(key);
+      if (!info) throw new BadRequestException(`${field}: upload not found`);
+      if (info.size > maxBytes(spec)) {
+        await this.storage.remove(key);
+        throw new BadRequestException(tooLarge(spec));
+      }
+      if (!info.contentType || !IMAGE_TYPES[info.contentType]) {
+        await this.storage.remove(key);
+        throw new BadRequestException(
+          `contentType must be one of: ${Object.keys(IMAGE_TYPES).join(", ")}`,
+        );
+      }
+    }
   }
 
   private async toVM(row: typeof profile.$inferSelect) {
@@ -126,6 +173,9 @@ export class ProfilesService {
       relationshipStatus: row.relationshipStatus,
       lookingFor: row.lookingFor ?? [],
       interests: row.interests ?? [],
+      orientation: row.orientation,
+      bodyType: row.bodyType,
+      languages: row.languages ?? [],
       location: row.location,
       phone: row.phone,
       phoneVerified: row.phoneVerified,

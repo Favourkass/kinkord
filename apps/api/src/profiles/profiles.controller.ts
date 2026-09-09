@@ -15,6 +15,8 @@ import { ProfilesService, updateProfileSchema } from "./profiles.service";
 const uploadUrlSchema = z.object({
   kind: z.enum(["avatar", "cover"]),
   contentType: z.string(),
+  /** Byte size of the file about to be uploaded; signed into the URL when given. */
+  contentLength: z.number().int().positive().optional(),
 });
 
 @Controller("profile")
@@ -42,6 +44,11 @@ export class ProfilesController {
     if (!parsed.success) {
       throw new BadRequestException("kind (avatar|cover) and contentType are required");
     }
-    return this.profiles.presignImageUpload(req.user.id, parsed.data.kind, parsed.data.contentType);
+    return this.profiles.presignImageUpload(
+      req.user.id,
+      parsed.data.kind,
+      parsed.data.contentType,
+      parsed.data.contentLength,
+    );
   }
 }

@@ -495,7 +495,14 @@ export default function ContactPage({
                 className="p-1 text-neutral-400 hover:text-white transition-colors"
                 aria-label="Close menu"
               >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <path d="M18 6 6 18M6 6l12 12" />
                 </svg>
               </button>
@@ -534,7 +541,9 @@ export default function ContactPage({
       <main className="flex-1 overflow-y-auto px-4 pt-4 pb-28 lg:px-14 lg:py-12">
         <div className="mx-auto w-full max-w-[880px]">
           {/* Top Header */}
-          <header className={`flex items-center justify-between py-2 mb-6 ${isLoggedIn ? "lg:hidden" : ""}`}>
+          <header
+            className={`flex items-center justify-between py-2 mb-6 ${isLoggedIn ? "lg:hidden" : ""}`}
+          >
             <div className="flex items-center gap-4">
               <button
                 type="button"
@@ -544,7 +553,10 @@ export default function ContactPage({
               >
                 <HamburgerMenuIcon />
               </button>
-              <Link href={bottomNav.homeHref} className="text-2xl font-black tracking-wider text-[#ffba1f]">
+              <Link
+                href={bottomNav.homeHref}
+                className="text-2xl font-black tracking-wider text-[#ffba1f]"
+              >
                 {brand}
               </Link>
             </div>
@@ -573,7 +585,9 @@ export default function ContactPage({
             </h1>
             <div className="mt-6 lg:mt-8">
               <h2 className="text-xl lg:text-[22px] font-bold text-[#ffba1f]">{lead}</h2>
-              <p className="mt-1 text-sm lg:text-[15px] leading-relaxed text-neutral-400">{subcopy}</p>
+              <p className="mt-1 text-sm lg:text-[15px] leading-relaxed text-neutral-400">
+                {subcopy}
+              </p>
             </div>
           </section>
 
@@ -600,7 +614,9 @@ export default function ContactPage({
                       <p className="text-[15px] font-bold text-white group-hover:text-[#ffba1f] transition-colors">
                         {channel.title}
                       </p>
-                      <p className="text-[13px] font-medium text-[#ffba1f] mt-0.5">{channel.value}</p>
+                      <p className="text-[13px] font-medium text-[#ffba1f] mt-0.5">
+                        {channel.value}
+                      </p>
                     </div>
                   </div>
 
@@ -617,7 +633,9 @@ export default function ContactPage({
                 <MapPinIcon />
               </div>
               <div>
-                <p className="text-[13px] font-bold tracking-wider text-white uppercase">{office.title}</p>
+                <p className="text-[13px] font-bold tracking-wider text-white uppercase">
+                  {office.title}
+                </p>
                 <p className="mt-0.5 text-[14px] font-semibold text-white">{office.company}</p>
                 <div className="mt-0.5 text-[13px] text-neutral-400">
                   {office.addressLines.join(", ")}
@@ -636,7 +654,9 @@ export default function ContactPage({
                 <p className="text-[13px] font-bold tracking-wider text-white uppercase">
                   {safetyNotice.title}
                 </p>
-                <p className="mt-1 text-[13px] leading-relaxed text-neutral-400">{safetyNotice.body}</p>
+                <p className="mt-1 text-[13px] leading-relaxed text-neutral-400">
+                  {safetyNotice.body}
+                </p>
               </div>
             </div>
           </section>
@@ -663,7 +683,9 @@ export default function ContactPage({
             <h3 className="text-xl lg:text-[20px] font-bold tracking-wide text-[#ffba1f] uppercase">
               {chooseTopicHeading}
             </h3>
-            <p className="mt-1 mb-4 text-xs lg:text-[14px] text-neutral-400">{chooseTopicSubcopy}</p>
+            <p className="mt-1 mb-4 text-xs lg:text-[14px] text-neutral-400">
+              {chooseTopicSubcopy}
+            </p>
 
             <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
               {topics.map((topic) => (
@@ -702,7 +724,8 @@ export default function ContactPage({
                 <div>
                   <p className="text-xs font-bold text-[#ffba1f]">Connecting to Support</p>
                   <p className="text-xs text-neutral-300 mt-1">
-                    Drafting support inquiry for: <span className="font-semibold text-white">{selectedTopic.title}</span>
+                    Drafting support inquiry for:{" "}
+                    <span className="font-semibold text-white">{selectedTopic.title}</span>
                   </p>
                 </div>
                 <button

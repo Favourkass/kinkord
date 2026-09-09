@@ -6,6 +6,7 @@ import QRCode from "qrcode";
 import { authClient } from "@/services/authClient";
 import { api, ApiError, uploadToPresignedUrl } from "@/services/apiClient";
 import { Routes } from "@/constants/Routes";
+import { IMAGE_UPLOAD_PRESETS, compressImage } from "@/util/image";
 
 export interface MeVM {
   id: string;
@@ -110,13 +111,16 @@ export function useProfilePresenter() {
     }
   }, [edit]);
 
-  const uploadImage = useCallback(async (kind: "avatar" | "cover", file: File) => {
+  const uploadImage = useCallback(async (kind: "avatar" | "cover", rawFile: File) => {
     setUploading(kind);
     setError(null);
     try {
+      // Shrink to what the UI can show (512px avatars, 1600px covers) before it leaves the phone.
+      const file = await compressImage(rawFile, IMAGE_UPLOAD_PRESETS[kind]);
+      // Declaring the byte size lets the API sign it, so S3 refuses a different body.
       const spec = await api.post<{ key: string; uploadUrl: string; maxSizeMb: number }>(
         "/profile/upload-url",
-        { kind, contentType: file.type },
+        { kind, contentType: file.type, contentLength: file.size },
       );
       if (file.size > spec.maxSizeMb * 1024 * 1024)
         throw new Error(`Image is too large — max ${spec.maxSizeMb}MB.`);

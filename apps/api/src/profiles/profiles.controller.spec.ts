@@ -41,7 +41,17 @@ describe("ProfilesController", () => {
     await new ProfilesController(service).presignUpload(req, {
       kind: "cover",
       contentType: "image/png",
+      contentLength: 123_456,
     });
-    expect(service.presignImageUpload).toHaveBeenCalledWith("u1", "cover", "image/png");
+    expect(service.presignImageUpload).toHaveBeenCalledWith("u1", "cover", "image/png", 123_456);
+  });
+
+  it("rejects a non-positive or fractional contentLength", () => {
+    const controller = new ProfilesController(serviceMock());
+    for (const contentLength of [0, -5, 12.5]) {
+      expect(() =>
+        controller.presignUpload(req, { kind: "avatar", contentType: "image/png", contentLength }),
+      ).toThrow(BadRequestException);
+    }
   });
 });

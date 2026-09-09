@@ -1,29 +1,32 @@
-import Image from "next/image";
+import Link from "next/link";
 import AvatarCircle from "./AvatarCircle";
-import { ChevronRightIcon, LogoutIcon, PeopleIcon } from "./icons";
+import MaskIcon from "./MaskIcon";
+import type { AppNavLabels, AppNavLinks } from "./nav";
 
 export interface SidebarDrawerProps {
   open: boolean;
   onClose: () => void;
   name: string;
-  handle: string;
   avatarUrl: string | null;
-  membersLabel: string;
   membersCount: string;
-  logoutLabel: string;
+  links: Pick<AppNavLinks, "members" | "settings">;
+  labels: Pick<AppNavLabels, "members" | "settings" | "logout">;
   onLogout: () => void;
 }
 
-/** Mobile slide-over: gold banner, avatar, identity, members count, log out. */
+/**
+ * Mobile slide-over (Figma 873:269 dark / 873:233 light): 348px panel with an
+ * identity card, the Members row (live count) and, pinned to the bottom,
+ * "Settings and Privacy" + "Log Out".
+ */
 export default function SidebarDrawer({
   open,
   onClose,
   name,
-  handle,
   avatarUrl,
-  membersLabel,
   membersCount,
-  logoutLabel,
+  links,
+  labels,
   onLogout,
 }: SidebarDrawerProps) {
   if (!open) return null;
@@ -35,46 +38,54 @@ export default function SidebarDrawer({
         onClick={onClose}
         className="absolute inset-0 bg-black/40"
       />
-      <div className="absolute inset-y-0 left-0 w-[348px] max-w-[88vw] overflow-y-auto border-r border-app-drawer-border bg-app-drawer">
-        <div className="relative mx-[18px] mt-[29px]">
-          <div className="relative h-[84px] overflow-hidden rounded-[16px]">
-            <Image
-              src="/app/gold-metallic.png"
-              alt=""
-              fill
-              sizes="311px"
-              className="object-cover"
-            />
-          </div>
-          <div className="absolute left-1/2 top-[20px] -translate-x-1/2">
-            <AvatarCircle
-              src={avatarUrl}
-              alt={name}
-              size={117}
-              ringClassName="bg-kink-gold-bright"
-            />
-          </div>
+      <div className="absolute inset-y-0 left-0 flex w-[348px] max-w-[88vw] flex-col border-r border-app-drawer-border bg-app-drawer">
+        <div className="mx-[18px] mt-[29px] flex h-[51px] items-center gap-[13px] rounded-[15px] border border-drawer-identity-border px-[12px]">
+          <AvatarCircle src={avatarUrl} alt="" size={33} ringClassName="bg-kink-gold-bright" />
+          <p className="truncate text-[15px] font-bold text-drawer-text">{name}</p>
         </div>
-        <p className="mt-[66px] text-center text-[32px] font-bold text-app-name">{name}</p>
-        <p className="text-center text-[13px] font-light tracking-[2px] text-app-handle">
-          {handle}
-        </p>
-        <div className="mx-[18px] mt-[24px] flex h-[52px] items-center rounded-[16px] bg-app-members pl-[18px] pr-[15px]">
-          <PeopleIcon className="text-app-people-icon" />
-          <span className="pl-[24px] text-[18px] font-medium text-app-name">{membersLabel}</span>
-          <span className="ml-auto text-[14px] font-medium text-app-members-count">
+        <Link
+          href={links.members}
+          onClick={onClose}
+          className="ml-[18px] mt-[21px] flex h-[36px] w-[245px] items-center rounded-[12px] bg-app-members pl-[13px] pr-[9px]"
+        >
+          <MaskIcon name="people" width={16} className="text-app-members-count" />
+          <span className="pl-[10px] text-[12px] font-medium text-drawer-text">
+            {labels.members}
+          </span>
+          <span className="ml-auto text-[10px] font-medium text-app-members-count">
             {membersCount}
           </span>
-          <ChevronRightIcon className="ml-[15px] text-[#b8850f]" />
+          <MaskIcon
+            name="chevron-right-14"
+            width={14}
+            className="ml-[14px] text-app-members-count"
+          />
+        </Link>
+        <div className="mt-auto pb-[37px]">
+          <Link
+            href={links.settings}
+            onClick={onClose}
+            className="ml-[31px] flex h-[36px] w-[245px] items-center rounded-[12px] bg-drawer-settings pl-[16px] pr-[13px]"
+          >
+            <MaskIcon name="settings" width={16} className="text-app-members-count" />
+            <span className="pl-[10px] text-[12px] font-medium text-drawer-text">
+              {labels.settings}
+            </span>
+            <MaskIcon
+              name="chevron-right-14"
+              width={14}
+              className="ml-auto text-app-members-count"
+            />
+          </Link>
+          <button
+            type="button"
+            onClick={onLogout}
+            className="ml-[48px] mt-[11px] flex items-center gap-[10px] text-[12px] font-medium text-drawer-text"
+          >
+            <MaskIcon name="logout" width={16} className="text-[#b8850f]" />
+            {labels.logout}
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={onLogout}
-          className="mt-[19px] flex items-center pl-[33px] text-[18px] font-medium text-app-logout-text"
-        >
-          <LogoutIcon className="text-app-logout-icon" />
-          <span className="pl-[27px]">{logoutLabel}</span>
-        </button>
       </div>
     </div>
   );
