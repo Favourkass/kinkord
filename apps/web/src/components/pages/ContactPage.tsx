@@ -379,6 +379,9 @@ export default function ContactPage({
   selectTopic,
   handleTopicClick,
   onLogout,
+  isLoggedIn,
+  loginHref,
+  signupHref,
 }: ContactVM) {
   const renderChannelIcon = (icon: string) => {
     switch (icon) {
@@ -417,61 +420,63 @@ export default function ContactPage({
 
   return (
     <div className="flex min-h-screen bg-black text-white selection:bg-[#ffba1f] selection:text-black">
-      {/* Desktop Left Sidebar (Visible on lg+) */}
-      <aside className="hidden w-[280px] shrink-0 sticky top-0 h-screen flex-col bg-[#1e1e1e] pt-[44px] pb-[44px] px-[36px] z-20 lg:flex">
-        {/* Brand */}
-        <Link
-          href={sidebarNav.homeHref}
-          className="text-[34px] font-black tracking-[2px] text-[#ffba1f] transition-opacity hover:opacity-90 mb-[44px]"
-        >
-          {brand}
-        </Link>
-
-        {/* Navigation Items */}
-        <nav className="flex flex-col gap-[28px]">
+      {/* Desktop Left Sidebar (Only visible when user is logged in) */}
+      {isLoggedIn && (
+        <aside className="hidden w-[280px] shrink-0 sticky top-0 h-screen flex-col bg-[#1e1e1e] pt-[44px] pb-[44px] px-[36px] z-20 lg:flex">
+          {/* Brand */}
           <Link
             href={sidebarNav.homeHref}
-            className="flex items-center gap-[18px] text-[20px] font-medium text-white transition-opacity hover:opacity-80"
+            className="text-[34px] font-black tracking-[2px] text-[#ffba1f] transition-opacity hover:opacity-90 mb-[44px]"
           >
-            <HomeNavIcon />
-            <span>Home</span>
+            {brand}
           </Link>
 
-          <Link
-            href={sidebarNav.messagesHref}
-            className="flex items-center gap-[18px] text-[20px] font-medium text-white transition-opacity hover:opacity-80"
-          >
-            <ChatNavIcon />
-            <span>Chat</span>
-          </Link>
+          {/* Navigation Items */}
+          <nav className="flex flex-col gap-[28px]">
+            <Link
+              href={sidebarNav.homeHref}
+              className="flex items-center gap-[18px] text-[20px] font-medium text-white transition-opacity hover:opacity-80"
+            >
+              <HomeNavIcon />
+              <span>Home</span>
+            </Link>
 
-          <Link
-            href={sidebarNav.settingsHref}
-            className="flex items-center gap-[18px] text-[20px] font-medium text-white transition-opacity hover:opacity-80"
-          >
-            <SettingsNavIcon />
-            <span>Settings</span>
-          </Link>
+            <Link
+              href={sidebarNav.messagesHref}
+              className="flex items-center gap-[18px] text-[20px] font-medium text-white transition-opacity hover:opacity-80"
+            >
+              <ChatNavIcon />
+              <span>Chat</span>
+            </Link>
 
-          <Link
-            href={sidebarNav.profileHref}
-            className="flex items-center gap-[18px] text-[20px] font-medium text-white transition-opacity hover:opacity-80"
-          >
-            <ProfileAvatarIcon avatarUrl={sidebarNav.avatarUrl} />
-            <span>Profile</span>
-          </Link>
-        </nav>
+            <Link
+              href={sidebarNav.settingsHref}
+              className="flex items-center gap-[18px] text-[20px] font-medium text-white transition-opacity hover:opacity-80"
+            >
+              <SettingsNavIcon />
+              <span>Settings</span>
+            </Link>
 
-        {/* Log Out Button */}
-        <button
-          type="button"
-          onClick={onLogout}
-          className="mt-auto flex items-center gap-[18px] text-[20px] font-medium text-white transition-opacity hover:opacity-80 cursor-pointer text-left"
-        >
-          <LogoutNavIcon />
-          <span>Log Out</span>
-        </button>
-      </aside>
+            <Link
+              href={sidebarNav.profileHref}
+              className="flex items-center gap-[18px] text-[20px] font-medium text-white transition-opacity hover:opacity-80"
+            >
+              <ProfileAvatarIcon avatarUrl={sidebarNav.avatarUrl} />
+              <span>Profile</span>
+            </Link>
+          </nav>
+
+          {/* Log Out Button */}
+          <button
+            type="button"
+            onClick={onLogout}
+            className="mt-auto flex items-center gap-[18px] text-[20px] font-medium text-white transition-opacity hover:opacity-80 cursor-pointer text-left"
+          >
+            <LogoutNavIcon />
+            <span>Log Out</span>
+          </button>
+        </aside>
+      )}
 
       {/* Mobile Slide-Out Drawer Overlay */}
       {drawerOpen && (
@@ -514,17 +519,19 @@ export default function ContactPage({
                   {item.label}
                 </Link>
               ))}
-              <button
-                type="button"
-                onClick={() => {
-                  closeDrawer();
-                  onLogout();
-                }}
-                className="mt-4 flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-neutral-400 transition-colors hover:bg-neutral-800/60 hover:text-white text-left"
-              >
-                <LogoutNavIcon />
-                <span>Log Out</span>
-              </button>
+              {isLoggedIn && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeDrawer();
+                    onLogout();
+                  }}
+                  className="mt-4 flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-neutral-400 transition-colors hover:bg-neutral-800/60 hover:text-white text-left"
+                >
+                  <LogoutNavIcon />
+                  <span>Log Out</span>
+                </button>
+              )}
             </nav>
           </aside>
         </div>
@@ -533,17 +540,42 @@ export default function ContactPage({
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto px-4 pt-4 pb-10 lg:px-14 lg:py-12">
         <div className="mx-auto w-full max-w-[880px]">
-          {/* Mobile Top Header (hidden on lg+) */}
-          <header className="flex items-center gap-4 py-2 lg:hidden">
-            <button
-              type="button"
-              onClick={openDrawer}
-              className="flex items-center justify-center p-1 transition-transform active:scale-95"
-              aria-label="Open menu"
-            >
-              <HamburgerMenuIcon />
-            </button>
-            <span className="text-2xl font-black tracking-wider text-[#ffba1f]">{brand}</span>
+          {/* Top Header */}
+          <header
+            className={`flex items-center justify-between py-2 mb-6 ${isLoggedIn ? "lg:hidden" : ""}`}
+          >
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={openDrawer}
+                className="flex items-center justify-center p-1 transition-transform active:scale-95"
+                aria-label="Open menu"
+              >
+                <HamburgerMenuIcon />
+              </button>
+              <Link
+                href={sidebarNav.homeHref}
+                className="text-2xl font-black tracking-wider text-[#ffba1f]"
+              >
+                {brand}
+              </Link>
+            </div>
+            {!isLoggedIn && (
+              <div className="flex items-center gap-3">
+                <Link
+                  href={loginHref}
+                  className="px-4 py-1.5 rounded-full text-xs font-bold text-white border border-[#faab14]/40 hover:border-[#faab14] transition"
+                >
+                  Log In
+                </Link>
+                <Link
+                  href={signupHref}
+                  className="px-4 py-1.5 rounded-full text-xs font-bold text-black bg-[#ffba1f] hover:bg-[#faab14] transition"
+                >
+                  Sign Up
+                </Link>
+              </div>
+            )}
           </header>
 
           {/* Page Title & Intro */}

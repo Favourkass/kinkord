@@ -2,6 +2,7 @@ export const Routes = {
   home: "/",
   kinkopedia: "/kinkopedia",
   about: "/about",
+  team: "/about/team",
   contact: "/contact",
   invest: "/invest",
   lectures: "/lectures",

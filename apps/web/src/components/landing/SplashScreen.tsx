@@ -1,6 +1,16 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Cookie, Copyright, FileText, Lock, Shield, ShieldAlert, Users } from "lucide-react";
+import {
+  Cookie,
+  Copyright,
+  FileText,
+  Info,
+  Landmark,
+  Lock,
+  Shield,
+  ShieldAlert,
+  Users,
+} from "lucide-react";
 import AgeGateModal from "@/components/ui/AgeGateModal";
 
 export interface SplashLink {
@@ -22,7 +32,17 @@ interface SplashImage {
 export interface PolicyItem {
   label: string;
   href: string;
-  icon: "privacy" | "terms" | "guidelines" | "cookie" | "safety" | "copyright";
+  icon:
+    | "privacy"
+    | "terms"
+    | "guidelines"
+    | "cookie"
+    | "safety"
+    | "copyright"
+    | "about"
+    | "contact"
+    | "invest"
+    | "whatsapp";
 }
 
 export interface AdultBadgeData {
@@ -112,8 +132,11 @@ function ChevronIcon() {
 
 function PolicyChevron() {
   return (
-    <span aria-hidden className="grid size-5 place-items-center text-[#faab14]">
-      <svg width="8" height="14" viewBox="0 0 8 14" fill="none" overflow="visible">
+    <span
+      aria-hidden
+      className="grid size-4 sm:size-5 shrink-0 place-items-center text-[#faab14] ml-1"
+    >
+      <svg width="7" height="12" viewBox="0 0 8 14" fill="none" overflow="visible">
         <path
           d="M1 1L7 7L1 13"
           stroke="currentColor"
@@ -126,7 +149,7 @@ function PolicyChevron() {
   );
 }
 
-function StarDivider() {
+export function StarDivider() {
   return (
     <div className="relative my-5 sm:my-6 flex w-full items-center justify-center">
       <div className="h-px w-full bg-gradient-to-r from-transparent via-[#faab14]/60 to-transparent" />
@@ -164,45 +187,124 @@ function AdultAgeBadge({ badge, className = "" }: { badge: AdultBadgeData; class
   );
 }
 
+function ContactIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <line x1="19" x2="23" y1="8" y2="8" />
+      <line x1="19" x2="23" y1="12" y2="12" />
+      <line x1="19" x2="23" y1="16" y2="16" />
+    </svg>
+  );
+}
+
+function CommunityNetworkIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="5" r="2.5" />
+      <path d="M9 10a3 3 0 0 1 6 0" />
+      <circle cx="5" cy="16" r="2" />
+      <path d="M2.5 20a2.5 2.5 0 0 1 5 0" />
+      <circle cx="19" cy="16" r="2" />
+      <path d="M16.5 20a2.5 2.5 0 0 1 5 0" />
+      <line x1="9.5" y1="9" x2="6.5" y2="14" />
+      <line x1="14.5" y1="9" x2="17.5" y2="14" />
+    </svg>
+  );
+}
+
 function PolicyIcon({ type }: { type: PolicyItem["icon"] }) {
   switch (type) {
     case "privacy":
-      return <Shield className="size-[20px] sm:size-[22px] text-[#faab14]" aria-hidden />;
+      return <Shield className="size-[18px] sm:size-[22px] text-[#faab14]" aria-hidden />;
     case "terms":
-      return <FileText className="size-[20px] sm:size-[22px] text-[#faab14]" aria-hidden />;
+      return <FileText className="size-[18px] sm:size-[22px] text-[#faab14]" aria-hidden />;
     case "guidelines":
-      return <Users className="size-[20px] sm:size-[22px] text-[#faab14]" aria-hidden />;
+      return <Users className="size-[18px] sm:size-[22px] text-[#faab14]" aria-hidden />;
     case "cookie":
-      return <Cookie className="size-[20px] sm:size-[22px] text-[#faab14]" aria-hidden />;
+      return <Cookie className="size-[18px] sm:size-[22px] text-[#faab14]" aria-hidden />;
     case "safety":
-      return <ShieldAlert className="size-[20px] sm:size-[22px] text-[#faab14]" aria-hidden />;
+      return <ShieldAlert className="size-[18px] sm:size-[22px] text-[#faab14]" aria-hidden />;
     case "copyright":
-      return <Copyright className="size-[20px] sm:size-[22px] text-[#faab14]" aria-hidden />;
+      return <Copyright className="size-[18px] sm:size-[22px] text-[#faab14]" aria-hidden />;
+    case "about":
+      return <Info className="size-[18px] sm:size-[22px] text-[#faab14]" aria-hidden />;
+    case "contact":
+      return <ContactIcon className="size-[18px] sm:size-[22px] text-[#faab14]" />;
+    case "invest":
+      return <Landmark className="size-[18px] sm:size-[22px] text-[#faab14]" aria-hidden />;
+    case "whatsapp":
+      return <CommunityNetworkIcon className="size-[18px] sm:size-[22px] text-[#faab14]" />;
     default:
-      return <Shield className="size-[20px] sm:size-[22px] text-[#faab14]" aria-hidden />;
+      return <Shield className="size-[18px] sm:size-[22px] text-[#faab14]" aria-hidden />;
   }
 }
 
-function PolicyButtonsGrid({ links }: { links: PolicyItem[] }) {
+export function PolicyButtonsGrid({ links }: { links: PolicyItem[] }) {
   return (
-    <div className="grid w-full grid-cols-2 gap-2.5 sm:gap-3.5">
-      {links.map((link) => (
-        <Link
-          key={link.label}
-          href={link.href}
-          className="flex h-[52px] sm:h-[58px] items-center justify-between rounded-[12px] border border-[#faab14]/40 bg-[#0c0c0b] px-3 sm:px-4 text-white transition hover:border-[#faab14] hover:bg-[#181815] active:scale-[0.99]"
-        >
-          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-            <span className="shrink-0">
-              <PolicyIcon type={link.icon} />
-            </span>
-            <span className="truncate text-[11px] sm:text-[14px] lg:text-[15px] font-medium text-white">
-              {link.label}
-            </span>
-          </div>
-          <PolicyChevron />
-        </Link>
-      ))}
+    <div className="grid w-full grid-cols-2 gap-2 sm:gap-3.5">
+      {links.map((link) => {
+        const isExternal = link.href.startsWith("http");
+        const content = (
+          <>
+            <div className="flex min-w-0 items-center gap-1.5 sm:gap-2.5">
+              <span className="shrink-0">
+                <PolicyIcon type={link.icon} />
+              </span>
+              <span className="min-w-0 text-[11px] sm:text-[13px] lg:text-[14px] font-medium leading-[1.25] text-white break-words">
+                {link.label}
+              </span>
+            </div>
+            <PolicyChevron />
+          </>
+        );
+
+        const className =
+          "flex min-h-[52px] sm:min-h-[58px] py-2 items-center justify-between rounded-[14px] border border-[#faab14]/40 bg-[#0c0c0b] px-2.5 sm:px-4 text-white transition hover:border-[#faab14] hover:bg-[#181815] active:scale-[0.99]";
+
+        if (isExternal) {
+          return (
+            <a
+              key={link.label}
+              href={link.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={className}
+            >
+              {content}
+            </a>
+          );
+        }
+
+        return (
+          <Link key={link.label} href={link.href} className={className}>
+            {content}
+          </Link>
+        );
+      })}
     </div>
   );
 }
@@ -380,7 +482,7 @@ export default function SplashScreen({
           </nav>
 
           {policyLinks && policyLinks.length > 0 && (
-            <div className="mt-7 w-full max-w-[347px] sm:max-w-[440px]">
+            <div className="mt-7 w-full max-w-[360px] sm:max-w-[460px]">
               <StarDivider />
               <PolicyButtonsGrid links={policyLinks} />
             </div>
