@@ -35,14 +35,11 @@ vi.mock("@/services/apiClient", () => {
   };
 });
 
-// Canvas is unavailable in jsdom, so stand in for the compressor and hand back a smaller file.
-const compressImage = vi.fn();
+// Canvas is unavailable in jsdom, so stand in for the resizer and hand back a set of files.
+const buildUploadSet = vi.fn();
 vi.mock("@/util/image", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/util/image")>()),
-  compressImage: (...a: unknown[]) => {
-    const r = compressImage(...a);
-    return r;
-  },
+  buildUploadSet: (...a: unknown[]) => buildUploadSet(...a),
 }));
 
 const twoFactorEnable = vi.fn();
@@ -114,20 +111,22 @@ describe("useProfilePresenter", () => {
 
   describe("uploadImage", () => {
     const raw = new File([new Uint8Array(4_000_000)], "IMG_0042.HEIC.jpg", { type: "image/jpeg" });
-    const small = new File([new Uint8Array(180_000)], "IMG_0042.jpg", { type: "image/jpeg" });
+    const original = new File([new Uint8Array(180_000)], "IMG_0042.jpg", { type: "image/jpeg" });
+    const sm = new File([new Uint8Array(8_000)], "IMG_0042_sm.jpg", { type: "image/jpeg" });
+    const md = new File([new Uint8Array(40_000)], "IMG_0042_md.jpg", { type: "image/jpeg" });
 
     beforeEach(() => {
-      compressImage.mockReset().mockResolvedValue(small);
+      buildUploadSet.mockReset().mockResolvedValue({ original, variants: { sm, md } });
       uploadToPresignedUrl.mockClear();
       post.mockReset().mockResolvedValue({
         key: "avatars/u1/abc.jpg",
         uploadUrl: "https://s3/put",
+        variantUploadUrls: { sm: "https://s3/put_sm", md: "https://s3/put_md" },
         maxSizeMb: 5,
       });
     });
 
-    it("compresses with the avatar preset, declares the size, uploads the small file and saves the key", async () => {
-      const { IMAGE_UPLOAD_PRESETS } = await import("@/util/image");
+    it("uploads every stored size, then points the profile at the key", async () => {
       const { result } = renderHook(() => useProfilePresenter());
       await waitFor(() => expect(result.current.loading).toBe(false));
       act(() => {
@@ -135,33 +134,49 @@ describe("useProfilePresenter", () => {
       });
       await waitFor(() => expect(result.current.uploading).toBeNull());
 
-      expect(compressImage).toHaveBeenCalledWith(raw, IMAGE_UPLOAD_PRESETS.avatar);
+      expect(buildUploadSet).toHaveBeenCalledWith(raw, "avatar");
+      // The declared size is the original's, which is what the API signs.
       expect(post).toHaveBeenCalledWith("/profile/upload-url", {
         kind: "avatar",
         contentType: "image/jpeg",
-        contentLength: small.size,
+        contentLength: original.size,
       });
-      expect(uploadToPresignedUrl).toHaveBeenCalledWith("https://s3/put", small);
+      expect(uploadToPresignedUrl.mock.calls).toEqual([
+        ["https://s3/put_sm", sm],
+        ["https://s3/put_md", md],
+        ["https://s3/put", original],
+      ]);
       expect(patch).toHaveBeenCalledWith("/profile", { avatarKey: "avatars/u1/abc.jpg" });
       expect(result.current.error).toBeNull();
     });
 
-    it("uses the cover preset for covers", async () => {
-      const { IMAGE_UPLOAD_PRESETS } = await import("@/util/image");
+    it("builds the set for covers too", async () => {
       const { result } = renderHook(() => useProfilePresenter());
       await waitFor(() => expect(result.current.loading).toBe(false));
       act(() => {
         void result.current.uploadImage("cover", raw);
       });
       await waitFor(() => expect(patch).toHaveBeenCalled());
-      expect(compressImage).toHaveBeenCalledWith(raw, IMAGE_UPLOAD_PRESETS.cover);
+      expect(buildUploadSet).toHaveBeenCalledWith(raw, "cover");
       expect(patch).toHaveBeenCalledWith("/profile", { coverKey: "avatars/u1/abc.jpg" });
     });
 
-    it("stops before uploading when even the compressed file is over the API's cap", async () => {
-      compressImage.mockResolvedValue(
-        new File([new Uint8Array(6 * 1024 * 1024)], "huge.jpg", { type: "image/jpeg" }),
-      );
+    it("leaves the old photo in place when a size fails to upload", async () => {
+      uploadToPresignedUrl.mockRejectedValueOnce(new Error("network died"));
+      const { result } = renderHook(() => useProfilePresenter());
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      act(() => {
+        void result.current.uploadImage("avatar", raw);
+      });
+      await waitFor(() => expect(result.current.error).toMatch(/network died/));
+      expect(patch).not.toHaveBeenCalled();
+    });
+
+    it("stops before uploading when even the compressed original is over the cap", async () => {
+      buildUploadSet.mockResolvedValue({
+        original: new File([new Uint8Array(6 * 1024 * 1024)], "huge.jpg", { type: "image/jpeg" }),
+        variants: { sm, md },
+      });
       const { result } = renderHook(() => useProfilePresenter());
       await waitFor(() => expect(result.current.loading).toBe(false));
       act(() => {

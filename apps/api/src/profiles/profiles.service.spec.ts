@@ -117,6 +117,37 @@ describe("ProfilesService", () => {
     expect(db.update).toHaveBeenCalled();
   });
 
+  it("rejects and cleans up a photo whose smaller sizes never landed", async () => {
+    const { service, storage, db } = makeService();
+    // Original present, the "sm" variant missing.
+    storage.describe
+      .mockResolvedValueOnce({ size: 120_000, contentType: "image/jpeg" })
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ size: 9_000, contentType: "image/jpeg" });
+    await expect(
+      service.updateOwn("u1", { avatarKey: "avatars/u1/pic.jpg" }, "Favour"),
+    ).rejects.toThrow(/incomplete/);
+    expect(storage.remove).toHaveBeenCalledWith("avatars/u1/pic.jpg");
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it("checks the original and every stored size before saving the key", async () => {
+    const { service, storage } = makeService();
+    await service.updateOwn("u1", { avatarKey: "avatars/u1/pic.jpg" }, "Favour");
+    expect(storage.describe.mock.calls.map((c) => c[0])).toEqual([
+      "avatars/u1/pic.jpg",
+      "avatars/u1/pic_sm.jpg",
+      "avatars/u1/pic_md.jpg",
+    ]);
+  });
+
+  it("hands back a presigned slot for the original and for every variant", async () => {
+    const { service } = makeService();
+    const slot = await service.presignImageUpload("u1", "avatar", "image/jpeg", 200_000);
+    expect(slot.key).toMatch(/^avatars\/u1\/[0-9a-f-]+\.jpg$/);
+    expect(Object.keys(slot.variantUploadUrls)).toEqual(["sm", "md"]);
+  });
+
   it("rejects a PATCH whose key was never uploaded", async () => {
     const { service, storage, db } = makeService();
     storage.describe.mockResolvedValueOnce(null);
