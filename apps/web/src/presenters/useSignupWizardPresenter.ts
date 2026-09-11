@@ -3,7 +3,15 @@
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, uploadToPresignedUrl } from "@/services/apiClient";
-import { IMAGE_UPLOAD_PRESETS, compressImage } from "@/util/image";
+import { IMAGE_VARIANTS, buildUploadSet, type ImageVariant } from "@/util/image";
+
+/** Presigned PUT slots returned by POST /profile/upload-url — one per stored size. */
+interface UploadSlots {
+  key: string;
+  uploadUrl: string;
+  variantUploadUrls: Record<ImageVariant, string>;
+  maxSizeMb: number;
+}
 import {
   validateAccount,
   validateAbout,
@@ -126,16 +134,23 @@ export function useSignupWizardPresenter() {
     setUploading(kind);
     setProfileError(null);
     try {
-      // Shrink phone photos before upload so they survive slow connections.
-      const file = await compressImage(rawFile, IMAGE_UPLOAD_PRESETS[kind]);
-      const spec = await api.post<{ key: string; uploadUrl: string; maxSizeMb: number }>(
-        "/profile/upload-url",
-        { kind, contentType: file.type, contentLength: file.size },
-      );
-      if (file.size > spec.maxSizeMb * 1024 * 1024) {
+      // Shrink phone photos before upload so they survive slow connections, and
+      // derive the smaller stored sizes from the compressed original.
+      const { original, variants } = await buildUploadSet(rawFile, kind);
+      const spec = await api.post<UploadSlots>("/profile/upload-url", {
+        kind,
+        contentType: original.type,
+        contentLength: original.size,
+      });
+      if (original.size > spec.maxSizeMb * 1024 * 1024) {
         throw new Error(`Image is too large — max ${spec.maxSizeMb}MB.`);
       }
-      await uploadToPresignedUrl(spec.uploadUrl, file);
+      // Variants first, original last: the profile is only pointed at the photo
+      // after every size has landed.
+      await Promise.all(
+        IMAGE_VARIANTS.map((v) => uploadToPresignedUrl(spec.variantUploadUrls[v], variants[v])),
+      );
+      await uploadToPresignedUrl(spec.uploadUrl, original);
       const vm = await api.patch<ProfileVM>(
         "/profile",
         kind === "avatar" ? { avatarKey: spec.key } : { coverKey: spec.key },

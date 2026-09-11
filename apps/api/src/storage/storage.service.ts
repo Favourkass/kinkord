@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import {
+  CopyObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
@@ -11,6 +12,19 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 /** Download URLs are identical within this window, so browsers can cache them. */
 export const DOWNLOAD_URL_WINDOW_S = 3600;
+
+/**
+ * Stored sizes for every uploaded photo. The original is kept as-is; `sm` and
+ * `md` are generated at upload time so a 48px row never downloads a 512px file.
+ */
+export const IMAGE_VARIANTS = ["sm", "md"] as const;
+export type ImageVariant = (typeof IMAGE_VARIANTS)[number];
+
+/** `avatars/u1/abc.jpg` + "sm" -> `avatars/u1/abc_sm.jpg`. */
+export function variantKey(key: string, variant: ImageVariant): string {
+  const dot = key.lastIndexOf(".");
+  return dot === -1 ? `${key}_${variant}` : `${key.slice(0, dot)}_${variant}${key.slice(dot)}`;
+}
 
 export interface StoredObjectInfo {
   size: number;
@@ -67,14 +81,19 @@ export class StorageService {
    * browser serves repeat views from its cache (S3 is told to allow an hour of
    * caching). Each URL is valid for two hours — at least an hour past its window.
    */
-  async presignDownload(key: string, now: Date = new Date()): Promise<string> {
+  async presignDownload(
+    key: string,
+    variant?: ImageVariant,
+    now: Date = new Date(),
+  ): Promise<string> {
+    const target = variant ? variantKey(key, variant) : key;
     const windowMs = DOWNLOAD_URL_WINDOW_S * 1000;
     const windowStart = new Date(Math.floor(now.getTime() / windowMs) * windowMs);
     return getSignedUrl(
       this.s3,
       new GetObjectCommand({
         Bucket: this.bucket,
-        Key: key,
+        Key: target,
         ResponseCacheControl: `private, max-age=${DOWNLOAD_URL_WINDOW_S}`,
       }),
       { expiresIn: DOWNLOAD_URL_WINDOW_S * 2, signingDate: windowStart },
@@ -90,6 +109,17 @@ export class StorageService {
       if (isMissing(e)) return null;
       throw e;
     }
+  }
+
+  /** Server-side copy within the bucket (no download). Used to fill a missing size. */
+  async copy(fromKey: string, toKey: string): Promise<void> {
+    await this.s3.send(
+      new CopyObjectCommand({
+        Bucket: this.bucket,
+        CopySource: `${this.bucket}/${encodeURIComponent(fromKey).replace(/%2F/g, "/")}`,
+        Key: toKey,
+      }),
+    );
   }
 
   /** Best-effort delete for rejected uploads; never throws. */

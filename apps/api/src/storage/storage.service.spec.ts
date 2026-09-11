@@ -24,6 +24,9 @@ vi.mock("@aws-sdk/client-s3", () => ({
   DeleteObjectCommand: class {
     constructor(public input: unknown) {}
   },
+  CopyObjectCommand: class {
+    constructor(public input: unknown) {}
+  },
 }));
 
 type SignCall = [unknown, { input: Record<string, unknown> }, Record<string, unknown>];
@@ -97,7 +100,7 @@ describe("StorageService", () => {
   it("presigns downloads with a stable per-hour URL, 2h validity and 1h cache-control", async () => {
     const { StorageService, DOWNLOAD_URL_WINDOW_S } = await import("./storage.service");
     const storage = new StorageService();
-    await storage.presignDownload("avatars/u1/x.png", new Date("2026-09-08T15:47:12Z"));
+    await storage.presignDownload("avatars/u1/x.png", undefined, new Date("2026-09-08T15:47:12Z"));
     const [, command, opts] = lastSign();
     expect(command.input).toEqual({
       Bucket: "kinkord-media-test",
@@ -108,14 +111,27 @@ describe("StorageService", () => {
     expect(opts.signingDate).toEqual(new Date("2026-09-08T15:00:00Z"));
 
     // Same hour → identical signing input; next hour → a new window.
-    await storage.presignDownload("avatars/u1/x.png", new Date("2026-09-08T15:59:59Z"));
+    await storage.presignDownload("avatars/u1/x.png", undefined, new Date("2026-09-08T15:59:59Z"));
     expect((getSignedUrl.mock.calls[1] as unknown[] as SignCall)[2].signingDate).toEqual(
       new Date("2026-09-08T15:00:00Z"),
     );
-    await storage.presignDownload("avatars/u1/x.png", new Date("2026-09-08T16:00:00Z"));
+    await storage.presignDownload("avatars/u1/x.png", undefined, new Date("2026-09-08T16:00:00Z"));
     expect((getSignedUrl.mock.calls[2] as unknown[] as SignCall)[2].signingDate).toEqual(
       new Date("2026-09-08T16:00:00Z"),
     );
+  });
+
+  it("presigns a named variant instead of the original key", async () => {
+    const { StorageService, variantKey, IMAGE_VARIANTS } = await import("./storage.service");
+    expect(IMAGE_VARIANTS).toEqual(["sm", "md"]);
+    expect(variantKey("avatars/u1/abc.jpg", "sm")).toBe("avatars/u1/abc_sm.jpg");
+    expect(variantKey("covers/u1/abc.webp", "md")).toBe("covers/u1/abc_md.webp");
+    // A key with no extension still gets a distinct variant key.
+    expect(variantKey("avatars/u1/abc", "sm")).toBe("avatars/u1/abc_sm");
+
+    await new StorageService().presignDownload("avatars/u1/x.png", "sm");
+    const [, command] = lastSign();
+    expect(command.input.Key).toBe("avatars/u1/x_sm.png");
   });
 
   it("describes an uploaded object from its HEAD response", async () => {
@@ -138,6 +154,17 @@ describe("StorageService", () => {
     expect(await storage.describe("avatars/u1/nope.jpg")).toBeNull();
     send.mockRejectedValueOnce({ name: "InternalError", $metadata: { httpStatusCode: 500 } });
     await expect(storage.describe("avatars/u1/nope.jpg")).rejects.toBeTruthy();
+  });
+
+  it("copies an object within the bucket without downloading it", async () => {
+    const { StorageService } = await import("./storage.service");
+    send.mockResolvedValueOnce({});
+    await new StorageService().copy("avatars/u1/a b.jpg", "avatars/u1/a b_sm.jpg");
+    expect((send.mock.calls[0][0] as { input: unknown }).input).toEqual({
+      Bucket: "kinkord-media-test",
+      CopySource: "kinkord-media-test/avatars/u1/a%20b.jpg",
+      Key: "avatars/u1/a b_sm.jpg",
+    });
   });
 
   it("removes objects best-effort without throwing", async () => {

@@ -6,7 +6,15 @@ import QRCode from "qrcode";
 import { authClient } from "@/services/authClient";
 import { api, ApiError, uploadToPresignedUrl } from "@/services/apiClient";
 import { Routes } from "@/constants/Routes";
-import { IMAGE_UPLOAD_PRESETS, compressImage } from "@/util/image";
+import { IMAGE_VARIANTS, buildUploadSet, type ImageVariant } from "@/util/image";
+
+/** Presigned PUT slots returned by POST /profile/upload-url — one per stored size. */
+interface UploadSlots {
+  key: string;
+  uploadUrl: string;
+  variantUploadUrls: Record<ImageVariant, string>;
+  maxSizeMb: number;
+}
 
 export interface MeVM {
   id: string;
@@ -115,16 +123,23 @@ export function useProfilePresenter() {
     setUploading(kind);
     setError(null);
     try {
-      // Shrink to what the UI can show (512px avatars, 1600px covers) before it leaves the phone.
-      const file = await compressImage(rawFile, IMAGE_UPLOAD_PRESETS[kind]);
+      // Shrink to what the UI can show (512px avatars, 1600px covers) before it
+      // leaves the phone, and derive the smaller stored sizes from it.
+      const { original, variants } = await buildUploadSet(rawFile, kind);
       // Declaring the byte size lets the API sign it, so S3 refuses a different body.
-      const spec = await api.post<{ key: string; uploadUrl: string; maxSizeMb: number }>(
-        "/profile/upload-url",
-        { kind, contentType: file.type, contentLength: file.size },
-      );
-      if (file.size > spec.maxSizeMb * 1024 * 1024)
+      const spec = await api.post<UploadSlots>("/profile/upload-url", {
+        kind,
+        contentType: original.type,
+        contentLength: original.size,
+      });
+      if (original.size > spec.maxSizeMb * 1024 * 1024)
         throw new Error(`Image is too large — max ${spec.maxSizeMb}MB.`);
-      await uploadToPresignedUrl(spec.uploadUrl, file);
+      // Variants first: the PATCH below only runs once every size has landed, so a
+      // failed upload leaves the previous photo in place rather than a half set.
+      await Promise.all(
+        IMAGE_VARIANTS.map((v) => uploadToPresignedUrl(spec.variantUploadUrls[v], variants[v])),
+      );
+      await uploadToPresignedUrl(spec.uploadUrl, original);
       const vm = await api.patch<ProfileVM>(
         "/profile",
         kind === "avatar" ? { avatarKey: spec.key } : { coverKey: spec.key },
