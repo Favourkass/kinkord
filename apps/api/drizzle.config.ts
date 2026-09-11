@@ -8,3 +8,4 @@ export default defineConfig({
     url: process.env.DATABASE_URL ?? "postgres://kinkord:kinkord@localhost:5432/kinkord",
   },
 });
+
