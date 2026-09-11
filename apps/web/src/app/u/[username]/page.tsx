@@ -54,6 +54,8 @@ export default function MemberProfilePage() {
             editHref={vm.editHref}
             onToggleFollow={vm.toggleFollow}
             followBusy={vm.followBusy}
+            onSelectStatsTab={vm.onSelectStatsTab}
+            onShare={vm.nav.onShare}
           />
         ) : null
       }
@@ -67,6 +69,7 @@ export default function MemberProfilePage() {
             editHref={vm.editHref}
             onToggleFollow={vm.toggleFollow}
             followBusy={vm.followBusy}
+            onShare={vm.nav.onShare}
           />
         ) : null
       }

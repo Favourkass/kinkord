@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { Copy } from "lucide-react";
 import MaskIcon from "@/components/app/MaskIcon";
 import type { PublicProfileVM } from "@/domain/member";
 
@@ -19,6 +21,7 @@ export interface ProfileSideCardProps {
   editHref: string;
   onToggleFollow: () => void;
   followBusy: boolean;
+  onShare?: () => void;
 }
 
 /** Figma desktop profile left column (987:5489): 340px card with cover, avatar, details and actions. */
@@ -30,7 +33,9 @@ export default function ProfileSideCard({
   editHref,
   onToggleFollow,
   followBusy,
+  onShare,
 }: ProfileSideCardProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
   return (
     <section className="flex flex-col gap-[24px] overflow-hidden rounded-[20px] border border-pf-border bg-pf-surface">
       <div className="relative h-[220px]">
@@ -67,10 +72,15 @@ export default function ProfileSideCard({
               type="button"
               onClick={onToggleFollow}
               disabled={followBusy}
-              aria-label={vm.isFollowing ? labels.following : labels.follow}
-              className="absolute left-[75px] top-[75px] grid size-[28px] place-items-center rounded-[14px] bg-kink-gold-bright text-white"
+              aria-label={vm.isFriend ? "Friends" : "Add friend"}
+              title={vm.isFriend ? "Friends (Mutual)" : "Add friend"}
+              className={`absolute left-[75px] top-[75px] grid size-[28px] place-items-center rounded-full border-2 border-pf-surface shadow transition-all ${
+                vm.isFriend
+                  ? "bg-kink-gold-bright text-black ring-2 ring-amber-400/30"
+                  : "bg-[#141a26] text-neutral-300 hover:bg-[#1f283a] hover:text-white"
+              }`}
             >
-              <MaskIcon name={vm.isFollowing ? "user-check" : "plus"} width={14} />
+              <MaskIcon name={vm.isFriend ? "user-check" : "people"} width={14} />
             </button>
           )}
         </div>
@@ -134,24 +144,102 @@ export default function ProfileSideCard({
               {labels.editProfile}
             </a>
           ) : (
-            <button
-              type="button"
-              onClick={onToggleFollow}
-              disabled={followBusy}
-              aria-pressed={vm.isFollowing}
-              className="flex flex-1 items-center justify-center gap-[8px] rounded-[12px] bg-kink-gold-bright py-[12px] text-[13px] font-bold text-black disabled:opacity-60"
-            >
-              <MaskIcon name={vm.isFollowing ? "user-check" : "person-add"} width={14} />
-              {vm.isFollowing ? labels.following : labels.follow}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={onToggleFollow}
+                disabled={followBusy}
+                aria-pressed={vm.isFollowing}
+                className={`flex flex-1 items-center justify-center gap-[8px] rounded-[12px] py-[12px] text-[13px] font-bold shadow transition-opacity hover:opacity-95 disabled:opacity-60 ${
+                  vm.isFollowing
+                    ? "border border-neutral-800 bg-[#0c0f17] text-white"
+                    : "bg-kink-gold-bright text-black"
+                }`}
+              >
+                <MaskIcon name={vm.isFollowing ? "user-check" : "person-add"} width={14} />
+                {vm.isFollowing ? (vm.isFriend ? "Friends" : labels.following) : labels.follow}
+              </button>
+
+              <a
+                href={messageHref}
+                className="flex flex-1 items-center justify-center gap-[8px] rounded-[12px] border border-[#1f2937] bg-[#1f2937] py-[12px] text-[13px] font-bold text-[#f9fafb]"
+              >
+                <MaskIcon name="message" width={16} />
+                {labels.message}
+              </a>
+
+              {/* Arrow action button (Share / Add friend / Copy link) */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setMenuOpen((prev) => !prev)}
+                  aria-label="More options"
+                  aria-expanded={menuOpen}
+                  className="grid size-[42px] shrink-0 place-items-center rounded-[12px] border border-neutral-800 bg-[#0c0f17] text-white shadow transition-colors hover:bg-neutral-800"
+                >
+                  <svg
+                    className="size-[16px] text-white"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </button>
+
+                {menuOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setMenuOpen(false)}
+                      aria-hidden="true"
+                    />
+                    <div className="absolute right-0 top-[48px] z-50 w-[180px] rounded-[14px] border border-neutral-800 bg-[#0f1420] p-[6px] shadow-2xl">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMenuOpen(false);
+                          onToggleFollow();
+                        }}
+                        className="flex w-full items-center gap-[10px] rounded-[10px] px-[12px] py-[8px] text-left text-[13px] font-medium text-white transition-colors hover:bg-white/10"
+                      >
+                        <MaskIcon name={vm.isFriend ? "user-check" : "person-add"} width={16} />
+                        <span>{vm.isFriend ? "Remove friend" : "Add friend"}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMenuOpen(false);
+                          onShare?.();
+                        }}
+                        className="flex w-full items-center gap-[10px] rounded-[10px] px-[12px] py-[8px] text-left text-[13px] font-medium text-white transition-colors hover:bg-white/10"
+                      >
+                        <MaskIcon name="nav-share" width={16} />
+                        <span>Share profile</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMenuOpen(false);
+                          if (typeof window !== "undefined" && navigator.clipboard) {
+                            void navigator.clipboard.writeText(window.location.href);
+                          }
+                        }}
+                        className="flex w-full items-center gap-[10px] rounded-[10px] px-[12px] py-[8px] text-left text-[13px] font-medium text-white transition-colors hover:bg-white/10"
+                      >
+                        <Copy className="size-[16px] shrink-0" />
+                        <span>Copy link</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </>
           )}
-          <a
-            href={messageHref}
-            className="flex flex-1 items-center justify-center gap-[8px] rounded-[12px] border border-[#1f2937] bg-[#1f2937] py-[12px] text-[13px] font-bold text-[#f9fafb]"
-          >
-            <MaskIcon name="message" width={16} />
-            {labels.message}
-          </a>
         </div>
       </div>
     </section>

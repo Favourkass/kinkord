@@ -24,6 +24,7 @@ const makeService = () => {
   const storage = { presignDownload } as unknown as StorageService;
   const counts = vi.fn(async () => ({ friends: 2, followers: 30, following: 9 }));
   const isFollowing = vi.fn(async () => true);
+  const isFriend = vi.fn(async () => true);
   const mutualFriendsCount = vi.fn(async () => 5);
   const resolveUserId = vi.fn(async () => "u2");
   const friends = vi.fn(async () => ({
@@ -42,6 +43,7 @@ const makeService = () => {
   const follows = {
     counts,
     isFollowing,
+    isFriend,
     mutualFriendsCount,
     resolveUserId,
     friends,
@@ -52,6 +54,7 @@ const makeService = () => {
     select,
     presignDownload,
     isFollowing,
+    isFriend,
     mutualFriendsCount,
     friends,
     mutualFriends,
@@ -195,6 +198,7 @@ describe("MembersService", () => {
     expect(vm.avatarUrl).toBeNull();
     expect(vm.counts).toEqual({ friends: 2, followers: 30, following: 9, mutualFriends: 5 });
     expect(vm.isFollowing).toBe(true);
+    expect(vm.isFriend).toBe(true);
     expect(vm.isSelf).toBe(false);
     expect(vm.joinedAt).toBe("2023-03-10T09:00:00.000Z");
     expect(typeof vm.age).toBe("number");

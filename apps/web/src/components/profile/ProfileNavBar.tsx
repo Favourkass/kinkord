@@ -18,9 +18,9 @@ export default function ProfileNavBar({
   onShare,
 }: ProfileNavBarProps) {
   const circle =
-    "grid size-[32px] place-items-center rounded-[20px] border border-pf-border bg-pf-surface-2 text-pf-icon";
+    "grid size-[36px] place-items-center rounded-full border border-neutral-800/80 bg-[#121622] text-white hover:bg-neutral-800 transition-colors";
   return (
-    <header className="flex h-[56px] shrink-0 items-center justify-between border-b border-pf-border bg-pf-nav px-[16px]">
+    <header className="flex h-[56px] shrink-0 items-center justify-between border-b border-neutral-900 bg-black px-[16px]">
       <p className="text-[22px] font-black leading-none tracking-[0.88px] text-kink-gold-bright">
         {brand}
       </p>
