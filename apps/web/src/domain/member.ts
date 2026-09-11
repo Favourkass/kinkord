@@ -92,6 +92,7 @@ export interface PublicProfilePM {
   isOnline: boolean;
   counts: { friends: number; followers: number; following: number; mutualFriends: number };
   isFollowing: boolean;
+  isFriend?: boolean;
   isSelf: boolean;
 }
 
@@ -109,6 +110,8 @@ export interface PublicProfileVM {
   stats: { friends: string; followers: string; following: string; mutualFriends: string };
   /** "Abraka, Delta State, Nigeria" */
   locationLine: string | null;
+  /** "25F" */
+  ageTag: string | null;
   /** "25F · Dominant | Sadist" */
   tagLine: string | null;
   bio: string | null;
@@ -126,6 +129,7 @@ export interface PublicProfileVM {
   /** "March 2023" */
   joined: string | null;
   isFollowing: boolean;
+  isFriend: boolean;
   isSelf: boolean;
 }
 
@@ -151,6 +155,7 @@ export function toPublicProfileVM(pm: PublicProfilePM, now = new Date()): Public
       mutualFriends: compactNumber(pm.counts.mutualFriends),
     },
     locationLine,
+    ageTag: ageTag || null,
     tagLine,
     bio: pm.bio,
     basic: {
@@ -165,6 +170,7 @@ export function toPublicProfileVM(pm: PublicProfilePM, now = new Date()): Public
     languages: pm.languages.length > 0 ? pm.languages.join(", ") : null,
     joined: monthYear(pm.joinedAt),
     isFollowing: pm.isFollowing,
+    isFriend: Boolean(pm.isFriend),
     isSelf: pm.isSelf,
   };
 }

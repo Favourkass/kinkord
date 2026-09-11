@@ -35,7 +35,7 @@ export interface FriendsPagePM {
   limit: number;
 }
 
-export type FriendsTab = "all" | "mutual";
+export type FriendsTab = "all" | "mutual" | "followers" | "following";
 
 export interface MembersPagePM {
   items: MemberCardPM[];

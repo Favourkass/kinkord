@@ -35,14 +35,16 @@ export default function ProfileShell({
   children,
 }: ProfileShellProps) {
   return (
-    <div className="min-h-dvh bg-pf-page text-pf-text">
+    <div className="min-h-dvh bg-black text-white">
       <div className="flex min-h-dvh flex-col lg:hidden">
-        <ProfileNavBar {...nav} />
-        <main className="flex-1 pb-[calc(57px+env(safe-area-inset-bottom))]">
-          {hero}
-          {children}
-        </main>
-        <MobileTabBar avatarUrl={viewerAvatarUrl} links={links} labels={labels} />
+        <div className="mx-auto flex w-full max-w-[440px] flex-1 flex-col">
+          <ProfileNavBar {...nav} />
+          <main className="flex-1 pb-[calc(57px+env(safe-area-inset-bottom))]">
+            {hero}
+            {children}
+          </main>
+        </div>
+        <MobileTabBar active="profile" avatarUrl={viewerAvatarUrl} links={links} labels={labels} />
       </div>
       <div className="hidden min-h-dvh flex-col lg:flex">
         <ProfileTopNav {...topNav} />

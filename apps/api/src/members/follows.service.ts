@@ -60,6 +60,14 @@ export class FollowsService {
     return Boolean(row);
   }
 
+  async isFriend(userA: string, userB: string): Promise<boolean> {
+    const [aFollowsB, bFollowsA] = await Promise.all([
+      this.isFollowing(userA, userB),
+      this.isFollowing(userB, userA),
+    ]);
+    return aFollowsB && bFollowsA;
+  }
+
   async followersCount(userId: string): Promise<number> {
     const [row] = await this.db
       .select({ c: count() })
@@ -160,6 +168,68 @@ export class FollowsService {
     const rows = await base().orderBy(desc(back.createdAt)).limit(limit).offset(offset);
     const total = await this.mutualFriendsCount(userId, viewerId);
     return { items: rows.map((r) => ({ ...r, isFollowing: true })), total };
+  }
+
+  /** Members who follow `userId`, newest followers first. */
+  async followers(
+    userId: string,
+    viewerId: string,
+    limit: number,
+    offset: number,
+  ): Promise<FriendsPage> {
+    const viewerFollow = alias(follow, "viewer_follow");
+    const rows = await this.db
+      .select({
+        userId: user.id,
+        username: user.username,
+        displayName: profile.displayName,
+        avatarKey: profile.avatarKey,
+        isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
+      })
+      .from(follow)
+      .innerJoin(user, eq(user.id, follow.followerId))
+      .innerJoin(profile, eq(profile.userId, user.id))
+      .leftJoin(
+        viewerFollow,
+        and(eq(viewerFollow.followerId, viewerId), eq(viewerFollow.followingId, user.id)),
+      )
+      .where(eq(follow.followingId, userId))
+      .orderBy(desc(follow.createdAt))
+      .limit(limit)
+      .offset(offset);
+    const total = await this.followersCount(userId);
+    return { items: rows.map((r) => ({ ...r, isFollowing: Boolean(r.isFollowing) })), total };
+  }
+
+  /** Members whom `userId` follows, newest follows first. */
+  async following(
+    userId: string,
+    viewerId: string,
+    limit: number,
+    offset: number,
+  ): Promise<FriendsPage> {
+    const viewerFollow = alias(follow, "viewer_follow");
+    const rows = await this.db
+      .select({
+        userId: user.id,
+        username: user.username,
+        displayName: profile.displayName,
+        avatarKey: profile.avatarKey,
+        isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
+      })
+      .from(follow)
+      .innerJoin(user, eq(user.id, follow.followingId))
+      .innerJoin(profile, eq(profile.userId, user.id))
+      .leftJoin(
+        viewerFollow,
+        and(eq(viewerFollow.followerId, viewerId), eq(viewerFollow.followingId, user.id)),
+      )
+      .where(eq(follow.followerId, userId))
+      .orderBy(desc(follow.createdAt))
+      .limit(limit)
+      .offset(offset);
+    const total = await this.followingCount(userId);
+    return { items: rows.map((r) => ({ ...r, isFollowing: Boolean(r.isFollowing) })), total };
   }
 
   async mutualFriendsCount(userId: string, viewerId: string): Promise<number> {

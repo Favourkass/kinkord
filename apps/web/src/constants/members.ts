@@ -62,7 +62,7 @@ export const MEMBERS_COPY = {
   profile: {
     brand: "KINKORD",
     actions: { search: "Search members", more: "More options", share: "Share profile" },
-    tabs: { posts: "Posts", about: "About", media: "Media", friends: "Friends" },
+    tabs: { posts: "Posts", about: "About", media: "Media", friends: "People" },
     follow: "Follow",
     following: "Following",
     message: "Message",
@@ -84,9 +84,13 @@ export const MEMBERS_COPY = {
       notShared: "Not shared",
     },
     friends: {
-      heading: "Friends",
-      all: (n: string) => `All Friends (${n})`,
+      heading: "People",
+      all: (n: string) => `Friends (${n})`,
       mutual: (n: string) => `Mutual Friends (${n})`,
+      followersCount: (n: string) => `Followers(${n})`,
+      followingCount: (n: string) => `Following(${n})`,
+      suggested: "Suggested",
+      seeMore: "See more",
       follow: "Follow",
       following: "Following",
       more: "More",
@@ -108,6 +112,7 @@ export const MEMBERS_COPY = {
     notFound: "We couldn’t find that member.",
     yourself: "This is you",
     editProfile: "Edit profile",
+    addToStory: "Add to story",
     /** Desktop-only chrome (Figma desktop-profile-* frames). */
     desktop: {
       searchPlaceholder: "Search friends, kinks, groups...",

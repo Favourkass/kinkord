@@ -84,6 +84,7 @@ const profile: PublicProfilePM = {
   isOnline: false,
   counts: { friends: 1200, followers: 2300, following: 980, mutualFriends: 86 },
   isFollowing: true,
+  isFriend: true,
   isSelf: false,
 };
 
@@ -105,6 +106,7 @@ describe("toPublicProfileVM", () => {
     expect(vm.joined).toBe("March 2023");
     expect(vm.basic.age).toBe("25");
     expect(vm.isFollowing).toBe(true);
+    expect(vm.isFriend).toBe(true);
   });
 
   it("degrades gracefully when optional fields are missing", () => {

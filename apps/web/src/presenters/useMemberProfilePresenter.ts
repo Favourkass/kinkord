@@ -28,6 +28,8 @@ const TAB_KEYS: ProfileTabKey[] = ["posts", "about", "media", "friends"];
 const isTabKey = (v: string | null | undefined): v is ProfileTabKey =>
   TAB_KEYS.includes(v as ProfileTabKey);
 
+export type ActiveFriendsTab = FriendsTab | "suggested";
+
 /** Outcome of loading one username; keyed so a route change never shows stale data. */
 interface ProfileOutcome {
   username: string;
@@ -51,7 +53,7 @@ interface SuggestOutcome {
 }
 
 const FRIENDS_PAGE = 50;
-const SUGGESTIONS = 3;
+const SUGGESTIONS = 5;
 
 /** Another member's public profile (Figma 948:2866 / 926:818 / 987:5468): hero, tabs, About, Friends, empty Posts/Media. */
 export function useMemberProfilePresenter(usernameParam: string, initialTab?: string | null) {
@@ -62,7 +64,7 @@ export function useMemberProfilePresenter(usernameParam: string, initialTab?: st
   // Deep-linkable via ?tab=…; About is the default because Posts/Media have no content yet.
   const [tab, setTab] = useState<ProfileTabKey>(isTabKey(initialTab) ? initialTab : "about");
   const [followBusy, setFollowBusy] = useState(false);
-  const [friendsTab, setFriendsTab] = useState<FriendsTab>("all");
+  const [friendsTab, setFriendsTab] = useState<ActiveFriendsTab>("all");
   const [friends, setFriends] = useState<FriendsOutcome | null>(null);
   const [suggested, setSuggested] = useState<SuggestOutcome | null>(null);
   const [rowBusy, setRowBusy] = useState<ReadonlySet<string>>(new Set());
@@ -102,7 +104,7 @@ export function useMemberProfilePresenter(usernameParam: string, initialTab?: st
   const friendsKey = `${username}|${friendsTab}`;
   const currentFriends = friends?.key === friendsKey ? friends : null;
   useEffect(() => {
-    if (tab !== "friends" || !pm || currentFriends) return;
+    if (tab !== "friends" || !pm || currentFriends || friendsTab === "suggested") return;
     let cancelled = false;
     void membersApi
       .friends(username, friendsTab, 1, FRIENDS_PAGE)
@@ -119,7 +121,7 @@ export function useMemberProfilePresenter(usernameParam: string, initialTab?: st
     };
   }, [tab, pm, currentFriends, username, friendsTab, friendsKey]);
 
-  // Suggested friends: members from the same state (desktop right column). Best effort, never blocks.
+  // Suggested friends: members from the same state, but those in their region/city show first.
   const currentSuggested = suggested?.username === username ? suggested : null;
   useEffect(() => {
     if (!pm || !pm.state || currentSuggested) return;
@@ -130,13 +132,23 @@ export function useMemberProfilePresenter(usernameParam: string, initialTab?: st
         state: pm.state,
         region: null,
         page: 1,
-        limit: 5,
+        limit: 50,
         sort: "recent",
       })
       .then((res) => {
         if (cancelled) return;
-        const items = res.items.filter((m) => m.userId !== pm.userId).slice(0, SUGGESTIONS);
-        setSuggested({ username, items });
+        const sameRegion = (m: MemberCardPM) =>
+          Boolean(
+            pm.city && m.city && m.city.trim().toLowerCase() === pm.city.trim().toLowerCase(),
+          );
+        const sorted = res.items
+          .filter((m) => m.userId !== pm.userId)
+          .sort((a, b) => {
+            const aMatch = sameRegion(a) ? 1 : 0;
+            const bMatch = sameRegion(b) ? 1 : 0;
+            return bMatch - aMatch;
+          });
+        setSuggested({ username, items: sorted });
       })
       .catch(() => {
         if (!cancelled) setSuggested({ username, items: [] });
@@ -271,7 +283,7 @@ export function useMemberProfilePresenter(usernameParam: string, initialTab?: st
     tabs,
     toggleFollow,
     followBusy,
-    messageHref: Routes.messages,
+    messageHref: Routes.messagesWith(username),
     editHref: Routes.profileEdit,
     heroLabels: {
       follow: copy.follow,
@@ -279,6 +291,7 @@ export function useMemberProfilePresenter(usernameParam: string, initialTab?: st
       message: copy.message,
       yourself: copy.yourself,
       editProfile: copy.editProfile,
+      addToStory: copy.addToStory,
       stats: statsLabels,
     },
     sideLabels: {
@@ -291,9 +304,20 @@ export function useMemberProfilePresenter(usernameParam: string, initialTab?: st
       stats: statsLabels,
     },
     aboutLabels: copy.about,
+    onSelectStatsTab: (sub: "all" | "followers" | "following") => {
+      setTab("friends");
+      setFriendsTab(sub as FriendsTab);
+    },
     friends: {
       heading: copy.friends.heading,
       headingDesktop: copy.desktop.friendsList,
+      activeSubTab: friendsTab,
+      counts: {
+        friends: vm?.stats.friends ?? "0",
+        followers: vm?.stats.followers ?? "0",
+        following: vm?.stats.following ?? "0",
+        mutualFriends: vm?.stats.mutualFriends ?? "0",
+      },
       subTabs: [
         {
           key: "all" as const,
@@ -301,30 +325,57 @@ export function useMemberProfilePresenter(usernameParam: string, initialTab?: st
           active: friendsTab === "all",
         },
         {
-          key: "mutual" as const,
-          label: copy.friends.mutual(vm?.stats.mutualFriends ?? "0"),
-          active: friendsTab === "mutual",
+          key: "followers" as const,
+          label: copy.friends.followersCount(vm?.stats.followers ?? "0"),
+          active: friendsTab === "followers",
+        },
+        {
+          key: "following" as const,
+          label: copy.friends.followingCount(vm?.stats.following ?? "0"),
+          active: friendsTab === "following",
+        },
+        {
+          key: "suggested" as const,
+          label: copy.friends.suggested,
+          active: friendsTab === "suggested",
         },
       ],
-      onSubTab: setFriendsTab,
-      rows: friendRows,
+      onSubTab: (key: ActiveFriendsTab) => setFriendsTab(key),
+      rows: friendsTab === "suggested" ? suggestedRows : friendRows,
       labels: {
         follow: copy.friends.follow,
         following: copy.friends.following,
         more: copy.friends.more,
+        seeMore: copy.friends.seeMore,
       },
       onToggleFollow: toggleFriendFollow,
       loading: tab === "friends" && pm !== null && currentFriends === null,
       loadingText: MEMBERS_COPY.common.loading,
+      emptyTitle:
+        friendsTab === "followers"
+          ? "No followers yet"
+          : friendsTab === "following"
+            ? "Not following anyone yet"
+            : "No friends yet",
+      emptySubtitle:
+        friendsTab === "followers"
+          ? "When people follow this profile, they will appear here."
+          : friendsTab === "following"
+            ? "Profiles this person follows will appear here."
+            : "When mutual follows occur, they will appear here.",
       empty:
         currentFriends && currentFriends.items.length === 0 && !currentFriends.error
           ? copy.friends.empty
           : null,
       error: currentFriends?.error ?? null,
+      exploreHref: vm?.isSelf
+        ? Routes.profilePeople(friendsTab)
+        : Routes.memberPeople(username, friendsTab),
+      isSelf: vm?.isSelf ?? false,
     },
     suggested: {
       heading: copy.desktop.suggested,
-      rows: suggestedRows,
+      rows: suggestedRows.slice(0, SUGGESTIONS),
       addLabel: copy.desktop.add,
       addedLabel: copy.desktop.added,
       onAdd: addSuggested,

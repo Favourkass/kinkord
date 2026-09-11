@@ -8,7 +8,7 @@ import { StorageService } from "../storage/storage.service";
 import { FollowsService } from "./follows.service";
 
 export type MembersSort = "recent" | "followers" | "name";
-export type FriendsTab = "all" | "mutual";
+export type FriendsTab = "all" | "mutual" | "followers" | "following";
 
 export interface ListMembersParams {
   country: string;
@@ -178,13 +178,15 @@ export class MembersService {
 
     const { u, p } = row;
     const isSelf = u.id === viewerId;
-    const [followCounts, mutualFriends, isFollowing, avatarUrl, coverUrl] = await Promise.all([
-      this.follows.counts(u.id),
-      isSelf ? Promise.resolve(0) : this.follows.mutualFriendsCount(u.id, viewerId),
-      isSelf ? Promise.resolve(false) : this.follows.isFollowing(viewerId, u.id),
-      p.avatarKey ? this.storage.presignDownload(p.avatarKey) : Promise.resolve(null),
-      p.coverKey ? this.storage.presignDownload(p.coverKey) : Promise.resolve(null),
-    ]);
+    const [followCounts, mutualFriends, isFollowing, isFriend, avatarUrl, coverUrl] =
+      await Promise.all([
+        this.follows.counts(u.id),
+        isSelf ? Promise.resolve(0) : this.follows.mutualFriendsCount(u.id, viewerId),
+        isSelf ? Promise.resolve(false) : this.follows.isFollowing(viewerId, u.id),
+        isSelf ? Promise.resolve(false) : this.follows.isFriend(viewerId, u.id),
+        p.avatarKey ? this.storage.presignDownload(p.avatarKey) : Promise.resolve(null),
+        p.coverKey ? this.storage.presignDownload(p.coverKey) : Promise.resolve(null),
+      ]);
     const counts = { ...followCounts, mutualFriends };
 
     return {
@@ -211,6 +213,7 @@ export class MembersService {
       isOnline: PresenceService.isOnline(p.lastSeenAt),
       counts,
       isFollowing,
+      isFriend: Boolean(isFriend),
       isSelf,
     };
   }
@@ -228,7 +231,11 @@ export class MembersService {
     const result =
       tab === "mutual"
         ? await this.follows.mutualFriends(targetId, viewerId, limit, offset)
-        : await this.follows.friends(targetId, viewerId, limit, offset);
+        : tab === "followers"
+          ? await this.follows.followers(targetId, viewerId, limit, offset)
+          : tab === "following"
+            ? await this.follows.following(targetId, viewerId, limit, offset)
+            : await this.follows.friends(targetId, viewerId, limit, offset);
     const items = await Promise.all(
       result.items.map(async (r) => ({
         userId: r.userId,

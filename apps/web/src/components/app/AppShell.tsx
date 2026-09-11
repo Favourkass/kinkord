@@ -29,6 +29,10 @@ export interface AppShellProps {
   mobileTone?: "surface" | "members";
   /** Desktop greeting strip (avatar + "Hi …"); the directory screens don't have one in the PC frames. */
   desktopGreeting?: boolean;
+  /** Hide the top mobile header (e.g. for custom chat header). */
+  hideMobileHeader?: boolean;
+  /** Hide the bottom mobile tab bar (e.g. for active chat conversation room). */
+  hideMobileTabBar?: boolean;
   children: ReactNode;
 }
 
@@ -49,6 +53,8 @@ export default function AppShell({
   labels,
   mobileTone = "surface",
   desktopGreeting = true,
+  hideMobileHeader = false,
+  hideMobileTabBar = false,
   children,
 }: AppShellProps) {
   const tone = mobileTone === "members" ? "bg-mem-page" : "bg-app-surface";
@@ -56,11 +62,17 @@ export default function AppShell({
     <div className="min-h-dvh bg-app-page">
       {/* Mobile */}
       <div className={`flex min-h-dvh flex-col lg:hidden ${tone}`}>
-        <AppMobileHeader brand={brand} onMenu={onMenu} />
-        <main className="flex flex-1 flex-col pb-[calc(57px+env(safe-area-inset-bottom))]">
+        {!hideMobileHeader && <AppMobileHeader brand={brand} onMenu={onMenu} />}
+        <main
+          className={`flex flex-1 flex-col ${
+            hideMobileTabBar ? "pb-0" : "pb-[calc(57px+env(safe-area-inset-bottom))]"
+          }`}
+        >
           {children}
         </main>
-        <MobileTabBar active={activeTab} avatarUrl={avatarUrl} links={links} labels={labels} />
+        {!hideMobileTabBar && (
+          <MobileTabBar active={activeTab} avatarUrl={avatarUrl} links={links} labels={labels} />
+        )}
         <SidebarDrawer
           open={drawerOpen}
           onClose={onCloseDrawer}
