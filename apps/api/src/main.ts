@@ -10,6 +10,9 @@ import { Pool } from "pg";
 import { AppModule } from "./app.module";
 import { AUTH, Auth } from "./auth/auth.instance";
 
+// New imports for RedisIoAdapter and ValidationPipe
+import { RedisIoAdapter } from './redis/redis-io.adapter';
+
 /** Applies pending Drizzle migrations before serving (idempotent; used in
  *  deployed environments so CI never needs database network access). */
 async function migrateOnBoot() {
@@ -31,6 +34,12 @@ async function bootstrap() {
     bodyParser: false,
   });
 
+  // New Changes Implemented
+  const adapter = new RedisIoAdapter(app);
+  await adapter.connectToRedis();
+  app.useWebSocketAdapter(adapter);
+
+  //End of New Changes Implemented
   const origins = (process.env.WEB_ORIGINS ?? "http://localhost:3000")
     .split(",")
     .map((o) => o.trim())
@@ -55,3 +64,8 @@ async function bootstrap() {
 }
 
 void bootstrap();
+
+
+
+
+
