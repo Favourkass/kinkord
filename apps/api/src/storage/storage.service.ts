@@ -5,6 +5,7 @@ import {
   HeadObjectCommand,
   PutObjectCommand,
   S3Client,
+  type S3ClientConfig,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
@@ -16,9 +17,30 @@ export interface StoredObjectInfo {
   contentType: string | null;
 }
 
+/**
+ * Local development points at MinIO (docker-compose) instead of real S3, so the
+ * upload flow works with no AWS account. Setting S3_ENDPOINT switches to
+ * path-style addressing and falls back to MinIO's default root credentials —
+ * unset in every deployed environment, where the instance role supplies them.
+ */
+export function s3ClientConfig(env: NodeJS.ProcessEnv = process.env): S3ClientConfig {
+  const region = env.AWS_REGION ?? "eu-west-1";
+  const endpoint = env.S3_ENDPOINT;
+  if (!endpoint) return { region };
+  return {
+    region,
+    endpoint,
+    forcePathStyle: true,
+    credentials: {
+      accessKeyId: env.AWS_ACCESS_KEY_ID ?? "minioadmin",
+      secretAccessKey: env.AWS_SECRET_ACCESS_KEY ?? "minioadmin",
+    },
+  };
+}
+
 @Injectable()
 export class StorageService {
-  private readonly s3 = new S3Client({ region: process.env.AWS_REGION ?? "eu-west-1" });
+  private readonly s3 = new S3Client(s3ClientConfig());
   private readonly bucket = process.env.MEDIA_BUCKET ?? "";
 
   /**
