@@ -126,7 +126,7 @@ describe("useMemberProfilePresenter", () => {
     });
     expect(result.current.presenceText).toBe("Last seen an hour ago");
     expect(result.current.tab).toBe("about");
-    expect(result.current.tabs.map((t) => t.label)).toEqual(["Posts", "About", "Media", "Friends"]);
+    expect(result.current.tabs.map((t) => t.label)).toEqual(["Posts", "About", "Media", "People"]);
     expect(result.current.nav.searchHref).toBe("/members");
     expect(result.current.nav.brand).toBe("KINKORD");
     expect(result.current.notFound).toBeNull();
@@ -180,8 +180,10 @@ describe("useMemberProfilePresenter", () => {
     await waitFor(() => expect(result.current.friends.rows).toHaveLength(1));
     expect(apiGet).toHaveBeenCalledWith("/profiles/nene/friends?tab=all&page=1&limit=50");
     expect(result.current.friends.subTabs.map((t) => t.label)).toEqual([
-      "All Friends (3)",
-      "Mutual Friends (86)",
+      "Friends (3)",
+      "Followers(2.3K)",
+      "Following(10)",
+      "Suggested",
     ]);
     expect(result.current.friends.rows[0]).toMatchObject({
       displayName: "Kinky Kay",
@@ -195,9 +197,10 @@ describe("useMemberProfilePresenter", () => {
     await waitFor(() => expect(result.current.friends.rows[0].busy).toBe(false));
     expect(apiPost).toHaveBeenCalledWith("/follows/kay", {});
 
-    act(() => result.current.friends.onSubTab("mutual"));
+    act(() => result.current.onSelectStatsTab("followers"));
+    expect(result.current.tab).toBe("friends");
     await waitFor(() =>
-      expect(apiGet).toHaveBeenCalledWith("/profiles/nene/friends?tab=mutual&page=1&limit=50"),
+      expect(apiGet).toHaveBeenCalledWith("/profiles/nene/friends?tab=followers&page=1&limit=50"),
     );
     expect(result.current.friends.subTabs[1].active).toBe(true);
   });
@@ -206,12 +209,13 @@ describe("useMemberProfilePresenter", () => {
     const { result } = renderHook(() => useMemberProfilePresenter("nene"));
     await waitFor(() => expect(result.current.suggested.rows).toHaveLength(1));
     expect(apiGet).toHaveBeenCalledWith(
-      "/members?country=NG&state=Delta&page=1&limit=5&sort=recent",
+      "/members?country=NG&state=Delta&page=1&limit=50&sort=recent",
     );
     expect(result.current.suggested.rows[0]).toMatchObject({
       displayName: "Leather Lace",
       handle: "@leatherlace",
     });
+    expect(result.current.friends.exploreHref).toBe("/u/nene/people?tab=all");
     act(() => result.current.suggested.onAdd(result.current.suggested.rows[0]));
     expect(result.current.suggested.rows[0].isFollowing).toBe(true);
     await waitFor(() => expect(apiPost).toHaveBeenCalledWith("/follows/leatherlace", {}));

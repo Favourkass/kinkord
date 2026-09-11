@@ -5,7 +5,7 @@ import { usernameParamSchema } from "./follows.controller";
 import { MembersService } from "./members.service";
 
 const friendsQuerySchema = z.object({
-  tab: z.enum(["all", "mutual"]).default("all"),
+  tab: z.enum(["all", "mutual", "followers", "following"]).default("all"),
   page: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().positive().optional(),
 });

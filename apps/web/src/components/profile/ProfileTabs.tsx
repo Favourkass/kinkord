@@ -17,7 +17,8 @@ export default function ProfileTabs({ tabs, active, onSelect }: ProfileTabsProps
   return (
     <div
       role="tablist"
-      className="flex items-end justify-evenly border-b border-pf-border px-[10px] lg:justify-start lg:gap-[8px] lg:px-0"
+      aria-label="Profile sections"
+      className="mx-auto flex w-full max-w-[440px] items-center justify-between border-b border-neutral-800/70 px-[20px] lg:max-w-none lg:justify-start lg:gap-[16px] lg:px-[16px]"
     >
       {tabs.map((tab) => {
         const selected = tab.key === active;
@@ -28,13 +29,19 @@ export default function ProfileTabs({ tabs, active, onSelect }: ProfileTabsProps
             role="tab"
             aria-selected={selected}
             onClick={() => onSelect(tab.key)}
-            className={`h-[26px] border-b-[1.5px] text-[15px] font-medium leading-[18px] lg:h-auto lg:border-b-2 lg:px-[16px] lg:py-[8px] ${
+            className={`relative pb-[10px] pt-[6px] text-[15px] transition-colors lg:px-[12px] ${
               selected
-                ? "border-kink-gold-bright text-kink-gold-bright lg:font-bold"
-                : "border-transparent text-pf-muted"
+                ? "font-bold text-kink-gold-bright"
+                : "font-medium text-neutral-400 hover:text-white"
             }`}
           >
             {tab.label}
+            {selected && (
+              <span
+                aria-hidden
+                className="absolute bottom-0 left-1/2 h-[2.5px] w-[46px] -translate-x-1/2 rounded-full bg-kink-gold-bright"
+              />
+            )}
           </button>
         );
       })}

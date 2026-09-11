@@ -127,10 +127,51 @@ describe("FollowsService friends lists", () => {
     });
   });
 
-  it("has no mutual friends with yourself and skips the query", async () => {
+  it("lists followers with the viewer's follow state and total", async () => {
     const { db, select } = makeDb();
+    select.mockReturnValueOnce(
+      chain([
+        { userId: "u5", username: "fan", displayName: "Fan", avatarKey: null, isFollowing: 0 },
+      ]),
+    );
+    select.mockReturnValueOnce(chain([{ c: 1 }]));
     const svc = new FollowsService(db);
-    await expect(svc.mutualFriendsCount("me", "me")).resolves.toBe(0);
-    expect(select).not.toHaveBeenCalled();
+    await expect(svc.followers("u2", "me", 20, 0)).resolves.toEqual({
+      items: [
+        { userId: "u5", username: "fan", displayName: "Fan", avatarKey: null, isFollowing: false },
+      ],
+      total: 1,
+    });
+    expect(select).toHaveBeenCalledTimes(2);
+  });
+
+  it("lists following with the viewer's follow state and total", async () => {
+    const { db, select } = makeDb();
+    select.mockReturnValueOnce(
+      chain([
+        { userId: "u6", username: "idol", displayName: "Idol", avatarKey: null, isFollowing: 1 },
+      ]),
+    );
+    select.mockReturnValueOnce(chain([{ c: 1 }]));
+    const svc = new FollowsService(db);
+    await expect(svc.following("u2", "me", 20, 0)).resolves.toEqual({
+      items: [
+        { userId: "u6", username: "idol", displayName: "Idol", avatarKey: null, isFollowing: true },
+      ],
+      total: 1,
+    });
+    expect(select).toHaveBeenCalledTimes(2);
+  });
+
+  it("checks whether two members are mutual friends", async () => {
+    const { db, select } = makeDb();
+    select.mockReturnValueOnce(chain([{ followerId: "u1" }]));
+    select.mockReturnValueOnce(chain([{ followerId: "u2" }]));
+    const svc = new FollowsService(db);
+    await expect(svc.isFriend("u1", "u2")).resolves.toBe(true);
+
+    select.mockReturnValueOnce(chain([{ followerId: "u1" }]));
+    select.mockReturnValueOnce(chain([]));
+    await expect(svc.isFriend("u1", "u2")).resolves.toBe(false);
   });
 });

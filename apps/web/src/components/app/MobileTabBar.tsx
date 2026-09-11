@@ -3,15 +3,31 @@ import AvatarCircle from "./AvatarCircle";
 import MaskIcon, { type MaskIconName } from "./MaskIcon";
 import type { AppNavLabels, AppNavLinks, AppTab } from "./nav";
 
+import { Routes } from "@/constants/Routes";
+
 export type { AppTab } from "./nav";
 
 export interface MobileTabBarProps {
   /** Undefined when the current screen isn't one of the tabs (e.g. Settings). */
   active?: AppTab;
-  avatarUrl: string | null;
-  links: Pick<AppNavLinks, "home" | "chat" | "notifications" | "profile">;
-  labels: Pick<AppNavLabels, "home" | "chat" | "notifications" | "profile">;
+  avatarUrl?: string | null;
+  links?: Pick<AppNavLinks, "home" | "chat" | "notifications" | "profile">;
+  labels?: Pick<AppNavLabels, "home" | "chat" | "notifications" | "profile">;
 }
+
+const DEFAULT_LINKS: Pick<AppNavLinks, "home" | "chat" | "notifications" | "profile"> = {
+  home: Routes.appHome,
+  chat: Routes.messages,
+  notifications: Routes.notifications,
+  profile: Routes.profile,
+};
+
+const DEFAULT_LABELS: Pick<AppNavLabels, "home" | "chat" | "notifications" | "profile"> = {
+  home: "Home",
+  chat: "Chat",
+  notifications: "Notifications",
+  profile: "Profile",
+};
 
 /** Figma tab bar: 57px tall, icon-only; centres at 79/176/265.5/360.5 of a 440px frame. */
 const ICON_TABS: Array<{
@@ -27,7 +43,12 @@ const ICON_TABS: Array<{
 const PROFILE_CENTER_PCT = 81.93;
 
 /** Bottom tab bar: Home, Chat, Notifications, Profile (live avatar) with a 60px gold indicator over the active tab. */
-export default function MobileTabBar({ active, avatarUrl, links, labels }: MobileTabBarProps) {
+export default function MobileTabBar({
+  active,
+  avatarUrl = null,
+  links = DEFAULT_LINKS,
+  labels = DEFAULT_LABELS,
+}: MobileTabBarProps) {
   const indicatorCenter =
     active === "profile" ? PROFILE_CENTER_PCT : ICON_TABS.find((t) => t.key === active)?.centerPct;
   return (
@@ -35,7 +56,7 @@ export default function MobileTabBar({ active, avatarUrl, links, labels }: Mobil
       aria-label="Primary"
       className="fixed inset-x-0 bottom-0 z-20 border-t border-mem-hairline bg-mem-header pb-[env(safe-area-inset-bottom)]"
     >
-      <div className="relative h-[57px]">
+      <div className="relative mx-auto h-[57px] max-w-[440px]">
         {indicatorCenter !== undefined && (
           <span
             aria-hidden

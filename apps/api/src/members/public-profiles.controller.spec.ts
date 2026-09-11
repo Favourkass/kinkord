@@ -34,6 +34,10 @@ describe("PublicProfilesController.friends", () => {
     expect(friends).toHaveBeenCalledWith("nene", "me", "all", undefined, undefined);
     await controller.friends(req, "nene", { tab: "mutual", page: "2", limit: "10" });
     expect(friends).toHaveBeenLastCalledWith("nene", "me", "mutual", 2, 10);
+    await controller.friends(req, "nene", { tab: "followers" });
+    expect(friends).toHaveBeenLastCalledWith("nene", "me", "followers", undefined, undefined);
+    await controller.friends(req, "nene", { tab: "following" });
+    expect(friends).toHaveBeenLastCalledWith("nene", "me", "following", undefined, undefined);
   });
 
   it("rejects an unknown tab or a malformed handle", () => {
