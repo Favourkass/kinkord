@@ -4,8 +4,12 @@ const getSignedUrl = vi.fn(async () => "https://signed.example");
 vi.mock("@aws-sdk/s3-request-presigner", () => ({ getSignedUrl }));
 
 const send = vi.fn();
+const s3Config = vi.fn();
 vi.mock("@aws-sdk/client-s3", () => ({
   S3Client: class {
+    constructor(config: unknown) {
+      s3Config(config);
+    }
     send = (...args: unknown[]) => send(...args);
   },
   PutObjectCommand: class {
@@ -30,7 +34,44 @@ describe("StorageService", () => {
     vi.resetModules();
     getSignedUrl.mockClear();
     send.mockReset();
+    s3Config.mockClear();
     process.env.MEDIA_BUCKET = "kinkord-media-test";
+    delete process.env.S3_ENDPOINT;
+    delete process.env.AWS_ACCESS_KEY_ID;
+    delete process.env.AWS_SECRET_ACCESS_KEY;
+  });
+
+  it("uses plain AWS S3 (instance-role credentials) when no endpoint is configured", async () => {
+    const { s3ClientConfig } = await import("./storage.service");
+    expect(s3ClientConfig({ AWS_REGION: "eu-west-1" })).toEqual({ region: "eu-west-1" });
+  });
+
+  it("targets a local S3 with path-style addressing when S3_ENDPOINT is set", async () => {
+    const { s3ClientConfig } = await import("./storage.service");
+    // Local dev default: MinIO with no AWS credentials present at all.
+    expect(s3ClientConfig({ S3_ENDPOINT: "http://localhost:9000" })).toEqual({
+      region: "eu-west-1",
+      endpoint: "http://localhost:9000",
+      forcePathStyle: true,
+      credentials: { accessKeyId: "minioadmin", secretAccessKey: "minioadmin" },
+    });
+    // Explicit credentials still win.
+    expect(
+      s3ClientConfig({
+        S3_ENDPOINT: "http://minio:9000",
+        AWS_ACCESS_KEY_ID: "k",
+        AWS_SECRET_ACCESS_KEY: "s",
+      }).credentials,
+    ).toEqual({ accessKeyId: "k", secretAccessKey: "s" });
+  });
+
+  it("builds its client from that config", async () => {
+    process.env.S3_ENDPOINT = "http://localhost:9000";
+    const { StorageService } = await import("./storage.service");
+    new StorageService();
+    expect(s3Config).toHaveBeenCalledWith(
+      expect.objectContaining({ endpoint: "http://localhost:9000", forcePathStyle: true }),
+    );
   });
 
   it("presigns uploads with bucket, key, content type and short expiry", async () => {
