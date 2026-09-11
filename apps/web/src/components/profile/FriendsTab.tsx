@@ -122,16 +122,12 @@ export default function FriendsTab(p: FriendsTabProps) {
 
         {/* Loading state */}
         {p.loading && (
-          <div className="py-[32px] text-center text-[14px] text-neutral-400">
-            {p.loadingText}
-          </div>
+          <div className="py-[32px] text-center text-[14px] text-neutral-400">{p.loadingText}</div>
         )}
 
         {/* Error state */}
         {p.error && !p.loading && (
-          <div className="py-[32px] text-center text-[14px] text-red-400">
-            {p.error}
-          </div>
+          <div className="py-[32px] text-center text-[14px] text-red-400">{p.error}</div>
         )}
 
         {/* Empty state */}
@@ -143,9 +139,7 @@ export default function FriendsTab(p: FriendsTabProps) {
               <div className="mt-[3px] h-[34px] w-[86px] rounded-t-[34px] bg-kink-gold-bright" />
             </div>
 
-            <h3 className="mt-[18px] text-center text-[17px] font-bold text-white">
-              {emptyTitle}
-            </h3>
+            <h3 className="mt-[18px] text-center text-[17px] font-bold text-white">{emptyTitle}</h3>
 
             <p className="mt-[6px] max-w-[260px] text-center text-[13px] leading-relaxed text-neutral-400">
               {emptySubtitle}
@@ -232,7 +226,9 @@ export default function FriendsTab(p: FriendsTabProps) {
                       <div className="relative">
                         <button
                           type="button"
-                          onClick={() => setMenuUserId((prev) => (prev === r.userId ? null : r.userId))}
+                          onClick={() =>
+                            setMenuUserId((prev) => (prev === r.userId ? null : r.userId))
+                          }
                           aria-label={p.labels.more}
                           aria-expanded={menuUserId === r.userId}
                           className="grid size-[30px] place-items-center rounded-full text-neutral-400 transition-colors hover:text-white"
@@ -256,8 +252,17 @@ export default function FriendsTab(p: FriendsTabProps) {
                                 }}
                                 className="flex w-full items-center gap-[10px] rounded-[10px] px-[12px] py-[8px] text-left text-[13px] font-medium text-white transition-colors hover:bg-white/10"
                               >
-                                <MaskIcon name={r.isFollowing ? "user-check" : "person-add"} width={15} />
-                                <span>{r.isFollowing ? (isFriend ? "Unfriend" : "Unfollow") : "Add friend"}</span>
+                                <MaskIcon
+                                  name={r.isFollowing ? "user-check" : "person-add"}
+                                  width={15}
+                                />
+                                <span>
+                                  {r.isFollowing
+                                    ? isFriend
+                                      ? "Unfriend"
+                                      : "Unfollow"
+                                    : "Add friend"}
+                                </span>
                               </button>
                               {r.username && (
                                 <Link

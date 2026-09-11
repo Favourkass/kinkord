@@ -178,14 +178,15 @@ export class MembersService {
 
     const { u, p } = row;
     const isSelf = u.id === viewerId;
-    const [followCounts, mutualFriends, isFollowing, isFriend, avatarUrl, coverUrl] = await Promise.all([
-      this.follows.counts(u.id),
-      isSelf ? Promise.resolve(0) : this.follows.mutualFriendsCount(u.id, viewerId),
-      isSelf ? Promise.resolve(false) : this.follows.isFollowing(viewerId, u.id),
-      isSelf ? Promise.resolve(false) : this.follows.isFriend(viewerId, u.id),
-      p.avatarKey ? this.storage.presignDownload(p.avatarKey) : Promise.resolve(null),
-      p.coverKey ? this.storage.presignDownload(p.coverKey) : Promise.resolve(null),
-    ]);
+    const [followCounts, mutualFriends, isFollowing, isFriend, avatarUrl, coverUrl] =
+      await Promise.all([
+        this.follows.counts(u.id),
+        isSelf ? Promise.resolve(0) : this.follows.mutualFriendsCount(u.id, viewerId),
+        isSelf ? Promise.resolve(false) : this.follows.isFollowing(viewerId, u.id),
+        isSelf ? Promise.resolve(false) : this.follows.isFriend(viewerId, u.id),
+        p.avatarKey ? this.storage.presignDownload(p.avatarKey) : Promise.resolve(null),
+        p.coverKey ? this.storage.presignDownload(p.coverKey) : Promise.resolve(null),
+      ]);
     const counts = { ...followCounts, mutualFriends };
 
     return {

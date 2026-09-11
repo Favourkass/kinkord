@@ -107,9 +107,7 @@ export default function ProfileHero({
       <div className="flex flex-col items-center gap-[8px] px-[16px] pb-[16px]">
         {/* Name and Handle */}
         <div className="flex flex-wrap items-center justify-center gap-[6px] text-center">
-          <span className="text-[22px] font-bold leading-[27px] text-white">
-            {vm.displayName}
-          </span>
+          <span className="text-[22px] font-bold leading-[27px] text-white">{vm.displayName}</span>
           {vm.handle && (
             <span className="text-[16px] leading-[19px] text-neutral-400">· {vm.handle}</span>
           )}
@@ -124,7 +122,9 @@ export default function ProfileHero({
           >
             {vm.stats.friends} {labels.stats.friends}
           </button>
-          <span aria-hidden className="text-neutral-500">·</span>
+          <span aria-hidden className="text-neutral-500">
+            ·
+          </span>
           <button
             type="button"
             onClick={() => onSelectStatsTab?.("followers")}
@@ -132,7 +132,9 @@ export default function ProfileHero({
           >
             {vm.stats.followers} {labels.stats.followers}
           </button>
-          <span aria-hidden className="text-neutral-500">·</span>
+          <span aria-hidden className="text-neutral-500">
+            ·
+          </span>
           <button
             type="button"
             onClick={() => onSelectStatsTab?.("following")}

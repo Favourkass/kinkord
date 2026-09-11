@@ -22,8 +22,8 @@ export default function ChatNoticeBanners({
         <div className="flex items-start gap-3 rounded-2xl bg-[#1a1a1e] p-3.5 border border-white/5 shadow-sm">
           <Lock className="mt-0.5 size-4.5 text-[#9a9aa0] shrink-0" />
           <p className="text-[12.5px] leading-relaxed text-[#c7c7cc]">
-            Messages and calls are end-to-end encrypted. No one outside of this chat,
-            not even Kinkord, can read or listen to them.{" "}
+            Messages and calls are end-to-end encrypted. No one outside of this chat, not even
+            Kinkord, can read or listen to them.{" "}
             <button
               type="button"
               onClick={onLearnMoreEncryption}
@@ -41,9 +41,7 @@ export default function ChatNoticeBanners({
           <div className="flex items-center gap-3">
             <Clock className="size-4.5 text-[#9a9aa0] shrink-0" />
             <div className="flex flex-col">
-              <span className="text-[13px] font-semibold text-white">
-                Disappearing messages
-              </span>
+              <span className="text-[13px] font-semibold text-white">Disappearing messages</span>
               <span className="text-[12px] text-[#8e8e93]">
                 Messages will disappear in {disappearingDays} days
               </span>

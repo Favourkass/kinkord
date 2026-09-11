@@ -31,11 +31,7 @@ export default function ChatMessageTimeline({
 
       {/* Messages */}
       {messages.map((message) => (
-        <ChatMessageBubble
-          key={message.id}
-          message={message}
-          onReply={onReply}
-        />
+        <ChatMessageBubble key={message.id} message={message} onReply={onReply} />
       ))}
 
       {/* Anchor for auto-scroll */}

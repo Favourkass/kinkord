@@ -40,11 +40,7 @@ export default function ChatConversationRoom({
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col bg-black text-white">
       {/* Room Header */}
-      <ChatRoomHeader
-        conversation={conversation}
-        onBack={onBack}
-        onMoreClick={onMoreClick}
-      />
+      <ChatRoomHeader conversation={conversation} onBack={onBack} onMoreClick={onMoreClick} />
 
       {/* Security & Disappearing Notice Banners */}
       <ChatNoticeBanners

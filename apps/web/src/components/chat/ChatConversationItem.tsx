@@ -33,9 +33,7 @@ export default function ChatConversationItem({
       type="button"
       onClick={onClick}
       className={`group flex w-full items-center gap-3.5 px-4 py-3 text-left transition-colors ${
-        isSelected
-          ? "bg-white/[0.08]"
-          : "hover:bg-white/[0.04] active:bg-white/[0.06]"
+        isSelected ? "bg-white/[0.08]" : "hover:bg-white/[0.04] active:bg-white/[0.06]"
       }`}
     >
       {/* Avatar with live status dot */}
@@ -46,13 +44,7 @@ export default function ChatConversationItem({
           </div>
         ) : avatarUrl ? (
           <div className="relative size-13 overflow-hidden rounded-full ring-1 ring-white/10">
-            <Image
-              src={avatarUrl}
-              alt={name}
-              fill
-              sizes="52px"
-              className="object-cover"
-            />
+            <Image src={avatarUrl} alt={name} fill sizes="52px" className="object-cover" />
           </div>
         ) : (
           <div className="grid size-13 place-items-center rounded-full bg-zinc-800 text-zinc-300 font-semibold text-lg">
@@ -76,25 +68,19 @@ export default function ChatConversationItem({
           <h2 className="truncate text-[16px] font-semibold text-white group-hover:text-kink-gold-bright transition-colors">
             {name}
           </h2>
-          <span className="shrink-0 text-[12px] text-[#8e8e93] font-medium">
-            {timeLabel}
-          </span>
+          <span className="shrink-0 text-[12px] text-[#8e8e93] font-medium">{timeLabel}</span>
         </div>
 
         {/* Subtitle / Last Message */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-1.5 text-[13px] text-[#8e8e93]">
             {isOnline && isPinned && (
-              <span className="shrink-0 text-[12px] font-medium text-[#34c759]">
-                Online
-              </span>
+              <span className="shrink-0 text-[12px] font-medium text-[#34c759]">Online</span>
             )}
             {hasPhoto && <ImageIcon className="size-3.5 text-kink-gold-bright shrink-0" />}
             <p className="truncate">
               {previewSenderPrefix && (
-                <span className="text-[#a78bfa] font-medium">
-                  {previewSenderPrefix}
-                </span>
+                <span className="text-[#a78bfa] font-medium">{previewSenderPrefix}</span>
               )}
               {previewText}
             </p>

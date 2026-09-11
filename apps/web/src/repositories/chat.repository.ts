@@ -378,7 +378,8 @@ export async function saveMessage(message: MessagePM): Promise<MessagePM> {
       ...inMemoryConversations[convIndex],
       lastMessage: message,
       updatedAt: message.createdAt,
-      unreadCount: message.senderId === "current-user" ? 0 : inMemoryConversations[convIndex].unreadCount + 1,
+      unreadCount:
+        message.senderId === "current-user" ? 0 : inMemoryConversations[convIndex].unreadCount + 1,
     };
   }
 

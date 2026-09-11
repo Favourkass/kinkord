@@ -79,7 +79,9 @@ export default function ChatConversationList({
           <div className="flex flex-col items-center justify-center p-8 text-center text-[#8e8e93]">
             <p className="text-[15px] font-medium">No conversations found</p>
             <p className="mt-1 text-[13px]">
-              {searchQuery ? "Try a different search term." : "Start a new chat using the button below."}
+              {searchQuery
+                ? "Try a different search term."
+                : "Start a new chat using the button below."}
             </p>
           </div>
         )}

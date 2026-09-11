@@ -139,9 +139,7 @@ export function useMemberProfilePresenter(usernameParam: string, initialTab?: st
         if (cancelled) return;
         const sameRegion = (m: MemberCardPM) =>
           Boolean(
-            pm.city &&
-              m.city &&
-              m.city.trim().toLowerCase() === pm.city.trim().toLowerCase(),
+            pm.city && m.city && m.city.trim().toLowerCase() === pm.city.trim().toLowerCase(),
           );
         const sorted = res.items
           .filter((m) => m.userId !== pm.userId)

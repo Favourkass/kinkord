@@ -273,7 +273,9 @@ export default function PeopleView(p: PeopleViewProps) {
                       <div className="relative">
                         <button
                           type="button"
-                          onClick={() => setMenuUserId((prev) => (prev === r.userId ? null : r.userId))}
+                          onClick={() =>
+                            setMenuUserId((prev) => (prev === r.userId ? null : r.userId))
+                          }
                           aria-label="More options"
                           aria-expanded={menuUserId === r.userId}
                           className="grid size-[30px] place-items-center rounded-full text-neutral-400 transition-colors hover:text-white"
@@ -297,8 +299,17 @@ export default function PeopleView(p: PeopleViewProps) {
                                 }}
                                 className="flex w-full items-center gap-[10px] rounded-[10px] px-[12px] py-[8px] text-left text-[13px] font-medium text-white transition-colors hover:bg-white/10"
                               >
-                                <MaskIcon name={r.isFollowing ? "user-check" : "person-add"} width={15} />
-                                <span>{r.isFollowing ? (isFriend ? "Unfriend" : "Unfollow") : "Add friend"}</span>
+                                <MaskIcon
+                                  name={r.isFollowing ? "user-check" : "person-add"}
+                                  width={15}
+                                />
+                                <span>
+                                  {r.isFollowing
+                                    ? isFriend
+                                      ? "Unfriend"
+                                      : "Unfollow"
+                                    : "Add friend"}
+                                </span>
                               </button>
                               {r.username && (
                                 <Link

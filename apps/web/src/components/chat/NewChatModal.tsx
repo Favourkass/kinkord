@@ -53,11 +53,7 @@ const SUGGESTED_MEMBERS = [
   },
 ];
 
-export default function NewChatModal({
-  isOpen,
-  onClose,
-  onSelectMember,
-}: NewChatModalProps) {
+export default function NewChatModal({ isOpen, onClose, onSelectMember }: NewChatModalProps) {
   const [query, setQuery] = useState("");
 
   if (!isOpen) return null;
@@ -119,9 +115,7 @@ export default function NewChatModal({
                 />
               </div>
               <div className="flex flex-col min-w-0 flex-1">
-                <span className="text-[15px] font-semibold text-white truncate">
-                  {member.name}
-                </span>
+                <span className="text-[15px] font-semibold text-white truncate">{member.name}</span>
                 <span className="text-[12px] text-[#8e8e93] truncate">
                   @{member.username} • {member.role}
                 </span>

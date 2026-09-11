@@ -6,17 +6,12 @@ export interface ChatMessageBubbleProps {
   onReply?: (message: MessageVM) => void;
 }
 
-export default function ChatMessageBubble({
-  message,
-  onReply,
-}: ChatMessageBubbleProps) {
+export default function ChatMessageBubble({ message, onReply }: ChatMessageBubbleProps) {
   const { isOutgoing, text, timeLabel, readStatus, replyTo } = message;
 
   return (
     <div
-      className={`group relative flex w-full my-1 ${
-        isOutgoing ? "justify-end" : "justify-start"
-      }`}
+      className={`group relative flex w-full my-1 ${isOutgoing ? "justify-end" : "justify-start"}`}
     >
       {/* Quick reply button on hover */}
       {onReply && (
@@ -74,9 +69,7 @@ export default function ChatMessageBubble({
           <span>{timeLabel}</span>
           {isOutgoing && (
             <CheckCheck
-              className={`size-3.5 ${
-                readStatus === "read" ? "text-black" : "text-black/60"
-              }`}
+              className={`size-3.5 ${readStatus === "read" ? "text-black" : "text-black/60"}`}
             />
           )}
         </div>

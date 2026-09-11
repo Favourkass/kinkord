@@ -120,8 +120,8 @@ function MessagesContent() {
                 </div>
                 <h3 className="mt-5 text-[20px] font-bold text-white">Your Messages</h3>
                 <p className="mt-2 max-w-sm text-[14px] leading-relaxed text-[#8e8e93]">
-                  Select a conversation from the list to start chatting, or start a new
-                  private conversation.
+                  Select a conversation from the list to start chatting, or start a new private
+                  conversation.
                 </p>
                 <button
                   type="button"

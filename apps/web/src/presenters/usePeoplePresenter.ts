@@ -8,11 +8,7 @@ import {
   type PublicProfilePM,
   toPublicProfileVM,
 } from "@/domain/member";
-import {
-  type FriendPM,
-  type FriendsTab,
-  membersApi,
-} from "@/services/members.service";
+import { type FriendPM, type FriendsTab, membersApi } from "@/services/members.service";
 
 export type PeopleTabKey = "all" | "mutual" | "followers" | "following" | "suggested";
 
@@ -122,8 +118,8 @@ export function usePeoplePresenter(usernameParam: string, initialTabParam?: stri
           const sameRegion = (m: MemberCardPM) =>
             Boolean(
               profile.city &&
-                m.city &&
-                m.city.trim().toLowerCase() === profile.city.trim().toLowerCase(),
+              m.city &&
+              m.city.trim().toLowerCase() === profile.city.trim().toLowerCase(),
             );
           const sorted = res.items
             .filter((m) => m.userId !== profile.userId)
@@ -257,8 +253,7 @@ export function usePeoplePresenter(usernameParam: string, initialTabParam?: stri
     if (!q) return rawRows;
     return rawRows.filter(
       (r) =>
-        r.displayName.toLowerCase().includes(q) ||
-        (r.handle && r.handle.toLowerCase().includes(q)),
+        r.displayName.toLowerCase().includes(q) || (r.handle && r.handle.toLowerCase().includes(q)),
     );
   }, [rawRows, searchQuery]);
 

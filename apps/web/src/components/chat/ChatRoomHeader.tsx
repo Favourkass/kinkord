@@ -8,11 +8,7 @@ export interface ChatRoomHeaderProps {
   onMoreClick?: () => void;
 }
 
-export default function ChatRoomHeader({
-  conversation,
-  onBack,
-  onMoreClick,
-}: ChatRoomHeaderProps) {
+export default function ChatRoomHeader({ conversation, onBack, onMoreClick }: ChatRoomHeaderProps) {
   const { name, avatarUrl, isOnline, type } = conversation;
 
   return (
@@ -36,13 +32,7 @@ export default function ChatRoomHeader({
             </div>
           ) : avatarUrl ? (
             <div className="relative size-10 overflow-hidden rounded-full ring-1 ring-white/10">
-              <Image
-                src={avatarUrl}
-                alt={name}
-                fill
-                sizes="40px"
-                className="object-cover"
-              />
+              <Image src={avatarUrl} alt={name} fill sizes="40px" className="object-cover" />
             </div>
           ) : (
             <div className="grid size-10 place-items-center rounded-full bg-zinc-800 text-zinc-300 font-semibold">
@@ -62,12 +52,8 @@ export default function ChatRoomHeader({
         {/* Name and online status */}
         <div className="flex flex-col">
           <div className="flex items-center gap-1.5">
-            <h2 className="text-[16px] font-bold leading-tight text-white">
-              {name}
-            </h2>
-            {isOnline && type !== "group" && (
-              <span className="size-2 rounded-full bg-[#34c759]" />
-            )}
+            <h2 className="text-[16px] font-bold leading-tight text-white">{name}</h2>
+            {isOnline && type !== "group" && <span className="size-2 rounded-full bg-[#34c759]" />}
           </div>
           <span className="text-[12px] italic text-[#34c759]">
             {isOnline ? "online" : "offline"}

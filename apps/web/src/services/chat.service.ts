@@ -82,7 +82,9 @@ export async function fetchConversationById(id: string): Promise<ConversationPM 
   return chatRepo.getConversationById(id);
 }
 
-export async function fetchConversationByUsername(username: string): Promise<ConversationPM | null> {
+export async function fetchConversationByUsername(
+  username: string,
+): Promise<ConversationPM | null> {
   return chatRepo.getConversationByUsername(username);
 }
 

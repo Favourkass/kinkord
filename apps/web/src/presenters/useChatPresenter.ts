@@ -213,7 +213,14 @@ export function useChatPresenter(options: ChatPresenterOptions = {}) {
         });
       }, 1500);
     }
-  }, [activeConversationId, messageDraft, replyingTo, authUserId, authUserName, activeConversationPM]);
+  }, [
+    activeConversationId,
+    messageDraft,
+    replyingTo,
+    authUserId,
+    authUserName,
+    activeConversationPM,
+  ]);
 
   const startChatWith = useCallback(
     async (member: { name: string; username?: string; avatarUrl?: string | null }) => {

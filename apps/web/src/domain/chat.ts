@@ -152,10 +152,7 @@ export function toMessageVM(pm: MessagePM, currentUserId?: string): MessageVM {
   };
 }
 
-export function toConversationVM(
-  pm: ConversationPM,
-  currentUserId?: string,
-): ConversationVM {
+export function toConversationVM(pm: ConversationPM, currentUserId?: string): ConversationVM {
   const lastMsg = pm.lastMessage;
   const isOutgoing = Boolean(currentUserId && lastMsg?.senderId === currentUserId);
 

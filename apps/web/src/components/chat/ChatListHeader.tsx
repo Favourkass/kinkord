@@ -14,9 +14,7 @@ export default function ChatListHeader({
 }: ChatListHeaderProps) {
   return (
     <header className="flex h-[56px] items-center justify-between px-4">
-      <h1 className="text-[20px] font-extrabold tracking-[2px] text-kink-gold-bright">
-        {brand}
-      </h1>
+      <h1 className="text-[20px] font-extrabold tracking-[2px] text-kink-gold-bright">{brand}</h1>
       <div className="flex items-center gap-3">
         <button
           type="button"
