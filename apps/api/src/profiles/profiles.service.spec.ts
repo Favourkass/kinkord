@@ -91,6 +91,7 @@ describe("ProfilesService", () => {
       presignDownload: vi.fn(async () => "https://s3/download"),
       describe: vi.fn(async () => ({ size: 120_000, contentType: "image/jpeg" })),
       remove: vi.fn(async () => undefined),
+      copy: vi.fn(async () => undefined),
     };
     return {
       service: new ProfilesService(db, storage as unknown as StorageService),
@@ -117,18 +118,24 @@ describe("ProfilesService", () => {
     expect(db.update).toHaveBeenCalled();
   });
 
-  it("rejects and cleans up a photo whose smaller sizes never landed", async () => {
+  it("fills a missing size with a copy of the original instead of rejecting (old clients)", async () => {
     const { service, storage, db } = makeService();
-    // Original present, the "sm" variant missing.
+    // Original present, the "sm" variant missing, "md" present.
     storage.describe
       .mockResolvedValueOnce({ size: 120_000, contentType: "image/jpeg" })
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ size: 9_000, contentType: "image/jpeg" });
-    await expect(
-      service.updateOwn("u1", { avatarKey: "avatars/u1/pic.jpg" }, "Favour"),
-    ).rejects.toThrow(/incomplete/);
-    expect(storage.remove).toHaveBeenCalledWith("avatars/u1/pic.jpg");
-    expect(db.update).not.toHaveBeenCalled();
+    await service.updateOwn("u1", { avatarKey: "avatars/u1/pic.jpg" }, "Favour");
+    expect(storage.copy).toHaveBeenCalledTimes(1);
+    expect(storage.copy).toHaveBeenCalledWith("avatars/u1/pic.jpg", "avatars/u1/pic_sm.jpg");
+    expect(storage.remove).not.toHaveBeenCalled();
+    expect(db.update).toHaveBeenCalled();
+  });
+
+  it("copies nothing when every size already exists (new clients)", async () => {
+    const { service, storage } = makeService();
+    await service.updateOwn("u1", { avatarKey: "avatars/u1/pic.jpg" }, "Favour");
+    expect(storage.copy).not.toHaveBeenCalled();
   });
 
   it("checks the original and every stored size before saving the key", async () => {

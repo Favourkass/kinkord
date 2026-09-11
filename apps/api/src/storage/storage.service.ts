@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import {
+  CopyObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
@@ -108,6 +109,17 @@ export class StorageService {
       if (isMissing(e)) return null;
       throw e;
     }
+  }
+
+  /** Server-side copy within the bucket (no download). Used to fill a missing size. */
+  async copy(fromKey: string, toKey: string): Promise<void> {
+    await this.s3.send(
+      new CopyObjectCommand({
+        Bucket: this.bucket,
+        CopySource: `${this.bucket}/${encodeURIComponent(fromKey).replace(/%2F/g, "/")}`,
+        Key: toKey,
+      }),
+    );
   }
 
   /** Best-effort delete for rejected uploads; never throws. */

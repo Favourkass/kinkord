@@ -160,13 +160,17 @@ export class ProfilesService {
       const info = await this.storage.describe(key);
       if (!info) throw new BadRequestException(`${field}: upload not found`);
       // Every size must exist, or small surfaces would request a missing object.
-      const variants = await Promise.all(
-        IMAGE_VARIANTS.map((v) => this.storage.describe(variantKey(key, v))),
+      // A client still running the previous app version uploads only the
+      // original; rather than reject it, fill each missing size with a copy of
+      // the original. Those surfaces then show a full-size image (today's
+      // behaviour) instead of a broken one, and nobody is stuck until their app
+      // updates. New clients upload real thumbnails and never hit this path.
+      await Promise.all(
+        IMAGE_VARIANTS.map(async (v) => {
+          const target = variantKey(key, v);
+          if (!(await this.storage.describe(target))) await this.storage.copy(key, target);
+        }),
       );
-      if (variants.some((v) => !v)) {
-        await this.storage.remove(key);
-        throw new BadRequestException(`${field}: upload incomplete — please retry`);
-      }
       if (info.size > maxBytes(spec)) {
         await this.storage.remove(key);
         throw new BadRequestException(tooLarge(spec));

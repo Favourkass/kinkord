@@ -24,6 +24,9 @@ vi.mock("@aws-sdk/client-s3", () => ({
   DeleteObjectCommand: class {
     constructor(public input: unknown) {}
   },
+  CopyObjectCommand: class {
+    constructor(public input: unknown) {}
+  },
 }));
 
 type SignCall = [unknown, { input: Record<string, unknown> }, Record<string, unknown>];
@@ -151,6 +154,17 @@ describe("StorageService", () => {
     expect(await storage.describe("avatars/u1/nope.jpg")).toBeNull();
     send.mockRejectedValueOnce({ name: "InternalError", $metadata: { httpStatusCode: 500 } });
     await expect(storage.describe("avatars/u1/nope.jpg")).rejects.toBeTruthy();
+  });
+
+  it("copies an object within the bucket without downloading it", async () => {
+    const { StorageService } = await import("./storage.service");
+    send.mockResolvedValueOnce({});
+    await new StorageService().copy("avatars/u1/a b.jpg", "avatars/u1/a b_sm.jpg");
+    expect((send.mock.calls[0][0] as { input: unknown }).input).toEqual({
+      Bucket: "kinkord-media-test",
+      CopySource: "kinkord-media-test/avatars/u1/a%20b.jpg",
+      Key: "avatars/u1/a b_sm.jpg",
+    });
   });
 
   it("removes objects best-effort without throwing", async () => {
