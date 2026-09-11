@@ -12,6 +12,13 @@ import { PresenceModule } from "./presence/presence.module";
 import { ProfilesModule } from "./profiles/profiles.module";
 import { StorageModule } from "./storage/storage.module";
 
+//New modules that was added to the app.module.ts file
+import { RedisModule } from './redis/redis.module';
+import { UsersModule } from './users/users.module';
+import { ConversationsModule } from './conversations/conversations.module';
+import { UploadsModule } from './uploads/uploads.module';
+import { ChatModule } from './chat/chat.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -24,6 +31,11 @@ import { StorageModule } from "./storage/storage.module";
     ProfilesModule,
     CommunityModule,
     MembersModule,
+    RedisModule,
+    UsersModule,
+    ConversationsModule,
+    UploadsModule,
+    ChatModule,
   ],
   controllers: [HealthController],
   providers: [HealthService],
