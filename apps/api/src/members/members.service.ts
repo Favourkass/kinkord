@@ -146,7 +146,8 @@ export class MembersService {
         userId: r.userId,
         username: r.username,
         displayName: r.displayName,
-        avatarUrl: r.avatarKey ? await this.storage.presignDownload(r.avatarKey) : null,
+        // Cards render 139x106 at most, so the medium size is plenty.
+        avatarUrl: r.avatarKey ? await this.storage.presignDownload(r.avatarKey, "md") : null,
         age: ageFromDob(r.dateOfBirth),
         gender: r.gender,
         // CEO (2026-09-08): the card's second line is "19F • Submissive" — roles, not gender.
@@ -182,7 +183,8 @@ export class MembersService {
       this.follows.counts(u.id),
       isSelf ? Promise.resolve(0) : this.follows.mutualFriendsCount(u.id, viewerId),
       isSelf ? Promise.resolve(false) : this.follows.isFollowing(viewerId, u.id),
-      p.avatarKey ? this.storage.presignDownload(p.avatarKey) : Promise.resolve(null),
+      p.avatarKey ? this.storage.presignDownload(p.avatarKey, "md") : Promise.resolve(null),
+      // Covers are full-bleed, so they keep the original.
       p.coverKey ? this.storage.presignDownload(p.coverKey) : Promise.resolve(null),
     ]);
     const counts = { ...followCounts, mutualFriends };
@@ -234,7 +236,8 @@ export class MembersService {
         userId: r.userId,
         username: r.username,
         displayName: r.displayName,
-        avatarUrl: r.avatarKey ? await this.storage.presignDownload(r.avatarKey) : null,
+        // Friend rows are 48px circles — the small size is ~8KB.
+        avatarUrl: r.avatarKey ? await this.storage.presignDownload(r.avatarKey, "sm") : null,
         isFollowing: r.isFollowing,
       })),
     );

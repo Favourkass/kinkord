@@ -146,7 +146,8 @@ describe("MembersService", () => {
     expect(card.roles).toEqual(["Submissive", "Switch"]);
     expect(card.lastSeenAt).toBe("2026-09-08T11:59:00.000Z");
     expect(typeof card.age).toBe("number");
-    expect(presignDownload).toHaveBeenCalledWith("avatars/u2/a.jpg");
+    // Cards render the medium size, not the full-resolution original.
+    expect(presignDownload).toHaveBeenCalledWith("avatars/u2/a.jpg", "md");
   });
 
   it("404s an unknown public profile", async () => {

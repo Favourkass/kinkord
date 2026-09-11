@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { IMAGE_UPLOAD_PRESETS, compressImage } from "./image";
+import {
+  IMAGE_UPLOAD_PRESETS,
+  IMAGE_VARIANTS,
+  IMAGE_VARIANT_PRESETS,
+  buildUploadSet,
+  compressImage,
+} from "./image";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -23,6 +29,27 @@ describe("IMAGE_UPLOAD_PRESETS", () => {
     );
     const small = new File([new Uint8Array(20_000)], "me.jpg", { type: "image/jpeg" });
     expect(await compressImage(small, IMAGE_UPLOAD_PRESETS.avatar)).toBe(small);
+  });
+});
+
+describe("buildUploadSet", () => {
+  it("returns the original plus one file per stored size", async () => {
+    // No canvas in jsdom: compressImage falls back to the input, which still
+    // exercises the shape of the set and keeps the upload flow valid.
+    vi.stubGlobal("createImageBitmap", vi.fn().mockRejectedValue(new Error("no canvas")));
+    const photo = new File([new Uint8Array(400_000)], "me.jpg", { type: "image/jpeg" });
+    const set = await buildUploadSet(photo, "avatar");
+    expect(Object.keys(set.variants)).toEqual([...IMAGE_VARIANTS]);
+    expect(set.original).toBeInstanceOf(File);
+    for (const v of IMAGE_VARIANTS) expect(set.variants[v]).toBeInstanceOf(File);
+  });
+
+  it("orders the stored sizes smallest first and always re-encodes them", () => {
+    expect(IMAGE_VARIANT_PRESETS.sm.maxDim).toBeLessThan(IMAGE_VARIANT_PRESETS.md.maxDim);
+    // maxBytes 0 means a variant is never passed through at the original size.
+    for (const v of IMAGE_VARIANTS) expect(IMAGE_VARIANT_PRESETS[v].maxBytes).toBe(0);
+    // Both sit below the avatar upload cap, so a variant can never be the biggest file.
+    expect(IMAGE_VARIANT_PRESETS.md.maxDim).toBeLessThanOrEqual(IMAGE_UPLOAD_PRESETS.avatar.maxDim);
   });
 });
 

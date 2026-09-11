@@ -91,6 +91,7 @@ describe("ProfilesService", () => {
       presignDownload: vi.fn(async () => "https://s3/download"),
       describe: vi.fn(async () => ({ size: 120_000, contentType: "image/jpeg" })),
       remove: vi.fn(async () => undefined),
+      copy: vi.fn(async () => undefined),
     };
     return {
       service: new ProfilesService(db, storage as unknown as StorageService),
@@ -115,6 +116,43 @@ describe("ProfilesService", () => {
     expect(storage.describe).toHaveBeenCalledWith("avatars/u1/pic.jpg");
     expect(storage.remove).not.toHaveBeenCalled();
     expect(db.update).toHaveBeenCalled();
+  });
+
+  it("fills a missing size with a copy of the original instead of rejecting (old clients)", async () => {
+    const { service, storage, db } = makeService();
+    // Original present, the "sm" variant missing, "md" present.
+    storage.describe
+      .mockResolvedValueOnce({ size: 120_000, contentType: "image/jpeg" })
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ size: 9_000, contentType: "image/jpeg" });
+    await service.updateOwn("u1", { avatarKey: "avatars/u1/pic.jpg" }, "Favour");
+    expect(storage.copy).toHaveBeenCalledTimes(1);
+    expect(storage.copy).toHaveBeenCalledWith("avatars/u1/pic.jpg", "avatars/u1/pic_sm.jpg");
+    expect(storage.remove).not.toHaveBeenCalled();
+    expect(db.update).toHaveBeenCalled();
+  });
+
+  it("copies nothing when every size already exists (new clients)", async () => {
+    const { service, storage } = makeService();
+    await service.updateOwn("u1", { avatarKey: "avatars/u1/pic.jpg" }, "Favour");
+    expect(storage.copy).not.toHaveBeenCalled();
+  });
+
+  it("checks the original and every stored size before saving the key", async () => {
+    const { service, storage } = makeService();
+    await service.updateOwn("u1", { avatarKey: "avatars/u1/pic.jpg" }, "Favour");
+    expect(storage.describe.mock.calls.map((c) => c[0])).toEqual([
+      "avatars/u1/pic.jpg",
+      "avatars/u1/pic_sm.jpg",
+      "avatars/u1/pic_md.jpg",
+    ]);
+  });
+
+  it("hands back a presigned slot for the original and for every variant", async () => {
+    const { service } = makeService();
+    const slot = await service.presignImageUpload("u1", "avatar", "image/jpeg", 200_000);
+    expect(slot.key).toMatch(/^avatars\/u1\/[0-9a-f-]+\.jpg$/);
+    expect(Object.keys(slot.variantUploadUrls)).toEqual(["sm", "md"]);
   });
 
   it("rejects a PATCH whose key was never uploaded", async () => {

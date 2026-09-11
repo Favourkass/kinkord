@@ -16,6 +16,41 @@ export const IMAGE_UPLOAD_PRESETS = {
   cover: { maxDim: 1600, quality: 0.82, maxBytes: 800 * 1024 },
 } as const satisfies Record<"avatar" | "cover", CompressOptions>;
 
+/**
+ * Stored sizes, matching the API's IMAGE_VARIANTS. `sm` serves 36-48px rows and
+ * nav avatars; `md` serves member cards and the profile hero. maxBytes is 0 so a
+ * variant is always re-encoded rather than passed through at full size.
+ */
+export const IMAGE_VARIANTS = ["sm", "md"] as const;
+export type ImageVariant = (typeof IMAGE_VARIANTS)[number];
+
+export const IMAGE_VARIANT_PRESETS = {
+  sm: { maxDim: 160, quality: 0.82, maxBytes: 0 },
+  md: { maxDim: 480, quality: 0.82, maxBytes: 0 },
+} as const satisfies Record<ImageVariant, CompressOptions>;
+
+export interface UploadSet {
+  original: File;
+  variants: Record<ImageVariant, File>;
+}
+
+/**
+ * One photo in every size the app renders. Each variant is derived from the
+ * already-compressed original, so a phone photo is decoded once per size and
+ * never re-uploaded at full resolution for a 48px circle.
+ */
+export async function buildUploadSet(file: File, kind: "avatar" | "cover"): Promise<UploadSet> {
+  const original = await compressImage(file, IMAGE_UPLOAD_PRESETS[kind]);
+  const sizes = await Promise.all(
+    IMAGE_VARIANTS.map((v) => compressImage(original, IMAGE_VARIANT_PRESETS[v])),
+  );
+  const variants = Object.fromEntries(IMAGE_VARIANTS.map((v, i) => [v, sizes[i]])) as Record<
+    ImageVariant,
+    File
+  >;
+  return { original, variants };
+}
+
 async function loadBitmap(file: File): Promise<ImageBitmap | HTMLImageElement> {
   if (typeof createImageBitmap === "function") {
     return createImageBitmap(file);

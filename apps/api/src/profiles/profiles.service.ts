@@ -4,7 +4,12 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { Db, DRIZZLE } from "../db/db.module";
 import { profile } from "../db/schema";
-import { StorageService } from "../storage/storage.service";
+import {
+  IMAGE_VARIANTS,
+  StorageService,
+  variantKey,
+  type ImageVariant,
+} from "../storage/storage.service";
 
 const eighteenYearsAgo = () => {
   const d = new Date();
@@ -127,8 +132,16 @@ export class ProfilesService {
       throw new BadRequestException(tooLarge(spec));
     }
     const key = `${spec.prefix}/${userId}/${randomUUID()}.${ext}`;
-    const uploadUrl = await this.storage.presignUpload(key, contentType, contentLength);
-    return { key, uploadUrl, expiresInSeconds: 600, maxSizeMb: spec.maxMb };
+    // One slot per stored size. The browser downsizes and uploads all of them;
+    // the profile only points at `key` once every one has landed.
+    const [uploadUrl, ...variantUrls] = await Promise.all([
+      this.storage.presignUpload(key, contentType, contentLength),
+      ...IMAGE_VARIANTS.map((v) => this.storage.presignUpload(variantKey(key, v), contentType)),
+    ]);
+    const variantUploadUrls = Object.fromEntries(
+      IMAGE_VARIANTS.map((v, i) => [v, variantUrls[i]]),
+    ) as Record<ImageVariant, string>;
+    return { key, uploadUrl, variantUploadUrls, expiresInSeconds: 600, maxSizeMb: spec.maxMb };
   }
 
   /**
@@ -146,6 +159,18 @@ export class ProfilesService {
       const spec = UPLOAD_KINDS[kind];
       const info = await this.storage.describe(key);
       if (!info) throw new BadRequestException(`${field}: upload not found`);
+      // Every size must exist, or small surfaces would request a missing object.
+      // A client still running the previous app version uploads only the
+      // original; rather than reject it, fill each missing size with a copy of
+      // the original. Those surfaces then show a full-size image (today's
+      // behaviour) instead of a broken one, and nobody is stuck until their app
+      // updates. New clients upload real thumbnails and never hit this path.
+      await Promise.all(
+        IMAGE_VARIANTS.map(async (v) => {
+          const target = variantKey(key, v);
+          if (!(await this.storage.describe(target))) await this.storage.copy(key, target);
+        }),
+      );
       if (info.size > maxBytes(spec)) {
         await this.storage.remove(key);
         throw new BadRequestException(tooLarge(spec));

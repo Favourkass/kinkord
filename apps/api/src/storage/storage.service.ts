@@ -1,24 +1,60 @@
 import { Injectable } from "@nestjs/common";
 import {
+  CopyObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
   S3Client,
+  type S3ClientConfig,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 /** Download URLs are identical within this window, so browsers can cache them. */
 export const DOWNLOAD_URL_WINDOW_S = 3600;
 
+/**
+ * Stored sizes for every uploaded photo. The original is kept as-is; `sm` and
+ * `md` are generated at upload time so a 48px row never downloads a 512px file.
+ */
+export const IMAGE_VARIANTS = ["sm", "md"] as const;
+export type ImageVariant = (typeof IMAGE_VARIANTS)[number];
+
+/** `avatars/u1/abc.jpg` + "sm" -> `avatars/u1/abc_sm.jpg`. */
+export function variantKey(key: string, variant: ImageVariant): string {
+  const dot = key.lastIndexOf(".");
+  return dot === -1 ? `${key}_${variant}` : `${key.slice(0, dot)}_${variant}${key.slice(dot)}`;
+}
+
 export interface StoredObjectInfo {
   size: number;
   contentType: string | null;
 }
 
+/**
+ * Local development points at MinIO (docker-compose) instead of real S3, so the
+ * upload flow works with no AWS account. Setting S3_ENDPOINT switches to
+ * path-style addressing and falls back to MinIO's default root credentials —
+ * unset in every deployed environment, where the instance role supplies them.
+ */
+export function s3ClientConfig(env: NodeJS.ProcessEnv = process.env): S3ClientConfig {
+  const region = env.AWS_REGION ?? "eu-west-1";
+  const endpoint = env.S3_ENDPOINT;
+  if (!endpoint) return { region };
+  return {
+    region,
+    endpoint,
+    forcePathStyle: true,
+    credentials: {
+      accessKeyId: env.AWS_ACCESS_KEY_ID ?? "minioadmin",
+      secretAccessKey: env.AWS_SECRET_ACCESS_KEY ?? "minioadmin",
+    },
+  };
+}
+
 @Injectable()
 export class StorageService {
-  private readonly s3 = new S3Client({ region: process.env.AWS_REGION ?? "eu-west-1" });
+  private readonly s3 = new S3Client(s3ClientConfig());
   private readonly bucket = process.env.MEDIA_BUCKET ?? "";
 
   /**
@@ -45,14 +81,19 @@ export class StorageService {
    * browser serves repeat views from its cache (S3 is told to allow an hour of
    * caching). Each URL is valid for two hours — at least an hour past its window.
    */
-  async presignDownload(key: string, now: Date = new Date()): Promise<string> {
+  async presignDownload(
+    key: string,
+    variant?: ImageVariant,
+    now: Date = new Date(),
+  ): Promise<string> {
+    const target = variant ? variantKey(key, variant) : key;
     const windowMs = DOWNLOAD_URL_WINDOW_S * 1000;
     const windowStart = new Date(Math.floor(now.getTime() / windowMs) * windowMs);
     return getSignedUrl(
       this.s3,
       new GetObjectCommand({
         Bucket: this.bucket,
-        Key: key,
+        Key: target,
         ResponseCacheControl: `private, max-age=${DOWNLOAD_URL_WINDOW_S}`,
       }),
       { expiresIn: DOWNLOAD_URL_WINDOW_S * 2, signingDate: windowStart },
@@ -68,6 +109,17 @@ export class StorageService {
       if (isMissing(e)) return null;
       throw e;
     }
+  }
+
+  /** Server-side copy within the bucket (no download). Used to fill a missing size. */
+  async copy(fromKey: string, toKey: string): Promise<void> {
+    await this.s3.send(
+      new CopyObjectCommand({
+        Bucket: this.bucket,
+        CopySource: `${this.bucket}/${encodeURIComponent(fromKey).replace(/%2F/g, "/")}`,
+        Key: toKey,
+      }),
+    );
   }
 
   /** Best-effort delete for rejected uploads; never throws. */
