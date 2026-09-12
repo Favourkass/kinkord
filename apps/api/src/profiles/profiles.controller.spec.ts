@@ -11,6 +11,7 @@ const serviceMock = () =>
     getOwn: vi.fn(async () => ({ displayName: "Favour" })),
     updateOwn: vi.fn(async () => ({ displayName: "FavourK" })),
     presignImageUpload: vi.fn(async () => ({ key: "k", uploadUrl: "u" })),
+    changeUsername: vi.fn(async () => ({ username: "nene" })),
   }) as unknown as ProfilesService;
 
 describe("ProfilesController", () => {
@@ -27,6 +28,24 @@ describe("ProfilesController", () => {
       { country: "NG", roles: ["Switch"] },
       "Favour",
     );
+  });
+
+  it("serves the option lists the pickers render", () => {
+    const options = new ProfilesController(serviceMock()).options();
+    expect(options.genders).toEqual(["Male", "Female"]);
+    expect(options.relationshipStatuses).toHaveLength(17);
+    expect(options.roles).toHaveLength(20);
+    expect(options.kinks).toHaveLength(50);
+    expect(options.lookingFor).toHaveLength(10);
+    expect(options.nameChangeCooldownDays).toBe(30);
+  });
+
+  it("validates and delegates username changes", async () => {
+    const service = serviceMock();
+    const controller = new ProfilesController(service);
+    expect(() => controller.changeUsername(req, {})).toThrow(BadRequestException);
+    await controller.changeUsername(req, { username: " @Nene " });
+    expect(service.changeUsername).toHaveBeenCalledWith("u1", "@Nene");
   });
 
   it("requires a valid kind for upload URLs", () => {

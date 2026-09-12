@@ -90,6 +90,21 @@ export class FollowsService {
     return Number(row?.c ?? 0);
   }
 
+  /** Friends = they follow each other. Used to gate friends-only profiles. */
+  async areFriends(a: string, b: string): Promise<boolean> {
+    if (a === b) return false;
+    const back = alias(follow, "back");
+    const [row] = await this.db
+      .select({ c: count() })
+      .from(follow)
+      .innerJoin(
+        back,
+        and(eq(back.followerId, follow.followingId), eq(back.followingId, follow.followerId)),
+      )
+      .where(and(eq(follow.followerId, a), eq(follow.followingId, b)));
+    return Number(row?.c ?? 0) > 0;
+  }
+
   /**
    * Friends of `userId` (mutual follows), newest friendship first, with whether the
    * viewer already follows each of them.

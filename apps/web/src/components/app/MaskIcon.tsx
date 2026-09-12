@@ -32,8 +32,7 @@ export type MaskIconName =
   | "user-check"
   | "more-vertical";
 
-export interface MaskIconProps {
-  name: MaskIconName;
+interface MaskIconBaseProps {
   width: number;
   height?: number;
   /** Tailwind text-* class: the icon paints in `currentColor`. */
@@ -42,12 +41,23 @@ export interface MaskIconProps {
   label?: string;
 }
 
+/** Either a members-set icon by name, or any Figma export under /public by path (e.g. "/app/profile/edit/row-bio.svg"). */
+export type MaskIconProps = MaskIconBaseProps &
+  ({ name: MaskIconName; src?: undefined } | { name?: undefined; src: string });
+
 /**
  * Renders a Figma SVG export through a CSS mask so the exact designed glyph is
  * kept while its colour follows the theme (light/dark) via `currentColor`.
  */
-export default function MaskIcon({ name, width, height = width, className, label }: MaskIconProps) {
-  const url = `url(/app/members/icon-${name}.svg)`;
+export default function MaskIcon({
+  name,
+  src,
+  width,
+  height = width,
+  className,
+  label,
+}: MaskIconProps) {
+  const url = `url(${src ?? `/app/members/icon-${name}.svg`})`;
   const style: CSSProperties = {
     width,
     height,

@@ -1,15 +1,31 @@
-import { BadRequestException, Inject, Injectable } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { Db, DRIZZLE } from "../db/db.module";
-import { profile } from "../db/schema";
+import { profile, user } from "../db/schema";
 import {
   IMAGE_VARIANTS,
   StorageService,
   variantKey,
   type ImageVariant,
 } from "../storage/storage.service";
+import {
+  ACCEPTED_KINK_ROLES,
+  GENDERS,
+  KINKS,
+  LANGUAGES,
+  LOOKING_FOR,
+  NAME_CHANGE_COOLDOWN_DAYS,
+  PROFILE_VISIBILITIES,
+  RELATIONSHIP_STATUSES,
+} from "./profile-options";
 
 const eighteenYearsAgo = () => {
   const d = new Date();
@@ -17,17 +33,39 @@ const eighteenYearsAgo = () => {
   return d;
 };
 
+const isoCountry = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .regex(/^[A-Z]{2}$/, "must be ISO 3166-1 alpha-2");
+
+/** "female" / " FEMALE " -> "Female"; anything else is left for the enum to reject. */
+const canonicalGender = (v: string) =>
+  GENDERS.find((g) => g.toLowerCase() === v.trim().toLowerCase()) ?? v.trim();
+
+/** Public https link; blank/null clears it. */
+const socialUrl = z
+  .string()
+  .trim()
+  .max(200)
+  .url()
+  .refine((u) => u.startsWith("https://"), "Links must start with https://")
+  .nullable();
+
+export const socialLinksSchema = z
+  .object({ facebook: socialUrl.optional(), x: socialUrl.optional() })
+  .strict();
+
+/**
+ * PATCH /profile body. Everything a member picks from a list (CEO brief, 2026-09-12)
+ * is validated against `profile-options`; only bio, limits, occupation and the links
+ * are free text.
+ */
 export const updateProfileSchema = z.object({
   displayName: z.string().trim().min(3).max(30).optional(),
   bio: z.string().trim().max(500).nullable().optional(),
   pronouns: z.string().trim().max(30).nullable().optional(),
-  country: z
-    .string()
-    .trim()
-    .toUpperCase()
-    .regex(/^[A-Z]{2}$/, "country must be ISO 3166-1 alpha-2")
-    .nullable()
-    .optional(),
+  country: isoCountry.nullable().optional(),
   state: z.string().trim().min(1).max(80).nullable().optional(),
   city: z.string().trim().min(1).max(80).nullable().optional(),
   dateOfBirth: z
@@ -36,14 +74,14 @@ export const updateProfileSchema = z.object({
     .refine((s) => !Number.isNaN(new Date(s).getTime()), "dateOfBirth must be a real date")
     .refine((s) => new Date(s) <= eighteenYearsAgo(), "You must be 18 or older to join")
     .optional(),
-  gender: z.string().trim().min(1).max(20).nullable().optional(),
-  roles: z.array(z.string().trim().min(1).max(40)).max(10).optional(),
-  relationshipStatus: z.string().trim().min(1).max(60).nullable().optional(),
-  lookingFor: z.array(z.string().trim().min(1).max(40)).max(10).optional(),
-  interests: z.array(z.string().trim().min(1).max(40)).max(15).optional(),
+  gender: z.string().transform(canonicalGender).pipe(z.enum(GENDERS)).nullable().optional(),
+  roles: z.array(z.enum(ACCEPTED_KINK_ROLES)).max(10).optional(),
+  relationshipStatus: z.enum(RELATIONSHIP_STATUSES).nullable().optional(),
+  lookingFor: z.array(z.enum(LOOKING_FOR)).max(10).optional(),
+  interests: z.array(z.enum(KINKS)).max(20).optional(),
   orientation: z.string().trim().min(1).max(40).nullable().optional(),
   bodyType: z.string().trim().min(1).max(40).nullable().optional(),
-  languages: z.array(z.string().trim().min(1).max(30)).max(10).optional(),
+  languages: z.array(z.enum(LANGUAGES)).max(10).optional(),
   location: z.string().trim().min(1).max(120).nullable().optional(),
   phone: z
     .string()
@@ -53,8 +91,18 @@ export const updateProfileSchema = z.object({
     .optional(),
   avatarKey: z.string().trim().max(256).nullable().optional(),
   coverKey: z.string().trim().max(256).nullable().optional(),
+  nationality: isoCountry.nullable().optional(),
+  occupation: z.string().trim().min(1).max(80).nullable().optional(),
+  limits: z.string().trim().max(500).nullable().optional(),
+  socialLinks: socialLinksSchema.optional(),
+  profileVisibility: z.enum(PROFILE_VISIBILITIES).optional(),
 });
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
+/** Same rule as the Better Auth username plugin config (3–30, letters/digits/_/.). */
+export const USERNAME_RE = /^[a-zA-Z0-9_.]{3,30}$/;
+export const USERNAME_RULES =
+  "Usernames are 3–30 characters: letters, numbers, dots and underscores.";
 
 const UPLOAD_KINDS = {
   avatar: { prefix: "avatars", maxMb: 5 },
@@ -71,6 +119,36 @@ const IMAGE_TYPES: Record<string, string> = {
 const maxBytes = (spec: { maxMb: number }) => spec.maxMb * 1024 * 1024;
 const tooLarge = (spec: { maxMb: number }) => `Image is too large — max ${spec.maxMb}MB.`;
 
+const COOLDOWN_MS = NAME_CHANGE_COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
+
+/**
+ * 30-day lock on display name / username changes (CEO brief): the date the next change
+ * is allowed, or null when a change is allowed right now.
+ */
+export function nextAllowedChange(changedAt: Date | null | undefined, now = new Date()) {
+  if (!changedAt) return null;
+  const next = new Date(changedAt.getTime() + COOLDOWN_MS);
+  return next > now ? next : null;
+}
+
+const shortDate = (d: Date) =>
+  d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+
+export const lockMessage = (field: "display name" | "username", next: Date) =>
+  `You can change your ${field} again on ${shortDate(next)}.`;
+
+/** Postgres unique-violation, possibly wrapped by drizzle in a DrizzleQueryError. */
+const isUniqueViolation = (e: unknown): boolean => {
+  const code = (e as { code?: string; cause?: { code?: string } } | null)?.code;
+  const causeCode = (e as { cause?: { code?: string } } | null)?.cause?.code;
+  return code === "23505" || causeCode === "23505";
+};
+
 @Injectable()
 export class ProfilesService {
   constructor(
@@ -78,20 +156,17 @@ export class ProfilesService {
     private readonly storage: StorageService,
   ) {}
 
-  /** Profile is created at signup; upsert covers accounts predating that hook. */
   async getOwn(userId: string, fallbackName: string) {
-    const [row] = await this.db.select().from(profile).where(eq(profile.userId, userId));
-    if (row) return this.toVM(row);
-    const [created] = await this.db
-      .insert(profile)
-      .values({ userId, displayName: fallbackName })
-      .onConflictDoNothing()
-      .returning();
-    return this.toVM(created);
+    return this.toVM(await this.ensureRow(userId, fallbackName));
   }
 
-  async updateOwn(userId: string, input: UpdateProfileInput, fallbackName: string) {
-    await this.getOwn(userId, fallbackName);
+  async updateOwn(
+    userId: string,
+    input: UpdateProfileInput,
+    fallbackName: string,
+    now = new Date(),
+  ) {
+    const current = await this.ensureRow(userId, fallbackName);
     for (const [field, prefix] of [
       ["avatarKey", "avatars"],
       ["coverKey", "covers"],
@@ -102,12 +177,56 @@ export class ProfilesService {
       }
     }
     await this.verifyUploads(input);
+    const changes: Partial<typeof profile.$inferInsert> = { ...input };
+    if (input.displayName !== undefined && input.displayName !== current.displayName) {
+      const next = nextAllowedChange(current.displayNameChangedAt, now);
+      if (next) throw new BadRequestException({ displayName: [lockMessage("display name", next)] });
+      changes.displayNameChangedAt = now;
+    }
     const [row] = await this.db
       .update(profile)
-      .set(input)
+      .set(changes)
       .where(eq(profile.userId, userId))
       .returning();
     return this.toVM(row);
+  }
+
+  /**
+   * Username lives on the auth `user` row (Better Auth username plugin: lowercase
+   * `username` for lookups, `displayUsername` as typed). Changes are allowed once every
+   * 30 days; a taken handle is a 409.
+   */
+  async changeUsername(userId: string, requested: string, now = new Date()) {
+    const displayUsername = requested.trim().replace(/^@/, "");
+    if (!USERNAME_RE.test(displayUsername)) {
+      throw new BadRequestException({ username: [USERNAME_RULES] });
+    }
+    const [account] = await this.db
+      .select({ username: user.username, displayUsername: user.displayUsername, name: user.name })
+      .from(user)
+      .where(eq(user.id, userId));
+    if (!account) throw new NotFoundException("Account not found.");
+    const row = await this.ensureRow(userId, account.name);
+    const username = displayUsername.toLowerCase();
+    const unchanged =
+      account.username === username &&
+      (account.displayUsername ?? account.username) === displayUsername;
+    if (unchanged) return this.usernameVM(username, displayUsername, row.usernameChangedAt, now);
+
+    const next = nextAllowedChange(row.usernameChangedAt, now);
+    if (next) throw new BadRequestException({ username: [lockMessage("username", next)] });
+    try {
+      await this.db.transaction(async (tx) => {
+        await tx.update(user).set({ username, displayUsername }).where(eq(user.id, userId));
+        await tx.update(profile).set({ usernameChangedAt: now }).where(eq(profile.userId, userId));
+      });
+    } catch (e) {
+      if (isUniqueViolation(e)) {
+        throw new ConflictException({ username: ["That username is already taken."] });
+      }
+      throw e;
+    }
+    return this.usernameVM(username, displayUsername, now, now);
   }
 
   /**
@@ -142,6 +261,18 @@ export class ProfilesService {
       IMAGE_VARIANTS.map((v, i) => [v, variantUrls[i]]),
     ) as Record<ImageVariant, string>;
     return { key, uploadUrl, variantUploadUrls, expiresInSeconds: 600, maxSizeMb: spec.maxMb };
+  }
+
+  /** Profile is created at signup; upsert covers accounts predating that hook. */
+  private async ensureRow(userId: string, fallbackName: string) {
+    const [row] = await this.db.select().from(profile).where(eq(profile.userId, userId));
+    if (row) return row;
+    const [created] = await this.db
+      .insert(profile)
+      .values({ userId, displayName: fallbackName })
+      .onConflictDoNothing()
+      .returning();
+    return created;
   }
 
   /**
@@ -184,7 +315,21 @@ export class ProfilesService {
     }
   }
 
-  private async toVM(row: typeof profile.$inferSelect) {
+  private usernameVM(
+    username: string,
+    displayUsername: string,
+    changedAt: Date | null | undefined,
+    now: Date,
+  ) {
+    return {
+      username,
+      displayUsername,
+      usernameChangedAt: changedAt?.toISOString() ?? null,
+      canChangeUsernameAt: nextAllowedChange(changedAt, now)?.toISOString() ?? null,
+    };
+  }
+
+  private async toVM(row: typeof profile.$inferSelect, now = new Date()) {
     return {
       displayName: row.displayName,
       bio: row.bio,
@@ -206,6 +351,17 @@ export class ProfilesService {
       phoneVerified: row.phoneVerified,
       avatarUrl: row.avatarKey ? await this.storage.presignDownload(row.avatarKey) : null,
       coverUrl: row.coverKey ? await this.storage.presignDownload(row.coverKey) : null,
+      nationality: row.nationality ?? null,
+      occupation: row.occupation ?? null,
+      limits: row.limits ?? null,
+      socialLinks: row.socialLinks ?? {},
+      profileVisibility: row.profileVisibility ?? "public",
+      displayNameChangedAt: row.displayNameChangedAt?.toISOString() ?? null,
+      /** null = a change is allowed now; otherwise the date the 30-day lock lifts. */
+      canChangeDisplayNameAt:
+        nextAllowedChange(row.displayNameChangedAt, now)?.toISOString() ?? null,
+      usernameChangedAt: row.usernameChangedAt?.toISOString() ?? null,
+      canChangeUsernameAt: nextAllowedChange(row.usernameChangedAt, now)?.toISOString() ?? null,
       updatedAt: row.updatedAt,
     };
   }

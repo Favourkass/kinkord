@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Patch,
   Post,
   Req,
@@ -10,7 +11,10 @@ import {
 } from "@nestjs/common";
 import { z } from "zod";
 import { AuthGuard, AuthedRequest } from "../auth/auth.guard";
+import { PROFILE_OPTIONS } from "./profile-options";
 import { ProfilesService, updateProfileSchema } from "./profiles.service";
+
+const usernameSchema = z.object({ username: z.string().trim().min(1).max(64) });
 
 const uploadUrlSchema = z.object({
   kind: z.enum(["avatar", "cover"]),
@@ -27,6 +31,21 @@ export class ProfilesController {
   @Get()
   getOwn(@Req() req: AuthedRequest) {
     return this.profiles.getOwn(req.user.id, req.user.name);
+  }
+
+  /** Option lists for Edit Profile pickers — the API owns them, the web only renders them. */
+  @Get("options")
+  @Header("Cache-Control", "private, max-age=3600")
+  options() {
+    return PROFILE_OPTIONS;
+  }
+
+  /** Username changes bypass Better Auth's update-user on purpose: 30-day lock lives here. */
+  @Patch("username")
+  changeUsername(@Req() req: AuthedRequest, @Body() body: unknown) {
+    const parsed = usernameSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException({ username: ["username is required"] });
+    return this.profiles.changeUsername(req.user.id, parsed.data.username);
   }
 
   @Patch()
