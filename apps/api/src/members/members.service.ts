@@ -12,7 +12,9 @@ export type FriendsTab = "all" | "mutual";
 
 export interface ListMembersParams {
   country: string;
-  state: string;
+  /** Omit to list the whole country (CEO, 2026-09-12: "click Nigeria → everyone in Nigeria"). */
+  state?: string | null;
+  /** Only meaningful together with `state`. */
   lga?: string | null;
   sort: MembersSort;
   page?: number;
@@ -79,17 +81,19 @@ export class MembersService {
   }
 
   /**
-   * Member cards for a state (optionally narrowed to an LGA/area), newest first by
-   * default, with the viewer's follow state on each card. The viewer is excluded.
+   * Member cards for a country, a state within it, or one LGA/area within that state
+   * — each click narrows: Nigeria → everyone in Nigeria, Delta → everyone in Delta,
+   * Abraka → everyone in Abraka. Newest first by default, with the viewer's follow
+   * state on each card. The viewer is excluded.
    */
   async list(params: ListMembersParams, viewerId: string) {
     const { page, limit, offset } = normalizePaging(params.page, params.limit);
     const conditions = [
       eq(profile.country, params.country.toUpperCase()),
-      eq(profile.state, params.state),
       ne(profile.userId, viewerId),
     ];
-    if (params.lga) conditions.push(eq(profile.city, params.lga));
+    if (params.state) conditions.push(eq(profile.state, params.state));
+    if (params.state && params.lga) conditions.push(eq(profile.city, params.lga));
     const where = and(...conditions);
 
     const followerCounts = this.db
@@ -179,15 +183,22 @@ export class MembersService {
 
     const { u, p } = row;
     const isSelf = u.id === viewerId;
-    const [followCounts, mutualFriends, isFollowing, avatarUrl, coverUrl] = await Promise.all([
-      this.follows.counts(u.id),
-      isSelf ? Promise.resolve(0) : this.follows.mutualFriendsCount(u.id, viewerId),
-      isSelf ? Promise.resolve(false) : this.follows.isFollowing(viewerId, u.id),
-      p.avatarKey ? this.storage.presignDownload(p.avatarKey, "md") : Promise.resolve(null),
-      // Covers are full-bleed, so they keep the original.
-      p.coverKey ? this.storage.presignDownload(p.coverKey) : Promise.resolve(null),
-    ]);
+    const friendsOnly = p.profileVisibility === "friends" && !isSelf;
+    const [followCounts, mutualFriends, isFollowing, avatarUrl, coverUrl, isFriend] =
+      await Promise.all([
+        this.follows.counts(u.id),
+        isSelf ? Promise.resolve(0) : this.follows.mutualFriendsCount(u.id, viewerId),
+        isSelf ? Promise.resolve(false) : this.follows.isFollowing(viewerId, u.id),
+        p.avatarKey ? this.storage.presignDownload(p.avatarKey, "md") : Promise.resolve(null),
+        // Covers are full-bleed, so they keep the original.
+        p.coverKey ? this.storage.presignDownload(p.coverKey) : Promise.resolve(null),
+        friendsOnly ? this.follows.areFriends(viewerId, u.id) : Promise.resolve(true),
+      ]);
     const counts = { ...followCounts, mutualFriends };
+    // Friends-only profile seen by a non-friend: what the directory card already shows
+    // stays (so they can still follow back), the About details are withheld.
+    const restricted = friendsOnly && !isFriend;
+    const hidden = <T>(value: T, empty: T) => (restricted ? empty : value);
 
     return {
       userId: u.id,
@@ -195,25 +206,30 @@ export class MembersService {
       displayName: p.displayName,
       avatarUrl,
       coverUrl,
-      bio: p.bio,
+      bio: hidden(p.bio, null),
       country: p.country,
       state: p.state,
       city: p.city,
       age: ageFromDob(p.dateOfBirth),
       gender: p.gender,
-      orientation: p.orientation,
-      relationshipStatus: p.relationshipStatus,
-      bodyType: p.bodyType,
+      orientation: hidden(p.orientation, null),
+      relationshipStatus: hidden(p.relationshipStatus, null),
+      bodyType: hidden(p.bodyType, null),
       roles: p.roles ?? [],
-      interests: p.interests ?? [],
-      lookingFor: p.lookingFor ?? [],
-      languages: p.languages ?? [],
+      interests: hidden(p.interests ?? [], []),
+      lookingFor: hidden(p.lookingFor ?? [], []),
+      languages: hidden(p.languages ?? [], []),
+      nationality: hidden(p.nationality ?? null, null),
+      occupation: hidden(p.occupation ?? null, null),
+      limits: hidden(p.limits ?? null, null),
+      socialLinks: hidden(p.socialLinks ?? {}, {}),
       joinedAt: u.createdAt.toISOString(),
       lastSeenAt: p.lastSeenAt ? p.lastSeenAt.toISOString() : null,
       isOnline: PresenceService.isOnline(p.lastSeenAt),
       counts,
       isFollowing,
       isSelf,
+      restricted,
     };
   }
 

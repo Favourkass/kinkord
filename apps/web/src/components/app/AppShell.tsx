@@ -29,6 +29,8 @@ export interface AppShellProps {
   mobileTone?: "surface" | "members";
   /** Desktop greeting strip (avatar + "Hi …"); the directory screens don't have one in the PC frames. */
   desktopGreeting?: boolean;
+  /** Replaces the hamburger header on mobile (e.g. the Edit Profile back-arrow NavBar). */
+  mobileHeader?: ReactNode;
   children: ReactNode;
 }
 
@@ -49,6 +51,7 @@ export default function AppShell({
   labels,
   mobileTone = "surface",
   desktopGreeting = true,
+  mobileHeader,
   children,
 }: AppShellProps) {
   const tone = mobileTone === "members" ? "bg-mem-page" : "bg-app-surface";
@@ -56,7 +59,7 @@ export default function AppShell({
     <div className="min-h-dvh bg-app-page">
       {/* Mobile */}
       <div className={`flex min-h-dvh flex-col lg:hidden ${tone}`}>
-        <AppMobileHeader brand={brand} onMenu={onMenu} />
+        {mobileHeader ?? <AppMobileHeader brand={brand} onMenu={onMenu} />}
         <main className="flex flex-1 flex-col pb-[calc(57px+env(safe-area-inset-bottom))]">
           {children}
         </main>

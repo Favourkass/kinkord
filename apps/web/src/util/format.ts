@@ -61,15 +61,17 @@ export function genderInitial(gender: string | null | undefined): string {
 }
 
 /**
- * Relative time for presence: "just now", "5 minutes ago", "an hour ago",
- * "3 hours ago", "yesterday", "4 days ago", "2 weeks ago", "3 months ago", "a year ago".
+ * Relative time for presence and posts (CEO, 2026-09-12: "2 seconds ago, 3 minutes ago,
+ * an hour ago, 2 months ago"): "just now" only within the first second, then seconds,
+ * minutes, hours, "yesterday"/days, weeks, months, years.
  */
 export function timeAgo(iso: string | null | undefined, now = new Date()): string | null {
   if (!iso) return null;
   const then = new Date(iso);
   if (Number.isNaN(then.getTime())) return null;
   const s = Math.max(0, Math.floor((now.getTime() - then.getTime()) / 1000));
-  if (s < 60) return "just now";
+  if (s < 1) return "just now";
+  if (s < 60) return s === 1 ? "a second ago" : `${s} seconds ago`;
   const m = Math.floor(s / 60);
   if (m < 60) return m === 1 ? "a minute ago" : `${m} minutes ago`;
   const h = Math.floor(m / 60);
@@ -82,4 +84,23 @@ export function timeAgo(iso: string | null | undefined, now = new Date()): strin
   if (d < 365) return mo <= 1 ? "a month ago" : `${mo} months ago`;
   const y = Math.floor(d / 365);
   return y === 1 ? "a year ago" : `${y} years ago`;
+}
+
+/** ISO date or timestamp -> "26 Mar 1998" (UTC, en-GB); null when missing or unparseable. */
+export function shortDate(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+/** "female" -> "Female"; keeps already-cased values; "" for nothing. */
+export function capitalize(value: string | null | undefined): string {
+  const v = (value ?? "").trim();
+  return v ? v.charAt(0).toUpperCase() + v.slice(1) : "";
 }

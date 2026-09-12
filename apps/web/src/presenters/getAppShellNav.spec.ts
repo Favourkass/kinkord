@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getAppShellNav } from "./getAppShellNav";
+import { appShellProps, getAppShellNav } from "./getAppShellNav";
 
 describe("getAppShellNav", () => {
   it("maps every nav item to its route and label", () => {
@@ -21,5 +21,29 @@ describe("getAppShellNav", () => {
       settings: "Settings and Privacy",
       logout: "Log Out",
     });
+  });
+});
+
+describe("appShellProps", () => {
+  it("maps the home presenter + nav onto AppShell's props", () => {
+    const nav = getAppShellNav();
+    const openDrawer = () => {};
+    const props = appShellProps(
+      {
+        greeting: "Hi Tega",
+        name: "Tega",
+        handle: "@tega",
+        avatarUrl: null,
+        membersCount: "128",
+        drawerOpen: false,
+        openDrawer,
+        closeDrawer: () => {},
+        logout: () => {},
+      },
+      nav,
+    );
+    expect(props).toMatchObject({ brand: "KINKORD", greeting: "Hi Tega", membersCount: "128" });
+    expect(props.onMenu).toBe(openDrawer);
+    expect(props.links).toBe(nav.links);
   });
 });
