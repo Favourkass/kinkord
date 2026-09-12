@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  capitalize,
   compactNumber,
   countryName,
   displayState,
   flagEmoji,
   genderInitial,
   monthYear,
+  shortDate,
   timeAgo,
 } from "./format";
 
@@ -99,5 +101,19 @@ describe("timeAgo", () => {
     expect(timeAgo(null, now)).toBeNull();
     expect(timeAgo("bad", now)).toBeNull();
     expect(timeAgo(new Date(now.getTime() + 60_000).toISOString(), now)).toBe("just now");
+  });
+});
+
+describe("shortDate + capitalize", () => {
+  it("formats dates the way the Edit Profile rows show them", () => {
+    expect(shortDate("1998-03-26")).toBe("26 Mar 1998");
+    expect(shortDate("2025-05-25T10:00:00.000Z")).toBe("25 May 2025");
+    expect(shortDate(null)).toBeNull();
+    expect(shortDate("nope")).toBeNull();
+  });
+  it("capitalises stored lowercase values without touching cased ones", () => {
+    expect(capitalize("female")).toBe("Female");
+    expect(capitalize("Male")).toBe("Male");
+    expect(capitalize(null)).toBe("");
   });
 });

@@ -16,7 +16,15 @@ export const Routes = {
   appHome: "/home",
   messages: "/messages",
   settings: "/settings",
+  /** Password + 2FA moved here from /profile (CEO, 2026-09-12: "we still need to keep the change password and co"). */
+  settingsSecurity: "/settings/security",
+  // Edit Profile hub (Figma 1542:30) and its five sections.
   profileEdit: "/profile/edit",
+  profileEditPhotos: "/profile/edit/photos",
+  profileEditBasic: "/profile/edit/basic",
+  profileEditKinks: "/profile/edit/kinks",
+  profileEditLocation: "/profile/edit/location",
+  profileEditPrivacy: "/profile/edit/privacy",
   forgotPassword: "/forgot-password",
   resetPassword: "/reset-password",
   verifyEmail: "/verify-email",

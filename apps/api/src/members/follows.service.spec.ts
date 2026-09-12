@@ -134,3 +134,16 @@ describe("FollowsService friends lists", () => {
     expect(select).not.toHaveBeenCalled();
   });
 });
+
+describe("FollowsService.areFriends", () => {
+  it("is true only when both follow rows exist, and never with yourself", async () => {
+    const { db, select } = makeDb();
+    const svc = new FollowsService(db);
+    select.mockReturnValueOnce(chain([{ c: 1 }]));
+    await expect(svc.areFriends("me", "u2")).resolves.toBe(true);
+    select.mockReturnValueOnce(chain([{ c: 0 }]));
+    await expect(svc.areFriends("me", "u3")).resolves.toBe(false);
+    await expect(svc.areFriends("me", "me")).resolves.toBe(false);
+    expect(select).toHaveBeenCalledTimes(2);
+  });
+});

@@ -183,15 +183,22 @@ export class MembersService {
 
     const { u, p } = row;
     const isSelf = u.id === viewerId;
-    const [followCounts, mutualFriends, isFollowing, avatarUrl, coverUrl] = await Promise.all([
-      this.follows.counts(u.id),
-      isSelf ? Promise.resolve(0) : this.follows.mutualFriendsCount(u.id, viewerId),
-      isSelf ? Promise.resolve(false) : this.follows.isFollowing(viewerId, u.id),
-      p.avatarKey ? this.storage.presignDownload(p.avatarKey, "md") : Promise.resolve(null),
-      // Covers are full-bleed, so they keep the original.
-      p.coverKey ? this.storage.presignDownload(p.coverKey) : Promise.resolve(null),
-    ]);
+    const friendsOnly = p.profileVisibility === "friends" && !isSelf;
+    const [followCounts, mutualFriends, isFollowing, avatarUrl, coverUrl, isFriend] =
+      await Promise.all([
+        this.follows.counts(u.id),
+        isSelf ? Promise.resolve(0) : this.follows.mutualFriendsCount(u.id, viewerId),
+        isSelf ? Promise.resolve(false) : this.follows.isFollowing(viewerId, u.id),
+        p.avatarKey ? this.storage.presignDownload(p.avatarKey, "md") : Promise.resolve(null),
+        // Covers are full-bleed, so they keep the original.
+        p.coverKey ? this.storage.presignDownload(p.coverKey) : Promise.resolve(null),
+        friendsOnly ? this.follows.areFriends(viewerId, u.id) : Promise.resolve(true),
+      ]);
     const counts = { ...followCounts, mutualFriends };
+    // Friends-only profile seen by a non-friend: what the directory card already shows
+    // stays (so they can still follow back), the About details are withheld.
+    const restricted = friendsOnly && !isFriend;
+    const hidden = <T>(value: T, empty: T) => (restricted ? empty : value);
 
     return {
       userId: u.id,
@@ -199,25 +206,30 @@ export class MembersService {
       displayName: p.displayName,
       avatarUrl,
       coverUrl,
-      bio: p.bio,
+      bio: hidden(p.bio, null),
       country: p.country,
       state: p.state,
       city: p.city,
       age: ageFromDob(p.dateOfBirth),
       gender: p.gender,
-      orientation: p.orientation,
-      relationshipStatus: p.relationshipStatus,
-      bodyType: p.bodyType,
+      orientation: hidden(p.orientation, null),
+      relationshipStatus: hidden(p.relationshipStatus, null),
+      bodyType: hidden(p.bodyType, null),
       roles: p.roles ?? [],
-      interests: p.interests ?? [],
-      lookingFor: p.lookingFor ?? [],
-      languages: p.languages ?? [],
+      interests: hidden(p.interests ?? [], []),
+      lookingFor: hidden(p.lookingFor ?? [], []),
+      languages: hidden(p.languages ?? [], []),
+      nationality: hidden(p.nationality ?? null, null),
+      occupation: hidden(p.occupation ?? null, null),
+      limits: hidden(p.limits ?? null, null),
+      socialLinks: hidden(p.socialLinks ?? {}, {}),
       joinedAt: u.createdAt.toISOString(),
       lastSeenAt: p.lastSeenAt ? p.lastSeenAt.toISOString() : null,
       isOnline: PresenceService.isOnline(p.lastSeenAt),
       counts,
       isFollowing,
       isSelf,
+      restricted,
     };
   }
 

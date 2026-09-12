@@ -85,3 +85,22 @@ export function timeAgo(iso: string | null | undefined, now = new Date()): strin
   const y = Math.floor(d / 365);
   return y === 1 ? "a year ago" : `${y} years ago`;
 }
+
+/** ISO date or timestamp -> "26 Mar 1998" (UTC, en-GB); null when missing or unparseable. */
+export function shortDate(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+/** "female" -> "Female"; keeps already-cased values; "" for nothing. */
+export function capitalize(value: string | null | undefined): string {
+  const v = (value ?? "").trim();
+  return v ? v.charAt(0).toUpperCase() + v.slice(1) : "";
+}
