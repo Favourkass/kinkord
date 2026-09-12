@@ -14,12 +14,10 @@ vi.mock("./apiClient", () => ({
 
 import {
   decodeParam,
-  filterStates,
   hasMore,
   isCountryAvailable,
   membersApi,
   nextSort,
-  mergeStateCounts,
   regionsForState,
   searchCountries,
   statesForCountry,
@@ -55,6 +53,8 @@ describe("membersApi", () => {
       limit: 20,
       sort: "recent",
     });
+    // No state = the whole country; a region without a state is meaningless and dropped.
+    await membersApi.page({ country: "ng", state: null, region: "Asaba", page: 1, limit: 20 });
     await membersApi.profile("@Nene");
     await membersApi.friends("@Nene", "mutual", 2, 20);
     await membersApi.follow("@nene");
@@ -65,6 +65,7 @@ describe("membersApi", () => {
       "/members?country=NG&state=Akwa+Ibom&lga=Uyo&page=2&limit=20",
       "/members?country=NG&state=Delta&lga=Asaba&page=1&limit=20&sort=followers",
       "/members?country=NG&state=Delta&page=1&limit=20&sort=recent",
+      "/members?country=NG&page=1&limit=20",
       "/profiles/Nene",
       "/profiles/Nene/friends?tab=mutual&page=2&limit=20",
     ]);
@@ -122,20 +123,6 @@ describe("states + regions", () => {
     expect(regionsForState("GH", "Delta")).toEqual([]);
     expect(isCountryAvailable("ng")).toBe(true);
     expect(isCountryAvailable("GH")).toBe(false);
-  });
-
-  it("merges live counts onto every configured state and filters by query", () => {
-    const merged = mergeStateCounts(
-      ["Abia", "Delta", "Lagos"],
-      [{ state: "Delta", membersCount: 42 }],
-    );
-    expect(merged).toEqual([
-      { state: "Abia", membersCount: 0 },
-      { state: "Delta", membersCount: 42 },
-      { state: "Lagos", membersCount: 0 },
-    ]);
-    expect(filterStates(merged, " del ")).toEqual([{ state: "Delta", membersCount: 42 }]);
-    expect(filterStates(merged, "")).toHaveLength(3);
   });
 });
 
