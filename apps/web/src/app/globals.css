@@ -245,6 +245,7 @@ body {
   --pf-sheet: #ffffff;
   --pf-input: #f3f4f6;
   --pf-input-border: #e5e7eb;
+  --pf-btn-dark: #111827;
 }
 
 html[data-theme="dark"] {
@@ -308,6 +309,7 @@ html[data-theme="dark"] {
   --pf-sheet: #111827;
   --pf-input: #0b0f14;
   --pf-input-border: #1f2937;
+  --pf-btn-dark: #000000;
 }
 
 @theme inline {
@@ -371,4 +373,5 @@ html[data-theme="dark"] {
   --color-pf-sheet: var(--pf-sheet);
   --color-pf-input: var(--pf-input);
   --color-pf-input-border: var(--pf-input-border);
+  --color-pf-btn-dark: var(--pf-btn-dark);
 }

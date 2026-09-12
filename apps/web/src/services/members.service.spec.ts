@@ -57,6 +57,9 @@ describe("membersApi", () => {
     await membersApi.page({ country: "ng", state: null, region: "Asaba", page: 1, limit: 20 });
     await membersApi.profile("@Nene");
     await membersApi.friends("@Nene", "mutual", 2, 20);
+    await membersApi.friends("nene", "suggested", 1, 3);
+    await membersApi.media("@Nene", "profile", 1, 60);
+    await membersApi.deleteMedia("m1");
     await membersApi.follow("@nene");
     await membersApi.unfollow("nene");
     expect(apiGet.mock.calls.map((c) => c[0])).toEqual([
@@ -68,7 +71,10 @@ describe("membersApi", () => {
       "/members?country=NG&page=1&limit=20",
       "/profiles/Nene",
       "/profiles/Nene/friends?tab=mutual&page=2&limit=20",
+      "/profiles/nene/friends?tab=suggested&page=1&limit=3",
+      "/profiles/Nene/media?filter=profile&page=1&limit=60",
     ]);
+    expect(apiDel).toHaveBeenCalledWith("/profile/media/m1");
     expect(apiPost).toHaveBeenCalledWith("/follows/nene", {});
     expect(apiDel).toHaveBeenCalledWith("/follows/nene");
   });
