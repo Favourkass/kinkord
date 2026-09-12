@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { NotFoundException } from "@nestjs/common";
+import { type SQL } from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { type Db } from "../db/db.module";
 import { type StorageService } from "../storage/storage.service";
 import { type FollowsService } from "./follows.service";
@@ -16,6 +18,27 @@ const chain = (result: unknown) => {
   });
   return p;
 };
+
+/** Like `chain`, but remembers the argument of every `.where(...)` so the filter can be asserted. */
+const recordingChain = (result: unknown, wheres: SQL[]) => {
+  const p: unknown = new Proxy(() => p, {
+    get: (_t, prop) => {
+      if (prop === "then")
+        return (res: (v: unknown) => unknown, rej: (e: unknown) => unknown) =>
+          Promise.resolve(result).then(res, rej);
+      if (prop === "where")
+        return (w: SQL) => {
+          wheres.push(w);
+          return p;
+        };
+      return () => p;
+    },
+    apply: () => p,
+  });
+  return p;
+};
+
+const renderWhere = (w: SQL) => new PgDialect().sqlToQuery(w);
 
 const makeService = () => {
   const select = vi.fn();
@@ -148,6 +171,38 @@ describe("MembersService", () => {
     expect(typeof card.age).toBe("number");
     // Cards render the medium size, not the full-resolution original.
     expect(presignDownload).toHaveBeenCalledWith("avatars/u2/a.jpg", "md");
+  });
+
+  it("narrows by state and LGA only when they are given: country → state → LGA", async () => {
+    const run = async (params: Parameters<MembersService["list"]>[0]) => {
+      const { service, select } = makeService();
+      const wheres: SQL[] = [];
+      select
+        .mockReturnValueOnce(chain(undefined))
+        .mockReturnValueOnce(recordingChain([], wheres))
+        .mockReturnValueOnce(recordingChain([{ total: 0 }], wheres));
+      await service.list(params, "me");
+      // The rows query and the count query must apply the very same filter.
+      expect(wheres).toHaveLength(2);
+      expect(renderWhere(wheres[1])).toEqual(renderWhere(wheres[0]));
+      return renderWhere(wheres[0]);
+    };
+
+    const country = await run({ country: "ng", sort: "recent" });
+    expect(country.params).toEqual(["NG", "me"]);
+    expect(country.sql).not.toMatch(/"state"|"city"/);
+
+    const state = await run({ country: "ng", state: "Delta", sort: "recent" });
+    expect(state.params).toEqual(["NG", "me", "Delta"]);
+    expect(state.sql).toMatch(/"state" = /);
+    expect(state.sql).not.toMatch(/"city"/);
+
+    const lga = await run({ country: "ng", state: "Delta", lga: "Abraka", sort: "recent" });
+    expect(lga.params).toEqual(["NG", "me", "Delta", "Abraka"]);
+
+    // An LGA without a state cannot narrow anything, so it is ignored rather than applied.
+    const orphanLga = await run({ country: "ng", lga: "Abraka", sort: "recent" });
+    expect(orphanLga.params).toEqual(["NG", "me"]);
   });
 
   it("404s an unknown public profile", async () => {
