@@ -5,7 +5,7 @@
 import { ALL_COUNTRY_CODES } from "@/constants/countries";
 import { AVAILABLE_COUNTRIES } from "@/constants/members";
 import { NG_LGAS } from "@/constants/nigeria";
-import type { MemberCardPM, PublicProfilePM } from "@/domain/member";
+import type { MediaPagePM, MemberCardPM, PublicProfilePM } from "@/domain/member";
 import { countryName } from "@/util/format";
 import { api } from "./apiClient";
 
@@ -35,7 +35,16 @@ export interface FriendsPagePM {
   limit: number;
 }
 
-export type FriendsTab = "all" | "mutual";
+/** People tab (Figma 1321:14): Friends · Followers · Following · Suggested (+ mutual, desktop). */
+export type FriendsTab = "all" | "mutual" | "followers" | "following" | "suggested";
+/** Media tab pills (Figma 1524:1786). */
+export type MediaFilter = "all" | "profile" | "photos" | "videos";
+
+/** DELETE /profile/media/:id — the refreshed own profile rides along for the header. */
+export interface MediaDeletePM {
+  deleted: string;
+  profile: { avatarUrl: string | null; coverUrl: string | null };
+}
 
 export interface MembersPagePM {
   items: MemberCardPM[];
@@ -54,8 +63,9 @@ export function nextSort(mode: MembersSort): MembersSort {
 
 export interface MembersPageParams {
   country: string;
-  state: string;
-  /** LGA / area filter; omit to list the whole state (CEO, 2026-09-08). */
+  /** Omit to list the whole country (CEO, 2026-09-12); a state narrows to that state. */
+  state?: string | null;
+  /** LGA / area filter within `state`; omit to list the whole state (CEO, 2026-09-08). */
   region?: string | null;
   page: number;
   limit: number;
@@ -67,8 +77,9 @@ export const membersApi = {
   states: (country: string) =>
     api.get<StateCountPM[]>(`/members/states?country=${encodeURIComponent(country.toUpperCase())}`),
   page: (p: MembersPageParams) => {
-    const qs = new URLSearchParams({ country: p.country.toUpperCase(), state: p.state });
-    if (p.region) qs.set("lga", p.region);
+    const qs = new URLSearchParams({ country: p.country.toUpperCase() });
+    if (p.state) qs.set("state", p.state);
+    if (p.state && p.region) qs.set("lga", p.region);
     qs.set("page", String(p.page));
     qs.set("limit", String(p.limit));
     if (p.sort) qs.set("sort", p.sort);
@@ -80,6 +91,11 @@ export const membersApi = {
     api.get<FriendsPagePM>(
       `/profiles/${encodeURIComponent(username.replace(/^@/, ""))}/friends?tab=${tab}&page=${page}&limit=${limit}`,
     ),
+  media: (username: string, filter: MediaFilter, page: number, limit: number) =>
+    api.get<MediaPagePM>(
+      `/profiles/${encodeURIComponent(username.replace(/^@/, ""))}/media?filter=${filter}&page=${page}&limit=${limit}`,
+    ),
+  deleteMedia: (id: string) => api.del<MediaDeletePM>(`/profile/media/${encodeURIComponent(id)}`),
   follow: (username: string) =>
     api.post<unknown>(`/follows/${encodeURIComponent(username.replace(/^@/, ""))}`, {}),
   unfollow: (username: string) =>
@@ -137,18 +153,6 @@ export function statesForCountry(code: string): string[] {
 export function regionsForState(code: string, state: string): string[] {
   if (code.toUpperCase() !== "NG") return [];
   return [...(NG_LGAS[state] ?? [])];
-}
-
-/** Every configured state with its live count (0 when nobody has registered there yet). */
-export function mergeStateCounts(states: string[], counts: StateCountPM[]): StateCountPM[] {
-  const byState = new Map(counts.map((c) => [c.state, c.membersCount]));
-  return states.map((state) => ({ state, membersCount: byState.get(state) ?? 0 }));
-}
-
-export function filterStates(rows: StateCountPM[], query: string): StateCountPM[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return rows;
-  return rows.filter((r) => r.state.toLowerCase().includes(q));
 }
 
 /** Optimistic follow flip for a directory card. */

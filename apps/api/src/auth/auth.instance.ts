@@ -10,6 +10,18 @@ import { resetPasswordEmail, verificationEmail } from "../email/templates";
 export const AUTH = Symbol("AUTH");
 export type Auth = ReturnType<typeof buildAuth>;
 
+/**
+ * Username changes go through PATCH /profile/username, which enforces the 30-day lock
+ * (CEO brief, 2026-09-12). Better Auth's generic update-user route must not be a way
+ * around it, so any username field in an update is refused here.
+ */
+export function rejectUsernameChanges<T extends object>(data: T): { data: T } {
+  if ("username" in data || "displayUsername" in data) {
+    throw new APIError("BAD_REQUEST", { message: "Change your username from Edit Profile." });
+  }
+  return { data };
+}
+
 export function buildAuth(db: Db, email: EmailService) {
   const webOrigins = (process.env.WEB_ORIGINS ?? "http://localhost:3000")
     .split(",")
@@ -61,6 +73,9 @@ export function buildAuth(db: Db, email: EmailService) {
               .values({ userId: u.id, displayName: u.name })
               .onConflictDoNothing();
           },
+        },
+        update: {
+          before: async (u) => rejectUsernameChanges(u),
         },
       },
     },

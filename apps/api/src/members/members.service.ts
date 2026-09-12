@@ -1,18 +1,30 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, asc, count, desc, eq, isNotNull, ne, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { Db, DRIZZLE } from "../db/db.module";
-import { follow, profile, user } from "../db/schema";
+import { follow, profile, profileMedia, user, type ProfileMediaKind } from "../db/schema";
 import { ONLINE_WINDOW_SECONDS, PresenceService } from "../presence/presence.service";
 import { StorageService } from "../storage/storage.service";
 import { FollowsService } from "./follows.service";
 
 export type MembersSort = "recent" | "followers" | "name";
-export type FriendsTab = "all" | "mutual";
+/** People tab (Figma 1321:14): Friends · Followers · Following · Suggested (+ mutual for the viewer). */
+export type FriendsTab = "all" | "mutual" | "followers" | "following" | "suggested";
+/** Media tab pills (Figma 1524:1786): All · Profile Photo · Photos · Videos. */
+export type MediaFilter = "all" | "profile" | "photos" | "videos";
+const MEDIA_KINDS: Record<MediaFilter, ProfileMediaKind[]> = {
+  all: ["avatar", "cover"],
+  profile: ["avatar"],
+  photos: ["cover"],
+  // Videos arrive with posts; nothing to list yet.
+  videos: [],
+};
 
 export interface ListMembersParams {
   country: string;
-  state: string;
+  /** Omit to list the whole country (CEO, 2026-09-12: "click Nigeria → everyone in Nigeria"). */
+  state?: string | null;
+  /** Only meaningful together with `state`. */
   lga?: string | null;
   sort: MembersSort;
   page?: number;
@@ -79,17 +91,19 @@ export class MembersService {
   }
 
   /**
-   * Member cards for a state (optionally narrowed to an LGA/area), newest first by
-   * default, with the viewer's follow state on each card. The viewer is excluded.
+   * Member cards for a country, a state within it, or one LGA/area within that state
+   * — each click narrows: Nigeria → everyone in Nigeria, Delta → everyone in Delta,
+   * Abraka → everyone in Abraka. Newest first by default, with the viewer's follow
+   * state on each card. The viewer is excluded.
    */
   async list(params: ListMembersParams, viewerId: string) {
     const { page, limit, offset } = normalizePaging(params.page, params.limit);
     const conditions = [
       eq(profile.country, params.country.toUpperCase()),
-      eq(profile.state, params.state),
       ne(profile.userId, viewerId),
     ];
-    if (params.lga) conditions.push(eq(profile.city, params.lga));
+    if (params.state) conditions.push(eq(profile.state, params.state));
+    if (params.state && params.lga) conditions.push(eq(profile.city, params.lga));
     const where = and(...conditions);
 
     const followerCounts = this.db
@@ -179,15 +193,22 @@ export class MembersService {
 
     const { u, p } = row;
     const isSelf = u.id === viewerId;
-    const [followCounts, mutualFriends, isFollowing, avatarUrl, coverUrl] = await Promise.all([
-      this.follows.counts(u.id),
-      isSelf ? Promise.resolve(0) : this.follows.mutualFriendsCount(u.id, viewerId),
-      isSelf ? Promise.resolve(false) : this.follows.isFollowing(viewerId, u.id),
-      p.avatarKey ? this.storage.presignDownload(p.avatarKey, "md") : Promise.resolve(null),
-      // Covers are full-bleed, so they keep the original.
-      p.coverKey ? this.storage.presignDownload(p.coverKey) : Promise.resolve(null),
-    ]);
+    const friendsOnly = p.profileVisibility === "friends" && !isSelf;
+    const [followCounts, mutualFriends, isFollowing, avatarUrl, coverUrl, isFriend] =
+      await Promise.all([
+        this.follows.counts(u.id),
+        isSelf ? Promise.resolve(0) : this.follows.mutualFriendsCount(u.id, viewerId),
+        isSelf ? Promise.resolve(false) : this.follows.isFollowing(viewerId, u.id),
+        p.avatarKey ? this.storage.presignDownload(p.avatarKey, "md") : Promise.resolve(null),
+        // Covers are full-bleed, so they keep the original.
+        p.coverKey ? this.storage.presignDownload(p.coverKey) : Promise.resolve(null),
+        friendsOnly ? this.follows.areFriends(viewerId, u.id) : Promise.resolve(true),
+      ]);
     const counts = { ...followCounts, mutualFriends };
+    // Friends-only profile seen by a non-friend: what the directory card already shows
+    // stays (so they can still follow back), the About details are withheld.
+    const restricted = friendsOnly && !isFriend;
+    const hidden = <T>(value: T, empty: T) => (restricted ? empty : value);
 
     return {
       userId: u.id,
@@ -195,26 +216,130 @@ export class MembersService {
       displayName: p.displayName,
       avatarUrl,
       coverUrl,
-      bio: p.bio,
+      bio: hidden(p.bio, null),
       country: p.country,
       state: p.state,
       city: p.city,
       age: ageFromDob(p.dateOfBirth),
       gender: p.gender,
-      orientation: p.orientation,
-      relationshipStatus: p.relationshipStatus,
-      bodyType: p.bodyType,
+      orientation: hidden(p.orientation, null),
+      relationshipStatus: hidden(p.relationshipStatus, null),
+      bodyType: hidden(p.bodyType, null),
       roles: p.roles ?? [],
-      interests: p.interests ?? [],
-      lookingFor: p.lookingFor ?? [],
-      languages: p.languages ?? [],
+      interests: hidden(p.interests ?? [], []),
+      lookingFor: hidden(p.lookingFor ?? [], []),
+      languages: hidden(p.languages ?? [], []),
+      nationality: hidden(p.nationality ?? null, null),
+      occupation: hidden(p.occupation ?? null, null),
+      limits: hidden(p.limits ?? null, null),
+      socialLinks: hidden(p.socialLinks ?? {}, {}),
       joinedAt: u.createdAt.toISOString(),
       lastSeenAt: p.lastSeenAt ? p.lastSeenAt.toISOString() : null,
       isOnline: PresenceService.isOnline(p.lastSeenAt),
       counts,
       isFollowing,
       isSelf,
+      restricted,
+      // Only you see your own birth date; everyone else gets the derived age.
+      dateOfBirth: isSelf ? p.dateOfBirth : null,
+      verification: { email: u.emailVerified, phone: p.phoneVerified },
     };
+  }
+
+  /**
+   * "Suggested" people for a member: kinksters in their state, those in their own
+   * area first (CEO brief, 2026-09-12), excluding the member and the viewer.
+   */
+  async suggested(targetId: string, viewerId: string, limit: number, offset: number) {
+    const [target] = await this.db
+      .select({ country: profile.country, state: profile.state, city: profile.city })
+      .from(profile)
+      .where(eq(profile.userId, targetId));
+    if (!target?.state) return { items: [], total: 0 };
+    const conditions = [
+      eq(profile.state, target.state),
+      ne(profile.userId, targetId),
+      ne(profile.userId, viewerId),
+    ];
+    if (target.country) conditions.push(eq(profile.country, target.country));
+    const where = and(...conditions);
+    const sameArea = target.city
+      ? sql<number>`case when ${profile.city} = ${target.city} then 1 else 0 end`
+      : sql<number>`0`;
+    const viewerFollow = alias(follow, "viewer_follow");
+    const rows = await this.db
+      .select({
+        userId: profile.userId,
+        username: user.username,
+        displayName: profile.displayName,
+        avatarKey: profile.avatarKey,
+        isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
+      })
+      .from(profile)
+      .innerJoin(user, eq(user.id, profile.userId))
+      .leftJoin(
+        viewerFollow,
+        and(eq(viewerFollow.followerId, viewerId), eq(viewerFollow.followingId, profile.userId)),
+      )
+      .where(where)
+      .orderBy(desc(sameArea), desc(profile.createdAt))
+      .limit(limit)
+      .offset(offset);
+    const [totalRow] = await this.db.select({ total: count() }).from(profile).where(where);
+    return {
+      items: rows.map((r) => ({ ...r, isFollowing: Boolean(r.isFollowing) })),
+      total: Number(totalRow?.total ?? 0),
+    };
+  }
+
+  /**
+   * Media tab: the member's uploaded profile photos and covers, newest first. Friends-only
+   * profiles show nothing to non-friends. `isCurrent` marks the photo in use right now.
+   */
+  async media(
+    username: string,
+    viewerId: string,
+    filter: MediaFilter,
+    pageArg?: number,
+    limitArg?: number,
+  ) {
+    const targetId = await this.follows.resolveUserId(username);
+    const { page, limit, offset } = normalizePaging(pageArg, limitArg);
+    const [p] = await this.db
+      .select({
+        avatarKey: profile.avatarKey,
+        coverKey: profile.coverKey,
+        visibility: profile.profileVisibility,
+      })
+      .from(profile)
+      .where(eq(profile.userId, targetId));
+    if (!p) throw new NotFoundException("Member not found.");
+    const isSelf = targetId === viewerId;
+    const restricted =
+      p.visibility === "friends" && !isSelf && !(await this.follows.areFriends(viewerId, targetId));
+    const kinds = MEDIA_KINDS[filter];
+    if (restricted || kinds.length === 0) return { items: [], total: 0, page, limit, restricted };
+    const where = and(eq(profileMedia.userId, targetId), inArray(profileMedia.kind, kinds));
+    const rows = await this.db
+      .select()
+      .from(profileMedia)
+      .where(where)
+      .orderBy(desc(profileMedia.createdAt))
+      .limit(limit)
+      .offset(offset);
+    const [totalRow] = await this.db.select({ total: count() }).from(profileMedia).where(where);
+    const items = await Promise.all(
+      rows.map(async (r) => ({
+        id: r.id,
+        kind: r.kind,
+        // Grid tiles use the medium size; the lightbox opens the original.
+        url: await this.storage.presignDownload(r.key, "md"),
+        fullUrl: await this.storage.presignDownload(r.key),
+        createdAt: r.createdAt.toISOString(),
+        isCurrent: r.key === (r.kind === "avatar" ? p.avatarKey : p.coverKey),
+      })),
+    );
+    return { items, total: Number(totalRow?.total ?? 0), page, limit, restricted: false };
   }
 
   /** A member's friends ("all" = their mutual follows; "mutual" = friends in common with the viewer). */
@@ -230,7 +355,13 @@ export class MembersService {
     const result =
       tab === "mutual"
         ? await this.follows.mutualFriends(targetId, viewerId, limit, offset)
-        : await this.follows.friends(targetId, viewerId, limit, offset);
+        : tab === "followers"
+          ? await this.follows.followers(targetId, viewerId, limit, offset)
+          : tab === "following"
+            ? await this.follows.following(targetId, viewerId, limit, offset)
+            : tab === "suggested"
+              ? await this.suggested(targetId, viewerId, limit, offset)
+              : await this.follows.friends(targetId, viewerId, limit, offset);
     const items = await Promise.all(
       result.items.map(async (r) => ({
         userId: r.userId,

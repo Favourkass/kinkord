@@ -1,6 +1,12 @@
 import { boolean, date, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
+/** Public social handles a member chooses to show (Edit Profile → Privacy & Socials). */
+export interface SocialLinks {
+  facebook?: string | null;
+  x?: string | null;
+}
+
 /**
  * Public persona — deliberately separate from the auth `user` (legal identity).
  * Pseudonymity is a product feature: nothing here needs to match KYC data.
@@ -40,6 +46,17 @@ export const profile = pgTable("profile", {
   /** S3 object keys; served via presigned GET. */
   avatarKey: text("avatar_key"),
   coverKey: text("cover_key"),
+  /** Edit Profile (CEO brief, 2026-09-12). Nationality is ISO 3166-1 alpha-2, like `country`. */
+  nationality: text("nationality"),
+  occupation: text("occupation"),
+  /** Hard limits — the one free-text field of "Kinks & interests"; everything else is picked from lists. */
+  limits: text("limits"),
+  socialLinks: jsonb("social_links").$type<SocialLinks>().notNull().default({}),
+  /** "public" (every member) or "friends" (mutual follows only). */
+  profileVisibility: text("profile_visibility").notNull().default("public"),
+  /** Display name and username may change once every 30 days; these stamp the last change. */
+  displayNameChangedAt: timestamp("display_name_changed_at"),
+  usernameChangedAt: timestamp("username_changed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()

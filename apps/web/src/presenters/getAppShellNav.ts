@@ -36,3 +36,34 @@ export function getAppShellNav(): AppShellNavVM {
     labels: { ...MEMBERS_COPY.nav },
   };
 }
+
+/** What every post-login screen hands `AppShell`, built from the home presenter + nav. */
+export interface ShellSource {
+  greeting: string;
+  name: string;
+  handle: string;
+  avatarUrl: string | null;
+  membersCount: string;
+  drawerOpen: boolean;
+  openDrawer: () => void;
+  closeDrawer: () => void;
+  logout: () => void;
+}
+
+export function appShellProps(home: ShellSource, nav: ReturnType<typeof getAppShellNav>) {
+  return {
+    brand: "KINKORD",
+    tagline: "THE WORLD'S KINK COMMUNITY",
+    greeting: home.greeting,
+    name: home.name,
+    handle: home.handle,
+    avatarUrl: home.avatarUrl,
+    membersCount: home.membersCount,
+    drawerOpen: home.drawerOpen,
+    onMenu: home.openDrawer,
+    onCloseDrawer: home.closeDrawer,
+    onLogout: home.logout,
+    links: nav.links,
+    labels: nav.labels,
+  };
+}

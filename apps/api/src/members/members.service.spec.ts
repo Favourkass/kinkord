@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { NotFoundException } from "@nestjs/common";
+import { type SQL } from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { type Db } from "../db/db.module";
 import { type StorageService } from "../storage/storage.service";
 import { type FollowsService } from "./follows.service";
@@ -16,6 +18,27 @@ const chain = (result: unknown) => {
   });
   return p;
 };
+
+/** Like `chain`, but remembers the argument of every `.where(...)` so the filter can be asserted. */
+const recordingChain = (result: unknown, wheres: SQL[]) => {
+  const p: unknown = new Proxy(() => p, {
+    get: (_t, prop) => {
+      if (prop === "then")
+        return (res: (v: unknown) => unknown, rej: (e: unknown) => unknown) =>
+          Promise.resolve(result).then(res, rej);
+      if (prop === "where")
+        return (w: SQL) => {
+          wheres.push(w);
+          return p;
+        };
+      return () => p;
+    },
+    apply: () => p,
+  });
+  return p;
+};
+
+const renderWhere = (w: SQL) => new PgDialect().sqlToQuery(w);
 
 const makeService = () => {
   const select = vi.fn();
@@ -39,6 +62,9 @@ const makeService = () => {
     total: 1,
   }));
   const mutualFriends = vi.fn(async () => ({ items: [], total: 0 }));
+  const followers = vi.fn(async () => ({ items: [], total: 4 }));
+  const following = vi.fn(async () => ({ items: [], total: 6 }));
+  const areFriends = vi.fn(async () => false);
   const follows = {
     counts,
     isFollowing,
@@ -46,6 +72,9 @@ const makeService = () => {
     resolveUserId,
     friends,
     mutualFriends,
+    followers,
+    following,
+    areFriends,
   } as unknown as FollowsService;
   return {
     service: new MembersService(db, storage, follows),
@@ -55,6 +84,9 @@ const makeService = () => {
     mutualFriendsCount,
     friends,
     mutualFriends,
+    followers,
+    following,
+    areFriends,
   };
 };
 
@@ -150,6 +182,38 @@ describe("MembersService", () => {
     expect(presignDownload).toHaveBeenCalledWith("avatars/u2/a.jpg", "md");
   });
 
+  it("narrows by state and LGA only when they are given: country → state → LGA", async () => {
+    const run = async (params: Parameters<MembersService["list"]>[0]) => {
+      const { service, select } = makeService();
+      const wheres: SQL[] = [];
+      select
+        .mockReturnValueOnce(chain(undefined))
+        .mockReturnValueOnce(recordingChain([], wheres))
+        .mockReturnValueOnce(recordingChain([{ total: 0 }], wheres));
+      await service.list(params, "me");
+      // The rows query and the count query must apply the very same filter.
+      expect(wheres).toHaveLength(2);
+      expect(renderWhere(wheres[1])).toEqual(renderWhere(wheres[0]));
+      return renderWhere(wheres[0]);
+    };
+
+    const country = await run({ country: "ng", sort: "recent" });
+    expect(country.params).toEqual(["NG", "me"]);
+    expect(country.sql).not.toMatch(/"state"|"city"/);
+
+    const state = await run({ country: "ng", state: "Delta", sort: "recent" });
+    expect(state.params).toEqual(["NG", "me", "Delta"]);
+    expect(state.sql).toMatch(/"state" = /);
+    expect(state.sql).not.toMatch(/"city"/);
+
+    const lga = await run({ country: "ng", state: "Delta", lga: "Abraka", sort: "recent" });
+    expect(lga.params).toEqual(["NG", "me", "Delta", "Abraka"]);
+
+    // An LGA without a state cannot narrow anything, so it is ignored rather than applied.
+    const orphanLga = await run({ country: "ng", lga: "Abraka", sort: "recent" });
+    expect(orphanLga.params).toEqual(["NG", "me"]);
+  });
+
   it("404s an unknown public profile", async () => {
     const { service, select } = makeService();
     select.mockReturnValueOnce(chain([]));
@@ -199,7 +263,8 @@ describe("MembersService", () => {
     expect(vm.isSelf).toBe(false);
     expect(vm.joinedAt).toBe("2023-03-10T09:00:00.000Z");
     expect(typeof vm.age).toBe("number");
-    expect(vm).not.toHaveProperty("dateOfBirth");
+    // Another member never receives the birth date, only the derived age.
+    expect(vm.dateOfBirth).toBeNull();
     expect(isFollowing).toHaveBeenCalledWith("me", "u2");
   });
 
@@ -262,5 +327,200 @@ describe("MembersService.friends", () => {
     });
     await service.friends("nene", "me", "mutual");
     expect(mutualFriends).toHaveBeenCalledWith("u2", "me", 20, 0);
+  });
+});
+
+describe("MembersService.publicProfile visibility (Edit Profile → Privacy)", () => {
+  const rowFor = (profileVisibility: string) => [
+    {
+      u: {
+        id: "u2",
+        username: "nene",
+        emailVerified: true,
+        createdAt: new Date("2023-03-10T09:00:00Z"),
+      },
+      p: {
+        displayName: "Neze",
+        avatarKey: null,
+        coverKey: null,
+        bio: "Hi",
+        country: "NG",
+        state: "Delta",
+        city: "Abraka",
+        dateOfBirth: "2000-01-01",
+        gender: "Female",
+        orientation: "Pansexual",
+        relationshipStatus: "Single",
+        bodyType: "Slim",
+        roles: ["Dominant"],
+        interests: ["Bondage"],
+        lookingFor: ["Events"],
+        languages: ["English"],
+        lastSeenAt: null,
+        nationality: "NG",
+        occupation: "Entrepreneur",
+        limits: "No blood",
+        socialLinks: { x: "https://x.com/nene" },
+        profileVisibility,
+        phoneVerified: false,
+      },
+    },
+  ];
+
+  it("withholds the About details from non-friends on a friends-only profile, keeps the card basics", async () => {
+    const { service, select, areFriends } = makeService();
+    select.mockReturnValueOnce(chain(rowFor("friends")));
+    const vm = await service.publicProfile("nene", "me");
+    expect(areFriends).toHaveBeenCalledWith("me", "u2");
+    expect(vm.restricted).toBe(true);
+    expect(vm.bio).toBeNull();
+    expect(vm.interests).toEqual([]);
+    expect(vm.occupation).toBeNull();
+    expect(vm.socialLinks).toEqual({});
+    // What the directory card already shows stays, so they can still follow back.
+    expect(vm.displayName).toBe("Neze");
+    expect(vm.roles).toEqual(["Dominant"]);
+    expect(vm.city).toBe("Abraka");
+    expect(vm.counts.followers).toBe(30);
+  });
+
+  it("shows everything to friends and to the member; public profiles skip the check", async () => {
+    const { service, select, areFriends } = makeService();
+    areFriends.mockResolvedValueOnce(true);
+    select.mockReturnValueOnce(chain(rowFor("friends")));
+    const friend = await service.publicProfile("nene", "me");
+    expect(friend.restricted).toBe(false);
+    expect(friend.limits).toBe("No blood");
+    expect(friend.nationality).toBe("NG");
+
+    select.mockReturnValueOnce(chain(rowFor("friends")));
+    const self = await service.publicProfile("nene", "u2");
+    expect(self.restricted).toBe(false);
+    expect(self.bio).toBe("Hi");
+    // Only you see your own birth date; others get the derived age.
+    expect(self.dateOfBirth).toBe("2000-01-01");
+    expect(friend.dateOfBirth).toBeNull();
+    expect(self.verification).toEqual({ email: true, phone: false });
+
+    areFriends.mockClear();
+    select.mockReturnValueOnce(chain(rowFor("public")));
+    const pub = await service.publicProfile("nene", "me");
+    expect(pub.restricted).toBe(false);
+    expect(areFriends).not.toHaveBeenCalled();
+  });
+});
+
+describe("MembersService people tabs + media (profile rebuild, 2026-09-12)", () => {
+  it("routes each People sub-tab to its list", async () => {
+    const { service, followers, following, friends, mutualFriends } = makeService();
+    await service.friends("nene", "me", "followers");
+    expect(followers).toHaveBeenCalledWith("u2", "me", 20, 0);
+    await service.friends("nene", "me", "following");
+    expect(following).toHaveBeenCalledWith("u2", "me", 20, 0);
+    await service.friends("nene", "me", "all");
+    expect(friends).toHaveBeenCalledWith("u2", "me", 20, 0);
+    await service.friends("nene", "me", "mutual");
+    expect(mutualFriends).toHaveBeenCalledWith("u2", "me", 20, 0);
+  });
+
+  it("suggests kinksters from the member's state, their own area first, never the member or viewer", async () => {
+    const { service, select } = makeService();
+    const wheres: SQL[] = [];
+    select
+      .mockReturnValueOnce(chain([{ country: "NG", state: "Delta", city: "Abraka" }]))
+      .mockReturnValueOnce(
+        recordingChain(
+          [
+            {
+              userId: "u5",
+              username: "ada",
+              displayName: "Ada",
+              avatarKey: "avatars/u5/a.jpg",
+              isFollowing: null,
+            },
+          ],
+          wheres,
+        ),
+      )
+      .mockReturnValueOnce(recordingChain([{ total: 12 }], wheres));
+    const page = await service.friends("nene", "me", "suggested", 1, 10);
+    expect(page.total).toBe(12);
+    expect(page.items[0]).toEqual({
+      userId: "u5",
+      username: "ada",
+      displayName: "Ada",
+      avatarUrl: "https://s3/avatars/u5/a.jpg",
+      isFollowing: false,
+    });
+    const { params } = renderWhere(wheres[0]);
+    expect(params).toEqual(["Delta", "u2", "me", "NG"]);
+    expect(renderWhere(wheres[1])).toEqual(renderWhere(wheres[0]));
+  });
+
+  it("suggests nobody when the member has no state on file", async () => {
+    const { service, select } = makeService();
+    select.mockReturnValueOnce(chain([{ country: "NG", state: null, city: null }]));
+    const page = await service.friends("nene", "me", "suggested");
+    expect(page).toMatchObject({ items: [], total: 0 });
+    expect(select).toHaveBeenCalledTimes(1);
+  });
+
+  it("lists uploaded profile photos with grid + full URLs and marks the current one", async () => {
+    const { service, select, presignDownload } = makeService();
+    select
+      .mockReturnValueOnce(
+        chain([{ avatarKey: "avatars/u2/new.jpg", coverKey: null, visibility: "public" }]),
+      )
+      .mockReturnValueOnce(
+        chain([
+          {
+            id: "m1",
+            userId: "u2",
+            kind: "avatar",
+            key: "avatars/u2/new.jpg",
+            createdAt: new Date("2026-09-10T00:00:00Z"),
+          },
+          {
+            id: "m0",
+            userId: "u2",
+            kind: "avatar",
+            key: "avatars/u2/old.jpg",
+            createdAt: new Date("2026-08-10T00:00:00Z"),
+          },
+        ]),
+      )
+      .mockReturnValueOnce(chain([{ total: 2 }]));
+    const page = await service.media("nene", "me", "profile");
+    expect(page.total).toBe(2);
+    expect(page.items.map((i) => [i.id, i.isCurrent])).toEqual([
+      ["m1", true],
+      ["m0", false],
+    ]);
+    expect(page.items[0].url).toBe("https://s3/avatars/u2/new.jpg");
+    expect(presignDownload).toHaveBeenCalledWith("avatars/u2/new.jpg", "md");
+    expect(presignDownload).toHaveBeenCalledWith("avatars/u2/new.jpg");
+  });
+
+  it("returns nothing for the Videos pill yet, and nothing at all to non-friends of a friends-only profile", async () => {
+    const videos = makeService();
+    videos.select.mockReturnValueOnce(
+      chain([{ avatarKey: null, coverKey: null, visibility: "public" }]),
+    );
+    await expect(videos.service.media("nene", "me", "videos")).resolves.toMatchObject({
+      items: [],
+      total: 0,
+      restricted: false,
+    });
+    expect(videos.select).toHaveBeenCalledTimes(1);
+
+    const locked = makeService();
+    locked.select.mockReturnValueOnce(
+      chain([{ avatarKey: "avatars/u2/a.jpg", coverKey: null, visibility: "friends" }]),
+    );
+    await expect(locked.service.media("nene", "me", "all")).resolves.toMatchObject({
+      items: [],
+      restricted: true,
+    });
+    expect(locked.areFriends).toHaveBeenCalledWith("me", "u2");
   });
 });
