@@ -34,6 +34,10 @@ describe("PublicProfilesController.friends", () => {
     expect(friends).toHaveBeenCalledWith("nene", "me", "all", undefined, undefined);
     await controller.friends(req, "nene", { tab: "mutual", page: "2", limit: "10" });
     expect(friends).toHaveBeenLastCalledWith("nene", "me", "mutual", 2, 10);
+    for (const tab of ["followers", "following", "suggested"] as const) {
+      await controller.friends(req, "nene", { tab });
+      expect(friends).toHaveBeenLastCalledWith("nene", "me", tab, undefined, undefined);
+    }
   });
 
   it("rejects an unknown tab or a malformed handle", () => {
@@ -42,5 +46,18 @@ describe("PublicProfilesController.friends", () => {
     expect(() => controller.friends(req, "nene", { tab: "enemies" })).toThrow(BadRequestException);
     expect(() => controller.friends(req, "bad handle", {})).toThrow(BadRequestException);
     expect(friends).not.toHaveBeenCalled();
+  });
+});
+
+describe("PublicProfilesController.media", () => {
+  it("defaults to the All pill, forwards paging and rejects junk", async () => {
+    const media = vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, limit: 20 });
+    const controller = new PublicProfilesController({ media } as unknown as MembersService);
+    await controller.media(req, "nene", {});
+    expect(media).toHaveBeenCalledWith("nene", "me", "all", undefined, undefined);
+    await controller.media(req, "@Nene", { filter: "profile", page: "2", limit: "30" });
+    expect(media).toHaveBeenLastCalledWith("@Nene", "me", "profile", 2, 30);
+    expect(() => controller.media(req, "nene", { filter: "gifs" })).toThrow(BadRequestException);
+    expect(() => controller.media(req, "bad handle", {})).toThrow(BadRequestException);
   });
 });

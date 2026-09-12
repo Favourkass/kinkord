@@ -147,3 +147,43 @@ describe("FollowsService.areFriends", () => {
     expect(select).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("FollowsService.followers / following", () => {
+  it("lists followers with the viewer's follow state and the total", async () => {
+    const { db, select } = makeDb();
+    select
+      .mockReturnValueOnce(
+        chain([
+          { userId: "u3", username: "kay", displayName: "Kay", avatarKey: null, isFollowing: null },
+        ]),
+      )
+      .mockReturnValueOnce(chain([{ c: 7 }]));
+    const page = await new FollowsService(db).followers("u2", "me", 20, 0);
+    expect(page).toEqual({
+      items: [
+        { userId: "u3", username: "kay", displayName: "Kay", avatarKey: null, isFollowing: false },
+      ],
+      total: 7,
+    });
+  });
+
+  it("lists following the same way", async () => {
+    const { db, select } = makeDb();
+    select
+      .mockReturnValueOnce(
+        chain([
+          {
+            userId: "u4",
+            username: "vee",
+            displayName: "Vee",
+            avatarKey: "a.jpg",
+            isFollowing: true,
+          },
+        ]),
+      )
+      .mockReturnValueOnce(chain([{ c: 1 }]));
+    const page = await new FollowsService(db).following("u2", "me", 20, 0);
+    expect(page.items[0]).toMatchObject({ username: "vee", isFollowing: true });
+    expect(page.total).toBe(1);
+  });
+});

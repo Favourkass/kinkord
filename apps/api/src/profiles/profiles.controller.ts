@@ -2,8 +2,10 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Header,
+  Param,
   Patch,
   Post,
   Req,
@@ -15,6 +17,7 @@ import { PROFILE_OPTIONS } from "./profile-options";
 import { ProfilesService, updateProfileSchema } from "./profiles.service";
 
 const usernameSchema = z.object({ username: z.string().trim().min(1).max(64) });
+const mediaIdSchema = z.string().uuid();
 
 const uploadUrlSchema = z.object({
   kind: z.enum(["avatar", "cover"]),
@@ -55,6 +58,14 @@ export class ProfilesController {
       throw new BadRequestException(parsed.error.flatten().fieldErrors);
     }
     return this.profiles.updateOwn(req.user.id, parsed.data, req.user.name);
+  }
+
+  /** Media tab → tap a photo → delete (own photos only). Clears the avatar/cover if it was in use. */
+  @Delete("media/:id")
+  deleteMedia(@Req() req: AuthedRequest, @Param("id") id: string) {
+    const parsed = mediaIdSchema.safeParse(id);
+    if (!parsed.success) throw new BadRequestException("invalid media id");
+    return this.profiles.deleteMedia(req.user.id, parsed.data);
   }
 
   @Post("upload-url")

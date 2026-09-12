@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import MobileTabBar from "@/components/app/MobileTabBar";
-import type { AppNavLabels, AppNavLinks } from "@/components/app/nav";
+import type { AppNavLabels, AppNavLinks, AppTab } from "@/components/app/nav";
 import ProfileNavBar, { type ProfileNavBarProps } from "./ProfileNavBar";
 import ProfileTopNav, { type ProfileTopNavProps } from "./ProfileTopNav";
 
@@ -14,6 +14,8 @@ export interface ProfileShellProps {
   /** Desktop right column. */
   aside: ReactNode;
   viewerAvatarUrl: string | null;
+  /** "profile" on your own profile so the avatar tab lights up; undefined elsewhere. */
+  activeTab?: AppTab;
   links: AppNavLinks;
   labels: AppNavLabels;
   children: ReactNode;
@@ -30,6 +32,7 @@ export default function ProfileShell({
   sideCard,
   aside,
   viewerAvatarUrl,
+  activeTab,
   links,
   labels,
   children,
@@ -42,7 +45,12 @@ export default function ProfileShell({
           {hero}
           {children}
         </main>
-        <MobileTabBar avatarUrl={viewerAvatarUrl} links={links} labels={labels} />
+        <MobileTabBar
+          active={activeTab}
+          avatarUrl={viewerAvatarUrl}
+          links={links}
+          labels={labels}
+        />
       </div>
       <div className="hidden min-h-dvh flex-col lg:flex">
         <ProfileTopNav {...topNav} />

@@ -5,11 +5,13 @@
  * never leaves the server and online/offline is decided in one place.
  */
 import {
+  capitalize,
   compactNumber,
   countryName,
   displayState,
   genderInitial,
   monthYear,
+  shortDate,
   timeAgo,
 } from "@/util/format";
 
@@ -93,6 +95,55 @@ export interface PublicProfilePM {
   counts: { friends: number; followers: number; following: number; mutualFriends: number };
   isFollowing: boolean;
   isSelf: boolean;
+  /** About cards (Edit Profile fields, 2026-09-12). */
+  nationality: string | null;
+  occupation: string | null;
+  limits: string | null;
+  socialLinks: { facebook?: string | null; x?: string | null };
+  /** Friends-only profile seen by a non-friend: About details withheld. */
+  restricted: boolean;
+  /** Only your own profile carries the birth date. */
+  dateOfBirth: string | null;
+  verification: { email: boolean; phone: boolean };
+}
+
+export type SocialPlatform = "facebook" | "x";
+
+export interface SocialLinkVM {
+  platform: SocialPlatform;
+  url: string;
+  /** "@naughty_neze" — the last path segment of the link. */
+  handle: string;
+}
+
+/** One tile of the Media tab (profile photos / covers now, post media later). */
+export interface MediaItemPM {
+  id: string;
+  kind: "avatar" | "cover" | "photo" | "video";
+  /** Grid size. */
+  url: string;
+  /** Original, for the lightbox. */
+  fullUrl: string;
+  createdAt: string;
+  isCurrent: boolean;
+}
+
+export interface MediaPagePM {
+  items: MediaItemPM[];
+  total: number;
+  page: number;
+  limit: number;
+  restricted: boolean;
+}
+
+export interface MediaTileVM {
+  id: string;
+  kind: MediaItemPM["kind"];
+  url: string;
+  fullUrl: string;
+  /** The current profile photo gets the 2-column "Featured" tile (Figma 1524:1786). */
+  featured: boolean;
+  isCurrent: boolean;
 }
 
 export interface PublicProfileVM {
@@ -125,8 +176,63 @@ export interface PublicProfileVM {
   languages: string | null;
   /** "March 2023" */
   joined: string | null;
+  /** "25 May 2025" — the exact join date (CEO, 2026-09-12). */
+  memberSince: string | null;
   isFollowing: boolean;
   isSelf: boolean;
+  /** About → Personal Information rows (Figma 1256:800), display-ready. */
+  personal: {
+    age: string | null;
+    /** "14 February 2001"; only on your own profile. */
+    dateOfBirth: string | null;
+    gender: string | null;
+    /** "Abraka, Delta State" */
+    location: string | null;
+    relationshipStatus: string | null;
+    nationality: string | null;
+    occupation: string | null;
+    languages: string | null;
+  };
+  roles: string[];
+  limits: string | null;
+  socialLinks: SocialLinkVM[];
+  verification: { level: "basic" | "none"; email: boolean; phone: boolean };
+  restricted: boolean;
+}
+
+/** "https://x.com/naughty_neze/" -> "@naughty_neze"; falls back to the host. */
+export function socialHandle(url: string): string {
+  try {
+    const u = new URL(url);
+    const last = u.pathname.split("/").filter(Boolean).pop();
+    return last ? `@${last.replace(/^@/, "")}` : u.host;
+  } catch {
+    return url;
+  }
+}
+
+function longDate(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+/** Grid tiles: the current profile photo is the featured 2-column tile. */
+export function toMediaTiles(items: MediaItemPM[]): MediaTileVM[] {
+  return items.map((m) => ({
+    id: m.id,
+    kind: m.kind,
+    url: m.url,
+    fullUrl: m.fullUrl,
+    featured: m.kind === "avatar" && m.isCurrent,
+    isCurrent: m.isCurrent,
+  }));
 }
 
 export function toPublicProfileVM(pm: PublicProfilePM, now = new Date()): PublicProfileVM {
@@ -164,8 +270,31 @@ export function toPublicProfileVM(pm: PublicProfilePM, now = new Date()): Public
     lookingFor: pm.lookingFor,
     languages: pm.languages.length > 0 ? pm.languages.join(", ") : null,
     joined: monthYear(pm.joinedAt),
+    memberSince: shortDate(pm.joinedAt),
     isFollowing: pm.isFollowing,
     isSelf: pm.isSelf,
+    personal: {
+      age: pm.age === null ? null : String(pm.age),
+      dateOfBirth: longDate(pm.dateOfBirth),
+      gender: capitalize(pm.gender) || null,
+      location: [pm.city, displayState(pm.state)].filter(Boolean).join(", ") || null,
+      relationshipStatus: pm.relationshipStatus,
+      nationality: countryName(pm.nationality),
+      occupation: pm.occupation,
+      languages: pm.languages.length > 0 ? pm.languages.join(", ") : null,
+    },
+    roles: pm.roles,
+    limits: pm.limits,
+    socialLinks: (["facebook", "x"] as const).flatMap((platform) => {
+      const url = pm.socialLinks?.[platform];
+      return url ? [{ platform, url, handle: socialHandle(url) }] : [];
+    }),
+    verification: {
+      level: pm.verification?.email || pm.verification?.phone ? "basic" : "none",
+      email: Boolean(pm.verification?.email),
+      phone: Boolean(pm.verification?.phone),
+    },
+    restricted: Boolean(pm.restricted),
   };
 }
 

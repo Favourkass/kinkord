@@ -12,6 +12,7 @@ const serviceMock = () =>
     updateOwn: vi.fn(async () => ({ displayName: "FavourK" })),
     presignImageUpload: vi.fn(async () => ({ key: "k", uploadUrl: "u" })),
     changeUsername: vi.fn(async () => ({ username: "nene" })),
+    deleteMedia: vi.fn(async () => ({ deleted: "id" })),
   }) as unknown as ProfilesService;
 
 describe("ProfilesController", () => {
@@ -46,6 +47,14 @@ describe("ProfilesController", () => {
     expect(() => controller.changeUsername(req, {})).toThrow(BadRequestException);
     await controller.changeUsername(req, { username: " @Nene " });
     expect(service.changeUsername).toHaveBeenCalledWith("u1", "@Nene");
+  });
+
+  it("only deletes media by a real id", async () => {
+    const service = serviceMock();
+    const controller = new ProfilesController(service);
+    expect(() => controller.deleteMedia(req, "nope")).toThrow(BadRequestException);
+    await controller.deleteMedia(req, "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d");
+    expect(service.deleteMedia).toHaveBeenCalledWith("u1", "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d");
   });
 
   it("requires a valid kind for upload URLs", () => {
