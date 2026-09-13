@@ -5,7 +5,7 @@
 import { ALL_COUNTRY_CODES } from "@/constants/countries";
 import { AVAILABLE_COUNTRIES } from "@/constants/members";
 import { NG_LGAS } from "@/constants/nigeria";
-import type { MemberCardPM, PublicProfilePM } from "@/domain/member";
+import type { MediaPagePM, MemberCardPM, PublicProfilePM } from "@/domain/member";
 import { countryName } from "@/util/format";
 import { api } from "./apiClient";
 
@@ -35,7 +35,16 @@ export interface FriendsPagePM {
   limit: number;
 }
 
-export type FriendsTab = "all" | "mutual";
+/** People tab (Figma 1321:14): Friends · Followers · Following · Suggested (+ mutual, desktop). */
+export type FriendsTab = "all" | "mutual" | "followers" | "following" | "suggested";
+/** Media tab pills (Figma 1524:1786). */
+export type MediaFilter = "all" | "profile" | "photos" | "videos";
+
+/** DELETE /profile/media/:id — the refreshed own profile rides along for the header. */
+export interface MediaDeletePM {
+  deleted: string;
+  profile: { avatarUrl: string | null; coverUrl: string | null };
+}
 
 export interface MembersPagePM {
   items: MemberCardPM[];
@@ -82,6 +91,11 @@ export const membersApi = {
     api.get<FriendsPagePM>(
       `/profiles/${encodeURIComponent(username.replace(/^@/, ""))}/friends?tab=${tab}&page=${page}&limit=${limit}`,
     ),
+  media: (username: string, filter: MediaFilter, page: number, limit: number) =>
+    api.get<MediaPagePM>(
+      `/profiles/${encodeURIComponent(username.replace(/^@/, ""))}/media?filter=${filter}&page=${page}&limit=${limit}`,
+    ),
+  deleteMedia: (id: string) => api.del<MediaDeletePM>(`/profile/media/${encodeURIComponent(id)}`),
   follow: (username: string) =>
     api.post<unknown>(`/follows/${encodeURIComponent(username.replace(/^@/, ""))}`, {}),
   unfollow: (username: string) =>

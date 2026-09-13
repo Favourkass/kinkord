@@ -1,3 +1,4 @@
+import Link from "next/link";
 import MaskIcon from "@/components/app/MaskIcon";
 import type { PublicProfileVM } from "@/domain/member";
 
@@ -7,6 +8,11 @@ export interface ProfileHeroLabels {
   message: string;
   yourself: string;
   editProfile: string;
+  /** Own profile (Figma 1167:552); inert until stories ship. */
+  addToStory: string;
+  /** "Gift is not working for now" (CEO) — shown, never active. */
+  gift: string;
+  comingSoon: string;
   stats: { friends: string; followers: string; following: string };
 }
 
@@ -22,9 +28,10 @@ export interface ProfileHeroProps {
 }
 
 /**
- * Figma profile header (948:2866): 180px cover, 110px avatar overlay with gold "+"
- * badge, italic "Last seen", centred name · @handle, bold stats row, pin + location,
- * "25F · Dominant | Sadist", then Follow (gold) + Message (#1f2937) buttons.
+ * Figma profile header (1167:552 own / 1202:242 member): 169px cover, 110px avatar
+ * overlay, italic "Last seen", centred name · @handle, bold stats row, pin + location,
+ * "25F · Dominant | Sadist", then the action row — own: gold "Add to story" + black
+ * "Edit profile"; member: gold Follow + black Message + inert Gift.
  */
 export default function ProfileHero({
   vm,
@@ -66,17 +73,6 @@ export default function ProfileHero({
             <span className="absolute left-[5px] top-[8px] grid size-[100px] place-items-center rounded-full bg-pf-surface-2 text-pf-muted">
               <MaskIcon name="people" width={40} />
             </span>
-          )}
-          {!vm.isSelf && (
-            <button
-              type="button"
-              onClick={onToggleFollow}
-              disabled={followBusy}
-              aria-label={vm.isFollowing ? labels.following : labels.follow}
-              className="absolute left-[75px] top-[75px] grid size-[28px] place-items-center rounded-[14px] bg-kink-gold-bright text-white"
-            >
-              <MaskIcon name={vm.isFollowing ? "user-check" : "plus"} width={14} />
-            </button>
           )}
         </div>
         {presenceText && (
@@ -122,31 +118,52 @@ export default function ProfileHero({
 
       <div className="flex gap-[12px] px-[16px] pb-[20px]">
         {vm.isSelf ? (
-          <a
-            href={editHref}
-            className="flex h-[36px] flex-1 items-center justify-center rounded-[12px] bg-kink-gold-bright text-[11px] font-bold text-white"
-          >
-            {labels.editProfile}
-          </a>
+          <>
+            <button
+              type="button"
+              aria-disabled="true"
+              title={labels.comingSoon}
+              className="flex h-[36px] flex-1 cursor-default items-center justify-center rounded-[12px] bg-kink-gold-bright text-[11px] font-bold text-white"
+            >
+              {labels.addToStory}
+            </button>
+            <Link
+              href={editHref}
+              className="flex h-[36px] flex-1 items-center justify-center gap-[8px] rounded-[12px] bg-pf-btn-dark text-[11px] font-bold text-white"
+            >
+              <MaskIcon src="/app/profile/icon-edit-filled.svg" width={16} />
+              {labels.editProfile}
+            </Link>
+          </>
         ) : (
-          <button
-            type="button"
-            onClick={onToggleFollow}
-            disabled={followBusy}
-            aria-pressed={vm.isFollowing}
-            className="flex h-[36px] flex-1 items-center justify-center gap-[8px] rounded-[12px] bg-kink-gold-bright text-[11px] font-bold text-white disabled:opacity-60"
-          >
-            <MaskIcon name={vm.isFollowing ? "user-check" : "person-add"} width={16} />
-            {vm.isFollowing ? labels.following : labels.follow}
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={onToggleFollow}
+              disabled={followBusy}
+              aria-pressed={vm.isFollowing}
+              className="flex h-[36px] flex-1 items-center justify-center gap-[8px] rounded-[12px] bg-kink-gold-bright text-[11px] font-bold text-white disabled:opacity-60"
+            >
+              <MaskIcon name={vm.isFollowing ? "user-check" : "person-add"} width={16} />
+              {vm.isFollowing ? labels.following : labels.follow}
+            </button>
+            <Link
+              href={messageHref}
+              className="flex h-[36px] flex-1 items-center justify-center gap-[8px] rounded-[12px] bg-pf-btn-dark text-[11px] font-bold text-white"
+            >
+              <MaskIcon name="message" width={16} />
+              {labels.message}
+            </Link>
+            <button
+              type="button"
+              disabled
+              title={labels.comingSoon}
+              className="flex h-[36px] w-[64px] items-center justify-center rounded-[12px] border border-pf-border bg-pf-surface-2 text-[11px] font-bold text-pf-muted"
+            >
+              {labels.gift}
+            </button>
+          </>
         )}
-        <a
-          href={messageHref}
-          className="flex h-[36px] flex-1 items-center justify-center gap-[8px] rounded-[12px] bg-[#1f2937] text-[11px] font-bold text-white"
-        >
-          <MaskIcon name="message" width={16} />
-          {labels.message}
-        </a>
       </div>
     </section>
   );

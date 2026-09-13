@@ -5,11 +5,11 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { Db, DRIZZLE } from "../db/db.module";
-import { profile, user } from "../db/schema";
+import { profile, profileMedia, user } from "../db/schema";
 import {
   IMAGE_VARIANTS,
   StorageService,
@@ -188,7 +188,48 @@ export class ProfilesService {
       .set(changes)
       .where(eq(profile.userId, userId))
       .returning();
+    // A new photo joins the member's media history (Media tab); replacing it never deletes the old one.
+    const uploads = (["avatarKey", "coverKey"] as const)
+      .filter((field) => input[field] && input[field] !== current[field])
+      .map((field) => ({
+        userId,
+        kind: (field === "avatarKey" ? "avatar" : "cover") as "avatar" | "cover",
+        key: input[field] as string,
+      }));
+    if (uploads.length > 0) await this.db.insert(profileMedia).values(uploads);
     return this.toVM(row);
+  }
+
+  /**
+   * Delete one of your own photos (Media tab → tap → delete). Removes the object and its
+   * stored sizes; if it was the current avatar/cover the profile falls back to none.
+   */
+  async deleteMedia(userId: string, id: string) {
+    const [row] = await this.db
+      .select()
+      .from(profileMedia)
+      .where(and(eq(profileMedia.id, id), eq(profileMedia.userId, userId)));
+    if (!row) throw new NotFoundException("Photo not found.");
+    await this.db.delete(profileMedia).where(eq(profileMedia.id, row.id));
+    const [current] = await this.db.select().from(profile).where(eq(profile.userId, userId));
+    const clears: Partial<typeof profile.$inferInsert> = {};
+    if (row.kind === "avatar" && current?.avatarKey === row.key) clears.avatarKey = null;
+    if (row.kind === "cover" && current?.coverKey === row.key) clears.coverKey = null;
+    let updated = current;
+    if (Object.keys(clears).length > 0) {
+      [updated] = await this.db
+        .update(profile)
+        .set(clears)
+        .where(eq(profile.userId, userId))
+        .returning();
+    }
+    // Best effort — a leftover object costs cents; a failed delete must not fail the request.
+    await Promise.all(
+      [row.key, ...IMAGE_VARIANTS.map((v) => variantKey(row.key, v))].map((k) =>
+        this.storage.remove(k),
+      ),
+    );
+    return { deleted: row.id, profile: await this.toVM(updated) };
   }
 
   /**

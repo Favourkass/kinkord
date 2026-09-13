@@ -36,5 +36,8 @@ export const Routes = {
     `/members/${country.toLowerCase()}/${encodeURIComponent(state)}`,
   /** Another member's public profile. */
   member: (username: string) => `/u/${encodeURIComponent(username.replace(/^@/, ""))}`,
+  /** People tab "See more" page (Figma 1322:25). */
+  memberPeople: (username: string, tab: string) =>
+    `/u/${encodeURIComponent(username.replace(/^@/, ""))}/people?tab=${encodeURIComponent(tab)}`,
   notifications: "/notifications",
 } as const;

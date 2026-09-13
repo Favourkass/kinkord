@@ -182,6 +182,14 @@ describe("ProfilesService", () => {
       }),
     }));
     const transaction = vi.fn(async (fn: (tx: unknown) => Promise<void>) => fn({ update }));
+    const inserted: unknown[] = [];
+    const values = vi.fn((v: unknown) => {
+      inserted.push(v);
+      return Object.assign(Promise.resolve(undefined), {
+        onConflictDoNothing: () => ({ returning: async () => [row] }),
+      });
+    });
+    const deleted = vi.fn(async () => undefined);
     const db = {
       select: vi.fn(() => ({
         from: vi.fn(() => ({
@@ -189,7 +197,8 @@ describe("ProfilesService", () => {
         })),
       })),
       update,
-      insert: vi.fn(),
+      insert: vi.fn(() => ({ values })),
+      delete: vi.fn(() => ({ where: deleted })),
       transaction,
     } as unknown as Db;
     const storage = {
@@ -206,9 +215,61 @@ describe("ProfilesService", () => {
       row,
       setCalls,
       transaction,
+      inserted,
+      deleted,
     };
   };
   const now = new Date("2026-09-12T10:00:00Z");
+  const mediaRow = {
+    id: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+    userId: "u1",
+    kind: "avatar" as const,
+    key: "avatars/u1/old.jpg",
+    createdAt: new Date("2026-09-01T00:00:00Z"),
+  };
+
+  it("records a new avatar or cover in the media history, but not an unchanged key", async () => {
+    const { service, inserted, row } = makeService();
+    await service.updateOwn("u1", { avatarKey: "avatars/u1/pic.jpg" }, "Favour");
+    expect(inserted).toEqual([[{ userId: "u1", kind: "avatar", key: "avatars/u1/pic.jpg" }]]);
+    row.avatarKey = "avatars/u1/pic.jpg";
+    inserted.length = 0;
+    await service.updateOwn("u1", { avatarKey: "avatars/u1/pic.jpg", bio: "same photo" }, "Favour");
+    expect(inserted).toEqual([]);
+  });
+
+  describe("deleteMedia", () => {
+    it("removes the row and every stored size, and clears the avatar when it was in use", async () => {
+      const { service, deleted, setCalls, storage } = makeService({
+        selects: [[mediaRow], [{ avatarKey: mediaRow.key, coverKey: null }]],
+      });
+      const result = await service.deleteMedia("u1", mediaRow.id);
+      expect(result.deleted).toBe(mediaRow.id);
+      expect(deleted).toHaveBeenCalledTimes(1);
+      expect(setCalls).toEqual([{ avatarKey: null }]);
+      expect(storage.remove.mock.calls.map((c) => c[0])).toEqual([
+        "avatars/u1/old.jpg",
+        "avatars/u1/old_sm.jpg",
+        "avatars/u1/old_md.jpg",
+      ]);
+    });
+
+    it("leaves the profile alone when the deleted photo was not the current one", async () => {
+      const { service, setCalls } = makeService({
+        selects: [[mediaRow], [{ avatarKey: "avatars/u1/newer.jpg", coverKey: null }]],
+      });
+      await service.deleteMedia("u1", mediaRow.id);
+      expect(setCalls).toEqual([]);
+    });
+
+    it("404s for a photo that is not yours", async () => {
+      const { service, deleted } = makeService({ selects: [[]] });
+      await expect(service.deleteMedia("u1", mediaRow.id)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(deleted).not.toHaveBeenCalled();
+    });
+  });
   const account = { username: "tega", displayUsername: "Tega", name: "Tega" };
 
   it("stamps the first display-name change and refuses another inside 30 days", async () => {
