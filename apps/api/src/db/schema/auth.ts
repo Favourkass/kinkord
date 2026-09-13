@@ -23,6 +23,9 @@ export const user = pgTable("user", {
   ageAttested: boolean("age_attested").notNull(),
 });
 
+// Keep the plural application-facing name while using Better Auth's `user` table.
+export const users = user;
+
 export const session = pgTable(
   "session",
   {

@@ -30,9 +30,27 @@ export class DbService implements OnModuleInit {
     if (count > 0) return;
     this.log.log('Seeding dev users…');
     await this.db.insert(schema.users).values([
-      { username: 'alice', displayName: 'Alice' },
-      { username: 'bob', displayName: 'Bob' },
-      { username: 'carol', displayName: 'Carol' },
+      {
+        id: 'dev-alice',
+        name: 'Alice',
+        email: 'alice@example.com',
+        username: 'alice',
+        ageAttested: true,
+      },
+      {
+        id: 'dev-bob',
+        name: 'Bob',
+        email: 'bob@example.com',
+        username: 'bob',
+        ageAttested: true,
+      },
+      {
+        id: 'dev-carol',
+        name: 'Carol',
+        email: 'carol@example.com',
+        username: 'carol',
+        ageAttested: true,
+      },
     ]);
   }
 }

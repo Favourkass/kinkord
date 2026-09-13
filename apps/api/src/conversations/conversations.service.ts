@@ -40,8 +40,8 @@ export class ConversationsService {
         user: {
           id: usersTbl.id,
           username: usersTbl.username,
-          displayName: usersTbl.displayName,
-          avatarUrl: usersTbl.avatarUrl,
+          displayName: usersTbl.name,
+          avatarUrl: usersTbl.image,
         },
       })
       .from(cp)

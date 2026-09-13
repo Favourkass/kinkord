@@ -1,18 +1,12 @@
-import {
-  pgTable, uuid, text, timestamp, integer, bigint, index, primaryKey, uniqueIndex,
-} from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
-
-export const users = pgTable('users', {
-  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
-  username: text('username').notNull().unique(),
-  displayName: text('display_name').notNull(),
-  avatarUrl: text('avatar_url'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+import {
+  pgTable, text, timestamp, integer, bigint,
+  index, primaryKey, uniqueIndex,
+} from 'drizzle-orm/pg-core';
+import { users } from './auth';   // text id — FKs must also be text
 
 export const conversations = pgTable('conversations', {
-  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  id: text('id').primaryKey().default(sql`gen_random_uuid()::text`),
   type: text('type').notNull().default('dm'),
   dmKey: text('dm_key').unique(),
   title: text('title'),
@@ -23,10 +17,12 @@ export const conversations = pgTable('conversations', {
 export const conversationParticipants = pgTable(
   'conversation_participants',
   {
-    conversationId: uuid('conversation_id').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
-    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    conversationId: text('conversation_id').notNull()
+      .references(() => conversations.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
     joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
-    lastReadMessageId: uuid('last_read_message_id'),
+    lastReadMessageId: text('last_read_message_id'),
   },
   (t) => ({
     pk: primaryKey({ columns: [t.conversationId, t.userId] }),
@@ -37,9 +33,10 @@ export const conversationParticipants = pgTable(
 export const messages = pgTable(
   'messages',
   {
-    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
-    conversationId: uuid('conversation_id').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
-    senderId: uuid('sender_id').notNull().references(() => users.id),
+    id: text('id').primaryKey().default(sql`gen_random_uuid()::text`),
+    conversationId: text('conversation_id').notNull()
+      .references(() => conversations.id, { onDelete: 'cascade' }),
+    senderId: text('sender_id').notNull().references(() => users.id),
     body: text('body'),
     clientId: text('client_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -55,9 +52,9 @@ export const messages = pgTable(
 export const attachments = pgTable(
   'attachments',
   {
-    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
-    messageId: uuid('message_id').references(() => messages.id, { onDelete: 'cascade' }),
-    uploaderId: uuid('uploader_id').notNull().references(() => users.id),
+    id: text('id').primaryKey().default(sql`gen_random_uuid()::text`),
+    messageId: text('message_id').references(() => messages.id, { onDelete: 'cascade' }),
+    uploaderId: text('uploader_id').notNull().references(() => users.id),
     key: text('key').notNull(),
     filename: text('filename').notNull(),
     mime: text('mime').notNull(),
