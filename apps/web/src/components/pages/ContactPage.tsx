@@ -631,7 +631,9 @@ export default function ContactPage({
 
             <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
               {channels.map((channel) => {
-                const isClickable = Boolean(channel.href && channel.href !== "#" && channel.id !== "instagram");
+                const isClickable = Boolean(
+                  channel.href && channel.href !== "#" && channel.id !== "instagram",
+                );
                 const inner = (
                   <>
                     <div className="flex items-center gap-3.5">

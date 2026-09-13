@@ -68,9 +68,7 @@ describe("useContactPresenter", () => {
 
     // Office
     expect(result.current.office.company).toBe("Kinkord Limited");
-    expect(result.current.office.addressLines).toContain(
-      "Sapele, Delta State, Nigeria",
-    );
+    expect(result.current.office.addressLines).toContain("Sapele, Delta State, Nigeria");
 
     // Notices
     expect(result.current.safetyNotice.title).toBe("SAFETY NOTICE");
