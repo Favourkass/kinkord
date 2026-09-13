@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { Routes } from "@/constants/Routes";
 import type { MemberCardPM } from "@/domain/member";
 import { useMembersRegionPresenter } from "./useMembersRegionPresenter";
 
@@ -159,6 +160,41 @@ describe("useMembersRegionPresenter", () => {
     expect(result.current.rows[1].card.isFollowing).toBe(true);
     await waitFor(() => expect(result.current.rows[1].card.isFollowing).toBe(false));
     expect(result.current.rows[1].card.followers).toBe("10");
+  });
+
+  it("lists the whole country when no state is given, and a tapped state opens its list", async () => {
+    router.push.mockClear();
+    const { result } = renderHook(() => useMembersRegionPresenter("ng", null));
+    expect(result.current.title).toBe("Nigeria");
+    expect(result.current.unknownState).toBeNull();
+    expect(result.current.selector.value).toBe("All states");
+    expect(result.current.selector.options[0]).toBe("All states");
+    expect(result.current.selector.options).toContain("Delta");
+    expect(result.current.selector.options).toHaveLength(38);
+    expect(result.current.selector.sheetTitle).toBe("Choose a state");
+    expect(result.current.selector.searchByRegionLabel).toBe("Search by State");
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(apiGet).toHaveBeenCalledWith("/members?country=NG&page=1&limit=20&sort=recent");
+    expect(result.current.count).toBe("3");
+
+    act(() => result.current.selector.onOpen());
+    act(() => result.current.selector.onSelect("All states"));
+    expect(router.push).not.toHaveBeenCalled();
+    expect(result.current.selector.open).toBe(false);
+    act(() => result.current.selector.onSelect("Delta"));
+    expect(router.push).toHaveBeenCalledWith(Routes.membersState("NG", "Delta"));
+    // Still the country list underneath — the state page takes over after navigation.
+    expect(result.current.selector.value).toBe("All states");
+    expect(apiGet).toHaveBeenCalledTimes(1);
+
+    apiGet.mockImplementation(() => pageOf([], 0, 1));
+    const empty = renderHook(() => useMembersRegionPresenter("ng", null));
+    await waitFor(() => expect(empty.result.current.loading).toBe(false));
+    expect(empty.result.current.empty).toBe("No members in Nigeria yet. Be the first.");
+
+    const unlaunched = renderHook(() => useMembersRegionPresenter("gh", null));
+    expect(unlaunched.result.current.unknownState).toMatch(/coming soon/);
+    expect(unlaunched.result.current.loading).toBe(false);
   });
 
   it("handles unknown states, empty regions and expired sessions", async () => {

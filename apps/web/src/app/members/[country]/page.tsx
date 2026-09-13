@@ -2,16 +2,17 @@
 
 import { useParams } from "next/navigation";
 import AppShell from "@/components/app/AppShell";
-import StateSelect from "@/components/members/StateSelect";
+import RegionList from "@/components/members/RegionList";
 import { getAppShellNav } from "@/presenters/getAppShellNav";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
-import { useMembersStatePresenter } from "@/presenters/useMembersStatePresenter";
+import { useMembersRegionPresenter } from "@/presenters/useMembersRegionPresenter";
 
-export default function MembersStatesPage() {
+/** /members/ng — everyone in the country; the dropdown narrows to a state (CEO, 2026-09-12). */
+export default function MembersCountryPage() {
   const params = useParams<{ country: string }>();
   const shell = useHomePresenter();
   const nav = getAppShellNav();
-  const vm = useMembersStatePresenter(params.country);
+  const vm = useMembersRegionPresenter(params.country, null);
 
   return (
     <AppShell
@@ -33,7 +34,7 @@ export default function MembersStatesPage() {
       mobileTone="members"
       desktopGreeting={false}
     >
-      <StateSelect {...vm} />
+      <RegionList {...vm} />
     </AppShell>
   );
 }

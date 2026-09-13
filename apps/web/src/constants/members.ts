@@ -27,14 +27,7 @@ export const MEMBERS_COPY = {
     },
   },
   state: {
-    subtitle: "Choose your state to find kinksters near you",
-    searchPlaceholder: "Search for a state",
-    searchLabel: "Search for a state",
-    membersSuffix: "Members",
-    continueLabel: "Continue",
-    noResults: "No states match that search.",
     notAvailable: "Kinkord isn’t in this country yet — it’s coming soon.",
-    selectLabel: (state: string) => `Select ${state}`,
   },
   region: {
     subtitle: "Discover like-minded members near you.",
@@ -43,6 +36,10 @@ export const MEMBERS_COPY = {
     allRegions: "All regions",
     searchByRegion: "Search by Region",
     sheetTitle: "Choose a region",
+    /** Country page: the dropdown lists states and the whole country is shown until one is picked. */
+    allStates: "All states",
+    searchByState: "Search by State",
+    sheetTitleStates: "Choose a state",
     closeSheet: "Close",
     found: "Members Found",
     sort: "Sort",

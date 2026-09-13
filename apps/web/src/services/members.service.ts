@@ -54,8 +54,9 @@ export function nextSort(mode: MembersSort): MembersSort {
 
 export interface MembersPageParams {
   country: string;
-  state: string;
-  /** LGA / area filter; omit to list the whole state (CEO, 2026-09-08). */
+  /** Omit to list the whole country (CEO, 2026-09-12); a state narrows to that state. */
+  state?: string | null;
+  /** LGA / area filter within `state`; omit to list the whole state (CEO, 2026-09-08). */
   region?: string | null;
   page: number;
   limit: number;
@@ -67,8 +68,9 @@ export const membersApi = {
   states: (country: string) =>
     api.get<StateCountPM[]>(`/members/states?country=${encodeURIComponent(country.toUpperCase())}`),
   page: (p: MembersPageParams) => {
-    const qs = new URLSearchParams({ country: p.country.toUpperCase(), state: p.state });
-    if (p.region) qs.set("lga", p.region);
+    const qs = new URLSearchParams({ country: p.country.toUpperCase() });
+    if (p.state) qs.set("state", p.state);
+    if (p.state && p.region) qs.set("lga", p.region);
     qs.set("page", String(p.page));
     qs.set("limit", String(p.limit));
     if (p.sort) qs.set("sort", p.sort);
@@ -137,18 +139,6 @@ export function statesForCountry(code: string): string[] {
 export function regionsForState(code: string, state: string): string[] {
   if (code.toUpperCase() !== "NG") return [];
   return [...(NG_LGAS[state] ?? [])];
-}
-
-/** Every configured state with its live count (0 when nobody has registered there yet). */
-export function mergeStateCounts(states: string[], counts: StateCountPM[]): StateCountPM[] {
-  const byState = new Map(counts.map((c) => [c.state, c.membersCount]));
-  return states.map((state) => ({ state, membersCount: byState.get(state) ?? 0 }));
-}
-
-export function filterStates(rows: StateCountPM[], query: string): StateCountPM[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return rows;
-  return rows.filter((r) => r.state.toLowerCase().includes(q));
 }
 
 /** Optimistic follow flip for a directory card. */

@@ -40,6 +40,16 @@ describe("MembersController", () => {
     );
   });
 
+  it("lists a whole country when no state is given, but an LGA alone is rejected", async () => {
+    const { controller, list } = makeController();
+    await controller.list(req, { country: "ng" });
+    expect(list).toHaveBeenCalledWith({ country: "NG", sort: "recent", page: 1, limit: 20 }, "me");
+    expect(() => controller.list(req, { country: "ng", lga: "Asaba" })).toThrow(
+      BadRequestException,
+    );
+    expect(list).toHaveBeenCalledTimes(1);
+  });
+
   it("coerces paging from query strings and forwards the LGA filter", async () => {
     const { controller, list } = makeController();
     await controller.list(req, {
