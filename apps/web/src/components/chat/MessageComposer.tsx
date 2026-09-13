@@ -1,5 +1,5 @@
-'use client';
-import { useRef, useState } from 'react';
+"use client";
+import { useRef, useState } from "react";
 
 export default function MessageComposer({
   disabled,
@@ -12,7 +12,7 @@ export default function MessageComposer({
   onTyping: (typing: boolean) => void;
   onAttach: (files: FileList) => Promise<string[]>;
 }) {
-  const [text, setText] = useState('');
+  const [text, setText] = useState("");
   const [attIds, setAttIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -22,7 +22,7 @@ export default function MessageComposer({
     if (!text.trim() && attIds.length === 0) return;
     const body = text.trim();
     const ids = attIds;
-    setText('');
+    setText("");
     setAttIds([]);
     onTyping(false);
     onSend(body, ids);
@@ -31,7 +31,9 @@ export default function MessageComposer({
   return (
     <div className="border-t border-slate-200 bg-white p-3">
       {attIds.length > 0 && (
-        <div className="text-xs text-slate-500 mb-2">{attIds.length} attachment(s) ready to send</div>
+        <div className="text-xs text-slate-500 mb-2">
+          {attIds.length} attachment(s) ready to send
+        </div>
       )}
       <div className="flex items-end gap-2">
         <button
@@ -55,7 +57,7 @@ export default function MessageComposer({
               setAttIds((prev) => [...prev, ...ids]);
             } finally {
               setBusy(false);
-              if (fileRef.current) fileRef.current.value = '';
+              if (fileRef.current) fileRef.current.value = "";
             }
           }}
         />
@@ -67,13 +69,13 @@ export default function MessageComposer({
             onTyping(e.target.value.length > 0);
           }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
+            if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               submit();
             }
           }}
           rows={1}
-          placeholder={disabled ? 'Select a conversation…' : 'Write a message…'}
+          placeholder={disabled ? "Select a conversation…" : "Write a message…"}
           className="flex-1 resize-none px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 max-h-40"
         />
         <button

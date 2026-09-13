@@ -6,15 +6,17 @@ import {
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
-} from '@nestjs/websockets';
-import { Logger } from '@nestjs/common';
-import { Server, Socket } from 'socket.io';
-import { eq } from 'drizzle-orm';
-import { ChatService } from './chat.service';
-import { ConversationsService } from '../conversations/conversations.service';
-import { RedisService } from '../redis/redis.service';
-import { DbService } from '../db/db.service';
-import { conversationParticipants as cpTbl } from '../db/schema';
+} from "@nestjs/websockets";
+import { Inject, Logger } from "@nestjs/common";
+import { Server, Socket } from "socket.io";
+import { eq } from "drizzle-orm";
+import { ChatService } from "./chat.service";
+import { ConversationsService } from "../conversations/conversations.service";
+import { RedisService } from "../redis/redis.service";
+import { DbService } from "../db/db.service";
+import { conversationParticipants as cpTbl } from "../db/schema";
+import { fromNodeHeaders } from "better-auth/node";
+import { AUTH, Auth } from "../auth/auth.instance";
 
 type Ack<T = any> = (res: { ok: true; data: T } | { ok: false; error: string }) => void;
 
@@ -28,14 +30,25 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private convs: ConversationsService,
     private redis: RedisService,
     private db: DbService,
+    @Inject(AUTH) private auth: Auth,
   ) {}
 
-  private room(userId: string) { return `user:${userId}`; }
-  private convRoom(id: string) { return `conv:${id}`; }
+  private room(userId: string) {
+    return `user:${userId}`;
+  }
+  private convRoom(id: string) {
+    return `conv:${id}`;
+  }
 
   async handleConnection(socket: Socket) {
-    const userId = (socket.handshake.auth?.userId as string) || (socket.handshake.query?.userId as string);
-    if (!userId) { socket.disconnect(true); return; }
+    const session = await this.auth.api.getSession({
+      headers: fromNodeHeaders(socket.handshake.headers),
+    });
+    if (!session) {
+      socket.disconnect(true);
+      return;
+    }
+    const userId = session.user.id;
     socket.data.userId = userId;
 
     await socket.join(this.room(userId));
@@ -51,15 +64,15 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     // Send a presence snapshot to this fresh client.
     const online = await this.redis.onlineUsers();
-    socket.emit('presence:snapshot', { online });
+    socket.emit("presence:snapshot", { online });
 
     if (becameOnline) {
-      this.server.emit('presence:update', { userId, online: true });
+      this.server.emit("presence:update", { userId, online: true });
     }
 
     // Rebuild unread counters from DB (source of truth) and push.
     const unread = await this.convs.rebuildUnread(userId);
-    socket.emit('unread:snapshot', unread);
+    socket.emit("unread:snapshot", unread);
   }
 
   async handleDisconnect(socket: Socket) {
@@ -67,14 +80,15 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!userId) return;
     const { becameOffline } = await this.redis.removeSocket(userId, socket.id);
     if (becameOffline) {
-      this.server.emit('presence:update', { userId, online: false });
+      this.server.emit("presence:update", { userId, online: false });
     }
   }
 
-  @SubscribeMessage('message:send')
+  @SubscribeMessage("message:send")
   async onSend(
     @ConnectedSocket() socket: Socket,
-    @MessageBody() payload: {
+    @MessageBody()
+    payload: {
       conversationId: string;
       body?: string;
       clientId?: string;
@@ -94,7 +108,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const senderId = socket.data.userId as string;
     try {
       if (!(await this.convs.isParticipant(payload.conversationId, senderId))) {
-        ack?.({ ok: false, error: 'not_a_participant' });
+        ack?.({ ok: false, error: "not_a_participant" });
         return;
       }
       const message = await this.chat.createMessage({
@@ -106,7 +120,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       });
 
       // Fan out to everyone in the conversation room (including the sender's other tabs).
-      this.server.to(this.convRoom(payload.conversationId)).emit('message:new', message);
+      this.server.to(this.convRoom(payload.conversationId)).emit("message:new", message);
 
       // Bump unread for offline/away participants.
       const participants = await this.convs.participantIds(payload.conversationId);
@@ -115,7 +129,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         // Only bump if the user isn't currently "in" the conversation.
         // Simplest robust signal: bump always, clear on explicit read.
         const count = await this.redis.bumpUnread(p, payload.conversationId);
-        this.server.to(this.room(p)).emit('unread:bump', {
+        this.server.to(this.room(p)).emit("unread:bump", {
           conversationId: payload.conversationId,
           count,
         });
@@ -123,33 +137,33 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       ack?.({ ok: true, data: message });
     } catch (e: any) {
-      this.log.error('message:send failed', e);
-      ack?.({ ok: false, error: e?.message ?? 'send_failed' });
+      this.log.error("message:send failed", e);
+      ack?.({ ok: false, error: e?.message ?? "send_failed" });
     }
   }
 
-  @SubscribeMessage('message:read')
+  @SubscribeMessage("message:read")
   async onRead(
     @ConnectedSocket() socket: Socket,
     @MessageBody() payload: { conversationId: string; messageId: string },
   ) {
     const userId = socket.data.userId as string;
     await this.convs.markRead(payload.conversationId, userId, payload.messageId);
-    this.server.to(this.convRoom(payload.conversationId)).emit('message:read', {
+    this.server.to(this.convRoom(payload.conversationId)).emit("message:read", {
       conversationId: payload.conversationId,
       userId,
       messageId: payload.messageId,
     });
-    socket.emit('unread:cleared', { conversationId: payload.conversationId });
+    socket.emit("unread:cleared", { conversationId: payload.conversationId });
   }
 
-  @SubscribeMessage('typing')
+  @SubscribeMessage("typing")
   onTyping(
     @ConnectedSocket() socket: Socket,
     @MessageBody() payload: { conversationId: string; typing: boolean },
   ) {
     const userId = socket.data.userId as string;
-    socket.to(this.convRoom(payload.conversationId)).emit('typing', {
+    socket.to(this.convRoom(payload.conversationId)).emit("typing", {
       conversationId: payload.conversationId,
       userId,
       typing: payload.typing,

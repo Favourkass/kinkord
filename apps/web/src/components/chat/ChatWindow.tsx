@@ -1,8 +1,8 @@
-'use client';
-import { useEffect, useMemo, useRef } from 'react';
-import type { Conversation, Message, User } from '../lib/types';
-import MessageBubble from './MessageBubble';
-import MessageComposer from './MessageComposer';
+"use client";
+import { useEffect, useMemo, useRef } from "react";
+import type { Conversation, Message, User } from "../../../lib/types";
+import MessageBubble from "./MessageBubble";
+import MessageComposer from "./MessageComposer";
 
 export default function ChatWindow({
   me,
@@ -33,7 +33,7 @@ export default function ChatWindow({
 
   const typingLabel = useMemo(() => {
     if (!typingUserIds.size) return null;
-    return 'typing…';
+    return "typing…";
   }, [typingUserIds]);
 
   if (!conversation) {
@@ -49,10 +49,12 @@ export default function ChatWindow({
       <header className="px-5 py-4 border-b border-slate-200 bg-white flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-semibold">
-            {peer?.displayName?.[0]?.toUpperCase() ?? '?'}
+            {peer?.displayName?.[0]?.toUpperCase() ?? "?"}
           </div>
           <div>
-            <div className="font-semibold">{peer?.displayName ?? conversation.title ?? 'Conversation'}</div>
+            <div className="font-semibold">
+              {peer?.displayName ?? conversation.title ?? "Conversation"}
+            </div>
             <div className="text-xs">
               {online ? (
                 <span className="text-emerald-600">● Online</span>
@@ -71,12 +73,7 @@ export default function ChatWindow({
         ))}
       </div>
 
-      <MessageComposer
-        disabled={false}
-        onSend={onSend}
-        onTyping={onTyping}
-        onAttach={onAttach}
-      />
+      <MessageComposer disabled={false} onSend={onSend} onTyping={onTyping} onAttach={onAttach} />
     </main>
   );
 }

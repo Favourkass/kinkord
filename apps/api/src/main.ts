@@ -11,7 +11,7 @@ import { AppModule } from "./app.module";
 import { AUTH, Auth } from "./auth/auth.instance";
 
 // New imports for RedisIoAdapter and ValidationPipe
-import { RedisIoAdapter } from './redis/redis-io.adapter';
+import { RedisIoAdapter } from "./redis/redis-io.adapter";
 
 /** Applies pending Drizzle migrations before serving (idempotent; used in
  *  deployed environments so CI never needs database network access). */
@@ -36,7 +36,7 @@ async function bootstrap() {
 
   // New Changes Implemented
   const adapter = new RedisIoAdapter(app);
-  await adapter.connectToRedis();
+  if (process.env.REDIS_URL) await adapter.connectToRedis();
   app.useWebSocketAdapter(adapter);
 
   //End of New Changes Implemented
@@ -64,8 +64,3 @@ async function bootstrap() {
 }
 
 void bootstrap();
-
-
-
-
-

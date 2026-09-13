@@ -5,6 +5,14 @@ export type User = {
   avatarUrl?: string | null;
 };
 
+export type SessionUser = {
+  id: string;
+  name: string;
+  email: string;
+  username?: string | null;
+  image?: string | null;
+};
+
 export type Attachment = {
   id: string;
   key: string;
@@ -31,7 +39,7 @@ export type Message = {
 
 export type Conversation = {
   id: string;
-  type: 'dm' | 'group';
+  type: "dm" | "group";
   title: string | null;
   participants: User[];
   lastMessage: Message | null;
