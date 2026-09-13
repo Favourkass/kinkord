@@ -41,7 +41,7 @@ describe("useContactPresenter", () => {
     expect(result.current.chooseTopicHeading).toBe("CHOOSE A TOPIC");
 
     // Channels
-    expect(result.current.channels).toHaveLength(4);
+    expect(result.current.channels).toHaveLength(6);
     const email = result.current.channels.find((c) => c.id === "email");
     expect(email?.value).toBe("support@kinkord.com");
     expect(email?.href).toBe("mailto:support@kinkord.com");
@@ -55,13 +55,21 @@ describe("useContactPresenter", () => {
     expect(phone?.href).toBe("tel:09127883266");
 
     const twitter = result.current.channels.find((c) => c.id === "twitter");
-    expect(twitter?.value).toBe("@kinkordlimited");
-    expect(twitter?.href).toBe("https://x.com/kinkordlimited");
+    expect(twitter?.value).toBe("@kinkordofficial");
+    expect(twitter?.href).toBe("https://x.com/kinkordofficial");
+
+    const facebook = result.current.channels.find((c) => c.id === "facebook");
+    expect(facebook?.value).toBe("Kinkord");
+    expect(facebook?.href).toBe("https://www.facebook.com/share/14iTBY2fTuN/");
+
+    const instagram = result.current.channels.find((c) => c.id === "instagram");
+    expect(instagram?.value).toBe("");
+    expect(instagram?.href).toBe("#");
 
     // Office
     expect(result.current.office.company).toBe("Kinkord Limited");
     expect(result.current.office.addressLines).toContain(
-      "13 Obire Street, Sapele, Delta State, Nigeria",
+      "Sapele, Delta State, Nigeria",
     );
 
     // Notices

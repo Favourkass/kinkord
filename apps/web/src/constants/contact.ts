@@ -4,7 +4,7 @@ export interface ContactChannel {
   subtitle: string;
   value: string;
   href: string;
-  icon: "email" | "whatsapp" | "phone" | "twitter";
+  icon: "email" | "whatsapp" | "phone" | "twitter" | "facebook" | "instagram";
 }
 
 export const CONTACT_CHANNELS: readonly ContactChannel[] = [
@@ -36,9 +36,25 @@ export const CONTACT_CHANNELS: readonly ContactChannel[] = [
     id: "twitter",
     title: "Twitter (X)",
     subtitle: "Follow and DM us on Twitter",
-    value: "@kinkordlimited",
-    href: "https://x.com/kinkordlimited",
+    value: "@kinkordofficial",
+    href: "https://x.com/kinkordofficial",
     icon: "twitter",
+  },
+  {
+    id: "facebook",
+    title: "Facebook",
+    subtitle: "Connect with us on Facebook",
+    value: "Kinkord",
+    href: "https://www.facebook.com/share/14iTBY2fTuN/",
+    icon: "facebook",
+  },
+  {
+    id: "instagram",
+    title: "Instagram",
+    subtitle: "Follow us on Instagram",
+    value: "",
+    href: "#",
+    icon: "instagram",
   },
 ];
 
@@ -51,7 +67,7 @@ export interface OfficeInfo {
 export const OFFICE_INFO: OfficeInfo = {
   title: "OUR OFFICE",
   company: "Kinkord Limited",
-  addressLines: ["13 Obire Street, Sapele, Delta State, Nigeria"],
+  addressLines: ["Sapele, Delta State, Nigeria"],
 };
 
 export interface NoticeCard {

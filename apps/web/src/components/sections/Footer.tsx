@@ -1,11 +1,12 @@
 "use client";
 
-import { Send, MessageCircle, Music2, AtSign, Hash } from "lucide-react";
+import { Send, MessageCircle, Music2, AtSign, Hash, Facebook } from "lucide-react";
 import type { FooterVM } from "@/presenters/getFooterVM";
 
 type Props = FooterVM;
 
 const SOCIAL_ICONS: Record<string, typeof AtSign> = {
+  Facebook: Facebook,
   Instagram: AtSign,
   "X / Twitter": Hash,
   TikTok: Music2,
@@ -41,10 +42,26 @@ export default function Footer({ links, socials, addressLine, ageDisclaimer }: P
         <div className="flex items-center gap-5">
           {socials.map(({ name, href }) => {
             const Icon = SOCIAL_ICONS[name] ?? AtSign;
+            const isClickable = href && href !== "#" && name !== "Instagram";
+
+            if (!isClickable) {
+              return (
+                <span
+                  key={name}
+                  aria-label={name}
+                  className="w-9 h-9 border border-[#d4af37]/10 flex items-center justify-center text-[#555] cursor-default select-none opacity-60"
+                >
+                  <Icon size={15} />
+                </span>
+              );
+            }
+
             return (
               <a
                 key={name}
                 href={href}
+                target={href.startsWith("http") ? "_blank" : undefined}
+                rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
                 aria-label={name}
                 className="w-9 h-9 border border-[#d4af37]/15 flex items-center justify-center text-[#888] hover:text-[#d4af37] hover:border-[#d4af37]/50 transition-all duration-200"
               >

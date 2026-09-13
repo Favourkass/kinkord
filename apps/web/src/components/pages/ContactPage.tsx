@@ -91,6 +91,34 @@ function TwitterXIcon() {
   );
 }
 
+function FacebookIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="#1877F2" aria-hidden="true">
+      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+    </svg>
+  );
+}
+
+function InstagramIcon() {
+  return (
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#E4405F"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+      <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
+    </svg>
+  );
+}
+
 function MapPinIcon() {
   return (
     <svg
@@ -393,6 +421,10 @@ export default function ContactPage({
         return <PhoneIcon />;
       case "twitter":
         return <TwitterXIcon />;
+      case "facebook":
+        return <FacebookIcon />;
+      case "instagram":
+        return <InstagramIcon />;
       default:
         return <MailIcon />;
     }
@@ -598,31 +630,55 @@ export default function ContactPage({
             </h3>
 
             <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-              {channels.map((channel) => (
-                <a
-                  key={channel.id}
-                  href={channel.href}
-                  target={channel.href.startsWith("http") ? "_blank" : undefined}
-                  rel={channel.href.startsWith("http") ? "noopener noreferrer" : undefined}
-                  className="group flex items-center justify-between rounded-[16px] border border-[#222222] bg-[#121212] p-4 transition-all duration-200 hover:border-[#ffba1f]/40 hover:bg-[#161616]"
-                >
-                  <div className="flex items-center gap-3.5">
-                    <div className="flex size-9 shrink-0 items-center justify-center">
-                      {renderChannelIcon(channel.icon)}
+              {channels.map((channel) => {
+                const isClickable = Boolean(channel.href && channel.href !== "#" && channel.id !== "instagram");
+                const inner = (
+                  <>
+                    <div className="flex items-center gap-3.5">
+                      <div className="flex size-9 shrink-0 items-center justify-center">
+                        {renderChannelIcon(channel.icon)}
+                      </div>
+                      <div>
+                        <p className="text-[15px] font-bold text-white group-hover:text-[#ffba1f] transition-colors">
+                          {channel.title}
+                        </p>
+                        {channel.value ? (
+                          <p className="text-[13px] font-medium text-[#ffba1f] mt-0.5">
+                            {channel.value}
+                          </p>
+                        ) : null}
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-[15px] font-bold text-white group-hover:text-[#ffba1f] transition-colors">
-                        {channel.title}
-                      </p>
-                      <p className="text-[13px] font-medium text-[#ffba1f] mt-0.5">
-                        {channel.value}
-                      </p>
-                    </div>
-                  </div>
 
-                  <ChevronRightIcon className="text-neutral-500 group-hover:translate-x-0.5 transition-transform" />
-                </a>
-              ))}
+                    {isClickable && (
+                      <ChevronRightIcon className="text-neutral-500 group-hover:translate-x-0.5 transition-transform" />
+                    )}
+                  </>
+                );
+
+                if (!isClickable) {
+                  return (
+                    <div
+                      key={channel.id}
+                      className="group flex items-center justify-between rounded-[16px] border border-[#222222] bg-[#121212] p-4 cursor-default select-none opacity-85"
+                    >
+                      {inner}
+                    </div>
+                  );
+                }
+
+                return (
+                  <a
+                    key={channel.id}
+                    href={channel.href}
+                    target={channel.href.startsWith("http") ? "_blank" : undefined}
+                    rel={channel.href.startsWith("http") ? "noopener noreferrer" : undefined}
+                    className="group flex items-center justify-between rounded-[16px] border border-[#222222] bg-[#121212] p-4 transition-all duration-200 hover:border-[#ffba1f]/40 hover:bg-[#161616]"
+                  >
+                    {inner}
+                  </a>
+                );
+              })}
             </div>
           </section>
 

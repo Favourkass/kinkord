@@ -334,6 +334,25 @@ function TopicIcon({ id, className = "size-4 sm:size-4.5" }: { id: string; class
           <path d="M16 3.13a4 4 0 0 1 0 7.75" />
         </svg>
       );
+    case "support-my-work":
+      return (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+          aria-hidden="true"
+        >
+          <path d="M17 8h1a4 4 0 1 1 0 8h-1" />
+          <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z" />
+          <line x1="6" x2="6" y1="2" y2="4" />
+          <line x1="10" x2="10" y1="2" y2="4" />
+          <line x1="14" x2="14" y1="2" y2="4" />
+        </svg>
+      );
     case "my-message-to-the-community":
       return (
         <svg
@@ -768,7 +787,10 @@ export default function TeamPage({
                     <button
                       key={topic.id}
                       type="button"
-                      onClick={() => selectTopic(topic.id)}
+                      onClick={() => {
+                        if (topic.id === "support-my-work") return;
+                        selectTopic(topic.id);
+                      }}
                       className="group flex items-center justify-between min-h-[58px] rounded-[18px] border border-neutral-800/90 bg-[#0e0e0c] px-3 sm:px-3.5 py-3 hover:border-[#faab14]/70 hover:bg-[#151512] transition-all cursor-pointer text-left shadow-sm active:scale-[0.98]"
                     >
                       <div className="flex items-center gap-2.5 min-w-0 pr-1">
@@ -1078,13 +1100,16 @@ export default function TeamPage({
                 </p>
                 <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                   {founderTopics
-                    .filter((t) => t.id !== selectedTopic.id)
+                    .filter((t) => t.id !== selectedTopic.id && t.id !== "support-my-work")
                     .slice(0, 4)
                     .map((topic) => (
                       <button
                         key={topic.id}
                         type="button"
-                        onClick={() => selectTopic(topic.id)}
+                        onClick={() => {
+                          if (topic.id === "support-my-work") return;
+                          selectTopic(topic.id);
+                        }}
                         className="group flex items-center justify-between rounded-[16px] border border-neutral-800/90 bg-[#0e0e0c] px-3 py-2.5 hover:border-[#faab14]/50 hover:bg-[#151512] transition-all cursor-pointer text-left"
                       >
                         <div className="flex items-center gap-2 min-w-0 pr-1">

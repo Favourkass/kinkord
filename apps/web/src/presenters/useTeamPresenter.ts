@@ -86,6 +86,7 @@ export function useTeamPresenter(): TeamVM {
   }, []);
 
   const selectTopic = useCallback((id: FounderTopicId) => {
+    if (id === "support-my-work") return;
     setSelectedTopicId(id);
   }, []);
 
