@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useRef } from 'react';
-import type { Conversation, Message, User } from '@/lib/types';
+import type { Conversation, Message, User } from '../lib/types';
 import MessageBubble from './MessageBubble';
 import MessageComposer from './MessageComposer';
 

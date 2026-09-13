@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
-import type { User } from '@/lib/types';
+import { api } from '../lib/api';
+import type { User } from '../lib/types';
 
 export default function UserPicker({ onPick }: { onPick: (u: User) => void }) {
   const [users, setUsers] = useState<User[]>([]);

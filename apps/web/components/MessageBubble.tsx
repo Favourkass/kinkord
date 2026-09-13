@@ -1,5 +1,5 @@
 'use client';
-import type { Message } from '@/lib/types';
+import type { Message } from '../lib/types';
 
 export default function MessageBubble({ m, mine }: { m: Message; mine: boolean }) {
   const t = new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

@@ -1,8 +1,8 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api } from '@/lib/api';
-import { getSocket } from '@/lib/socket';
-import type { Conversation, Message, User } from '@/lib/types';
+import { api } from '../lib/api';
+import { getSocket } from '../lib/socket';
+import type { Conversation, Message, User } from '../lib/types';
 import UserPicker from './UserPicker';
 import ConversationList from './ConversationList';
 import ChatWindow from './ChatWindow';

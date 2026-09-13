@@ -1,5 +1,5 @@
 'use client';
-import type { Conversation, User } from '@/lib/types';
+import type { Conversation, User } from '../lib/types';
 
 export default function ConversationList({
   conversations,
