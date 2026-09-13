@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { DbService } from '../db/db.service';
 import { users } from '../db/schema';
-import { ne } from 'drizzle-orm';
+//import { ne } from 'drizzle-orm';
+import { inArray, ne } from 'drizzle-orm';
 
 @Injectable()
 export class UsersService {
@@ -17,6 +18,6 @@ export class UsersService {
   }
   async byIds(ids: string[]) {
     if (!ids.length) return [];
-    return this.db.db.select().from(users).where((u, { inArray }) => inArray(u.id, ids));
+    return this.db.db.select().from(users).where(inArray(users.id, ids));
   }
 }

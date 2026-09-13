@@ -65,7 +65,8 @@ services:
 
   api:
     build:
-      context: ./apps/api
+      context: .
+      dockerfile: apps/api/Dockerfile # ← path is now relative to context
     container_name: kinkord-api
     env_file: .env
     depends_on:
@@ -80,7 +81,8 @@ services:
 
   web:
     build:
-      context: ./apps/web
+      context: .
+      dockerfile: apps/web/Dockerfile # ← path is now relative to context
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     container_name: kinkord-web
@@ -93,6 +95,7 @@ services:
       - ./apps/web/components:/app/components
       - ./apps/web/lib:/app/lib
     command: ["npm", "run", "dev"]
+    
 
 volumes:
   kinkord_pg:
