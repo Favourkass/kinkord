@@ -74,10 +74,6 @@ services:
       redis: { condition: service_healthy }
       minio-init: { condition: service_completed_successfully }
     ports: ["4000:4000"]
-    volumes:
-      - ./apps/api/src:/app/src
-      - ./apps/api/drizzle:/app/drizzle
-    command: ["npm", "run", "dev"]
 
   web:
     build:
@@ -90,11 +86,6 @@ services:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     depends_on: [api]
     ports: ["3000:3000"]
-    volumes:
-      - ./apps/web/app:/app/app
-      - ./apps/web/components:/app/components
-      - ./apps/web/lib:/app/lib
-    command: ["npm", "run", "dev"]
     
 
 volumes:
