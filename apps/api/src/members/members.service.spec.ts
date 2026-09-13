@@ -62,6 +62,7 @@ const makeService = () => {
     total: 1,
   }));
   const mutualFriends = vi.fn(async () => ({ items: [], total: 0 }));
+  const areFriends = vi.fn(async () => false);
   const follows = {
     counts,
     isFollowing,
@@ -69,6 +70,7 @@ const makeService = () => {
     resolveUserId,
     friends,
     mutualFriends,
+    areFriends,
   } as unknown as FollowsService;
   return {
     service: new MembersService(db, storage, follows),
@@ -78,6 +80,7 @@ const makeService = () => {
     mutualFriendsCount,
     friends,
     mutualFriends,
+    areFriends,
   };
 };
 
@@ -317,5 +320,75 @@ describe("MembersService.friends", () => {
     });
     await service.friends("nene", "me", "mutual");
     expect(mutualFriends).toHaveBeenCalledWith("u2", "me", 20, 0);
+  });
+});
+
+describe("MembersService.publicProfile visibility (Edit Profile → Privacy)", () => {
+  const rowFor = (profileVisibility: string) => [
+    {
+      u: { id: "u2", username: "nene", createdAt: new Date("2023-03-10T09:00:00Z") },
+      p: {
+        displayName: "Neze",
+        avatarKey: null,
+        coverKey: null,
+        bio: "Hi",
+        country: "NG",
+        state: "Delta",
+        city: "Abraka",
+        dateOfBirth: "2000-01-01",
+        gender: "Female",
+        orientation: "Pansexual",
+        relationshipStatus: "Single",
+        bodyType: "Slim",
+        roles: ["Dominant"],
+        interests: ["Bondage"],
+        lookingFor: ["Events"],
+        languages: ["English"],
+        lastSeenAt: null,
+        nationality: "NG",
+        occupation: "Entrepreneur",
+        limits: "No blood",
+        socialLinks: { x: "https://x.com/nene" },
+        profileVisibility,
+      },
+    },
+  ];
+
+  it("withholds the About details from non-friends on a friends-only profile, keeps the card basics", async () => {
+    const { service, select, areFriends } = makeService();
+    select.mockReturnValueOnce(chain(rowFor("friends")));
+    const vm = await service.publicProfile("nene", "me");
+    expect(areFriends).toHaveBeenCalledWith("me", "u2");
+    expect(vm.restricted).toBe(true);
+    expect(vm.bio).toBeNull();
+    expect(vm.interests).toEqual([]);
+    expect(vm.occupation).toBeNull();
+    expect(vm.socialLinks).toEqual({});
+    // What the directory card already shows stays, so they can still follow back.
+    expect(vm.displayName).toBe("Neze");
+    expect(vm.roles).toEqual(["Dominant"]);
+    expect(vm.city).toBe("Abraka");
+    expect(vm.counts.followers).toBe(30);
+  });
+
+  it("shows everything to friends and to the member; public profiles skip the check", async () => {
+    const { service, select, areFriends } = makeService();
+    areFriends.mockResolvedValueOnce(true);
+    select.mockReturnValueOnce(chain(rowFor("friends")));
+    const friend = await service.publicProfile("nene", "me");
+    expect(friend.restricted).toBe(false);
+    expect(friend.limits).toBe("No blood");
+    expect(friend.nationality).toBe("NG");
+
+    select.mockReturnValueOnce(chain(rowFor("friends")));
+    const self = await service.publicProfile("nene", "u2");
+    expect(self.restricted).toBe(false);
+    expect(self.bio).toBe("Hi");
+
+    areFriends.mockClear();
+    select.mockReturnValueOnce(chain(rowFor("public")));
+    const pub = await service.publicProfile("nene", "me");
+    expect(pub.restricted).toBe(false);
+    expect(areFriends).not.toHaveBeenCalled();
   });
 });

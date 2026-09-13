@@ -4,46 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { authClient } from "@/services/authClient";
-import { api, ApiError, uploadToPresignedUrl } from "@/services/apiClient";
+import { api, ApiError } from "@/services/apiClient";
+import { uploadProfileImage } from "@/services/profile.service";
 import { Routes } from "@/constants/Routes";
-import { IMAGE_VARIANTS, buildUploadSet, type ImageVariant } from "@/util/image";
+import type { MePM, OwnProfilePM } from "@/domain/profile";
 
-/** Presigned PUT slots returned by POST /profile/upload-url — one per stored size. */
-interface UploadSlots {
-  key: string;
-  uploadUrl: string;
-  variantUploadUrls: Record<ImageVariant, string>;
-  maxSizeMb: number;
-}
-
-export interface MeVM {
-  id: string;
-  email: string;
-  emailVerified: boolean;
-  username: string | null;
-  displayUsername: string | null;
-  twoFactorEnabled: boolean;
-}
-
-export interface ProfileVM {
-  displayName: string;
-  bio: string | null;
-  pronouns: string | null;
-  country: string | null;
-  state: string | null;
-  city: string | null;
-  dateOfBirth: string | null;
-  gender: string | null;
-  roles: string[];
-  relationshipStatus: string | null;
-  lookingFor: string[];
-  interests: string[];
-  location: string | null;
-  phone: string | null;
-  phoneVerified: boolean;
-  avatarUrl: string | null;
-  coverUrl: string | null;
-}
+export type MeVM = MePM;
+export type ProfileVM = OwnProfilePM;
 
 export function useProfilePresenter() {
   const router = useRouter();
@@ -123,28 +90,7 @@ export function useProfilePresenter() {
     setUploading(kind);
     setError(null);
     try {
-      // Shrink to what the UI can show (512px avatars, 1600px covers) before it
-      // leaves the phone, and derive the smaller stored sizes from it.
-      const { original, variants } = await buildUploadSet(rawFile, kind);
-      // Declaring the byte size lets the API sign it, so S3 refuses a different body.
-      const spec = await api.post<UploadSlots>("/profile/upload-url", {
-        kind,
-        contentType: original.type,
-        contentLength: original.size,
-      });
-      if (original.size > spec.maxSizeMb * 1024 * 1024)
-        throw new Error(`Image is too large — max ${spec.maxSizeMb}MB.`);
-      // Variants first: the PATCH below only runs once every size has landed, so a
-      // failed upload leaves the previous photo in place rather than a half set.
-      await Promise.all(
-        IMAGE_VARIANTS.map((v) => uploadToPresignedUrl(spec.variantUploadUrls[v], variants[v])),
-      );
-      await uploadToPresignedUrl(spec.uploadUrl, original);
-      const vm = await api.patch<ProfileVM>(
-        "/profile",
-        kind === "avatar" ? { avatarKey: spec.key } : { coverKey: spec.key },
-      );
-      setProfile(vm);
+      setProfile(await uploadProfileImage(kind, rawFile));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed.");
     } finally {

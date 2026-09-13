@@ -1,20 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { Lock, ShieldCheck } from "lucide-react";
+import Link from "next/link";
+import { ShieldCheck } from "lucide-react";
 import AuthShell from "@/components/auth/AuthShell";
 import TextField from "@/components/auth/TextField";
 import GoldCta from "@/components/auth/GoldCta";
 import UploadTile from "@/components/auth/UploadTile";
-import CodeInput from "@/components/auth/CodeInput";
-import { useProfilePresenter, useSecurityPresenter } from "@/presenters/useProfilePresenter";
+import { Routes } from "@/constants/Routes";
+import { useProfilePresenter } from "@/presenters/useProfilePresenter";
 
 export default function ProfilePage() {
   const p = useProfilePresenter();
-  const [twoFactorOn, setTwoFactorOn] = useState<boolean | null>(null);
-  const sec = useSecurityPresenter((enabled) => setTwoFactorOn(enabled));
-  const [pw, setPw] = useState({ current: "", next: "" });
-  const [enablePw, setEnablePw] = useState("");
 
   if (p.loading) {
     return (
@@ -30,8 +26,6 @@ export default function ProfilePage() {
       </AuthShell>
     );
   }
-
-  const is2faOn = twoFactorOn ?? p.me.twoFactorEnabled;
 
   return (
     <AuthShell>
@@ -145,139 +139,20 @@ export default function ProfilePage() {
           />
         </section>
 
-        {/* Security (feature 006) */}
-        <section className="flex flex-col gap-5 border-t border-kink-line pt-8">
-          <h2 className="text-[20px] font-extrabold uppercase tracking-wide text-kink-cream">
-            Security <span className="text-kink-gold">&amp; 2FA</span>
-          </h2>
-
-          <div className="rounded-2xl border border-kink-line bg-kink-surface p-6 flex flex-col gap-4">
-            <div className="flex items-center gap-3">
-              <ShieldCheck size={20} className={is2faOn ? "text-kink-gold" : "text-kink-faint"} />
-              <p className="text-[16px] font-semibold text-kink-cream">
-                Two-factor authentication:{" "}
-                <span className={is2faOn ? "text-kink-gold" : "text-kink-faint"}>
-                  {is2faOn ? "ON" : "OFF"}
-                </span>
-              </p>
-            </div>
-            <p className="text-[14px] text-kink-dim">
-              Works with Google Authenticator, Authy or any authenticator app — free.
-            </p>
-
-            {!is2faOn && !sec.setup && (
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="flex-1">
-                  <TextField
-                    label="Confirm password to enable"
-                    type="password"
-                    icon={Lock}
-                    autoComplete="current-password"
-                    value={enablePw}
-                    onChange={setEnablePw}
-                  />
-                </div>
-                <div className="sm:self-end">
-                  <GoldCta
-                    label="Enable 2FA"
-                    arrow={false}
-                    loading={sec.busy}
-                    onClick={() => void sec.beginEnable(enablePw)}
-                    className="sm:w-56"
-                  />
-                </div>
-              </div>
-            )}
-
-            {sec.setup && (
-              <div className="flex flex-col items-center gap-4 rounded-xl border border-kink-amber/50 p-5">
-                <p className="text-[15px] text-kink-cream text-center">
-                  1. Scan this QR with your authenticator app · 2. Enter the 6-digit code
-                </p>
-                {/* eslint-disable-next-line @next/next/no-img-element -- locally generated data URL */}
-                <img
-                  src={sec.setup.qrDataUrl}
-                  alt="2FA QR code"
-                  className="rounded-lg bg-white p-2"
-                />
-                <details className="text-[13px] text-kink-dim">
-                  <summary className="cursor-pointer text-kink-gold">
-                    Backup codes (save these)
-                  </summary>
-                  <div className="mt-2 grid grid-cols-2 gap-1 font-mono">
-                    {sec.setup.backupCodes.map((c) => (
-                      <span key={c}>{c}</span>
-                    ))}
-                  </div>
-                </details>
-                <CodeInput value={sec.code} onChange={sec.setCode} />
-                <GoldCta
-                  label="Confirm & turn on"
-                  loading={sec.busy}
-                  onClick={sec.confirmEnable}
-                  className="max-w-[360px]"
-                />
-              </div>
-            )}
-
-            {is2faOn && (
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="flex-1">
-                  <TextField
-                    label="Confirm password to disable"
-                    type="password"
-                    icon={Lock}
-                    autoComplete="current-password"
-                    value={enablePw}
-                    onChange={setEnablePw}
-                  />
-                </div>
-                <div className="sm:self-end">
-                  <GoldCta
-                    label="Disable 2FA"
-                    variant="outline"
-                    arrow={false}
-                    loading={sec.busy}
-                    onClick={() => void sec.disable(enablePw)}
-                    className="sm:w-56"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-2xl border border-kink-line bg-kink-surface p-6 flex flex-col gap-4">
-            <p className="text-[16px] font-semibold text-kink-cream">Change password</p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <TextField
-                label="Current password"
-                type="password"
-                icon={Lock}
-                autoComplete="current-password"
-                value={pw.current}
-                onChange={(v) => setPw({ ...pw, current: v })}
-              />
-              <TextField
-                label="New password"
-                type="password"
-                icon={Lock}
-                autoComplete="new-password"
-                helper="10+ characters, letters & numbers."
-                value={pw.next}
-                onChange={(v) => setPw({ ...pw, next: v })}
-              />
-            </div>
-            <GoldCta
-              label="Change password"
-              arrow={false}
-              loading={sec.busy}
-              onClick={() => void sec.changePassword(pw.current, pw.next)}
-              className="max-w-[420px] self-start"
-            />
-          </div>
-
-          {sec.error && <p className="text-[14px] text-red-400">{sec.error}</p>}
-          {sec.notice && <p className="text-[14px] text-kink-gold">{sec.notice}</p>}
+        {/* Password + 2FA live in Settings → Security & 2FA. */}
+        <section className="border-t border-kink-line pt-8">
+          <Link
+            href={Routes.settingsSecurity}
+            className="flex items-center justify-between rounded-2xl border border-kink-line bg-kink-surface p-6 text-[16px] font-semibold text-kink-cream hover:border-kink-gold/50"
+          >
+            <span className="flex items-center gap-3">
+              <ShieldCheck size={20} className="text-kink-gold" />
+              Security &amp; 2FA — password and two-factor authentication
+            </span>
+            <span aria-hidden className="text-kink-gold">
+              →
+            </span>
+          </Link>
         </section>
       </div>
     </AuthShell>
