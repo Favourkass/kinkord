@@ -12,7 +12,9 @@ export type FriendsTab = "all" | "mutual";
 
 export interface ListMembersParams {
   country: string;
-  state: string;
+  /** Omit to list the whole country (CEO, 2026-09-12: "click Nigeria → everyone in Nigeria"). */
+  state?: string | null;
+  /** Only meaningful together with `state`. */
   lga?: string | null;
   sort: MembersSort;
   page?: number;
@@ -79,17 +81,19 @@ export class MembersService {
   }
 
   /**
-   * Member cards for a state (optionally narrowed to an LGA/area), newest first by
-   * default, with the viewer's follow state on each card. The viewer is excluded.
+   * Member cards for a country, a state within it, or one LGA/area within that state
+   * — each click narrows: Nigeria → everyone in Nigeria, Delta → everyone in Delta,
+   * Abraka → everyone in Abraka. Newest first by default, with the viewer's follow
+   * state on each card. The viewer is excluded.
    */
   async list(params: ListMembersParams, viewerId: string) {
     const { page, limit, offset } = normalizePaging(params.page, params.limit);
     const conditions = [
       eq(profile.country, params.country.toUpperCase()),
-      eq(profile.state, params.state),
       ne(profile.userId, viewerId),
     ];
-    if (params.lga) conditions.push(eq(profile.city, params.lga));
+    if (params.state) conditions.push(eq(profile.state, params.state));
+    if (params.state && params.lga) conditions.push(eq(profile.city, params.lga));
     const where = and(...conditions);
 
     const followerCounts = this.db

@@ -14,13 +14,15 @@ import { ApiError } from "@/services/apiClient";
 import {
   decodeParam,
   hasMore,
+  isCountryAvailable,
   membersApi,
   nextSort,
   regionsForState,
+  statesForCountry,
   toggleFollowOnCard,
   type MembersSort,
 } from "@/services/members.service";
-import { displayState } from "@/util/format";
+import { countryName, displayState } from "@/util/format";
 
 /** Loaded pages for one country/state/region/sort key; a different key means "loading". */
 interface RegionPage {
@@ -35,16 +37,22 @@ interface RegionPage {
 const NO_ITEMS: MemberCardPM[] = [];
 
 /**
- * Members → {Country} → {State} (Figma 907:1410): the whole state by default, a
- * tap-only region dropdown that narrows to one LGA, "{n} Members Found", Sort toggle,
- * online-first cards from the API, infinite scroll, optimistic Follow per card.
+ * Members list at every level of the directory (Figma 907:1410 list layout):
+ *   /members/ng        → everyone in Nigeria, dropdown of states (picking one navigates)
+ *   /members/ng/Delta  → everyone in Delta, dropdown of LGAs (picking one filters)
+ * CEO, 2026-09-12: each click shows everyone in that place; the next click narrows.
+ * "{n} Members Found", Sort toggle, online-first cards, infinite scroll, optimistic Follow.
  */
-export function useMembersRegionPresenter(countryParam: string, stateParam: string) {
+export function useMembersRegionPresenter(countryParam: string, stateParam?: string | null) {
   const router = useRouter();
   const copy = MEMBERS_COPY.region;
   const country = countryParam.toUpperCase();
-  const state = decodeParam(stateParam);
-  const regions = useMemo(() => regionsForState(country, state), [country, state]);
+  const state = stateParam ? decodeParam(stateParam) : null;
+  const countryMode = state === null;
+  const regions = useMemo(
+    () => (state ? regionsForState(country, state) : statesForCountry(country)),
+    [country, state],
+  );
 
   // null = the whole state (CEO, 2026-09-08); picking an LGA narrows the list.
   const [region, setRegion] = useState<string | null>(null);
@@ -54,8 +62,9 @@ export function useMembersRegionPresenter(countryParam: string, stateParam: stri
   const [loadingMore, setLoadingMore] = useState(false);
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
 
-  const knownState = regions.length > 0;
-  const key = knownState ? `${country}|${state}|${region ?? "*"}|${sort}` : null;
+  // Country mode needs a launched country; state mode needs a state we have LGAs for.
+  const knownState = countryMode ? isCountryAvailable(country) : regions.length > 0;
+  const key = knownState ? `${country}|${state ?? "*"}|${region ?? "*"}|${sort}` : null;
   const current = data?.key === key ? data : null;
   const loading = key !== null && current === null;
   const items = current?.items ?? NO_ITEMS;
@@ -115,9 +124,14 @@ export function useMembersRegionPresenter(countryParam: string, stateParam: stri
   const selectRegion = useCallback(
     (next: string) => {
       setSheetOpen(false);
+      if (countryMode) {
+        // Picking a state on the country page opens that state's own list.
+        if (next !== copy.allStates) router.push(Routes.membersState(country, next));
+        return;
+      }
       setRegion(next === copy.allRegions ? null : next);
     },
-    [copy.allRegions],
+    [countryMode, copy.allStates, copy.allRegions, router, country],
   );
 
   const toggleSort = useCallback(() => setSort((s) => nextSort(s)), []);
@@ -160,21 +174,27 @@ export function useMembersRegionPresenter(countryParam: string, stateParam: stri
     [items, busy, copy],
   );
 
+  const placeName = countryMode ? (countryName(country) ?? country) : displayState(state);
+
   return {
-    title: displayState(state),
+    title: placeName,
     subtitle: copy.subtitle,
-    unknownState: regions.length === 0 ? copy.unknownState : null,
+    unknownState: knownState
+      ? null
+      : countryMode
+        ? MEMBERS_COPY.state.notAvailable
+        : copy.unknownState,
     selector: {
       label: copy.selectorLabel,
-      value: region ?? copy.allRegions,
-      options: [copy.allRegions, ...regions],
+      value: countryMode ? copy.allStates : (region ?? copy.allRegions),
+      options: [countryMode ? copy.allStates : copy.allRegions, ...regions],
       open: sheetOpen,
       onOpen: () => setSheetOpen(true),
       onClose: () => setSheetOpen(false),
       onSelect: selectRegion,
-      sheetTitle: copy.sheetTitle,
+      sheetTitle: countryMode ? copy.sheetTitleStates : copy.sheetTitle,
       closeLabel: copy.closeSheet,
-      searchByRegionLabel: copy.searchByRegion,
+      searchByRegionLabel: countryMode ? copy.searchByState : copy.searchByRegion,
     },
     count: total.toLocaleString("en-US"),
     foundLabel: copy.found,
@@ -197,7 +217,7 @@ export function useMembersRegionPresenter(countryParam: string, stateParam: stri
     onToggleFollow: toggleFollow,
     empty:
       !loading && !error && knownState && items.length === 0
-        ? copy.empty(region ?? displayState(state))
+        ? copy.empty(region ?? placeName)
         : null,
     loadingMoreText: copy.loadingMore,
     endText: items.length > 0 && !more ? copy.end : null,

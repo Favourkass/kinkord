@@ -11,14 +11,17 @@ const countryCode = z
 
 const statesQuerySchema = z.object({ country: countryCode });
 
-const listQuerySchema = z.object({
-  country: countryCode,
-  state: z.string().trim().min(1).max(80),
-  lga: z.string().trim().min(1).max(80).optional(),
-  sort: z.enum(["recent", "followers", "name"]).default("recent"),
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(50).default(20),
-});
+const listQuerySchema = z
+  .object({
+    country: countryCode,
+    /** Optional: without it the whole country is listed. */
+    state: z.string().trim().min(1).max(80).optional(),
+    lga: z.string().trim().min(1).max(80).optional(),
+    sort: z.enum(["recent", "followers", "name"]).default("recent"),
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(50).default(20),
+  })
+  .refine((q) => !q.lga || Boolean(q.state), { message: "lga requires state", path: ["lga"] });
 
 @Controller("members")
 @UseGuards(AuthGuard)
