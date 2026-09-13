@@ -9,8 +9,8 @@ export interface SidebarDrawerProps {
   name: string;
   avatarUrl: string | null;
   membersCount: string;
-  links: Pick<AppNavLinks, "members" | "settings">;
-  labels: Pick<AppNavLabels, "members" | "settings" | "logout">;
+  links: Pick<AppNavLinks, "members" | "settings" | "profile">;
+  labels: Pick<AppNavLabels, "members" | "settings" | "logout" | "profile">;
   onLogout: () => void;
 }
 
@@ -39,10 +39,15 @@ export default function SidebarDrawer({
         className="absolute inset-0 bg-black/40"
       />
       <div className="absolute inset-y-0 left-0 flex w-[348px] max-w-[88vw] flex-col border-r border-app-drawer-border bg-app-drawer">
-        <div className="mx-[18px] mt-[29px] flex h-[51px] items-center gap-[13px] rounded-[15px] border border-drawer-identity-border px-[12px]">
+        <Link
+          href={links.profile}
+          onClick={onClose}
+          aria-label={labels.profile}
+          className="mx-[18px] mt-[29px] flex h-[51px] items-center gap-[13px] rounded-[15px] border border-drawer-identity-border px-[12px]"
+        >
           <AvatarCircle src={avatarUrl} alt="" size={33} ringClassName="bg-kink-gold-bright" />
           <p className="truncate text-[15px] font-bold text-drawer-text">{name}</p>
-        </div>
+        </Link>
         <Link
           href={links.members}
           onClick={onClose}

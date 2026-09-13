@@ -1,105 +1,237 @@
+import type { ReactNode } from "react";
 import MaskIcon from "@/components/app/MaskIcon";
-import type { PublicProfileVM } from "@/domain/member";
+import type { PublicProfileVM, SocialPlatform } from "@/domain/member";
 
-export interface AboutTabLabels {
-  bio: string;
-  basicInfo: string;
+export interface AboutLabels {
+  aboutMe: string;
+  personal: string;
   age: string;
+  dateOfBirth: string;
   gender: string;
-  orientation: string;
+  location: string;
   relationship: string;
-  bodyType: string;
-  interests: string;
-  lookingFor: string;
+  nationality: string;
+  occupation: string;
   languages: string;
-  joined: string;
+  roles: string;
+  kinks: string;
+  lookingFor: string;
+  limits: string;
+  groups: string;
+  noGroups: string;
+  social: string;
+  noSocial: string;
+  platforms: Record<SocialPlatform, string>;
+  verification: string;
+  verified: { basic: string; none: string };
+  verifiedDetail: (email: boolean, phone: boolean) => string;
+  tagline: string;
+  memberSince: (date: string) => string;
   notShared: string;
+  privateNotice: string;
 }
 
 export interface AboutTabProps {
   vm: PublicProfileVM;
-  labels: AboutTabLabels;
+  labels: AboutLabels;
 }
 
-/**
- * About tab — Figma 948:2866 (mobile: plain sections) / 987:5468 (desktop: each section a
- * rounded card, 28px padding, 18px headings).
- */
-export default function AboutTab({ vm, labels }: AboutTabProps) {
-  const card =
-    "flex flex-col lg:gap-[20px] lg:rounded-[20px] lg:border lg:border-pf-card-border lg:bg-pf-card lg:p-[28px]";
-  const heading = (text: string) => (
-    <h2 className="text-[15px] font-bold leading-[18px] text-pf-text lg:text-[18px] lg:leading-[22px] lg:tracking-[0.5px] lg:text-pf-heading">
-      {text}
-    </h2>
-  );
-  const row = (label: string, value: string | null) => (
-    <div className="flex items-center justify-between border-b border-pf-border py-[12px] lg:border-pf-card-border lg:py-[14px]">
-      <span className="text-[14px] leading-[17px] text-pf-muted lg:font-medium">{label}</span>
-      <span className="flex items-center gap-[4px] lg:gap-[8px]">
-        <span
-          className={`text-[14px] font-semibold leading-[17px] ${value ? "text-pf-text lg:text-pf-heading" : "text-pf-muted"}`}
-        >
-          {value ?? labels.notShared}
+const ICONS = {
+  aboutMe: "/app/profile/about-me.svg",
+  personal: "/app/profile/about-personal.svg",
+  age: "/app/profile/about-age.svg",
+  dateOfBirth: "/app/profile/about-dob.svg",
+  gender: "/app/profile/about-gender.svg",
+  location: "/app/profile/about-location.svg",
+  relationship: "/app/profile/about-relationship.svg",
+  nationality: "/app/profile/about-nationality.svg",
+  occupation: "/app/profile/about-occupation.svg",
+  languages: "/app/profile/about-language.svg",
+  roles: "/app/profile/about-roles.svg",
+  kinks: "/app/profile/about-kinks.svg",
+  lookingFor: "/app/profile/about-looking-for.svg",
+  limits: "/app/profile/about-limits.svg",
+  groups: "/app/profile/about-groups.svg",
+  social: "/app/profile/about-social.svg",
+  verification: "/app/profile/about-verification.svg",
+  chevron: "/app/profile/icon-chevron-right-16.svg",
+  facebook: "/app/profile/icon-facebook.svg",
+  x: "/app/profile/icon-x.svg",
+  verified: "/app/profile/icon-verified.svg",
+  crown: "/app/profile/icon-crown.svg",
+} as const;
+
+function Card({ icon, title, children }: { icon: string; title: string; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-[12px] rounded-[16px] border border-pf-card-border bg-pf-card p-[16px]">
+      <header className="flex items-center gap-[10px]">
+        <span className="grid size-[32px] shrink-0 place-items-center rounded-full border border-kink-gold-bright/20 bg-pf-surface-2 text-kink-gold-bright">
+          <MaskIcon src={icon} width={16} />
         </span>
-        <MaskIcon name="chevron-right-gray" width={24} className="text-pf-muted" />
-      </span>
-    </div>
+        <h2 className="flex-1 text-[14px] font-semibold text-pf-text">{title}</h2>
+        <MaskIcon src={ICONS.chevron} width={16} className="text-pf-muted" />
+      </header>
+      {children}
+    </section>
   );
-  const chips = (items: string[]) => (
-    <ul className="flex flex-wrap gap-[8px] lg:gap-[10px]">
+}
+
+function Tags({ items }: { items: string[] }) {
+  return (
+    <ul className="flex flex-wrap gap-[8px]">
       {items.map((item) => (
         <li
           key={item}
-          className="rounded-[100px] border border-pf-border bg-pf-chip px-[14px] py-[6px] text-[12px] font-semibold leading-[15px] text-pf-chip-text lg:border-pf-card-border lg:bg-pf-chip-2 lg:px-[16px] lg:py-[8px] lg:text-[14px] lg:leading-[17px] lg:text-kink-gold-bright"
+          className="rounded-full border border-kink-gold-bright bg-kink-gold-bright/5 px-[12px] py-[4px] text-[12px] font-semibold text-kink-gold-bright"
         >
           {item}
         </li>
       ))}
     </ul>
   );
+}
+
+/**
+ * About tab (Figma 1256:800 + Profile Sections Design): About Me, Personal Information rows,
+ * Roles / Kinks / Looking For tags, Limits, Groups, Social Links, Verification, "Member since".
+ * Nothing here is editable — everything changes through Edit Profile (CEO, 2026-09-12).
+ */
+export default function AboutTab({ vm, labels }: AboutTabProps) {
+  const row = (icon: string, label: string, value: string | null) => (
+    <div
+      key={label}
+      className="flex items-center gap-[10px] border-b border-pf-divider py-[10px] last:border-b-0"
+    >
+      <MaskIcon src={icon} width={15} className="shrink-0 text-kink-gold-bright" />
+      <span className="flex-1 text-[14px] text-pf-muted">{label}</span>
+      <span
+        className={`text-right text-[14px] font-medium ${value ? "text-pf-text" : "text-pf-muted"}`}
+      >
+        {value ?? labels.notShared}
+      </span>
+    </div>
+  );
+
+  const footer = (
+    <div className="flex flex-col items-center gap-[6px] pt-[8px] text-center">
+      <MaskIcon src={ICONS.crown} width={24} className="text-kink-gold-bright" />
+      <p className="text-[12px] italic text-pf-muted">{labels.tagline}</p>
+      {vm.memberSince ? (
+        <p className="text-[12px] text-pf-text">{labels.memberSince(vm.memberSince)}</p>
+      ) : null}
+    </div>
+  );
+
+  if (vm.restricted) {
+    return (
+      <div className="flex flex-col gap-[16px] px-[16px] pb-[40px] pt-[16px] lg:p-0">
+        <div className="rounded-[16px] border border-pf-card-border bg-pf-card p-[16px] text-[13px] text-pf-muted">
+          {labels.privateNotice}
+        </div>
+        {footer}
+      </div>
+    );
+  }
+
+  const p = vm.personal;
   return (
-    <div className="flex flex-col gap-[24px] px-[20px] pb-[40px] pt-[20px] lg:p-0">
-      <section className={`gap-[8px] ${card}`}>
-        {heading(labels.bio)}
-        <p
-          className={`text-[14px] leading-[1.5] lg:text-[15px] lg:leading-[1.6] ${vm.bio ? "text-pf-body lg:text-pf-muted" : "text-pf-muted"}`}
-        >
+    <div className="flex flex-col gap-[16px] px-[16px] pb-[40px] pt-[16px] lg:p-0">
+      <Card icon={ICONS.aboutMe} title={labels.aboutMe}>
+        <p className={`text-[14px] leading-[1.5] ${vm.bio ? "text-pf-body" : "text-pf-muted"}`}>
           {vm.bio ?? labels.notShared}
         </p>
-      </section>
-      <section className={card}>
-        {heading(labels.basicInfo)}
+      </Card>
+
+      <Card icon={ICONS.personal} title={labels.personal}>
         <div className="flex flex-col">
-          {row(labels.age, vm.basic.age)}
-          {row(labels.gender, vm.basic.gender)}
-          {row(labels.orientation, vm.basic.orientation)}
-          {row(labels.relationship, vm.basic.relationshipStatus)}
-          {row(labels.bodyType, vm.basic.bodyType)}
+          {row(ICONS.age, labels.age, p.age)}
+          {p.dateOfBirth ? row(ICONS.dateOfBirth, labels.dateOfBirth, p.dateOfBirth) : null}
+          {row(ICONS.gender, labels.gender, p.gender)}
+          {row(ICONS.location, labels.location, p.location)}
+          {row(ICONS.relationship, labels.relationship, p.relationshipStatus)}
+          {row(ICONS.nationality, labels.nationality, p.nationality)}
+          {row(ICONS.occupation, labels.occupation, p.occupation)}
+          {row(ICONS.languages, labels.languages, p.languages)}
         </div>
-      </section>
-      {vm.interests.length > 0 && (
-        <section className={`gap-[10px] ${card}`}>
-          {heading(labels.interests)}
-          {chips(vm.interests)}
-        </section>
-      )}
-      {vm.lookingFor.length > 0 && (
-        <section className={`gap-[10px] ${card}`}>
-          {heading(labels.lookingFor)}
-          {chips(vm.lookingFor)}
-        </section>
-      )}
-      <section className={`gap-[12px] pt-[8px] text-[13px] leading-[16px] lg:pt-[28px] ${card}`}>
-        <div className="flex items-start justify-between">
-          <span className="text-pf-muted">{labels.languages}</span>
-          <span className="font-semibold text-pf-text">{vm.languages ?? labels.notShared}</span>
+      </Card>
+
+      {vm.roles.length > 0 ? (
+        <Card icon={ICONS.roles} title={labels.roles}>
+          <Tags items={vm.roles} />
+        </Card>
+      ) : null}
+      {vm.interests.length > 0 ? (
+        <Card icon={ICONS.kinks} title={labels.kinks}>
+          <Tags items={vm.interests} />
+        </Card>
+      ) : null}
+      {vm.lookingFor.length > 0 ? (
+        <Card icon={ICONS.lookingFor} title={labels.lookingFor}>
+          <Tags items={vm.lookingFor} />
+        </Card>
+      ) : null}
+      {vm.limits ? (
+        <Card icon={ICONS.limits} title={labels.limits}>
+          <p className="text-[14px] leading-[1.5] text-pf-body">{vm.limits}</p>
+        </Card>
+      ) : null}
+
+      <Card icon={ICONS.groups} title={labels.groups}>
+        <p className="text-[13px] text-pf-muted">{labels.noGroups}</p>
+      </Card>
+
+      <Card icon={ICONS.social} title={labels.social}>
+        {vm.socialLinks.length === 0 ? (
+          <p className="text-[13px] text-pf-muted">{labels.noSocial}</p>
+        ) : (
+          <div className="flex flex-col gap-[8px]">
+            {vm.socialLinks.map((link) => (
+              <a
+                key={link.platform}
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-[12px] rounded-[12px] border border-pf-border bg-pf-surface-2 p-[12px]"
+              >
+                <span
+                  className={`grid size-[36px] shrink-0 place-items-center rounded-full text-white ${
+                    link.platform === "facebook"
+                      ? "bg-[#1877f2]"
+                      : "border border-[#333333] bg-black"
+                  }`}
+                >
+                  <MaskIcon src={ICONS[link.platform]} width={18} />
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="text-[13px] font-semibold text-pf-text">
+                    {labels.platforms[link.platform]}
+                  </span>
+                  <span className="truncate text-[12px] text-pf-muted">{link.handle}</span>
+                </span>
+                <MaskIcon src={ICONS.chevron} width={16} className="text-pf-muted" />
+              </a>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <Card icon={ICONS.verification} title={labels.verification}>
+        <div className="flex items-center gap-[12px] rounded-[12px] border border-kink-gold-bright/30 bg-kink-gold-bright/10 p-[12px]">
+          <span className="grid size-[36px] shrink-0 place-items-center rounded-full bg-kink-gold-bright text-black">
+            <MaskIcon src={ICONS.verified} width={18} />
+          </span>
+          <span className="flex min-w-0 flex-col">
+            <span className="text-[13px] font-semibold text-pf-text">
+              {labels.verified[vm.verification.level]}
+            </span>
+            <span className="text-[12px] text-pf-muted">
+              {labels.verifiedDetail(vm.verification.email, vm.verification.phone)}
+            </span>
+          </span>
         </div>
-        <div className="flex items-start justify-between">
-          <span className="text-pf-muted">{labels.joined}</span>
-          <span className="font-semibold text-pf-text">{vm.joined ?? labels.notShared}</span>
-        </div>
-      </section>
+      </Card>
+
+      {footer}
     </div>
   );
 }

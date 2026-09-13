@@ -240,6 +240,12 @@ body {
   --pf-post-muted: #6b7280;
   --pf-pill: #e5e7eb;
   --pf-pill-text: #6b7280;
+  --pf-divider: rgba(107, 114, 128, 0.2);
+  --pf-plate: rgba(255, 186, 31, 0.15);
+  --pf-sheet: #ffffff;
+  --pf-input: #f3f4f6;
+  --pf-input-border: #e5e7eb;
+  --pf-btn-dark: #111827;
 }
 
 html[data-theme="dark"] {
@@ -298,6 +304,12 @@ html[data-theme="dark"] {
   --pf-post-muted: #8a8a8a;
   --pf-pill: #2a2a2a;
   --pf-pill-text: #aaaaaa;
+  --pf-divider: #6b7280;
+  --pf-plate: rgba(255, 186, 31, 0.15);
+  --pf-sheet: #111827;
+  --pf-input: #0b0f14;
+  --pf-input-border: #1f2937;
+  --pf-btn-dark: #000000;
 }
 
 @theme inline {
@@ -356,4 +368,10 @@ html[data-theme="dark"] {
   --color-pf-post-muted: var(--pf-post-muted);
   --color-pf-pill: var(--pf-pill);
   --color-pf-pill-text: var(--pf-pill-text);
+  --color-pf-divider: var(--pf-divider);
+  --color-pf-plate: var(--pf-plate);
+  --color-pf-sheet: var(--pf-sheet);
+  --color-pf-input: var(--pf-input);
+  --color-pf-input-border: var(--pf-input-border);
+  --color-pf-btn-dark: var(--pf-btn-dark);
 }

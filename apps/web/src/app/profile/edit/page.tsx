@@ -1,81 +1,39 @@
 "use client";
 
-import EditProfileView from "@/components/app/EditProfileView";
-import { NG_LGAS } from "@/constants/nigeria";
-import { NG_STATES } from "@/constants/onboarding";
-import { getAppShellNav } from "@/presenters/getAppShellNav";
-import { useEditProfilePresenter } from "@/presenters/useEditProfilePresenter";
+import EditHub from "@/components/profile/edit/EditHub";
+import EditScreen from "@/components/profile/edit/EditScreen";
+import { appShellProps, getAppShellNav } from "@/presenters/getAppShellNav";
+import { useEditProfileHubPresenter } from "@/presenters/useEditProfileHubPresenter";
+import { useHomePresenter } from "@/presenters/useHomePresenter";
 
+/** Edit Profile hub (Figma 1542:30 / 1542:164). */
 export default function EditProfilePage() {
-  const vm = useEditProfilePresenter();
-  const nav = getAppShellNav();
-
-  if (vm.loading) {
-    return (
-      <div className="grid min-h-dvh place-items-center bg-app-page">
-        <p className="text-[15px] font-semibold text-app-subtle">Loading your profile…</p>
-      </div>
-    );
-  }
+  const shell = useHomePresenter();
+  const vm = useEditProfileHubPresenter();
 
   return (
-    <EditProfileView
-      tagline="THE WORLD'S KINK COMMUNITY"
-      title="Edit Profile"
-      avatarUrl={vm.avatarUrl}
-      displayName={vm.fields.displayName}
-      pairedFields={[
-        { key: "displayName", label: "Display Name", value: vm.fields.displayName },
-        { key: "username", label: "Username", value: vm.fields.username },
-      ]}
-      fullFields={[
-        { key: "gender", label: "Gender", value: vm.fields.gender },
-        {
-          key: "relationshipStatus",
-          label: "Relationship Status",
-          value: vm.fields.relationshipStatus,
-        },
-        { key: "role", label: "Role", value: vm.fields.role },
-        {
-          key: "lookingFor",
-          label: "Looking for",
-          value: vm.fields.lookingFor,
-          placeholder: "Events, Relationships",
-        },
-        {
-          key: "interests",
-          label: "Interests",
-          value: vm.fields.interests,
-          placeholder: "Comma-separated interests",
-        },
-        {
-          key: "state",
-          label: "State",
-          value: vm.fields.state,
-          placeholder: "Select your state",
-          options: NG_STATES,
-        },
-        {
-          key: "lga",
-          label: "LGA / Area",
-          value: vm.fields.lga,
-          placeholder: vm.fields.state ? "Select your area" : "Select your state first",
-          options: NG_LGAS[vm.fields.state] ?? [],
-        },
-      ]}
-      saveLabel="SAVE CHANGES"
-      saving={vm.saving}
-      uploading={vm.uploading}
-      notice={vm.notice}
-      error={vm.error}
-      onFieldChange={vm.setField}
-      onSave={vm.save}
+    <EditScreen
+      shell={appShellProps(shell, getAppShellNav())}
+      title={vm.title}
+      backLabel={vm.backLabel}
       onBack={vm.back}
-      onLogout={vm.logout}
-      onAvatarFile={(f) => void vm.uploadImage("avatar", f)}
-      onCoverFile={(f) => void vm.uploadImage("cover", f)}
-      links={nav.links}
-      labels={nav.labels}
-    />
+      loading={vm.loading}
+      loadingLabel={vm.loadingLabel}
+      error={null}
+    >
+      <EditHub
+        subtitle={vm.subtitle}
+        avatarUrl={vm.avatarUrl}
+        name={vm.name}
+        handle={vm.handle}
+        tierLabel={vm.tierLabel}
+        changePhotoLabel={vm.changePhotoLabel}
+        uploading={vm.uploading}
+        rows={vm.rows}
+        notice={vm.notice}
+        error={vm.error}
+        onAvatarFile={vm.onAvatarFile}
+      />
+    </EditScreen>
   );
 }
