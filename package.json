@@ -13,5 +13,8 @@
   "devDependencies": {
     "prettier": "^3.9.6",
     "turbo": "^2.5.0"
+  },
+  "dependencies": {
+    "@robasedev/sdk": "^1.0.0"
   }
 }
