@@ -1,7 +1,6 @@
 import { Global, Module, OnApplicationShutdown } from "@nestjs/common";
 import { drizzle, NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
-import { DbService } from './db.service';
 import * as schema from "./schema";
 
 export const PG_POOL = Symbol("PG_POOL");
@@ -28,9 +27,8 @@ export type Db = NodePgDatabase<typeof schema>;
       inject: [PG_POOL],
       useFactory: (pool: Pool): Db => drizzle(pool, { schema }),
     },
-    DbService
   ],
-  exports: [PG_POOL, DRIZZLE, DbService],
+  exports: [PG_POOL, DRIZZLE],
 })
 export class DbModule implements OnApplicationShutdown {
   constructor() {}

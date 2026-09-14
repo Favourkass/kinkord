@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
-import { DbService } from '../db/db.service';
+import { Db, DRIZZLE } from '../db/db.module';
 import { conversations as convTbl, messages as msgTbl } from '../db/schema';
 import { ConversationsService } from '../conversations/conversations.service';
 import { UploadsService } from '../uploads/uploads.service';
@@ -8,7 +8,7 @@ import { UploadsService } from '../uploads/uploads.service';
 @Injectable()
 export class ChatService {
   constructor(
-    private db: DbService,
+    @Inject(DRIZZLE) private db: Db,
     private convs: ConversationsService,
     private uploads: UploadsService,
   ) {}
@@ -24,13 +24,13 @@ export class ChatService {
 
     // Idempotency: if we already stored this clientId, return it.
     if (clientId) {
-      const existing = await this.db.db.query.messages.findFirst({
+      const existing = await this.db.query.messages.findFirst({
         where: (m, { and, eq }) => and(eq(m.senderId, senderId), eq(m.clientId, clientId)),
       });
       if (existing) return this.hydrate(existing);
     }
 
-    const [created] = await this.db.db
+    const [created] = await this.db
       .insert(msgTbl)
       .values({ conversationId, senderId, body: body ?? null, clientId: clientId ?? null })
       .returning();
@@ -39,7 +39,7 @@ export class ChatService {
       await this.uploads.attachToMessage(attachmentIds, created.id, senderId);
     }
 
-    await this.db.db
+    await this.db
       .update(convTbl)
       .set({ lastMessageAt: created.createdAt })
       .where(eq(convTbl.id, conversationId));
@@ -48,7 +48,7 @@ export class ChatService {
   }
 
   async hydrate(msg: typeof msgTbl.$inferSelect) {
-    const atts = await this.db.db
+    const atts = await this.db
       .select()
       .from((await import('../db/schema')).attachments)
       .where(eq((await import('../db/schema')).attachments.messageId, msg.id));

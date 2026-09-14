@@ -1,9 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
-import { DbService } from '../db/db.service';
+import { Db, DRIZZLE } from '../db/db.module';
 import { attachments as attTbl } from '../db/schema';
 
 const PUBLIC_ENDPOINT = process.env.S3_PUBLIC_ENDPOINT;
@@ -13,7 +13,7 @@ export class UploadsService {
   private s3: S3Client;
   private bucket = process.env.S3_BUCKET!;
 
-  constructor(private db: DbService) {
+  constructor(@Inject(DRIZZLE) private db: Db) {
     this.s3 = new S3Client({
       region: process.env.S3_REGION || 'us-east-1',
       endpoint: process.env.S3_ENDPOINT,
@@ -35,7 +35,7 @@ export class UploadsService {
       { expiresIn: 600 },
     );
 
-    await this.db.db.insert(attTbl).values({
+    await this.db.insert(attTbl).values({
       id,
       uploaderId: userId,
       key,
@@ -60,7 +60,7 @@ export class UploadsService {
 
   async attachToMessage(attachmentIds: string[], messageId: string, userId: string) {
     if (!attachmentIds.length) return;
-    await this.db.db
+    await this.db
       .update(attTbl)
       .set({ messageId })
       .where(
@@ -80,6 +80,6 @@ export class UploadsService {
 
   async byIds(ids: string[]) {
     if (!ids.length) return [];
-    return this.db.db.select().from(attTbl).where(inArray(attTbl.id, ids));
+    return this.db.select().from(attTbl).where(inArray(attTbl.id, ids));
   }
 }

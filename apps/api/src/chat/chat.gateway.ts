@@ -13,7 +13,7 @@ import { eq } from "drizzle-orm";
 import { ChatService } from "./chat.service";
 import { ConversationsService } from "../conversations/conversations.service";
 import { RedisService } from "../redis/redis.service";
-import { DbService } from "../db/db.service";
+import { Db, DRIZZLE } from "../db/db.module";
 import { conversationParticipants as cpTbl } from "../db/schema";
 import { fromNodeHeaders } from "better-auth/node";
 import { AUTH, Auth } from "../auth/auth.instance";
@@ -29,7 +29,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private chat: ChatService,
     private convs: ConversationsService,
     private redis: RedisService,
-    private db: DbService,
+    @Inject(DRIZZLE) private db: Db,
     @Inject(AUTH) private auth: Auth,
   ) {}
 
@@ -54,7 +54,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     await socket.join(this.room(userId));
 
     // Join all conversation rooms this user belongs to.
-    const parts = await this.db.db
+    const parts = await this.db
       .select({ conversationId: cpTbl.conversationId })
       .from(cpTbl)
       .where(eq(cpTbl.userId, userId));

@@ -4,7 +4,7 @@ import type { Auth } from "../auth/auth.instance";
 import type { ChatService } from "./chat.service";
 import type { ConversationsService } from "../conversations/conversations.service";
 import type { RedisService } from "../redis/redis.service";
-import type { DbService } from "../db/db.service";
+import type { Db } from "../db/db.module";
 
 const authWith = (session: unknown) =>
   ({ api: { getSession: vi.fn(async () => session) } }) as unknown as Auth;
@@ -25,7 +25,7 @@ describe("ChatGateway", () => {
       {} as ChatService,
       {} as ConversationsService,
       {} as RedisService,
-      {} as DbService,
+      {} as Db,
       authWith(null),
     );
 
@@ -37,12 +37,10 @@ describe("ChatGateway", () => {
   it("uses the Better Auth session user id for a socket", async () => {
     const socket = socketWithHeaders();
     const db = {
-      db: {
-        select: () => ({
-          from: () => ({ where: async () => [] }),
-        }),
-      },
-    } as unknown as DbService;
+      select: () => ({
+        from: () => ({ where: async () => [] }),
+      }),
+    } as unknown as Db;
     const redis = {
       addSocket: vi.fn(async () => ({ becameOnline: false })),
       onlineUsers: vi.fn(async () => []),

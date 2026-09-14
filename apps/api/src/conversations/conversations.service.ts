@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, desc, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
-import { DbService } from '../db/db.service';
+import { Db, DRIZZLE } from '../db/db.module';
 import {
   attachments as attachmentsTbl,
   conversationParticipants as cp,
@@ -12,14 +12,14 @@ import { RedisService } from '../redis/redis.service';
 
 @Injectable()
 export class ConversationsService {
-  constructor(private db: DbService, private redis: RedisService) {}
+  constructor(@Inject(DRIZZLE) private db: Db, private redis: RedisService) {}
 
   private dmKeyFor(a: string, b: string) {
     return [a, b].sort().join(':');
   }
 
   async listForUser(userId: string) {
-    const rows = await this.db.db
+    const rows = await this.db
       .select({
         id: convTbl.id,
         type: convTbl.type,
@@ -34,7 +34,7 @@ export class ConversationsService {
     if (!rows.length) return [];
     const ids = rows.map((r) => r.id);
 
-    const allParticipants = await this.db.db
+    const allParticipants = await this.db
       .select({
         conversationId: cp.conversationId,
         user: {
@@ -48,13 +48,13 @@ export class ConversationsService {
       .innerJoin(usersTbl, eq(usersTbl.id, cp.userId))
       .where(inArray(cp.conversationId, ids));
 
-    const lastMsgs = await this.db.db
+    const lastMsgs = await this.db
       .select()
       .from(msgTbl)
       .where(
         inArray(
           msgTbl.id,
-          this.db.db
+          this.db
             .select({ id: sql<string>`distinct on (${msgTbl.conversationId}) ${msgTbl.id}` })
             .from(msgTbl)
             .where(inArray(msgTbl.conversationId, ids))
@@ -76,36 +76,36 @@ export class ConversationsService {
   async ensureDm(userA: string, userB: string) {
     if (userA === userB) throw new NotFoundException('Cannot DM yourself');
     const key = this.dmKeyFor(userA, userB);
-    const existing = await this.db.db.query.conversations.findFirst({
+    const existing = await this.db.query.conversations.findFirst({
       where: (c, { eq }) => eq(c.dmKey, key),
     });
     if (existing) return existing;
 
-    const [created] = await this.db.db
+    const [created] = await this.db
       .insert(convTbl)
       .values({ type: 'dm', dmKey: key })
       .onConflictDoNothing()
       .returning();
 
     if (created) {
-      await this.db.db.insert(cp).values([
+      await this.db.insert(cp).values([
         { conversationId: created.id, userId: userA },
         { conversationId: created.id, userId: userB },
       ]);
       return created;
     }
-    return this.db.db.query.conversations.findFirst({ where: (c, { eq }) => eq(c.dmKey, key) });
+    return this.db.query.conversations.findFirst({ where: (c, { eq }) => eq(c.dmKey, key) });
   }
 
   async isParticipant(conversationId: string, userId: string) {
-    const row = await this.db.db.query.conversationParticipants.findFirst({
+    const row = await this.db.query.conversationParticipants.findFirst({
       where: (p, { and, eq }) => and(eq(p.conversationId, conversationId), eq(p.userId, userId)),
     });
     return !!row;
   }
 
   async participantIds(conversationId: string) {
-    const rows = await this.db.db
+    const rows = await this.db
       .select({ userId: cp.userId })
       .from(cp)
       .where(eq(cp.conversationId, conversationId));
@@ -116,7 +116,7 @@ export class ConversationsService {
     if (!(await this.isParticipant(conversationId, userId)))
       throw new NotFoundException('Conversation not found');
 
-    const rows = await this.db.db
+    const rows = await this.db
       .select()
       .from(msgTbl)
       .where(
@@ -129,7 +129,7 @@ export class ConversationsService {
 
     const ids = rows.map((r) => r.id);
     const atts = ids.length
-      ? await this.db.db.select().from(attachmentsTbl).where(inArray(attachmentsTbl.messageId, ids))
+      ? await this.db.select().from(attachmentsTbl).where(inArray(attachmentsTbl.messageId, ids))
       : [];
 
     return rows.reverse().map((m) => ({
@@ -140,7 +140,7 @@ export class ConversationsService {
 
   async markRead(conversationId: string, userId: string, messageId: string) {
     if (!(await this.isParticipant(conversationId, userId))) return;
-    await this.db.db
+    await this.db
       .update(cp)
       .set({ lastReadMessageId: messageId })
       .where(and(eq(cp.conversationId, conversationId), eq(cp.userId, userId)));
@@ -148,7 +148,7 @@ export class ConversationsService {
   }
 
   async rebuildUnread(userId: string): Promise<Record<string, number>> {
-    const rows = await this.db.db
+    const rows = await this.db
       .select({
         conversationId: cp.conversationId,
         lastReadMessageId: cp.lastReadMessageId,
@@ -158,7 +158,7 @@ export class ConversationsService {
 
     const out: Record<string, number> = {};
     for (const r of rows) {
-      const [{ count }] = (await this.db.db.execute(sql`
+      const [{ count }] = (await this.db.execute(sql`
         select count(*)::int as count from messages m
         where m.conversation_id = ${r.conversationId}
           and m.sender_id <> ${userId}
