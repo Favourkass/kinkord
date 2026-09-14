@@ -787,11 +787,9 @@ export default function TeamPage({
                     <button
                       key={topic.id}
                       type="button"
-                      onClick={() => {
-                        if (topic.id === "support-my-work") return;
-                        selectTopic(topic.id);
-                      }}
-                      className="group flex items-center justify-between min-h-[58px] rounded-[18px] border border-neutral-800/90 bg-[#0e0e0c] px-3 sm:px-3.5 py-3 hover:border-[#faab14]/70 hover:bg-[#151512] transition-all cursor-pointer text-left shadow-sm active:scale-[0.98]"
+                      disabled={topic.comingSoon}
+                      onClick={() => selectTopic(topic.id)}
+                      className="group flex items-center justify-between min-h-[58px] rounded-[18px] border border-neutral-800/90 bg-[#0e0e0c] px-3 sm:px-3.5 py-3 hover:border-[#faab14]/70 hover:bg-[#151512] transition-all cursor-pointer text-left shadow-sm active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60"
                     >
                       <div className="flex items-center gap-2.5 min-w-0 pr-1">
                         <span className="shrink-0 text-[#faab14]">
@@ -1100,16 +1098,13 @@ export default function TeamPage({
                 </p>
                 <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                   {founderTopics
-                    .filter((t) => t.id !== selectedTopic.id && t.id !== "support-my-work")
+                    .filter((t) => t.id !== selectedTopic.id && !t.comingSoon)
                     .slice(0, 4)
                     .map((topic) => (
                       <button
                         key={topic.id}
                         type="button"
-                        onClick={() => {
-                          if (topic.id === "support-my-work") return;
-                          selectTopic(topic.id);
-                        }}
+                        onClick={() => selectTopic(topic.id)}
                         className="group flex items-center justify-between rounded-[16px] border border-neutral-800/90 bg-[#0e0e0c] px-3 py-2.5 hover:border-[#faab14]/50 hover:bg-[#151512] transition-all cursor-pointer text-left"
                       >
                         <div className="flex items-center gap-2 min-w-0 pr-1">

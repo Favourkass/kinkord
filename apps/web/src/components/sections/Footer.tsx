@@ -61,12 +61,13 @@ export default function Footer({ links, socials, addressLine, ageDisclaimer }: P
         <div className="flex items-center gap-5">
           {socials.map(({ name, href }) => {
             const Icon = SOCIAL_ICONS[name] ?? AtSign;
-            const isClickable = href && href !== "#" && name !== "Instagram";
 
-            if (!isClickable) {
+            // No URL yet (presenter passes href: null) — dimmed icon, not a link.
+            if (!href) {
               return (
                 <span
                   key={name}
+                  role="img"
                   aria-label={name}
                   className="w-9 h-9 border border-[#d4af37]/10 flex items-center justify-center text-[#555] cursor-default select-none opacity-60"
                 >

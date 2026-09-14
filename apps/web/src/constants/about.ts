@@ -72,6 +72,8 @@ export interface FounderTopic {
   principles?: readonly PrincipleItem[];
   /** Still being written — kept out of the published list. */
   draft?: boolean;
+  /** Announced on the page but not written yet — shown dimmed and can't be opened. */
+  comingSoon?: boolean;
 }
 
 export const FOUNDER_TOPICS: readonly FounderTopic[] = [
@@ -326,6 +328,7 @@ export const FOUNDER_TOPICS: readonly FounderTopic[] = [
     title: "Support My Work",
     badge: "Support",
     paragraphs: [],
+    comingSoon: true,
   },
   {
     id: "founders-principle",

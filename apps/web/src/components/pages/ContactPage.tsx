@@ -631,9 +631,7 @@ export default function ContactPage({
 
             <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
               {channels.map((channel) => {
-                const isClickable = Boolean(
-                  channel.href && channel.href !== "#" && channel.id !== "instagram",
-                );
+                // href: null = channel not launched yet — dimmed card, no link, no chevron.
                 const inner = (
                   <>
                     <div className="flex items-center gap-3.5">
@@ -652,13 +650,13 @@ export default function ContactPage({
                       </div>
                     </div>
 
-                    {isClickable && (
+                    {channel.href ? (
                       <ChevronRightIcon className="text-neutral-500 group-hover:translate-x-0.5 transition-transform" />
-                    )}
+                    ) : null}
                   </>
                 );
 
-                if (!isClickable) {
+                if (!channel.href) {
                   return (
                     <div
                       key={channel.id}

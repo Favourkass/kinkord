@@ -78,6 +78,9 @@ describe("useTeamPresenter", () => {
     const { result } = renderHook(() => useTeamPresenter());
 
     expect(result.current.founderTopics).toHaveLength(13);
+    expect(result.current.founderTopics.find((t) => t.id === "support-my-work")?.comingSoon).toBe(
+      true,
+    );
     expect(result.current.selectedTopicId).toBeNull();
     expect(result.current.selectedTopic).toBeNull();
 

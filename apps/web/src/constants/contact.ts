@@ -3,7 +3,8 @@ export interface ContactChannel {
   title: string;
   subtitle: string;
   value: string;
-  href: string;
+  /** null = channel not launched yet; rendered as an unlinked, dimmed card. */
+  href: string | null;
   icon: "email" | "whatsapp" | "phone" | "twitter" | "facebook" | "instagram";
 }
 
@@ -53,7 +54,7 @@ export const CONTACT_CHANNELS: readonly ContactChannel[] = [
     title: "Instagram",
     subtitle: "Follow us on Instagram",
     value: "",
-    href: "#",
+    href: null,
     icon: "instagram",
   },
 ];
