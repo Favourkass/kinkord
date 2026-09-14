@@ -22,7 +22,7 @@ build/
 .vscode/
 *.docx
 ~$*
-
+lockfile
 # debug
 npm-debug.log*
 yarn-debug.log*
