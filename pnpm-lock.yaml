@@ -132,6 +132,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@robasedev/sdk':
+        specifier: ^1.0.0
+        version: 1.0.0
       better-auth:
         specifier: ^1.7.0
         version: 1.7.0(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@16.2.6(@babel/core@7.29.7(supports-color@8.1.1))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(pg@8.23.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vitest@4.1.11(@types/node@20.19.43)(jsdom@30.0.1(@noble/hashes@2.3.0))(vite@8.2.2(@types/node@20.19.43)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.50.0)(tsx@4.23.12)))
@@ -1663,6 +1666,10 @@ packages:
     resolution: {integrity: sha512-c1Q99M5ljsIuc4YdaCwfUEXsofakb9c8+Zse2qxTadu8TalLXuAESzLvFAvNVbkmSlvlzIQOLpBCmWI9wTOt+g==}
     peerDependencies:
       '@redis/client': ^1.0.0
+
+  '@robasedev/sdk@1.0.0':
+    resolution: {integrity: sha512-jYjsahM3GHvxM4KrPKTzPYNSbo7VDscXn0VuXmKsaVENgpM6zu48lQnHTfjstNORU8kbgWaWnHXmM2a8UMgXRw==}
+    engines: {node: '>=20'}
 
   '@rolldown/binding-android-arm-eabi@1.2.5':
     resolution: {integrity: sha512-DLe/i+l8ynIBY7XEQ191TeZvCoowIGa18R+dIV30GW7DiOtp74i/xX8hs8GUjW5ARV7VZuie3d6AumSmCwbeRA==}
@@ -6771,6 +6778,8 @@ snapshots:
   '@redis/time-series@1.1.0(@redis/client@1.6.1)':
     dependencies:
       '@redis/client': 1.6.1
+
+  '@robasedev/sdk@1.0.0': {}
 
   '@rolldown/binding-android-arm-eabi@1.2.5':
     optional: true
