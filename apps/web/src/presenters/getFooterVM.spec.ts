@@ -19,6 +19,13 @@ describe("getFooterVM", () => {
     }
   });
 
+  it("links the live socials and leaves unlaunched ones unlinked (href null)", () => {
+    const byName = Object.fromEntries(vm.socials.map((s) => [s.name, s.href]));
+    expect(byName["Facebook"]).toMatch(/^https:\/\//);
+    expect(byName["X / Twitter"]).toBe("https://x.com/kinkordofficial");
+    expect(byName["Instagram"]).toBeNull();
+  });
+
   it("combines company name and address into one line", () => {
     expect(vm.addressLine).toContain("Temaxiro Limited");
     expect(vm.addressLine).toContain("Sapele");

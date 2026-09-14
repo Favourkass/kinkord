@@ -1,11 +1,31 @@
 "use client";
 
 import { Send, MessageCircle, Music2, AtSign, Hash } from "lucide-react";
+import type { ComponentType } from "react";
 import type { FooterVM } from "@/presenters/getFooterVM";
 
 type Props = FooterVM;
 
-const SOCIAL_ICONS: Record<string, typeof AtSign> = {
+function FacebookIcon({ size = 15, className }: { size?: number | string; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+    </svg>
+  );
+}
+
+const SOCIAL_ICONS: Record<
+  string,
+  ComponentType<{ size?: number | string; className?: string }>
+> = {
+  Facebook: FacebookIcon,
   Instagram: AtSign,
   "X / Twitter": Hash,
   TikTok: Music2,
@@ -41,10 +61,27 @@ export default function Footer({ links, socials, addressLine, ageDisclaimer }: P
         <div className="flex items-center gap-5">
           {socials.map(({ name, href }) => {
             const Icon = SOCIAL_ICONS[name] ?? AtSign;
+
+            // No URL yet (presenter passes href: null) — dimmed icon, not a link.
+            if (!href) {
+              return (
+                <span
+                  key={name}
+                  role="img"
+                  aria-label={name}
+                  className="w-9 h-9 border border-[#d4af37]/10 flex items-center justify-center text-[#555] cursor-default select-none opacity-60"
+                >
+                  <Icon size={15} />
+                </span>
+              );
+            }
+
             return (
               <a
                 key={name}
                 href={href}
+                target={href.startsWith("http") ? "_blank" : undefined}
+                rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
                 aria-label={name}
                 className="w-9 h-9 border border-[#d4af37]/15 flex items-center justify-center text-[#888] hover:text-[#d4af37] hover:border-[#d4af37]/50 transition-all duration-200"
               >

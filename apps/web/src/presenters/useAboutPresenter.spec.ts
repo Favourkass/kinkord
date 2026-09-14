@@ -33,7 +33,7 @@ describe("useAboutPresenter", () => {
     expect(result.current.aboutTitleAccent).toBe("KINKORD");
     expect(result.current.meetTeamCta).toBe("MEET THE TEAM");
     expect(result.current.teamHref).toBe("/about/team");
-    expect(result.current.policyLinks).toHaveLength(10);
+    expect(result.current.policyLinks).toHaveLength(8);
     expect(result.current.isLoggedIn).toBe(false);
     expect(result.current.loginHref).toBe("/login");
     expect(result.current.signupHref).toBe("/signup");

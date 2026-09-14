@@ -68,8 +68,6 @@ export const POLICY_LINKS: readonly PolicyLink[] = [
   { label: "Cookie Policy", href: "#", icon: "cookie" },
   { label: "Safety & Reporting", href: "#", icon: "safety" },
   { label: "Copyright Policy", href: "#", icon: "copyright" },
-  { label: "About Kinkord", href: Routes.about, icon: "about" },
-  { label: "Contact Us", href: Routes.contact, icon: "contact" },
   { label: "Invest in Kinkord", href: Routes.invest, icon: "invest" },
   {
     label: "Chat with us on WhatsApp",
@@ -78,12 +76,18 @@ export const POLICY_LINKS: readonly PolicyLink[] = [
   },
 ];
 
+/** `href: null` = channel not launched yet; the footer shows it dimmed and unlinked. */
 export const SOCIALS = [
-  { name: "Instagram", href: "#", icon: "instagram" },
-  { name: "X / Twitter", href: "#", icon: "twitter" },
-  { name: "TikTok", href: "#", icon: "tiktok" },
-  { name: "Telegram", href: "#", icon: "send" },
-  { name: "WhatsApp", href: "#", icon: "message-circle" },
+  {
+    name: "Facebook",
+    href: "https://www.facebook.com/share/14iTBY2fTuN/",
+    icon: "facebook",
+  },
+  { name: "Instagram", href: null, icon: "instagram" },
+  { name: "X / Twitter", href: "https://x.com/kinkordofficial", icon: "twitter" },
+  { name: "TikTok", href: null, icon: "tiktok" },
+  { name: "Telegram", href: null, icon: "send" },
+  { name: "WhatsApp", href: null, icon: "message-circle" },
 ] as const;
 
 export const COMPANY_NAME = "Temaxiro Limited";
