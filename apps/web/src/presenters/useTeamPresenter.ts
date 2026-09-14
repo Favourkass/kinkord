@@ -86,6 +86,9 @@ export function useTeamPresenter(): TeamVM {
   }, []);
 
   const selectTopic = useCallback((id: FounderTopicId) => {
+    const topic = ABOUT_PAGE_DATA.founderTopics.find((t) => t.id === id);
+    // Placeholder topics stay on the grid but never open.
+    if (!topic || topic.comingSoon) return;
     setSelectedTopicId(id);
   }, []);
 

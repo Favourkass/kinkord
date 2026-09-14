@@ -31,7 +31,7 @@ describe("useTeamPresenter", () => {
     expect(result.current.brand).toBe("KINKORD");
     expect(result.current.teamTitle).toBe("MEET THE");
     expect(result.current.teamTitleAccent).toBe("TEAM");
-    expect(result.current.policyLinks).toHaveLength(10);
+    expect(result.current.policyLinks).toHaveLength(8);
     expect(result.current.isLoggedIn).toBe(false);
     expect(result.current.loginHref).toBe("/login");
     expect(result.current.signupHref).toBe("/signup");
@@ -77,7 +77,28 @@ describe("useTeamPresenter", () => {
   it("handles topic selection and clearing for in-page content changes", () => {
     const { result } = renderHook(() => useTeamPresenter());
 
-    expect(result.current.founderTopics).toHaveLength(11);
+    expect(result.current.founderTopics).toHaveLength(13);
+    expect(result.current.founderTopics.find((t) => t.id === "support-my-work")?.comingSoon).toBe(
+      true,
+    );
+    expect(result.current.selectedTopicId).toBeNull();
+    expect(result.current.selectedTopic).toBeNull();
+
+    act(() => {
+      result.current.selectTopic("support-my-work");
+    });
+    expect(result.current.selectedTopicId).toBeNull();
+    expect(result.current.selectedTopic).toBeNull();
+
+    act(() => {
+      result.current.selectTopic("work-with-me");
+    });
+    expect(result.current.selectedTopicId).toBe("work-with-me");
+    expect(result.current.selectedTopic?.title).toBe("Work with Me");
+
+    act(() => {
+      result.current.clearTopic();
+    });
     expect(result.current.selectedTopicId).toBeNull();
     expect(result.current.selectedTopic).toBeNull();
 

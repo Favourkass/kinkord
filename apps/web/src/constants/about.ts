@@ -27,8 +27,9 @@ export type FounderTopicId =
   | "what-im-building"
   | "founders-journey"
   | "contact-the-founder"
-  | "work-with-me"
   | "my-message-to-the-community"
+  | "work-with-me"
+  | "support-my-work"
   | "founders-principle";
 
 export interface ContactChannel {
@@ -71,6 +72,8 @@ export interface FounderTopic {
   principles?: readonly PrincipleItem[];
   /** Still being written — kept out of the published list. */
   draft?: boolean;
+  /** Announced on the page but not written yet — shown dimmed and can't be opened. */
+  comingSoon?: boolean;
 }
 
 export const FOUNDER_TOPICS: readonly FounderTopic[] = [
@@ -79,15 +82,6 @@ export const FOUNDER_TOPICS: readonly FounderTopic[] = [
     title: "My Kink Identity",
     badge: "Identity & Expression",
     role: "Dominant",
-    interests: [
-      "⛓️ BDSM",
-      "🎭 Roleplay",
-      "🗯️ Dirty Talk",
-      "⚡ Sensory Play",
-      "👂 Ear Stimulation Kink",
-      "🪶 Tickling & Sensory Teasing",
-      "🙏 Body Worship",
-    ],
     paragraphs: [
       "My kink identity is rooted in BDSM, roleplay, and sensory exploration. I identify as a Dominant and enjoy exploring different forms of consensual kink and power dynamics.",
       "Beyond participating in kink, I’m also a Kink Educator, sharing knowledge and helping fellow kinksters better understand kink, BDSM, dynamics, terminology, communication, and responsible exploration.",
@@ -299,13 +293,6 @@ export const FOUNDER_TOPICS: readonly FounderTopic[] = [
       "🤝 Let's Connect\n\nI may not be able to respond immediately to every message, but I value genuine conversations and meaningful opportunities.\n\nThank you for taking the time to reach out.",
   },
   {
-    id: "work-with-me",
-    title: "Work with Me",
-    badge: "Collaboration & Careers",
-    draft: true,
-    paragraphs: ["Content for Work with Me will be provided here."],
-  },
-  {
     id: "my-message-to-the-community",
     title: "My Message to the Community",
     badge: "To the Kinkord Community",
@@ -316,6 +303,32 @@ export const FOUNDER_TOPICS: readonly FounderTopic[] = [
       "I want you to question us, share your ideas, challenge us and hold me accountable. I don't have every answer, but I am committed to listening, learning and building with you.",
       "Together, let's build more than a social platform.\n\nLet's build a home for the kink community.",
     ],
+  },
+  {
+    id: "work-with-me",
+    title: "Work with Me",
+    badge: "Collaboration & Careers",
+    paragraphs: [
+      "Help Me Build Something Global.",
+      "I’m building Kinkord from the ground up, and I’m looking for people who want to work alongside me as I turn the vision into reality.",
+      "Kinkord is being built as a global adult social & community platform bringing together community, relationships, education, creators, content, events and more.",
+      "But I know I cannot build everything alone.",
+      "I’m looking for people who can bring skills, knowledge, experience, creativity, ideas, connections or simply the willingness to contribute.",
+      "You could work with me in areas such as:\n\n💻 Technology & Engineering\n🎨 UI/UX & Product Design\n⚖️ Legal & Compliance\n📣 Marketing & Growth\n🎓 Education & Research\n📸 Photography & Videography\n🎭 Creators & Brand Ambassadors\n🛡️ Trust, Safety & Community\n🤝 Business & Partnerships\n📊 Strategy & Operations",
+      "DON’T SEE YOUR SKILL?\n\nTell me anyway.\n\nYou may have something valuable to contribute that I haven’t even thought of yet.\n\nYou don't need to be an expert.\n\nYou don't need decades of experience.\n\nWhat matters is what you can bring to the table.",
+      "⏳ WHERE WE ARE RIGHT NOW\n\nKinkord is still being built.\n\nAt this stage, opportunities to work with me are primarily flexible and part-time.\n\nThis is not currently a guaranteed paid employment opportunity, and working with me does not automatically guarantee employment, equity, royalties or payment.\n\nHowever, as the company grows, contributors may have opportunities for:\n\n💰 Employment\n📈 Equity opportunities\n💎 Royalty opportunities\n🏆 Recognition\n👑 Leadership opportunities\n🤝 Future professional opportunities",
+      "🌍 WHY WORK WITH ME NOW?\n\nBecause the early days matter.\n\nYou won't just be joining something that is already finished.\n\nYou can help shape the ideas, systems, culture, products and direction while Kinkord is still taking shape.\n\nYears from now, I want people to be able to say:\n\n“I worked with Tega when Kinkord was still being built.”",
+      "🚀 WANT TO WORK WITH ME?\n\nTell me about yourself, what you can do, what you would like to contribute, and how you believe you can help me build Kinkord.\n\nIf you have the skills, the passion, the ideas or the determination...\n\nI want to hear from you.\n\n🦁 Let's build something extraordinary.\n\nFROM THE GROUND UP.\nFOR THE WORLD.\nONE VISION. ONE TEAM.",
+    ],
+    whatsappUrl: "https://wa.me/2349127883266",
+    whatsappLabel: "Reach Out to Work with Me on WhatsApp",
+  },
+  {
+    id: "support-my-work",
+    title: "Support My Work",
+    badge: "Support",
+    paragraphs: [],
+    comingSoon: true,
   },
   {
     id: "founders-principle",
