@@ -22,6 +22,8 @@ export default function Home() {
           label={splash.label}
           animate={splash.animate}
           leaving={splash.leaving}
+          onPlaying={splash.onPlaying}
+          onFinished={splash.onFinished}
         />
       )}
       <SplashScreen {...vm} />

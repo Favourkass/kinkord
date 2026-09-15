@@ -13,14 +13,24 @@ export const BRAND_SPLASH = {
 } as const;
 
 /**
- * The session check usually settles in well under a second, so without a floor
- * the animation would register as a flicker. 1500ms carries the mask and most
- * of the wordmark; raise it toward 5000 to hold the full lockup every open.
+ * Fallback floor for when there is no animation to wait on — reduced motion, a
+ * blocked autoplay, or a video that failed to load. When the animation does
+ * play, it runs to the end instead (CEO, 2026-09-15).
  */
 export const SPLASH_MIN_MS = 1500;
 
-/** Hard stop, so a hung or unreachable API can never trap someone on the splash. */
-export const SPLASH_MAX_MS = 6000;
+/**
+ * How long the video gets to actually start before we stop waiting on it.
+ * Autoplay refusals raise no event, so this is the only way to notice one.
+ */
+export const SPLASH_START_MS = 2500;
+
+/**
+ * Hard stop, so a stalled download or a video that never reports its end can
+ * never trap someone on the splash. Must clear the clip's own length (5.03s)
+ * plus a little buffering, or it would cut the animation short.
+ */
+export const SPLASH_MAX_MS = 10000;
 
 /** Must match the overlay’s CSS transition so it unmounts only once faded. */
 export const SPLASH_FADE_MS = 500;
