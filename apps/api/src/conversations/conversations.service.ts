@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, desc, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
 import { Db, DRIZZLE } from '../db/db.module';
 import {
@@ -6,13 +6,19 @@ import {
   conversationParticipants as cp,
   conversations as convTbl,
   messages as msgTbl,
+  profile as profileTbl,
   users as usersTbl,
 } from '../db/schema';
 import { RedisService } from '../redis/redis.service';
+import { StorageService } from '../storage/storage.service';
 
 @Injectable()
 export class ConversationsService {
-  constructor(@Inject(DRIZZLE) private db: Db, private redis: RedisService) {}
+  constructor(
+    @Inject(DRIZZLE) private db: Db,
+    private redis: RedisService,
+    private storage: StorageService,
+  ) {}
 
   private dmKeyFor(a: string, b: string) {
     return [a, b].sort().join(':');
@@ -41,11 +47,12 @@ export class ConversationsService {
           id: usersTbl.id,
           username: usersTbl.username,
           displayName: usersTbl.name,
-          avatarUrl: usersTbl.image,
+          avatarKey: profileTbl.avatarKey,
         },
       })
       .from(cp)
       .innerJoin(usersTbl, eq(usersTbl.id, cp.userId))
+      .leftJoin(profileTbl, eq(profileTbl.userId, usersTbl.id))
       .where(inArray(cp.conversationId, ids));
 
     const lastMsgs = await this.db
@@ -65,16 +72,30 @@ export class ConversationsService {
 
     const unread = await this.redis.unreadSnapshot(userId);
 
+    const participants = await Promise.all(
+      allParticipants.map(async (p) => ({
+        conversationId: p.conversationId,
+        user: {
+          ...p.user,
+          avatarUrl: p.user.avatarKey ? await this.storage.presignDownload(p.user.avatarKey) : null,
+        },
+      })),
+    );
+
     return rows.map((r) => ({
       ...r,
-      participants: allParticipants.filter((p) => p.conversationId === r.id).map((p) => p.user),
+      participants: participants.filter((p) => p.conversationId === r.id).map((p) => p.user),
       lastMessage: lastMsgs.find((m) => m.conversationId === r.id) ?? null,
       unreadCount: unread[r.id] ?? 0,
     }));
   }
 
   async ensureDm(userA: string, userB: string) {
-    if (userA === userB) throw new NotFoundException('Cannot DM yourself');
+    if (userA === userB) throw new BadRequestException('Cannot DM yourself');
+    const target = await this.db.query.users.findFirst({
+      where: (u, { eq }) => eq(u.id, userB),
+    });
+    if (!target) throw new NotFoundException('User not found');
     const key = this.dmKeyFor(userA, userB);
     const existing = await this.db.query.conversations.findFirst({
       where: (c, { eq }) => eq(c.dmKey, key),

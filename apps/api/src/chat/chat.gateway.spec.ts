@@ -19,6 +19,31 @@ const socketWithHeaders = () => ({
 });
 
 describe("ChatGateway", () => {
+  it("returns the send result for Socket.IO acknowledgements", async () => {
+    const chat = {
+      createMessage: vi.fn(async () => ({ id: "message-1", conversationId: "conv-1" })),
+    } as unknown as ChatService;
+    const conversations = {
+      isParticipant: vi.fn(async () => true),
+      participantIds: vi.fn(async () => ["user-1", "user-2"]),
+    } as unknown as ConversationsService;
+    const redis = {
+      bumpUnread: vi.fn(async () => 1),
+    } as unknown as RedisService;
+    const gateway = new ChatGateway(chat, conversations, redis, {} as Db, authWith(null));
+    const emit = vi.fn();
+    gateway.server = { to: vi.fn(() => ({ emit })) } as never;
+    const socket = { data: { userId: "user-1" } };
+
+    const result = await gateway.onSend(socket as never, {
+      conversationId: "conv-1",
+      body: "hello",
+    });
+
+    expect(result).toEqual({ ok: true, data: { id: "message-1", conversationId: "conv-1" } });
+    expect(chat.createMessage).toHaveBeenCalled();
+  });
+
   it("disconnects sockets without a Better Auth session", async () => {
     const socket = socketWithHeaders();
     const gateway = new ChatGateway(

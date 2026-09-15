@@ -18,8 +18,6 @@ import { conversationParticipants as cpTbl } from "../db/schema";
 import { fromNodeHeaders } from "better-auth/node";
 import { AUTH, Auth } from "../auth/auth.instance";
 
-type Ack<T = any> = (res: { ok: true; data: T } | { ok: false; error: string }) => void;
-
 @WebSocketGateway({ cors: { origin: true, credentials: true } })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server!: Server;
@@ -94,22 +92,18 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       clientId?: string;
       attachmentIds?: string[];
     },
-    @ConnectedSocket() ackCb?: any,
   ) {
-    // Nest passes an ack callback when the client requests one.
-    return this.handleSend(socket, payload, ackCb);
+    return this.handleSend(socket, payload);
   }
 
   private async handleSend(
     socket: Socket,
     payload: { conversationId: string; body?: string; clientId?: string; attachmentIds?: string[] },
-    ack?: Ack,
-  ) {
+  ): Promise<{ ok: true; data: Awaited<ReturnType<ChatService['createMessage']>> } | { ok: false; error: string }> {
     const senderId = socket.data.userId as string;
     try {
       if (!(await this.convs.isParticipant(payload.conversationId, senderId))) {
-        ack?.({ ok: false, error: "not_a_participant" });
-        return;
+        return { ok: false, error: "not_a_participant" };
       }
       const message = await this.chat.createMessage({
         conversationId: payload.conversationId,
@@ -135,10 +129,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         });
       }
 
-      ack?.({ ok: true, data: message });
+      return { ok: true, data: message };
     } catch (e: any) {
       this.log.error("message:send failed", e);
-      ack?.({ ok: false, error: e?.message ?? "send_failed" });
+      return { ok: false, error: e?.message ?? "send_failed" };
     }
   }
 
