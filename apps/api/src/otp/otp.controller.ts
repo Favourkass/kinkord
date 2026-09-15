@@ -3,8 +3,15 @@ import type { Response } from "express";
 import { z } from "zod";
 import { OtpService } from "./otp.service";
 
-const sendSchema = z.object({ channel: z.enum(["email", "sms"]), destination: z.string().trim().min(1) });
-const verifySchema = z.object({ channel: z.enum(["email", "sms"]), otp_id: z.string().trim().min(1), code: z.string().trim().min(1) });
+const sendSchema = z.object({
+  channel: z.enum(["email", "sms"]),
+  destination: z.string().trim().min(1),
+});
+const verifySchema = z.object({
+  channel: z.enum(["email", "sms"]),
+  otp_id: z.string().trim().min(1),
+  code: z.string().trim().min(1),
+});
 
 function parse<T>(schema: z.ZodSchema<T>, body: unknown) {
   const result = schema.safeParse(body);

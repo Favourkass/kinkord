@@ -1,4 +1,10 @@
-import { BadRequestException, HttpException, Inject, Injectable, UnprocessableEntityException } from "@nestjs/common";
+import {
+  BadRequestException,
+  HttpException,
+  Inject,
+  Injectable,
+  UnprocessableEntityException,
+} from "@nestjs/common";
 import { createHash, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { and, eq, gte, sql } from "drizzle-orm";
 import { DRIZZLE, type Db } from "../db/db.module";
@@ -27,7 +33,9 @@ function normalizeDestination(channel: OtpChannel, destination: string) {
   if (channel === "email" && emailPattern.test(normalized)) return normalized;
   if (channel === "sms" && phonePattern.test(normalized)) return normalized;
   throw new BadRequestException(
-    channel === "email" ? "A valid email address is required" : "A valid E.164 phone number is required",
+    channel === "email"
+      ? "A valid email address is required"
+      : "A valid E.164 phone number is required",
   );
 }
 
@@ -56,9 +64,7 @@ export class OtpService {
     const recent = await this.db
       .select({ createdAt: otpChallenge.createdAt })
       .from(otpChallenge)
-      .where(
-        and(eq(otpChallenge.destination, normalized), gte(otpChallenge.createdAt, hourAgo)),
-      )
+      .where(and(eq(otpChallenge.destination, normalized), gte(otpChallenge.createdAt, hourAgo)))
       .orderBy(sql`${otpChallenge.createdAt} desc`);
 
     if (recent[0] && now.getTime() - recent[0].createdAt.getTime() < SEND_COOLDOWN_MS) {
@@ -75,7 +81,10 @@ export class OtpService {
     const id = randomUUID();
     const expiresAt = new Date(now.getTime() + OTP_TTL_MS);
     if (channel === "sms") {
-      await this.sms.send({ to: normalized, message: `Your Kinkord verification code is ${value}. It expires in 10 minutes.` });
+      await this.sms.send({
+        to: normalized,
+        message: `Your Kinkord verification code is ${value}. It expires in 10 minutes.`,
+      });
     } else {
       await this.email.send({
         to: normalized,
@@ -110,7 +119,8 @@ export class OtpService {
       }
       const storedHash = Buffer.from(challenge.codeHash);
       const computedHash = Buffer.from(hashCode(value));
-      const matches = storedHash.length === computedHash.length && timingSafeEqual(storedHash, computedHash);
+      const matches =
+        storedHash.length === computedHash.length && timingSafeEqual(storedHash, computedHash);
       if (matches) {
         await tx.delete(otpChallenge).where(eq(otpChallenge.id, id));
         return true;
@@ -120,10 +130,12 @@ export class OtpService {
         .update(otpChallenge)
         .set({
           failedAttempts,
-          lockedUntil: failedAttempts >= MAX_FAILED_ATTEMPTS ? new Date(now.getTime() + LOCKOUT_MS) : null,
+          lockedUntil:
+            failedAttempts >= MAX_FAILED_ATTEMPTS ? new Date(now.getTime() + LOCKOUT_MS) : null,
         })
         .where(eq(otpChallenge.id, id));
-      if (failedAttempts >= MAX_FAILED_ATTEMPTS) throw new TooManyOtpRequestsException("Verification is locked for 24 hours");
+      if (failedAttempts >= MAX_FAILED_ATTEMPTS)
+        throw new TooManyOtpRequestsException("Verification is locked for 24 hours");
       return false;
     });
   }

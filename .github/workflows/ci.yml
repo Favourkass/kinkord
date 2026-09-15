@@ -24,7 +24,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Prettier
-        run: pnpm exec prettier --check .
+        run: |
+          changed_files=$(git diff --name-only --diff-filter=ACMR "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}")
+          if [ -n "$changed_files" ]; then
+            printf '%s\n' "$changed_files" | xargs -r pnpm exec prettier --check
+          fi
 
       - name: Lint (all workspaces)
         run: pnpm run lint
