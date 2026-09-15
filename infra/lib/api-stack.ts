@@ -74,7 +74,7 @@ export class ApiBaseStack extends cdk.Stack {
           secretArn("kinkord/database-url"),
           secretArn("kinkord/auth-secret"),
           secretArn("kinkord/resend"),
-          secretArn("kinkord/termii"),
+          secretArn("kinkord/robase"),
         ],
       }),
     );
@@ -116,8 +116,6 @@ export class ApiStack extends cdk.Stack {
               { name: "AUTH_BASE_URL", value: "https://api.kinkord.com" },
               { name: "COOKIE_DOMAIN", value: ".kinkord.com" },
               { name: "EMAIL_FROM", value: "Kinkord <no-reply@kinkord.com>" },
-              { name: "TERMII_SENDER_ID", value: "KINKORD" },
-              { name: "TERMII_CHANNEL", value: "generic" },
               { name: "RUN_MIGRATIONS", value: "true" },
             ],
             // Full suffixed ARNs, resolved by the deploy script; falls back
@@ -142,10 +140,10 @@ export class ApiStack extends cdk.Stack {
                   `arn:aws:secretsmanager:${region}:${account}:secret:kinkord/resend`,
               },
               {
-                name: "TERMII_API_KEY",
+                name: "ROBASE_API_KEY",
                 value:
-                  process.env.ARN_TERMII ??
-                  `arn:aws:secretsmanager:${region}:${account}:secret:kinkord/termii`,
+                  process.env.ARN_ROBASE ??
+                  `arn:aws:secretsmanager:${region}:${account}:secret:kinkord/robase`,
               },
             ],
           },

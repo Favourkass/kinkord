@@ -46,7 +46,7 @@ function makeDb(recent: Array<{ createdAt: Date }> = []) {
   return { db, tx, challenge, update, del, stored };
 }
 
-const sms = () => ({ send: vi.fn(async () => ({ provider: "termii", providerMessageId: "1" })) });
+const sms = () => ({ send: vi.fn(async () => ({ provider: "robase", providerMessageId: "1" })) });
 const email = () => ({ send: vi.fn(async () => undefined) });
 
 describe("OtpService.send", () => {
@@ -68,11 +68,30 @@ describe("OtpService.send", () => {
 
   it("drops the challenge when delivery fails, so no dead code is left behind", async () => {
     const { db, del } = makeDb();
-    const texter = { send: vi.fn(async () => Promise.reject(new Error("termii down"))) };
+    const texter = { send: vi.fn(async () => Promise.reject(new Error("provider down"))) };
     const service = new OtpService(db as never, email() as never, texter as never);
 
-    await expect(service.send("u1", "sms", "+2348012345678")).rejects.toThrow("termii down");
+    await expect(service.send("u1", "sms", "+2348012345678")).rejects.toThrow(
+      /could not text you/i,
+    );
     expect(del).toHaveBeenCalled();
+  });
+
+  it("never puts the provider's own failure in front of a member", async () => {
+    const { db } = makeDb();
+    // The real 2026-09-15 outage: Termii refused every send and members were
+    // shown "Internal server error".
+    const texter = {
+      send: vi.fn(async () =>
+        Promise.reject(new Error("SMS delivery failed via Termii (422) SENDER_ID_NOT_APPROVED")),
+      ),
+    };
+    const service = new OtpService(db as never, email() as never, texter as never);
+
+    await expect(service.send("u1", "sms", "+2348012345678")).rejects.toMatchObject({
+      status: 503,
+    });
+    await expect(service.send("u1", "sms", "+2348012345678")).rejects.not.toThrow(/422|SENDER_ID/);
   });
 
   it("refuses a destination that is not a real number or address", async () => {
