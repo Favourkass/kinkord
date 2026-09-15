@@ -1,15 +1,30 @@
 "use client";
 
+import BrandSplash from "@/components/ui/BrandSplash";
 import SplashScreen from "@/components/landing/SplashScreen";
+import { useBrandSplashPresenter } from "@/presenters/useBrandSplashPresenter";
 import { useLandingPresenter } from "@/presenters/useLandingPresenter";
-import { useGuestRedirect } from "@/presenters/useGuestRedirect";
 
 export default function Home() {
-  // If the visitor already has a session, bounce them to /home instead of the
-  // marketing splash. Rendered optimistically so the splash still SSRs for
-  // logged-out visitors; only signed-in users get redirected client-side.
-  useGuestRedirect();
+  // The logo animation covers the entry route while the session lookup runs: a
+  // signed-in visitor is bounced to /home behind it, a guest sees the marketing
+  // splash once it fades. Both are rendered, so the page is still in the HTML
+  // for crawlers and assistive tech while the overlay is up.
+  const splash = useBrandSplashPresenter();
   const vm = useLandingPresenter();
 
-  return <SplashScreen {...vm} />;
+  return (
+    <>
+      {splash.visible && (
+        <BrandSplash
+          videoSrc={splash.videoSrc}
+          posterSrc={splash.posterSrc}
+          label={splash.label}
+          animate={splash.animate}
+          leaving={splash.leaving}
+        />
+      )}
+      <SplashScreen {...vm} />
+    </>
+  );
 }
