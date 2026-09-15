@@ -6,7 +6,7 @@ import { PROFILE_EDIT_COPY, SECTION_ICONS } from "@/constants/profileEdit";
 import { Routes } from "@/constants/Routes";
 import type { MePM, OwnProfilePM } from "@/domain/profile";
 import { ApiError } from "@/services/apiClient";
-import { profileApi, uploadProfileImage } from "@/services/profile.service";
+import { profileApi } from "@/services/profile.service";
 
 /** The five sections, in Figma order (1542:225). */
 const HUB_SECTIONS = [
@@ -25,8 +25,6 @@ export function useEditProfileHubPresenter() {
   const [profile, setProfile] = useState<OwnProfilePM | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,31 +50,13 @@ export function useEditProfileHubPresenter() {
     };
   }, [router, copy.loadError]);
 
-  const onAvatarFile = useCallback(
-    async (file: File) => {
-      setUploading(true);
-      setError(null);
-      setNotice(null);
-      try {
-        setProfile(await uploadProfileImage("avatar", file));
-        setNotice(copy.photos.savedAvatar);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : copy.uploadError);
-      } finally {
-        setUploading(false);
-      }
-    },
-    [copy],
-  );
-
   const back = useCallback(() => router.push(Routes.profile), [router]);
+  const changePhoto = useCallback(() => router.push(Routes.profileEditPhotos), [router]);
   const handle = me?.displayUsername ?? me?.username ?? null;
 
   return {
     loading,
     error,
-    notice,
-    uploading,
     title: copy.title,
     backLabel: copy.back,
     loadingLabel: copy.loading,
@@ -93,9 +73,7 @@ export function useEditProfileHubPresenter() {
       title: copy.hub.sections[s.key].title,
       subtitle: copy.hub.sections[s.key].subtitle,
     })),
-    onAvatarFile: (file: File) => {
-      void onAvatarFile(file);
-    },
+    changePhoto,
     back,
   };
 }

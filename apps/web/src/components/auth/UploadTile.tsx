@@ -11,6 +11,7 @@ interface Props {
   previewUrl: string | null;
   onFile: (f: File) => void;
   uploading?: boolean;
+  disabled?: boolean;
   error?: string;
 }
 
@@ -23,6 +24,7 @@ export default function UploadTile({
   previewUrl,
   onFile,
   uploading,
+  disabled,
   error,
 }: Props) {
   const input = useRef<HTMLInputElement>(null);
@@ -45,10 +47,10 @@ export default function UploadTile({
       <button
         type="button"
         onClick={() => input.current?.click()}
-        disabled={uploading}
+        disabled={uploading || disabled}
         className={`relative flex items-center justify-center overflow-hidden border-[1.5px] border-dashed transition hover:border-kink-gold-bright ${
           error ? "border-red-500/70" : "border-[rgba(200,146,42,0.6)]"
-        } bg-[#181818] ${frame}`}
+        } bg-[#181818] ${frame} ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
         style={{ boxShadow: "0 0 32px rgba(255,186,31,0.14)" }}
       >
         {previewUrl ? (
@@ -74,6 +76,7 @@ export default function UploadTile({
           ref={input}
           type="file"
           hidden
+          disabled={uploading || disabled}
           accept="image/jpeg,image/png,image/webp"
           onChange={(e) => {
             const f = e.target.files?.[0];

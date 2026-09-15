@@ -1,6 +1,9 @@
 import type { ChangeEvent } from "react";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import MaskIcon from "@/components/app/MaskIcon";
+import PhotoConfirmation, {
+  type PhotoConfirmationProps,
+} from "@/components/profile/PhotoConfirmation";
 
 export interface PhotoCardVM {
   title: string;
@@ -10,12 +13,14 @@ export interface PhotoCardVM {
   changeLabel: string;
   url: string | null;
   uploading: boolean;
+  disabled: boolean;
   uploadingLabel: string;
 }
 
 export interface EditPhotosProps {
   heading: string;
   subtitle: string;
+  confirmation: PhotoConfirmationProps;
   avatar: PhotoCardVM;
   cover: PhotoCardVM;
   notice: string | null;
@@ -52,8 +57,8 @@ function Card({
           <p className="text-[11px] text-pf-muted">{vm.subtitle}</p>
         </div>
         <label
-          className={`flex cursor-pointer items-center gap-[6px] rounded-[16px] border border-kink-gold-bright px-[14px] py-[6px] text-[12px] font-semibold text-kink-gold-bright ${
-            vm.uploading ? "opacity-50" : ""
+          className={`flex items-center gap-[6px] rounded-[16px] border border-kink-gold-bright px-[14px] py-[6px] text-[12px] font-semibold text-kink-gold-bright ${
+            vm.disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
           }`}
         >
           <MaskIcon src="/app/profile/icon-pencil-12.svg" width={12} />
@@ -63,7 +68,7 @@ function Card({
             type="file"
             accept="image/jpeg,image/png,image/webp"
             className="hidden"
-            disabled={vm.uploading}
+            disabled={vm.disabled}
             aria-label={vm.changeLabel}
             onChange={pickWith(onFile)}
           />
@@ -77,10 +82,10 @@ function Card({
 
 /** Photos & Media (Figma 1524:1786): profile photo and cover, each with a camera badge. */
 export default function EditPhotos(p: EditPhotosProps) {
-  const badge = (size: number, label: string, uploading: boolean, onFile: (f: File) => void) => (
+  const badge = (size: number, label: string, disabled: boolean, onFile: (f: File) => void) => (
     <label
-      className={`absolute bottom-0 right-0 grid cursor-pointer place-items-center rounded-full bg-kink-gold-bright text-black ${
-        uploading ? "opacity-50" : ""
+      className={`absolute bottom-0 right-0 grid place-items-center rounded-full bg-kink-gold-bright text-black ${
+        disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
       }`}
       style={{ width: size, height: size }}
     >
@@ -93,7 +98,7 @@ export default function EditPhotos(p: EditPhotosProps) {
         type="file"
         accept="image/jpeg,image/png,image/webp"
         className="hidden"
-        disabled={uploading}
+        disabled={disabled}
         onChange={pickWith(onFile)}
       />
     </label>
@@ -106,6 +111,8 @@ export default function EditPhotos(p: EditPhotosProps) {
         <p className="italic">{p.subtitle}</p>
       </div>
 
+      <PhotoConfirmation {...p.confirmation} />
+
       <Card vm={p.avatar} icon="/app/profile/icon-gallery.svg" onFile={p.onAvatarFile}>
         <div className="relative mx-auto size-[140px]">
           <div className="absolute inset-0 rounded-full border-[3px] border-kink-gold-bright" />
@@ -117,7 +124,7 @@ export default function EditPhotos(p: EditPhotosProps) {
               ringClassName="bg-transparent"
             />
           </div>
-          {badge(36, p.avatar.changeLabel, p.avatar.uploading, p.onAvatarFile)}
+          {badge(36, p.avatar.changeLabel, p.avatar.disabled, p.onAvatarFile)}
         </div>
       </Card>
 
@@ -132,7 +139,7 @@ export default function EditPhotos(p: EditPhotosProps) {
             </div>
           )}
           <div className="absolute bottom-[10px] right-[10px] size-[32px]">
-            {badge(32, p.cover.changeLabel, p.cover.uploading, p.onCoverFile)}
+            {badge(32, p.cover.changeLabel, p.cover.disabled, p.onCoverFile)}
           </div>
         </div>
       </Card>

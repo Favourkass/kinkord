@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { PHOTO_CONFIRMATION_COPY } from "@/constants/photoConfirmation";
 import { PROFILE_EDIT_COPY } from "@/constants/profileEdit";
 import { Routes } from "@/constants/Routes";
 import type { OwnProfilePM } from "@/domain/profile";
@@ -20,6 +21,7 @@ export function useEditPhotosPresenter() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [uploading, setUploading] = useState<ImageKind | null>(null);
+  const [photoConfirmed, setPhotoConfirmed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,6 +48,10 @@ export function useEditPhotosPresenter() {
 
   const upload = useCallback(
     async (kind: ImageKind, file: File) => {
+      if (!photoConfirmed) {
+        setError(PHOTO_CONFIRMATION_COPY.requiredError);
+        return;
+      }
       setUploading(kind);
       setError(null);
       setNotice(null);
@@ -58,7 +64,7 @@ export function useEditPhotosPresenter() {
         setUploading(null);
       }
     },
-    [copy],
+    [copy, photoConfirmed],
   );
 
   const card = (kind: ImageKind) => {
@@ -71,6 +77,7 @@ export function useEditPhotosPresenter() {
       changeLabel: c.change,
       url: kind === "avatar" ? (profile?.avatarUrl ?? null) : (profile?.coverUrl ?? null),
       uploading: uploading === kind,
+      disabled: !photoConfirmed || uploading !== null,
       uploadingLabel: copy.photos.uploading,
     };
   };
@@ -84,6 +91,15 @@ export function useEditPhotosPresenter() {
     loadingLabel: copy.loading,
     heading: copy.photos.heading,
     subtitle: copy.photos.subtitle,
+    confirmation: {
+      ...PHOTO_CONFIRMATION_COPY,
+      confirmed: photoConfirmed,
+      disabled: uploading !== null,
+      onConfirmedChange: (confirmed: boolean) => {
+        setPhotoConfirmed(confirmed);
+        if (confirmed) setError(null);
+      },
+    },
     avatar: card("avatar"),
     cover: card("cover"),
     onAvatarFile: (file: File) => {

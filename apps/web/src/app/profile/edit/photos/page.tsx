@@ -24,6 +24,7 @@ export default function EditPhotosPage() {
       <EditPhotos
         heading={vm.heading}
         subtitle={vm.subtitle}
+        confirmation={vm.confirmation}
         avatar={vm.avatar}
         cover={vm.cover}
         notice={vm.notice}

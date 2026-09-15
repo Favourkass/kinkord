@@ -20,7 +20,7 @@ describe("useEditPhotosPresenter", () => {
     upload.mockReset();
   });
 
-  it("describes both photo cards and uploads a new cover", async () => {
+  it("requires confirmation before uploading a new cover", async () => {
     upload.mockResolvedValueOnce({ avatarUrl: null, coverUrl: "https://s3/new.jpg" });
     const { result } = renderHook(() => useEditPhotosPresenter());
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -29,6 +29,7 @@ describe("useEditPhotosPresenter", () => {
       hint: "JPG, PNG or WebP up to 5MB",
       url: null,
       uploading: false,
+      disabled: true,
     });
     expect(result.current.cover).toMatchObject({
       hint: "JPG, PNG or WebP up to 10MB",
@@ -36,6 +37,13 @@ describe("useEditPhotosPresenter", () => {
     });
 
     const file = new File([new Uint8Array(10)], "cover.jpg", { type: "image/jpeg" });
+    act(() => result.current.onCoverFile(file));
+    expect(upload).not.toHaveBeenCalled();
+    expect(result.current.error).toMatch(/Confirm the Profile & Cover Photo/);
+
+    act(() => result.current.confirmation.onConfirmedChange(true));
+    expect(result.current.confirmation.confirmed).toBe(true);
+    expect(result.current.cover.disabled).toBe(false);
     act(() => result.current.onCoverFile(file));
     await waitFor(() => expect(result.current.cover.url).toBe("https://s3/new.jpg"));
     expect(upload).toHaveBeenCalledWith("cover", file);
