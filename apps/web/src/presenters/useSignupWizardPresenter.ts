@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, uploadToPresignedUrl } from "@/services/apiClient";
 import { IMAGE_VARIANTS, buildUploadSet, type ImageVariant } from "@/util/image";
@@ -23,7 +23,7 @@ import {
 } from "@/domain/onboarding";
 import { Routes } from "@/constants/Routes";
 import { PHOTO_CONFIRMATION_COPY } from "@/constants/photoConfirmation";
-import { usePhoneVerification } from "./usePhoneVerification";
+import { useVerification } from "./useVerification";
 
 export type WizardStage = "country" | "account" | "about" | "verify" | "profile" | "welcome";
 const STAGE_STEP: Record<WizardStage, number> = {
@@ -130,7 +130,16 @@ export function useSignupWizardPresenter() {
   }, [about, account, country]);
 
   // Phone verification, shared with Settings → Security.
-  const phone = usePhoneVerification(() => setStage("profile"));
+  const phone = useVerification("phone", () => setStage("profile"));
+  // Sent automatically when step 3 opens: they typed the address moments ago.
+  const emailCode = useVerification("email");
+
+  // The address was typed moments ago, so the code goes out without asking.
+  const emailSendCode = emailCode.sendCode;
+  useEffect(() => {
+    if (stage !== "verify") return;
+    emailSendCode();
+  }, [stage, emailSendCode]);
 
   const skipVerification = useCallback(() => setStage("profile"), []);
 
@@ -223,7 +232,7 @@ export function useSignupWizardPresenter() {
       aboutStep: { draft: about, set: setAbout, errors: aboutErrors },
       submitCombinedStep,
       backToCountry,
-      verifyStep: { ...phone, skip: skipVerification },
+      verifyStep: { ...phone, skip: skipVerification, email: emailCode },
       profileStep: {
         roles,
         toggleRole,
@@ -264,6 +273,7 @@ export function useSignupWizardPresenter() {
       backToCountry,
       skipVerification,
       phone,
+      emailCode,
       roles,
       toggleRole,
       avatarUrl,

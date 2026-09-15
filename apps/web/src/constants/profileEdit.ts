@@ -203,5 +203,18 @@ export const SECURITY_COPY = {
     sentTo: (masked: string) => `We texted a code to ${masked}. It expires in 10 minutes.`,
     resendIn: (seconds: string) => `Send a new code in ${seconds}`,
   },
+  email: {
+    heading: "Email verification",
+    verified: "VERIFIED",
+    unverified: "NOT VERIFIED",
+    description: "Confirm your address so we can reach you about your account.",
+    verifiedNote: "Your email address is confirmed.",
+    send: "Email me a code",
+    resend: "Send a new code",
+    codeLabel: "Enter the 6-digit code",
+    submit: "Verify my email",
+    sentTo: (masked: string) => `We emailed a code to ${masked}. It expires in 10 minutes.`,
+    resendIn: (seconds: string) => `Send a new code in ${seconds}`,
+  },
   loadError: "Could not load your account. Refresh to try again.",
 } as const;

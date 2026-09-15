@@ -14,9 +14,9 @@ vi.mock("@/services/profile.service", () => ({
 
 const sendCode = vi.fn();
 const verifyCode = vi.fn();
-vi.mock("@/services/phoneVerification.service", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/services/phoneVerification.service")>()),
-  phoneVerificationApi: {
+vi.mock("@/services/verification.service", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/services/verification.service")>()),
+  verificationApi: {
     sendCode: (...a: unknown[]) => sendCode(...a),
     verify: (...a: unknown[]) => verifyCode(...a),
   },
@@ -125,9 +125,56 @@ describe("useSecurityPagePresenter", () => {
       act(() => result.current.view.phone.onCode("123456"));
       await act(async () => result.current.view.phone.onSubmit());
 
-      expect(verifyCode).toHaveBeenCalledWith("11111111-1111-4111-8111-111111111111", "123456");
+      expect(verifyCode).toHaveBeenCalledWith(
+        "phone",
+        "11111111-1111-4111-8111-111111111111",
+        "123456",
+      );
       expect(result.current.view.phone.verified).toBe(true);
       expect(result.current.view.phone.statusLabel).toBe("VERIFIED");
+    });
+  });
+
+  describe("email verification", () => {
+    it("shows the account as unverified and offers a code", async () => {
+      const { result } = renderHook(() => useSecurityPagePresenter());
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(result.current.view.email.verified).toBe(false);
+      expect(result.current.view.email.statusLabel).toBe("NOT VERIFIED");
+      expect(result.current.view.email.sendLabel).toBe("Email me a code");
+    });
+
+    it("shows the badge when the account is already verified", async () => {
+      me.mockResolvedValue({ twoFactorEnabled: true, emailVerified: true });
+      const { result } = renderHook(() => useSecurityPagePresenter());
+      await waitFor(() => expect(result.current.view.email.verified).toBe(true));
+      expect(result.current.view.email.statusLabel).toBe("VERIFIED");
+    });
+
+    it("sends to the email channel, then flips to verified", async () => {
+      sendCode.mockResolvedValue({
+        otpId: "22222222-2222-4222-8222-222222222222",
+        sentTo: "t**a@kinkord.com",
+        expiresAt: new Date(Date.now() + 600_000).toISOString(),
+        resendAfterMs: 60_000,
+      });
+      const { result } = renderHook(() => useSecurityPagePresenter());
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => result.current.view.email.onSend());
+      expect(sendCode).toHaveBeenCalledWith("email");
+      expect(result.current.view.email.sentNote).toMatch(/t\*\*a@kinkord\.com/);
+
+      act(() => result.current.view.email.onCode("123456"));
+      await act(async () => result.current.view.email.onSubmit());
+
+      expect(verifyCode).toHaveBeenCalledWith(
+        "email",
+        "22222222-2222-4222-8222-222222222222",
+        "123456",
+      );
+      expect(result.current.view.email.verified).toBe(true);
     });
   });
 });

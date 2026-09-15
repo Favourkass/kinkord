@@ -3,14 +3,15 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   attemptsMessage,
-  phoneErrorMessage,
-  phoneVerificationApi,
-  type PhoneCodeSentPM,
-} from "@/services/phoneVerification.service";
+  verificationApi,
+  verificationErrorMessage,
+  type CodeSentPM,
+  type VerificationChannel,
+} from "@/services/verification.service";
 
-export interface PhoneVerificationVM {
+export interface VerificationVM {
   /** Masked by the API once a code is out; null before that. */
-  phone: string | null;
+  sentTo: string | null;
   sent: boolean;
   code: string;
   setCode: (code: string) => void;
@@ -25,12 +26,15 @@ export interface PhoneVerificationVM {
 }
 
 /**
- * Shared phone-verification flow: signup step 3 and Settings → Security both
- * drive the same two endpoints, so the cooldown, attempt messages and error
- * wording live here rather than being written twice.
+ * Shared verification flow for both contact points. Signup step 3 and
+ * Settings → Security each drive it twice — once per channel — so the cooldown,
+ * attempt messages and error wording are written once.
  */
-export function usePhoneVerification(onVerified?: () => void): PhoneVerificationVM {
-  const [challenge, setChallenge] = useState<PhoneCodeSentPM | null>(null);
+export function useVerification(
+  channel: VerificationChannel,
+  onVerified?: () => void,
+): VerificationVM {
+  const [challenge, setChallenge] = useState<CodeSentPM | null>(null);
   const [code, setCode] = useState("");
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -45,22 +49,22 @@ export function usePhoneVerification(onVerified?: () => void): PhoneVerification
     return () => clearTimeout(timer);
   }, [resendIn]);
 
-  const sendCode = useCallback(async () => {
+  const runSend = useCallback(async () => {
     setSending(true);
     setError(null);
     try {
-      const sent = await phoneVerificationApi.sendCode();
+      const sent = await verificationApi.sendCode(channel);
       setChallenge(sent);
       setCode("");
       setResendIn(Math.ceil(sent.resendAfterMs / 1000));
     } catch (e) {
-      setError(phoneErrorMessage(e, "Could not send the code. Try again."));
+      setError(verificationErrorMessage(e, "Could not send the code. Try again."));
     } finally {
       setSending(false);
     }
-  }, []);
+  }, [channel]);
 
-  const verify = useCallback(async () => {
+  const runVerify = useCallback(async () => {
     if (!challenge) return;
     if (!/^\d{6}$/.test(code)) {
       setError("Enter the 6-digit code.");
@@ -69,7 +73,7 @@ export function usePhoneVerification(onVerified?: () => void): PhoneVerification
     setVerifying(true);
     setError(null);
     try {
-      const result = await phoneVerificationApi.verify(challenge.otpId, code);
+      const result = await verificationApi.verify(channel, challenge.otpId, code);
       if (result.verified) {
         setVerified(true);
         onVerified?.();
@@ -81,23 +85,28 @@ export function usePhoneVerification(onVerified?: () => void): PhoneVerification
           "That code is wrong or has expired. Send a new one.",
       );
     } catch (e) {
-      setError(phoneErrorMessage(e, "Could not check the code. Try again."));
+      setError(verificationErrorMessage(e, "Could not check the code. Try again."));
     } finally {
       setVerifying(false);
     }
-  }, [challenge, code, onVerified]);
+  }, [channel, challenge, code, onVerified]);
+
+  // Stable identities: callers put these in effect dependency lists, and a fresh
+  // function every render would re-fire the effect forever.
+  const sendCode = useCallback(() => {
+    void runSend();
+  }, [runSend]);
+  const verify = useCallback(() => {
+    void runVerify();
+  }, [runVerify]);
 
   return {
-    phone: challenge?.sentTo ?? null,
+    sentTo: challenge?.sentTo ?? null,
     sent: challenge !== null,
     code,
     setCode,
-    sendCode: () => {
-      void sendCode();
-    },
-    verify: () => {
-      void verify();
-    },
+    sendCode,
+    verify,
     sending,
     verifying,
     error,
