@@ -183,6 +183,10 @@ export class ProfilesService {
       if (next) throw new BadRequestException({ displayName: [lockMessage("display name", next)] });
       changes.displayNameChangedAt = now;
     }
+    // A new number has not been proved, so "Basic verified" has to be earned again.
+    if (input.phone !== undefined && input.phone !== current.phone) {
+      changes.phoneVerified = false;
+    }
     const [row] = await this.db
       .update(profile)
       .set(changes)
