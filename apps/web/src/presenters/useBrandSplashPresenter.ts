@@ -29,13 +29,13 @@ const getMotionServerSnapshot = () => true;
  * moment before being bounced — `checking` stays true through the redirect, so
  * the animation covers it until the new route paints.
  *
- * The animation runs to the end before anyone is let through (CEO, 2026-09-15).
- * It is only the gate while it is genuinely playing: reduced motion, a refused
- * autoplay or a failed load fall back to a short floor, and a ceiling covers a
- * clip that stalls and never reports its end.
+ * The animation runs to the end before anyone is let through (CEO, 2026-09-15),
+ * which means holding back the redirect as well as the reveal. It is only the
+ * gate while it is genuinely playing: reduced motion, a refused autoplay or a
+ * failed load fall back to a short floor, and a ceiling covers a clip that
+ * stalls and never reports its end.
  */
 export function useBrandSplashPresenter() {
-  const { checking } = useGuestRedirect();
   const [playing, setPlaying] = useState(false);
   const [finished, setFinished] = useState(false);
   const [startWindowClosed, setStartWindowClosed] = useState(false);
@@ -61,6 +61,12 @@ export function useBrandSplashPresenter() {
   // The clip holds the gate while it is playing, or while it still might start.
   const animationRunning = animate && (playing || !startWindowClosed);
   const ready = finished || (!animationRunning && floorElapsed);
+
+  // The redirect waits on the same gate. Without that hold it fires the moment
+  // the session resolves — under a second — and the navigation tears this
+  // screen down mid-animation, which is what members were seeing.
+  const { checking } = useGuestRedirect({ hold: !ready });
+
   const settled = ceilingHit || (ready && !checking);
 
   // Stay mounted through the fade, then drop out so nothing overlays the page.

@@ -5,8 +5,12 @@ import { useBrandSplashPresenter } from "./useBrandSplashPresenter";
 import { SPLASH_FADE_MS, SPLASH_MAX_MS, SPLASH_MIN_MS, SPLASH_START_MS } from "@/constants/splash";
 
 const checking = { value: true };
+const lastHold = { value: undefined as boolean | undefined };
 vi.mock("./useGuestRedirect", () => ({
-  useGuestRedirect: () => ({ checking: checking.value }),
+  useGuestRedirect: ({ hold }: { hold?: boolean } = {}) => {
+    lastHold.value = hold;
+    return { checking: checking.value };
+  },
 }));
 
 const mediaQuery = (matches: boolean) =>
@@ -37,6 +41,21 @@ describe("useBrandSplashPresenter", () => {
     expect(result.current.leaving).toBe(false);
     expect(result.current.animate).toBe(true);
     expect(result.current.videoSrc).toMatch(/\.mp4$/);
+  });
+
+  it("holds the redirect back until the animation is done", async () => {
+    const { result, rerender } = renderHook(() => useBrandSplashPresenter());
+    act(() => result.current.onPlaying());
+    checking.value = false;
+    rerender();
+
+    // A redirect here would unmount the screen and cut the clip off mid-play.
+    await advance(SPLASH_MIN_MS + SPLASH_START_MS);
+    expect(lastHold.value).toBe(true);
+
+    act(() => result.current.onFinished());
+    rerender();
+    expect(lastHold.value).toBe(false);
   });
 
   it("lets the animation finish even when the session check returns at once", async () => {
