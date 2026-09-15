@@ -41,9 +41,13 @@ describe("useEditPhotosPresenter", () => {
     expect(upload).not.toHaveBeenCalled();
     expect(result.current.error).toMatch(/Confirm the Profile & Cover Photo/);
 
+    expect(result.current.cover.lockedHint).toMatch(/enable uploads/);
+
     act(() => result.current.confirmation.onConfirmedChange(true));
     expect(result.current.confirmation.confirmed).toBe(true);
     expect(result.current.cover.disabled).toBe(false);
+    expect(result.current.cover.lockedHint).toBeNull();
+    expect(result.current.avatar.lockedHint).toBeNull();
     act(() => result.current.onCoverFile(file));
     await waitFor(() => expect(result.current.cover.url).toBe("https://s3/new.jpg"));
     expect(upload).toHaveBeenCalledWith("cover", file);

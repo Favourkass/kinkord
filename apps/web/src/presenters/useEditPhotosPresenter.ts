@@ -78,6 +78,8 @@ export function useEditPhotosPresenter() {
       url: kind === "avatar" ? (profile?.avatarUrl ?? null) : (profile?.coverUrl ?? null),
       uploading: uploading === kind,
       disabled: !photoConfirmed || uploading !== null,
+      // Only the confirmation locks the control in a way the member can fix.
+      lockedHint: photoConfirmed ? null : PHOTO_CONFIRMATION_COPY.lockedHint,
       uploadingLabel: copy.photos.uploading,
     };
   };

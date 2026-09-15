@@ -135,9 +135,14 @@ describe("useSignupWizardPresenter", () => {
     expect(result.current.profileStep.error).toMatch(/Confirm the Profile & Cover Photo/);
     expect(result.current.profileStep.confirmation.confirmed).toBe(false);
 
+    // The tiles are disabled before the guard can run, so the hint is what the
+    // member actually sees.
+    expect(result.current.profileStep.lockedHint).toMatch(/enable uploads/);
+
     act(() => result.current.profileStep.confirmation.onConfirmedChange(true));
     expect(result.current.profileStep.confirmation.confirmed).toBe(true);
     expect(result.current.profileStep.error).toBeNull();
+    expect(result.current.profileStep.lockedHint).toBeNull();
   });
 
   it("exposes totalSteps as 4", () => {

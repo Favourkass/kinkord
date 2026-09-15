@@ -12,6 +12,8 @@ interface Props {
   onFile: (f: File) => void;
   uploading?: boolean;
   disabled?: boolean;
+  /** Why the tile is inert, when it is. Not an error — the member can act on it. */
+  note?: string;
   error?: string;
 }
 
@@ -25,6 +27,7 @@ export default function UploadTile({
   onFile,
   uploading,
   disabled,
+  note,
   error,
 }: Props) {
   const input = useRef<HTMLInputElement>(null);
@@ -85,6 +88,11 @@ export default function UploadTile({
           }}
         />
       </button>
+      {note && (
+        <p className="mt-1.5 text-[11px] font-semibold text-kink-gold-bright lg:text-[14px]">
+          {note}
+        </p>
+      )}
       {error && <p className="mt-1.5 text-[11px] text-red-400 lg:text-[14px]">{error}</p>}
     </div>
   );
