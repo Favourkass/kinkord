@@ -47,9 +47,9 @@ export class FoundationStack extends cdk.Stack {
       secretName: "kinkord/resend",
       description: "Resend API key — set the value in the console, never in code",
     });
-    const termiiSecret = new secretsmanager.Secret(this, "TermiiSecret", {
-      secretName: "kinkord/termii",
-      description: "Termii API key — set the value in the console, never in code",
+    const robaseSecret = new secretsmanager.Secret(this, "RobaseSecret", {
+      secretName: "kinkord/robase",
+      description: "Robase API key — set the value in the console, never in code",
     });
 
     // ---- DNS (nameserver switch at Namecheap happens at cutover) -----------
@@ -115,7 +115,7 @@ export class FoundationStack extends cdk.Stack {
     new cdk.CfnOutput(this, "ApiRepoUri", { value: apiRepo.repositoryUri });
     new cdk.CfnOutput(this, "DeployRoleArn", { value: deployRole.roleArn });
     new cdk.CfnOutput(this, "ResendSecretArn", { value: resendSecret.secretArn });
-    new cdk.CfnOutput(this, "TermiiSecretArn", { value: termiiSecret.secretArn });
+    new cdk.CfnOutput(this, "RobaseSecretArn", { value: robaseSecret.secretArn });
     new cdk.CfnOutput(this, "ZoneNameServers", {
       value: cdk.Fn.join(" ", zone.hostedZoneNameServers ?? []),
       description: "Set these at Namecheap at cutover time",

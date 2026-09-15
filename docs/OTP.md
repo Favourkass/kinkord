@@ -14,7 +14,7 @@ always comes from the caller's own profile.
 ### `POST /profile/phone/send-code`
 
 No body. Reads the number from the signed-in member's profile and texts a
-6-digit code through the usual `SmsService` (Termii for Nigerian numbers).
+6-digit code through the usual `SmsService` (Robase, which routes per country).
 
 ```json
 {
@@ -42,7 +42,7 @@ attempts remaining; the third wrong code returns 429 and locks the challenge for
 ## Why there is no endpoint that takes a destination
 
 An endpoint that texts an arbitrary number is an open SMS relay: anyone could
-run up the Termii bill from a script. The destination is therefore never read
+run up the SMS bill from a script. The destination is therefore never read
 from the request.
 
 ## Rules
