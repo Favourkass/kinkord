@@ -28,11 +28,9 @@ export default function EditProfilePage() {
         handle={vm.handle}
         tierLabel={vm.tierLabel}
         changePhotoLabel={vm.changePhotoLabel}
-        uploading={vm.uploading}
         rows={vm.rows}
-        notice={vm.notice}
         error={vm.error}
-        onAvatarFile={vm.onAvatarFile}
+        onChangePhoto={vm.changePhoto}
       />
     </EditScreen>
   );

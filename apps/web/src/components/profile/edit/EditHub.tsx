@@ -1,4 +1,3 @@
-import type { ChangeEvent } from "react";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import MaskIcon from "@/components/app/MaskIcon";
 import EditRowsCard, { type EditRowItem } from "./EditRowsCard";
@@ -11,20 +10,13 @@ export interface EditHubProps {
   handle: string | null;
   tierLabel: string;
   changePhotoLabel: string;
-  uploading: boolean;
   rows: EditRowItem[];
-  notice: string | null;
   error: string | null;
-  onAvatarFile: (file: File) => void;
+  onChangePhoto: () => void;
 }
 
 /** Edit Profile hub (Figma 1542:30 dark / 1542:164 light): identity + the five sections. */
 export default function EditHub(p: EditHubProps) {
-  const pick = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) p.onAvatarFile(file);
-    e.target.value = "";
-  };
   return (
     <div className="flex w-full flex-col items-center gap-[24px]">
       <p className="max-w-[299px] text-center text-[12px] italic text-pf-muted">{p.subtitle}</p>
@@ -38,24 +30,17 @@ export default function EditHub(p: EditHubProps) {
               ringClassName="bg-kink-gold-bright"
             />
           </div>
-          <label
-            className={`absolute left-[75px] top-[75px] grid size-[28px] cursor-pointer place-items-center rounded-[14px] bg-kink-gold-bright text-black ${
-              p.uploading ? "opacity-50" : ""
-            }`}
+          <button
+            type="button"
+            onClick={p.onChangePhoto}
+            className="absolute left-[75px] top-[75px] grid size-[28px] cursor-pointer place-items-center rounded-[14px] bg-kink-gold-bright text-black"
           >
             <MaskIcon
               src="/app/profile/icon-camera-fill.svg"
               width={16}
               label={p.changePhotoLabel}
             />
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="hidden"
-              disabled={p.uploading}
-              onChange={pick}
-            />
-          </label>
+          </button>
         </div>
         <div className="flex min-w-0 flex-col gap-[6px] pb-[8px]">
           <p className="truncate text-[16px] font-bold text-pf-text">{p.name}</p>
@@ -71,9 +56,6 @@ export default function EditHub(p: EditHubProps) {
         </div>
       </div>
       <EditRowsCard rows={p.rows} />
-      {p.notice ? (
-        <p className="text-[13px] font-semibold text-kink-gold-bright">{p.notice}</p>
-      ) : null}
       {p.error ? <p className="text-[13px] font-semibold text-red-500">{p.error}</p> : null}
     </div>
   );

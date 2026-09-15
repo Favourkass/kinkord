@@ -22,6 +22,7 @@ import {
   type AboutDraft,
 } from "@/domain/onboarding";
 import { Routes } from "@/constants/Routes";
+import { PHOTO_CONFIRMATION_COPY } from "@/constants/photoConfirmation";
 
 export type WizardStage = "country" | "account" | "about" | "verify" | "profile" | "welcome";
 const STAGE_STEP: Record<WizardStage, number> = {
@@ -77,8 +78,7 @@ export function useSignupWizardPresenter() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState<"avatar" | "cover" | null>(null);
-  const [noMinors, setNoMinors] = useState(false);
-  const [consentThirdParty, setConsentThirdParty] = useState(false);
+  const [photoConfirmed, setPhotoConfirmed] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
 
   const step = STAGE_STEP[stage];
@@ -130,39 +130,46 @@ export function useSignupWizardPresenter() {
 
   const skipVerification = useCallback(() => setStage("profile"), []);
 
-  const uploadImage = useCallback(async (kind: "avatar" | "cover", rawFile: File) => {
-    setUploading(kind);
-    setProfileError(null);
-    try {
-      // Shrink phone photos before upload so they survive slow connections, and
-      // derive the smaller stored sizes from the compressed original.
-      const { original, variants } = await buildUploadSet(rawFile, kind);
-      const spec = await api.post<UploadSlots>("/profile/upload-url", {
-        kind,
-        contentType: original.type,
-        contentLength: original.size,
-      });
-      if (original.size > spec.maxSizeMb * 1024 * 1024) {
-        throw new Error(`Image is too large — max ${spec.maxSizeMb}MB.`);
+  const uploadImage = useCallback(
+    async (kind: "avatar" | "cover", rawFile: File) => {
+      if (!photoConfirmed) {
+        setProfileError(PHOTO_CONFIRMATION_COPY.requiredError);
+        return;
       }
-      // Variants first, original last: the profile is only pointed at the photo
-      // after every size has landed.
-      await Promise.all(
-        IMAGE_VARIANTS.map((v) => uploadToPresignedUrl(spec.variantUploadUrls[v], variants[v])),
-      );
-      await uploadToPresignedUrl(spec.uploadUrl, original);
-      const vm = await api.patch<ProfileVM>(
-        "/profile",
-        kind === "avatar" ? { avatarKey: spec.key } : { coverKey: spec.key },
-      );
-      if (kind === "avatar") setAvatarUrl(vm.avatarUrl);
-      else setCoverUrl(vm.coverUrl);
-    } catch (e) {
-      setProfileError(e instanceof Error ? e.message : "Upload failed. Try again.");
-    } finally {
-      setUploading(null);
-    }
-  }, []);
+      setUploading(kind);
+      setProfileError(null);
+      try {
+        // Shrink phone photos before upload so they survive slow connections, and
+        // derive the smaller stored sizes from the compressed original.
+        const { original, variants } = await buildUploadSet(rawFile, kind);
+        const spec = await api.post<UploadSlots>("/profile/upload-url", {
+          kind,
+          contentType: original.type,
+          contentLength: original.size,
+        });
+        if (original.size > spec.maxSizeMb * 1024 * 1024) {
+          throw new Error(`Image is too large — max ${spec.maxSizeMb}MB.`);
+        }
+        // Variants first, original last: the profile is only pointed at the photo
+        // after every size has landed.
+        await Promise.all(
+          IMAGE_VARIANTS.map((v) => uploadToPresignedUrl(spec.variantUploadUrls[v], variants[v])),
+        );
+        await uploadToPresignedUrl(spec.uploadUrl, original);
+        const vm = await api.patch<ProfileVM>(
+          "/profile",
+          kind === "avatar" ? { avatarKey: spec.key } : { coverKey: spec.key },
+        );
+        if (kind === "avatar") setAvatarUrl(vm.avatarUrl);
+        else setCoverUrl(vm.coverUrl);
+      } catch (e) {
+        setProfileError(e instanceof Error ? e.message : "Upload failed. Try again.");
+      } finally {
+        setUploading(null);
+      }
+    },
+    [photoConfirmed],
+  );
 
   const toggleRole = useCallback((role: string) => {
     setRoles((r) => (r.includes(role) ? r.filter((x) => x !== role) : [...r, role]));
@@ -173,8 +180,8 @@ export function useSignupWizardPresenter() {
       setProfileError("Profile photo and cover picture are required.");
       return;
     }
-    if (!noMinors || !consentThirdParty) {
-      setProfileError("Please confirm both statements about your photographs.");
+    if (!photoConfirmed) {
+      setProfileError(PHOTO_CONFIRMATION_COPY.requiredError);
       return;
     }
     setBusy(true);
@@ -187,7 +194,7 @@ export function useSignupWizardPresenter() {
     } finally {
       setBusy(false);
     }
-  }, [avatarUrl, coverUrl, noMinors, consentThirdParty, roles]);
+  }, [avatarUrl, coverUrl, photoConfirmed, roles]);
 
   const finish = useCallback(() => router.push(Routes.appHome), [router]);
 
@@ -220,10 +227,16 @@ export function useSignupWizardPresenter() {
         coverUrl,
         uploading,
         uploadImage,
-        noMinors,
-        setNoMinors,
-        consentThirdParty,
-        setConsentThirdParty,
+        lockedHint: photoConfirmed ? null : PHOTO_CONFIRMATION_COPY.lockedHint,
+        confirmation: {
+          ...PHOTO_CONFIRMATION_COPY,
+          confirmed: photoConfirmed,
+          disabled: uploading !== null,
+          onConfirmedChange: (confirmed: boolean) => {
+            setPhotoConfirmed(confirmed);
+            if (confirmed) setProfileError(null);
+          },
+        },
         error: profileError,
         submit: completeProfile,
       },
@@ -252,8 +265,7 @@ export function useSignupWizardPresenter() {
       coverUrl,
       uploading,
       uploadImage,
-      noMinors,
-      consentThirdParty,
+      photoConfirmed,
       profileError,
       completeProfile,
       finish,

@@ -25,6 +25,7 @@ import DobPicker from "@/components/auth/DobPicker";
 import CodeInput from "@/components/auth/CodeInput";
 import UploadTile from "@/components/auth/UploadTile";
 import RoleChips from "@/components/auth/RoleChips";
+import PhotoConfirmation from "@/components/profile/PhotoConfirmation";
 import AgePill from "@/components/ui/AgePill";
 import { ShieldCheckIcon } from "@/components/auth/AuthIcons";
 import { useSignupWizardPresenter } from "@/presenters/useSignupWizardPresenter";
@@ -345,6 +346,7 @@ export default function SignupPage() {
         <SignupShell step={p.step} badge="STEP 4 OF 4">
           <section className="flex w-full max-w-[706px] flex-col items-center gap-6 lg:max-w-[1130px] lg:gap-8">
             <StageHeading plain="BUILD YOUR" highlight="PROFILE" />
+            <PhotoConfirmation {...p.profileStep.confirmation} />
             <UploadTile
               shape="circle"
               label="Profile photo"
@@ -352,6 +354,8 @@ export default function SignupPage() {
               maxMb={5}
               previewUrl={p.profileStep.avatarUrl}
               uploading={p.profileStep.uploading === "avatar"}
+              disabled={!p.profileStep.confirmation.confirmed || p.profileStep.uploading !== null}
+              note={p.profileStep.lockedHint ?? undefined}
               onFile={(f) => p.profileStep.uploadImage("avatar", f)}
             />
             <UploadTile
@@ -361,6 +365,8 @@ export default function SignupPage() {
               maxMb={10}
               previewUrl={p.profileStep.coverUrl}
               uploading={p.profileStep.uploading === "cover"}
+              disabled={!p.profileStep.confirmation.confirmed || p.profileStep.uploading !== null}
+              note={p.profileStep.lockedHint ?? undefined}
               onFile={(f) => p.profileStep.uploadImage("cover", f)}
             />
             <div className="w-full">
@@ -394,17 +400,6 @@ export default function SignupPage() {
                   />
                 </div>
               )}
-            </div>
-            <div className="w-full space-y-1">
-              <CheckRow checked={p.profileStep.noMinors} onChange={p.profileStep.setNoMinors}>
-                I confirm that my photographs do not contain minors.
-              </CheckRow>
-              <CheckRow
-                checked={p.profileStep.consentThirdParty}
-                onChange={p.profileStep.setConsentThirdParty}
-              >
-                I confirm that my photographs do not contain third parties without their consent.
-              </CheckRow>
             </div>
             {p.profileStep.error && (
               <p className="text-[13px] text-red-400 lg:text-[15px]">{p.profileStep.error}</p>

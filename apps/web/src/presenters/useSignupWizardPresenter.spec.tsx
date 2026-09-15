@@ -125,6 +125,26 @@ describe("useSignupWizardPresenter", () => {
     expect(result.current.stage).toBe("country");
   });
 
+  it("blocks photo selection until the safety confirmation is accepted", async () => {
+    const { result } = renderHook(() => useSignupWizardPresenter());
+    const file = new File([new Uint8Array(10)], "avatar.jpg", { type: "image/jpeg" });
+
+    await act(() => result.current.profileStep.uploadImage("avatar", file));
+
+    expect(post).not.toHaveBeenCalledWith("/profile/upload-url", expect.anything());
+    expect(result.current.profileStep.error).toMatch(/Confirm the Profile & Cover Photo/);
+    expect(result.current.profileStep.confirmation.confirmed).toBe(false);
+
+    // The tiles are disabled before the guard can run, so the hint is what the
+    // member actually sees.
+    expect(result.current.profileStep.lockedHint).toMatch(/enable uploads/);
+
+    act(() => result.current.profileStep.confirmation.onConfirmedChange(true));
+    expect(result.current.profileStep.confirmation.confirmed).toBe(true);
+    expect(result.current.profileStep.error).toBeNull();
+    expect(result.current.profileStep.lockedHint).toBeNull();
+  });
+
   it("exposes totalSteps as 4", () => {
     const { result } = renderHook(() => useSignupWizardPresenter());
     expect(result.current.totalSteps).toBe(4);
