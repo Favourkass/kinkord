@@ -63,8 +63,8 @@ describe("useContactPresenter", () => {
     expect(facebook?.href).toBe("https://www.facebook.com/share/14iTBY2fTuN/");
 
     const instagram = result.current.channels.find((c) => c.id === "instagram");
-    expect(instagram?.value).toBe("");
-    expect(instagram?.href).toBeNull();
+    expect(instagram?.value).toBe("@KinkordOfficial");
+    expect(instagram?.href).toBe("https://www.instagram.com/kinkordofficial/");
 
     // Office
     expect(result.current.office.company).toBe("Kinkord Limited");
