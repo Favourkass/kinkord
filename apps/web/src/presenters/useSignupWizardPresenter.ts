@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, uploadToPresignedUrl } from "@/services/apiClient";
 import { IMAGE_VARIANTS, buildUploadSet, type ImageVariant } from "@/util/image";
@@ -23,6 +23,12 @@ import {
 } from "@/domain/onboarding";
 import { Routes } from "@/constants/Routes";
 import { PHOTO_CONFIRMATION_COPY } from "@/constants/photoConfirmation";
+import {
+  attemptsMessage,
+  phoneErrorMessage,
+  phoneVerificationApi,
+  type PhoneCodeSentPM,
+} from "@/services/phoneVerification.service";
 
 export type WizardStage = "country" | "account" | "about" | "verify" | "profile" | "welcome";
 const STAGE_STEP: Record<WizardStage, number> = {
@@ -80,6 +86,13 @@ export function useSignupWizardPresenter() {
   const [uploading, setUploading] = useState<"avatar" | "cover" | null>(null);
   const [photoConfirmed, setPhotoConfirmed] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [challenge, setChallenge] = useState<PhoneCodeSentPM | null>(null);
+  const [codeDigits, setCodeDigits] = useState("");
+  const [sendingCode, setSendingCode] = useState(false);
+  const [verifyingCode, setVerifyingCode] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [resendIn, setResendIn] = useState(0);
+  const [phoneVerified, setPhoneVerified] = useState(false);
 
   const step = STAGE_STEP[stage];
 
@@ -127,6 +140,55 @@ export function useSignupWizardPresenter() {
       setBusy(false);
     }
   }, [about, account, country]);
+
+  /** Countdown for the resend link; the API enforces the same cooldown itself. */
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const timer = setTimeout(() => setResendIn((s) => s - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendIn]);
+
+  const sendCode = useCallback(async () => {
+    setSendingCode(true);
+    setVerifyError(null);
+    try {
+      const sent = await phoneVerificationApi.sendCode();
+      setChallenge(sent);
+      setCodeDigits("");
+      setResendIn(Math.ceil(sent.resendAfterMs / 1000));
+    } catch (e) {
+      setVerifyError(phoneErrorMessage(e, "Could not send the code. Try again."));
+    } finally {
+      setSendingCode(false);
+    }
+  }, []);
+
+  const verifyCode = useCallback(async () => {
+    if (!challenge) return;
+    if (!/^\d{6}$/.test(codeDigits)) {
+      setVerifyError("Enter the 6-digit code.");
+      return;
+    }
+    setVerifyingCode(true);
+    setVerifyError(null);
+    try {
+      const result = await phoneVerificationApi.verify(challenge.otpId, codeDigits);
+      if (result.verified) {
+        setPhoneVerified(true);
+        setStage("profile");
+        return;
+      }
+      setCodeDigits("");
+      setVerifyError(
+        attemptsMessage(result.attemptsLeft) ??
+          "That code is wrong or has expired. Send a new one.",
+      );
+    } catch (e) {
+      setVerifyError(phoneErrorMessage(e, "Could not check the code. Try again."));
+    } finally {
+      setVerifyingCode(false);
+    }
+  }, [challenge, codeDigits]);
 
   const skipVerification = useCallback(() => setStage("profile"), []);
 
@@ -219,7 +281,25 @@ export function useSignupWizardPresenter() {
       aboutStep: { draft: about, set: setAbout, errors: aboutErrors },
       submitCombinedStep,
       backToCountry,
-      verifyStep: { skip: skipVerification },
+      verifyStep: {
+        skip: skipVerification,
+        phone: challenge?.sentTo ?? null,
+        sent: challenge !== null,
+        code: codeDigits,
+        setCode: setCodeDigits,
+        sendCode: () => {
+          void sendCode();
+        },
+        verify: () => {
+          void verifyCode();
+        },
+        sending: sendingCode,
+        verifying: verifyingCode,
+        error: verifyError,
+        resendIn,
+        canResend: resendIn === 0 && !sendingCode,
+        verified: phoneVerified,
+      },
       profileStep: {
         roles,
         toggleRole,
@@ -259,6 +339,15 @@ export function useSignupWizardPresenter() {
       submitCombinedStep,
       backToCountry,
       skipVerification,
+      challenge,
+      codeDigits,
+      sendingCode,
+      verifyingCode,
+      verifyError,
+      resendIn,
+      phoneVerified,
+      sendCode,
+      verifyCode,
       roles,
       toggleRole,
       avatarUrl,

@@ -10,6 +10,7 @@ import { MembersModule } from "./members/members.module";
 import { MessagingModule } from "./messaging/messaging.module";
 import { PresenceModule } from "./presence/presence.module";
 import { ProfilesModule } from "./profiles/profiles.module";
+import { OtpModule } from "./otp/otp.module";
 import { StorageModule } from "./storage/storage.module";
 
 @Module({
@@ -24,6 +25,7 @@ import { StorageModule } from "./storage/storage.module";
     ProfilesModule,
     CommunityModule,
     MembersModule,
+    OtpModule,
   ],
   controllers: [HealthController],
   providers: [HealthService],
