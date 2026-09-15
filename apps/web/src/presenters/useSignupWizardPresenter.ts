@@ -23,6 +23,7 @@ import {
 } from "@/domain/onboarding";
 import { Routes } from "@/constants/Routes";
 import { PHOTO_CONFIRMATION_COPY } from "@/constants/photoConfirmation";
+import { usePhoneVerification } from "./usePhoneVerification";
 
 export type WizardStage = "country" | "account" | "about" | "verify" | "profile" | "welcome";
 const STAGE_STEP: Record<WizardStage, number> = {
@@ -128,6 +129,9 @@ export function useSignupWizardPresenter() {
     }
   }, [about, account, country]);
 
+  // Phone verification, shared with Settings → Security.
+  const phone = usePhoneVerification(() => setStage("profile"));
+
   const skipVerification = useCallback(() => setStage("profile"), []);
 
   const uploadImage = useCallback(
@@ -219,7 +223,7 @@ export function useSignupWizardPresenter() {
       aboutStep: { draft: about, set: setAbout, errors: aboutErrors },
       submitCombinedStep,
       backToCountry,
-      verifyStep: { skip: skipVerification },
+      verifyStep: { ...phone, skip: skipVerification },
       profileStep: {
         roles,
         toggleRole,
@@ -259,6 +263,7 @@ export function useSignupWizardPresenter() {
       submitCombinedStep,
       backToCountry,
       skipVerification,
+      phone,
       roles,
       toggleRole,
       avatarUrl,
