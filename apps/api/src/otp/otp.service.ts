@@ -1,4 +1,11 @@
-import { BadRequestException, HttpException, Inject, Injectable, Logger } from "@nestjs/common";
+import {
+  BadRequestException,
+  HttpException,
+  Inject,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from "@nestjs/common";
 import { createHash, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { and, eq, gte, lt, sql } from "drizzle-orm";
 import { DRIZZLE, type Db } from "../db/db.module";
@@ -97,7 +104,16 @@ export class OtpService {
       await this.deliver(channel, to, code);
     } catch (error) {
       await this.db.delete(otpChallenge).where(eq(otpChallenge.id, id));
-      throw error;
+      // Whatever the provider said — an unapproved sender ID, a dead key, an
+      // empty balance — is an operator's problem. On 2026-09-15 it reached
+      // members as a bare "Internal server error", which told them nothing and
+      // told us nothing either. The detail belongs in the logs.
+      this.logger.error(`otp ${channel} delivery failed: ${String(error)}`);
+      throw new ServiceUnavailableException(
+        channel === "sms"
+          ? "We could not text you right now. Please try again in a moment."
+          : "We could not email you right now. Please try again in a moment.",
+      );
     }
 
     void this.sweepExpired(now);

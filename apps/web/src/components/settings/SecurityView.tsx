@@ -61,6 +61,27 @@ export interface SecurityViewProps {
     verifying: boolean;
     error: string | null;
   };
+  email: {
+    heading: string;
+    verified: boolean;
+    statusLabel: string;
+    description: string;
+    verifiedNote: string;
+    sentNote: string | null;
+    sendLabel: string;
+    onSend: () => void;
+    canSend: boolean;
+    cooldownLabel: string | null;
+    sending: boolean;
+    sent: boolean;
+    codeLabel: string;
+    code: string;
+    onCode: (value: string) => void;
+    submitLabel: string;
+    onSubmit: () => void;
+    verifying: boolean;
+    error: string | null;
+  };
   busy: boolean;
   error: string | null;
   notice: string | null;
@@ -76,7 +97,7 @@ const gold =
 
 /** Settings → Security & 2FA: TOTP lifecycle + change password, in the app's theme tokens. */
 export default function SecurityView(p: SecurityViewProps) {
-  const { twoFactor: tf, password: pw, phone: ph } = p;
+  const { twoFactor: tf, password: pw, phone: ph, email: em } = p;
   return (
     <div className="flex w-full flex-col gap-[20px]">
       <div>
@@ -137,6 +158,57 @@ export default function SecurityView(p: SecurityViewProps) {
               {tf.actionLabel}
             </button>
           </div>
+        )}
+      </section>
+
+      <section className={card}>
+        <div className="flex items-center justify-between">
+          <p className="text-[16px] font-bold text-app-text">{em.heading}</p>
+          <span
+            className={`rounded-full px-[10px] py-[3px] text-[11px] font-bold ${
+              em.verified ? "bg-kink-amber text-black" : "bg-app-surface-2 text-app-subtle"
+            }`}
+          >
+            {em.statusLabel}
+          </span>
+        </div>
+
+        {em.verified ? (
+          <p className="text-[13px] text-app-subtle">{em.verifiedNote}</p>
+        ) : (
+          <>
+            <p className="text-[13px] text-app-subtle">{em.sentNote ?? em.description}</p>
+
+            {em.sent && (
+              <>
+                <CodeInput value={em.code} onChange={em.onCode} label={em.codeLabel} />
+                <button
+                  type="button"
+                  className={gold}
+                  onClick={em.onSubmit}
+                  disabled={em.verifying}
+                >
+                  {em.submitLabel}
+                </button>
+              </>
+            )}
+
+            <div className="flex items-center gap-[12px]">
+              <button
+                type="button"
+                className={em.sent ? "text-[13px] font-semibold text-kink-amber underline" : gold}
+                onClick={em.onSend}
+                disabled={!em.canSend || em.sending}
+              >
+                {em.sendLabel}
+              </button>
+              {em.cooldownLabel && (
+                <span className="text-[13px] text-app-subtle">{em.cooldownLabel}</span>
+              )}
+            </div>
+
+            {em.error && <p className="text-[13px] font-semibold text-red-500">{em.error}</p>}
+          </>
         )}
       </section>
 

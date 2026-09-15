@@ -1,20 +1,30 @@
-# Phone verification (OTP)
+# Verification codes (OTP)
 
-Proving a phone number is what earns the **Basic verified** badge
-(`profile.phone_verified`). Two screens use it: signup step 3, and Settings →
-Security for anyone who skipped it at the time. Both drive the same presenter
-hook (`usePhoneVerification`), so the cooldown, attempt wording and error
-handling are written once.
+Two contact points are proved the same way, with a 6-digit code:
+
+- **Email** (`user.email_verified`) — replaced Better Auth's click-a-link
+  message on 2026-09-15, so members stay in the app instead of leaving for a
+  mail client and back. `sendOnSignUp` is off; the link handler stays wired only
+  for messages already sitting in inboxes.
+- **Phone** (`profile.phone_verified`) — earns the **Basic verified** badge.
+
+Signup step 3 and Settings → Security both carry both. Everything shares one
+service (`OtpService`) and one presenter hook (`useVerification`), so the
+cooldown, attempt wording and error handling are written once.
 
 ## Endpoints
 
-Both require a session; both live under `/profile/phone` because the number
-always comes from the caller's own profile.
+All four require a session. The destination always comes from the caller's own
+account, never from the request.
 
-### `POST /profile/phone/send-code`
+- `POST /profile/phone/send-code` · `POST /profile/phone/verify`
+- `POST /profile/email/send-code` · `POST /profile/email/verify`
 
-No body. Reads the number from the signed-in member's profile and texts a
-6-digit code through the usual `SmsService` (Termii for Nigerian numbers).
+### `POST /profile/{channel}/send-code`
+
+No body. Reads the number or address from the signed-in member's own record and
+sends a 6-digit code — SMS through `SmsService` (Robase, which routes per
+country), email through `EmailService` (Resend).
 
 ```json
 {
@@ -25,24 +35,25 @@ No body. Reads the number from the signed-in member's profile and texts a
 }
 ```
 
-Refuses with 400 when the profile has no number or it is already verified, and
-429 for the cooldown or hourly cap.
+Refuses with 400 when there is no number on the profile, or when that contact
+point is already verified, and 429 for the cooldown or hourly cap.
 
-### `POST /profile/phone/verify`
+### `POST /profile/{channel}/verify`
 
 ```json
 { "otpId": "0f1c…", "code": "123456" }
 ```
 
 Returns `{ "verified": true, "attemptsLeft": null }` on success, which also sets
-`profile.phone_verified`. A wrong code returns `verified: false` with the
+`profile.phone_verified` or `user.email_verified`. A wrong code returns `verified: false` with the
 attempts remaining; the third wrong code returns 429 and locks the challenge for
 24 hours.
 
 ## Why there is no endpoint that takes a destination
 
 An endpoint that texts an arbitrary number is an open SMS relay: anyone could
-run up the Termii bill from a script. The destination is therefore never read
+run up the SMS bill from a script. The same shape for email would be a free way
+to send mail from our domain to anyone. The destination is therefore never read
 from the request.
 
 ## Rules
@@ -69,3 +80,6 @@ reversible. Rows are written before the code is sent, deleted if delivery
 fails, deleted on success, and swept after 24 hours.
 
 Changing the number on a profile resets `phone_verified`.
+
+Both channels share the `otp_challenge` table and every limit above, so the
+hourly cap counts a member's codes across email and SMS together.

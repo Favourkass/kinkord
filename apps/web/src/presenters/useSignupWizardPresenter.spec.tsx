@@ -9,7 +9,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push, replace: vi.fn() }
 const patch = vi.fn();
 const post = vi.fn();
 vi.mock("@/services/apiClient", () => ({
-  // ApiError must be exported: phoneErrorMessage does `instanceof ApiError`,
+  // ApiError must be exported: verificationErrorMessage does `instanceof ApiError`,
   // which throws outright if the binding is undefined.
   ApiError: class ApiError extends Error {
     constructor(
@@ -29,9 +29,9 @@ vi.mock("@/services/apiClient", () => ({
 
 const sendCode = vi.fn();
 const verifyCode = vi.fn();
-vi.mock("@/services/phoneVerification.service", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/services/phoneVerification.service")>()),
-  phoneVerificationApi: {
+vi.mock("@/services/verification.service", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/services/verification.service")>()),
+  verificationApi: {
     sendCode: (...a: unknown[]) => sendCode(...a),
     verify: (...a: unknown[]) => verifyCode(...a),
   },
@@ -120,6 +120,10 @@ describe("useSignupWizardPresenter", () => {
       }),
     );
     expect(result.current.stage).toBe("verify");
+    // The address was typed moments ago, so the email code goes out on arrival —
+    // once, not on every render.
+    await waitFor(() => expect(sendCode).toHaveBeenCalledWith("email"));
+    expect(sendCode.mock.calls.filter(([c]) => c === "email")).toHaveLength(1);
 
     act(() => result.current.verifyStep.skip());
     expect(result.current.stage).toBe("profile");
@@ -189,7 +193,7 @@ describe("useSignupWizardPresenter", () => {
 
       expect(sendCode).toHaveBeenCalled();
       expect(result.current.verifyStep.sent).toBe(true);
-      expect(result.current.verifyStep.phone).toBe("+234******4567");
+      expect(result.current.verifyStep.sentTo).toBe("+234******4567");
       // Cooldown starts immediately so the resend link cannot be hammered.
       expect(result.current.verifyStep.canResend).toBe(false);
       expect(result.current.verifyStep.resendIn).toBe(60);
@@ -201,7 +205,11 @@ describe("useSignupWizardPresenter", () => {
       act(() => result.current.verifyStep.setCode("123456"));
       await act(async () => result.current.verifyStep.verify());
 
-      expect(verifyCode).toHaveBeenCalledWith("11111111-1111-4111-8111-111111111111", "123456");
+      expect(verifyCode).toHaveBeenCalledWith(
+        "phone",
+        "11111111-1111-4111-8111-111111111111",
+        "123456",
+      );
       expect(result.current.verifyStep.verified).toBe(true);
       expect(result.current.stage).toBe("profile");
     });

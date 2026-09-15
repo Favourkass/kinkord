@@ -1,10 +1,10 @@
 import { Global, Module } from "@nestjs/common";
+import { RobaseSmsAdapter } from "./robase.adapter";
 import { SmsService } from "./sms.service";
-import { TermiiSmsAdapter } from "./termii.adapter";
 
 @Global()
 @Module({
-  providers: [TermiiSmsAdapter, SmsService],
+  providers: [RobaseSmsAdapter, SmsService],
   exports: [SmsService],
 })
 export class MessagingModule {}
