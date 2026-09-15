@@ -11,6 +11,7 @@ import { and, eq, gte, lt, sql } from "drizzle-orm";
 import { DRIZZLE, type Db } from "../db/db.module";
 import { otpChallenge } from "../db/schema";
 import { EmailService } from "../email/email.service";
+import { verificationCodeEmail } from "../email/templates";
 import { SmsService } from "../messaging/sms.service";
 
 export type OtpChannel = "email" | "sms";
@@ -190,17 +191,15 @@ export class OtpService {
   }
 
   private async deliver(channel: OtpChannel, to: string, code: string) {
-    const line = `Your Kinkord verification code is ${code}. It expires in 10 minutes.`;
+    const minutes = Math.round(OTP_TTL_MS / 60_000);
     if (channel === "sms") {
-      await this.sms.send({ to, message: line });
+      await this.sms.send({
+        to,
+        message: `Your Kinkord verification code is ${code}. It expires in ${minutes} minutes.`,
+      });
       return;
     }
-    await this.email.send({
-      to,
-      subject: "Your Kinkord verification code",
-      text: line,
-      html: `<p>Your Kinkord verification code is <strong>${code}</strong>.</p><p>It expires in 10 minutes.</p>`,
-    });
+    await this.email.send({ to, ...verificationCodeEmail(code, minutes) });
   }
 
   /** Best-effort tidy-up; a failure here must never fail the request. */
