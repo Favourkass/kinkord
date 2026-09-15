@@ -1,7 +1,10 @@
 # Phone verification (OTP)
 
 Proving a phone number is what earns the **Basic verified** badge
-(`profile.phone_verified`). Signup step 3 is the only place that uses it today.
+(`profile.phone_verified`). Two screens use it: signup step 3, and Settings →
+Security for anyone who skipped it at the time. Both drive the same presenter
+hook (`usePhoneVerification`), so the cooldown, attempt wording and error
+handling are written once.
 
 ## Endpoints
 
