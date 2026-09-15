@@ -1,5 +1,12 @@
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
+export function apiFetch(path: string, init?: RequestInit) {
+  return fetch(`${apiBase}${path}`, {
+    credentials: "include",
+    ...init,
+  });
+}
+
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -19,8 +26,7 @@ const NETWORK_MESSAGE = "Network problem — check your connection and try again
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(`${apiBase}${path}`, {
-      credentials: "include",
+    res = await apiFetch(path, {
       headers: { "content-type": "application/json", ...init?.headers },
       ...init,
     });

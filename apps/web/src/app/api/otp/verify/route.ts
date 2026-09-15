@@ -1,25 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyOtp, type OtpChannel } from "@/services/otp.service";
+import { apiFetch } from "@/services/apiClient";
 
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json()) as {
-      channel?: OtpChannel;
-      otp_id?: string;
-      code?: string;
-    };
-    if (
-      !["email", "sms"].includes(body.channel ?? "") ||
-      !body.otp_id?.trim() ||
-      !body.code?.trim()
-    ) {
-      return NextResponse.json({ error: "channel, otp_id, and code are required" }, { status: 400 });
-    }
-
-    const valid = await verifyOtp(body.channel!, body.otp_id, body.code);
-    return NextResponse.json({ valid }, { status: valid ? 200 : 422 });
+    const response = await apiFetch("/api/otp/verify", { method: "POST", body: await request.text(), headers: { "content-type": "application/json" } });
+    return NextResponse.json(await response.json(), { status: response.status });
   } catch {
     return NextResponse.json({ error: "Could not verify code" }, { status: 502 });
   }
