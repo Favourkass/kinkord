@@ -1,11 +1,12 @@
 import { Module } from "@nestjs/common";
-import { OtpController } from "./otp.controller";
+import { EmailVerificationController, OtpController } from "./otp.controller";
+import { EmailVerificationService } from "./email-verification.service";
 import { OtpService } from "./otp.service";
 import { PhoneVerificationService } from "./phone-verification.service";
 
 @Module({
-  controllers: [OtpController],
-  providers: [OtpService, PhoneVerificationService],
+  controllers: [OtpController, EmailVerificationController],
+  providers: [OtpService, PhoneVerificationService, EmailVerificationService],
   exports: [OtpService],
 })
 export class OtpModule {}

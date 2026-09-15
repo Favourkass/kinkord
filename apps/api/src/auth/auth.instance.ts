@@ -102,7 +102,11 @@ export function buildAuth(db: Db, email: EmailService) {
       },
     },
     emailVerification: {
-      sendOnSignUp: true,
+      // The address is verified with a 6-digit code through POST
+      // /profile/email/send-code (Favour, 2026-09-15) rather than a link, so
+      // Better Auth must not also mail one. sendVerificationEmail stays wired
+      // for links already sitting in inboxes and for any manual resend.
+      sendOnSignUp: false,
       autoSignInAfterVerification: true,
       sendVerificationEmail: async ({ user, url }) => {
         // Land the click on the web app's confirmation page, signed in.

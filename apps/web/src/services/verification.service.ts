@@ -1,22 +1,26 @@
 import { api, ApiError } from "./apiClient";
 
-export interface PhoneCodeSentPM {
+/** Which contact point is being proved. */
+export type VerificationChannel = "phone" | "email";
+
+export interface CodeSentPM {
   otpId: string;
-  /** Already masked by the API — the raw number never comes back. */
+  /** Already masked by the API — the raw number or address never comes back. */
   sentTo: string;
   expiresAt: string;
   resendAfterMs: number;
 }
 
-export interface PhoneVerifiedPM {
+export interface VerifiedPM {
   verified: boolean;
   attemptsLeft: number | null;
 }
 
-export const phoneVerificationApi = {
-  sendCode: () => api.post<PhoneCodeSentPM>("/profile/phone/send-code", {}),
-  verify: (otpId: string, code: string) =>
-    api.post<PhoneVerifiedPM>("/profile/phone/verify", { otpId, code }),
+export const verificationApi = {
+  sendCode: (channel: VerificationChannel) =>
+    api.post<CodeSentPM>(`/profile/${channel}/send-code`, {}),
+  verify: (channel: VerificationChannel, otpId: string, code: string) =>
+    api.post<VerifiedPM>(`/profile/${channel}/verify`, { otpId, code }),
 };
 
 /**
@@ -24,7 +28,7 @@ export const phoneVerificationApi = {
  * resend cooldown and the three-strike lockout, and the API's own wording says
  * which, so it is passed through rather than replaced.
  */
-export function phoneErrorMessage(error: unknown, fallback: string) {
+export function verificationErrorMessage(error: unknown, fallback: string) {
   if (error instanceof ApiError) {
     // Transport failures carry the message directly (apiClient uses status 0).
     if (typeof error.body === "string" && error.body.length > 0) return error.body;

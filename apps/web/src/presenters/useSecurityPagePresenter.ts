@@ -7,7 +7,7 @@ import { Routes } from "@/constants/Routes";
 import type { MePM, OwnProfilePM } from "@/domain/profile";
 import { ApiError } from "@/services/apiClient";
 import { profileApi } from "@/services/profile.service";
-import { usePhoneVerification } from "./usePhoneVerification";
+import { useVerification } from "./useVerification";
 import { useSecurityPresenter } from "./useProfilePresenter";
 
 /**
@@ -26,7 +26,8 @@ export function useSecurityPagePresenter() {
   const [pw, setPw] = useState({ current: "", next: "" });
   const sec = useSecurityPresenter((enabled) => setTwoFactorOn(enabled));
 
-  const phone = usePhoneVerification();
+  const phone = useVerification("phone");
+  const emailCode = useVerification("email");
 
   useEffect(() => {
     let cancelled = false;
@@ -128,7 +129,7 @@ export function useSecurityPagePresenter() {
         description: copy.phone.description,
         verifiedNote: copy.phone.verifiedNote,
         missingNote: copy.phone.missing,
-        sentNote: phone.phone ? copy.phone.sentTo(phone.phone) : null,
+        sentNote: phone.sentTo ? copy.phone.sentTo(phone.sentTo) : null,
         sendLabel: phone.sent ? copy.phone.resend : copy.phone.send,
         onSend: phone.sendCode,
         canSend: phone.canResend && Boolean(profile?.phone),
@@ -149,6 +150,35 @@ export function useSecurityPagePresenter() {
         onSubmit: phone.verify,
         verifying: phone.verifying,
         error: phone.error,
+      },
+      email: {
+        heading: copy.email.heading,
+        verified: emailCode.verified || (me?.emailVerified ?? false),
+        statusLabel:
+          emailCode.verified || me?.emailVerified ? copy.email.verified : copy.email.unverified,
+        description: copy.email.description,
+        verifiedNote: copy.email.verifiedNote,
+        sentNote: emailCode.sentTo ? copy.email.sentTo(emailCode.sentTo) : null,
+        sendLabel: emailCode.sent ? copy.email.resend : copy.email.send,
+        onSend: emailCode.sendCode,
+        canSend: emailCode.canResend,
+        cooldownLabel:
+          emailCode.resendIn > 0
+            ? copy.email.resendIn(
+                `${String(Math.floor(emailCode.resendIn / 60)).padStart(2, "0")}:${String(
+                  emailCode.resendIn % 60,
+                ).padStart(2, "0")}`,
+              )
+            : null,
+        sending: emailCode.sending,
+        sent: emailCode.sent,
+        codeLabel: copy.email.codeLabel,
+        code: emailCode.code,
+        onCode: emailCode.setCode,
+        submitLabel: copy.email.submit,
+        onSubmit: emailCode.verify,
+        verifying: emailCode.verifying,
+        error: emailCode.error,
       },
       busy: sec.busy,
       error: sec.error,
