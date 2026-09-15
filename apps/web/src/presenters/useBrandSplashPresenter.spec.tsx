@@ -2,7 +2,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useBrandSplashPresenter } from "./useBrandSplashPresenter";
-import { SPLASH_FADE_MS, SPLASH_MAX_MS, SPLASH_MIN_MS } from "@/constants/splash";
+import { SPLASH_FADE_MS, SPLASH_MAX_MS, SPLASH_MIN_MS, SPLASH_START_MS } from "@/constants/splash";
 
 const checking = { value: true };
 vi.mock("./useGuestRedirect", () => ({
@@ -39,39 +39,69 @@ describe("useBrandSplashPresenter", () => {
     expect(result.current.videoSrc).toMatch(/\.mp4$/);
   });
 
-  it("holds for the floor even when the session check returns at once", async () => {
+  it("lets the animation finish even when the session check returns at once", async () => {
     const { result, rerender } = renderHook(() => useBrandSplashPresenter());
+    act(() => result.current.onPlaying());
     checking.value = false;
     rerender();
+
+    // Well past the fallback floor: a playing clip is not cut short by it.
+    await advance(SPLASH_MIN_MS + SPLASH_START_MS);
     expect(result.current.leaving).toBe(false);
 
-    await advance(SPLASH_MIN_MS);
+    act(() => result.current.onFinished());
     expect(result.current.leaving).toBe(true);
-    expect(result.current.visible).toBe(true); // still fading out
 
     await advance(SPLASH_FADE_MS);
     expect(result.current.visible).toBe(false);
   });
 
-  it("keeps covering a slow session check past the floor", async () => {
+  it("still waits for a slow session check after the animation ends", async () => {
     const { result } = renderHook(() => useBrandSplashPresenter());
-    await advance(SPLASH_MIN_MS + 1000);
-    expect(result.current.leaving).toBe(false);
-    expect(result.current.visible).toBe(true);
+    act(() => result.current.onPlaying());
+    act(() => result.current.onFinished());
+    await advance(SPLASH_MIN_MS);
+    expect(result.current.leaving).toBe(false); // checking is still true
   });
 
-  it("gives up at the ceiling so a hung API cannot trap anyone", async () => {
+  it("falls back to the floor when autoplay is refused and never starts", async () => {
+    const { result, rerender } = renderHook(() => useBrandSplashPresenter());
+    checking.value = false;
+    rerender();
+
+    await advance(SPLASH_MIN_MS);
+    expect(result.current.leaving).toBe(false); // still inside the start window
+
+    await advance(SPLASH_START_MS - SPLASH_MIN_MS);
+    expect(result.current.leaving).toBe(true);
+  });
+
+  it("releases as soon as a failed video reports back", async () => {
+    const { result, rerender } = renderHook(() => useBrandSplashPresenter());
+    checking.value = false;
+    rerender();
+    act(() => result.current.onFinished()); // onError is wired to this
+    expect(result.current.leaving).toBe(true);
+  });
+
+  it("gives up at the ceiling so a stalled clip cannot trap anyone", async () => {
     const { result } = renderHook(() => useBrandSplashPresenter());
+    act(() => result.current.onPlaying());
     await advance(SPLASH_MAX_MS);
     expect(result.current.leaving).toBe(true);
     await advance(SPLASH_FADE_MS);
     expect(result.current.visible).toBe(false);
   });
 
-  it("falls back to the still poster when the viewer asked for reduced motion", () => {
+  it("uses the floor, not the clip, when the viewer asked for reduced motion", async () => {
     window.matchMedia = mediaQuery(true);
-    const { result } = renderHook(() => useBrandSplashPresenter());
+    const { result, rerender } = renderHook(() => useBrandSplashPresenter());
     expect(result.current.animate).toBe(false);
     expect(result.current.posterSrc).toMatch(/\.jpg$/);
+
+    checking.value = false;
+    rerender();
+    await advance(SPLASH_MIN_MS);
+    expect(result.current.leaving).toBe(true);
   });
 });

@@ -1,7 +1,13 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
-import { BRAND_SPLASH, SPLASH_FADE_MS, SPLASH_MAX_MS, SPLASH_MIN_MS } from "@/constants/splash";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import {
+  BRAND_SPLASH,
+  SPLASH_FADE_MS,
+  SPLASH_MAX_MS,
+  SPLASH_MIN_MS,
+  SPLASH_START_MS,
+} from "@/constants/splash";
 import { useGuestRedirect } from "./useGuestRedirect";
 
 const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
@@ -23,11 +29,16 @@ const getMotionServerSnapshot = () => true;
  * moment before being bounced — `checking` stays true through the redirect, so
  * the animation covers it until the new route paints.
  *
- * Held while the lookup is in flight OR the floor has not elapsed, released on
- * whichever comes first: both of those settling, or the ceiling.
+ * The animation runs to the end before anyone is let through (CEO, 2026-09-15).
+ * It is only the gate while it is genuinely playing: reduced motion, a refused
+ * autoplay or a failed load fall back to a short floor, and a ceiling covers a
+ * clip that stalls and never reports its end.
  */
 export function useBrandSplashPresenter() {
   const { checking } = useGuestRedirect();
+  const [playing, setPlaying] = useState(false);
+  const [finished, setFinished] = useState(false);
+  const [startWindowClosed, setStartWindowClosed] = useState(false);
   const [floorElapsed, setFloorElapsed] = useState(false);
   const [ceilingHit, setCeilingHit] = useState(false);
   const [gone, setGone] = useState(false);
@@ -35,14 +46,22 @@ export function useBrandSplashPresenter() {
 
   useEffect(() => {
     const floor = setTimeout(() => setFloorElapsed(true), SPLASH_MIN_MS);
+    const start = setTimeout(() => setStartWindowClosed(true), SPLASH_START_MS);
     const ceiling = setTimeout(() => setCeilingHit(true), SPLASH_MAX_MS);
     return () => {
       clearTimeout(floor);
+      clearTimeout(start);
       clearTimeout(ceiling);
     };
   }, []);
 
-  const settled = ceilingHit || (!checking && floorElapsed);
+  const onPlaying = useCallback(() => setPlaying(true), []);
+  const onFinished = useCallback(() => setFinished(true), []);
+
+  // The clip holds the gate while it is playing, or while it still might start.
+  const animationRunning = animate && (playing || !startWindowClosed);
+  const ready = finished || (!animationRunning && floorElapsed);
+  const settled = ceilingHit || (ready && !checking);
 
   // Stay mounted through the fade, then drop out so nothing overlays the page.
   useEffect(() => {
@@ -58,5 +77,8 @@ export function useBrandSplashPresenter() {
     videoSrc: BRAND_SPLASH.videoSrc,
     posterSrc: BRAND_SPLASH.posterSrc,
     label: BRAND_SPLASH.label,
+    onPlaying,
+    /** Both the clean end and a load failure release the gate. */
+    onFinished,
   };
 }

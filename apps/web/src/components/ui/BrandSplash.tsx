@@ -8,6 +8,10 @@ export interface BrandSplashProps {
   animate: boolean;
   /** Drives the fade-out; the overlay unmounts once the screen behind is ready. */
   leaving: boolean;
+  /** Playback actually began — a refused autoplay never fires this. */
+  onPlaying: () => void;
+  /** Reached the end, or gave up loading. Either way, stop waiting on it. */
+  onFinished: () => void;
 }
 
 /**
@@ -17,6 +21,10 @@ export interface BrandSplashProps {
  *
  * The clip is letterboxed rather than cropped — it is a centred lockup on
  * black, and the overlay is black, so the bars are invisible at any aspect.
+ *
+ * It plays once, to the end: the screen behind is only revealed after
+ * `onFinished` (CEO, 2026-09-15). The presenter decides what to do when it
+ * never starts or never ends.
  */
 export default function BrandSplash({
   videoSrc,
@@ -24,6 +32,8 @@ export default function BrandSplash({
   label,
   animate,
   leaving,
+  onPlaying,
+  onFinished,
 }: BrandSplashProps) {
   return (
     <div
@@ -42,6 +52,14 @@ export default function BrandSplash({
           playsInline
           preload="auto"
           aria-hidden
+          // `playing` alone is unreliable — a cached clip can start before the
+          // listener attaches — so `timeupdate` (≈4/s while running) is the real
+          // proof of playback. Neither fires when autoplay is refused, which is
+          // what lets the presenter notice and fall back.
+          onPlaying={onPlaying}
+          onTimeUpdate={onPlaying}
+          onEnded={onFinished}
+          onError={onFinished}
           // 16:9 source on a tall phone letterboxes to a small strip, so widen it
           // past the viewport in portrait. The lockup lives inside the middle
           // ~70% of the frame, so 125% crops black margin only.
