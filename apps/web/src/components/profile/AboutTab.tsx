@@ -23,7 +23,7 @@ export interface AboutLabels {
   noSocial: string;
   platforms: Record<SocialPlatform, string>;
   verification: string;
-  verified: { basic: string; none: string };
+  verified: { bronze: string; basic: string; none: string };
   verifiedDetail: (email: boolean, phone: boolean) => string;
   tagline: string;
   memberSince: (date: string) => string;
@@ -225,7 +225,9 @@ export default function AboutTab({ vm, labels }: AboutTabProps) {
               {labels.verified[vm.verification.level]}
             </span>
             <span className="text-[12px] text-pf-muted">
-              {labels.verifiedDetail(vm.verification.email, vm.verification.phone)}
+              {vm.verification.level === "bronze"
+                ? "Government ID, liveness & photo reviewed"
+                : labels.verifiedDetail(vm.verification.email, vm.verification.phone)}
             </span>
           </span>
         </div>
