@@ -41,7 +41,7 @@ pnpm --filter web dev     # Web on :3000
 ```
 
 Open http://localhost:3000/signup and create an account. **All emails land in
-Mailpit at http://localhost:8025** — verification links, password resets, etc.
+Mailpit at http://localhost:8025** — verification codes, password resets, etc.
 Nothing is sent to real inboxes locally.
 
 ## What works locally without any cloud credentials
@@ -49,10 +49,52 @@ Nothing is sent to real inboxes locally.
 - Full signup wizard, login, 2FA (scan the QR with Google Authenticator), password recovery
 - Profile viewing/editing
 - All emails (via Mailpit)
+- **Both verification flows, end to end** — see below
 
 **Avatar/cover uploads** are the one feature that talks to real AWS S3 (presigned
 uploads). Without AWS credentials they fail gracefully. If you need them, ask
 Favour for a scoped IAM user (S3-only) and run `aws configure`.
+
+## Testing the verification flow
+
+Neither channel needs a provider account locally.
+
+| Channel | Where the code appears |
+|---|---|
+| Email | Mailpit — http://localhost:8025 |
+| SMS | The API log, as `[local sms] to +234…: Your Kinkord verification code is …` |
+
+With `ROBASE_API_KEY` unset the API prints the text message instead of sending
+it, the same way Mailpit catches email. That path is refused when
+`NODE_ENV=production`, so a deployed API missing its key fails loudly rather
+than telling members a code is coming and sending nothing.
+
+Walk the whole thing without leaving your machine:
+
+1. Sign up at http://localhost:3000/signup. Step 3 emails a code on arrival —
+   read it in Mailpit and enter it.
+2. Press **Text me a code** on the same screen and read the code out of the
+   terminal running the API.
+3. Both again later from **Settings → Security**, which is where members verify
+   if they skipped at signup.
+
+Codes expire in 10 minutes, a resend is refused for 60 seconds, and three wrong
+codes lock that challenge for 24 hours — all of which you will hit while
+testing. `docs/OTP.md` has the full rules.
+
+## Changing the database schema
+
+Drizzle owns the schema; never hand-write SQL in `apps/api/drizzle/`.
+
+```bash
+# after editing apps/api/src/db/schema/*.ts
+pnpm --filter api db:generate   # writes the next NNNN_*.sql + snapshot
+pnpm --filter api db:migrate    # applies it to your local database
+```
+
+Commit the generated SQL **and** the meta files with your change. A schema PR
+without its migration looks fine in review and then fails every request in a
+deployed environment, because the table it describes was never created.
 
 ## Quality gates (CI enforces all of these — run them before pushing)
 
@@ -60,7 +102,7 @@ Favour for a scoped IAM user (S3-only) and run `aws configure`.
 pnpm exec prettier --check .   # or --write
 pnpm run lint                  # strict: unused imports are errors; layering walls
 pnpm run typecheck
-pnpm run test                  # 74+ unit tests
+pnpm run test                  # unit tests (api + web)
 node scripts/check-tests.mjs   # changed feature files must have .spec files
 ```
 
