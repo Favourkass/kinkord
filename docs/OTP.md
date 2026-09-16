@@ -8,9 +8,47 @@ Two contact points are proved the same way, with a 6-digit code:
   for messages already sitting in inboxes.
 - **Phone** (`profile.phone_verified`) — earns the **Basic verified** badge.
 
-Signup step 3 and Settings → Security both carry both. Everything shares one
-service (`OtpService`) and one presenter hook (`useVerification`), so the
-cooldown, attempt wording and error handling are written once.
+Signup presents the channels as separate wizard steps, while Settings →
+Security can use either channel independently. Everything shares one service
+(`OtpService`) and one presenter hook (`useVerification`), so the cooldown,
+attempt wording and error handling are written once.
+
+## Signup flow
+
+The signup wizard has five progress steps:
+
+1. Country selection
+2. Account and profile details
+3. Email verification
+4. Phone/SMS verification
+5. Profile setup
+
+The account form submits to `POST /auth-ext/sign-up`. That endpoint creates the
+account and writes the about-fields atomically. On success, the web presenter
+enters the email stage and automatically calls the email send-code endpoint.
+
+Email and phone verification are intentionally separate stages:
+
+- Step 3 renders the email destination, six-digit code input, verification
+  action, and resend control.
+- A successful email verification does not advance automatically. The member
+  clicks `Next step`, which moves the presenter to Step 4.
+- Step 4 renders the phone number, SMS code input, resend control, and phone
+  verification action.
+- A successful phone verification advances to Step 5. `Skip for now` also
+  advances to the profile stage without marking the phone verified.
+
+The frontend ownership is split by layer:
+
+- `apps/web/src/app/signup/page.tsx` renders the active step.
+- `apps/web/src/presenters/useSignupWizardPresenter.ts` owns wizard stages and
+  transitions.
+- `apps/web/src/presenters/useVerification.ts` owns shared OTP state and
+  actions.
+- `apps/web/src/services/verification.service.ts` owns the API calls.
+
+The temporary local review bypass used while designing the screens has been
+removed. Production signup performs the real account request and OTP requests.
 
 ## Endpoints
 

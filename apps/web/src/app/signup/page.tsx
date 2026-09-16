@@ -124,7 +124,7 @@ export default function SignupPage() {
       )}
 
       {(p.stage === "account" || p.stage === "about") && (
-        <SignupShell step={p.step} badge="STEP 2 OF 4" showTagline={false} onBack={p.backToCountry}>
+        <SignupShell step={p.step} badge="STEP 2 OF 5" showTagline={false} onBack={p.backToCountry}>
           <section className="flex w-full max-w-[706px] flex-col items-center gap-6 lg:max-w-[1130px] lg:gap-8">
             <StageHeading plain="CREATE YOUR" highlight="ACCOUNT" />
             <p className="text-center text-[12px] font-black text-[#cccccc] lg:text-[24px] lg:font-bold">
@@ -301,8 +301,8 @@ export default function SignupPage() {
         </SignupShell>
       )}
 
-      {p.stage === "verify" && (
-        <SignupShell step={p.step} badge="STEP 3 OF 4">
+      {(p.stage === "email" || p.stage === "phone") && (
+        <SignupShell step={p.step} badge={`STEP ${p.step} OF 5`}>
           <section className="flex w-full max-w-[706px] flex-col items-center gap-5 text-center lg:gap-7">
             <StageHeading plain="VERIFY YOUR" highlight="ACCOUNT" />
             <div className="relative grid h-[92px] w-[84px] place-items-center rounded-t-[16px] rounded-b-[42px] border-[3px] border-kink-gold-bright bg-[#1a1400] lg:h-[130px] lg:w-[118px] lg:rounded-b-[56px]">
@@ -310,7 +310,7 @@ export default function SignupPage() {
                 <ShieldCheckIcon className="size-9 text-kink-gold-bright lg:size-12" />
               </span>
             </div>
-            {p.verifyStep.channel === "email" ? (
+            {p.stage === "email" ? (
               <section className="w-full rounded-[16px] border border-kink-amber/60 bg-kink-surface p-5 text-left">
               <div className="flex items-center justify-between">
                 <p className="text-[15px] font-bold text-white">Email address</p>
@@ -331,7 +331,7 @@ export default function SignupPage() {
                       className="max-w-[564px]"
                     />
                   </div>
-              ) : (
+                ) : (
                 <>
                   <p className="mt-2 text-[12px] text-kink-cream lg:text-[15px]">
                     {p.verifyStep.email.sentTo
@@ -455,7 +455,7 @@ export default function SignupPage() {
       )}
 
       {p.stage === "profile" && (
-        <SignupShell step={p.step} badge="STEP 4 OF 4">
+        <SignupShell step={p.step} badge="STEP 5 OF 5">
           <section className="flex w-full max-w-[706px] flex-col items-center gap-6 lg:max-w-[1130px] lg:gap-8">
             <StageHeading plain="BUILD YOUR" highlight="PROFILE" />
             <PhotoConfirmation {...p.profileStep.confirmation} />

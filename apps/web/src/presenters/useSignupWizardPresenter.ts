@@ -25,14 +25,22 @@ import { Routes } from "@/constants/Routes";
 import { PHOTO_CONFIRMATION_COPY } from "@/constants/photoConfirmation";
 import { useVerification } from "./useVerification";
 
-export type WizardStage = "country" | "account" | "about" | "verify" | "profile" | "welcome";
+export type WizardStage =
+  | "country"
+  | "account"
+  | "about"
+  | "email"
+  | "phone"
+  | "profile"
+  | "welcome";
 const STAGE_STEP: Record<WizardStage, number> = {
   country: 1,
   account: 2,
   about: 2,
-  verify: 3,
-  profile: 4,
-  welcome: 4,
+  email: 3,
+  phone: 4,
+  profile: 5,
+  welcome: 5,
 };
 
 interface ProfileVM {
@@ -46,7 +54,6 @@ export function useSignupWizardPresenter() {
   const [stage, setStage] = useState<WizardStage>("country");
   const [busy, setBusy] = useState(false);
   const [topError, setTopError] = useState<string | null>(null);
-  const [verificationChannel, setVerificationChannel] = useState<"email" | "phone">("email");
 
   // step 1
   const [country, setCountry] = useState<string | null>(null);
@@ -122,7 +129,7 @@ export function useSignupWizardPresenter() {
           ? toE164(account.phoneCountryCode, account.phoneLocal)
           : null,
       });
-      setStage("verify");
+      setStage("email");
     } catch (e) {
       setTopError(e instanceof Error ? e.message : "Something went wrong. Try again.");
     } finally {
@@ -138,11 +145,11 @@ export function useSignupWizardPresenter() {
   // The address was typed moments ago, so the code goes out without asking.
   const emailSendCode = emailCode.sendCode;
   useEffect(() => {
-    if (stage !== "verify") return;
+    if (stage !== "email") return;
     emailSendCode();
   }, [stage, emailSendCode]);
 
-  const nextVerificationStep = useCallback(() => setVerificationChannel("phone"), []);
+  const nextVerificationStep = useCallback(() => setStage("phone"), []);
   const skipVerification = useCallback(() => setStage("profile"), []);
 
   const uploadImage = useCallback(
@@ -238,7 +245,6 @@ export function useSignupWizardPresenter() {
         ...phone,
         skip: skipVerification,
         email: emailCode,
-        channel: verificationChannel,
         nextStep: nextVerificationStep,
       },
       profileStep: {
@@ -268,7 +274,6 @@ export function useSignupWizardPresenter() {
       step,
       busy,
       topError,
-      verificationChannel,
       country,
       ageAttested,
       termsAccepted,
