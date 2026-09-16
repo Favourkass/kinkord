@@ -185,6 +185,28 @@ describe("useSignupWizardPresenter", () => {
       verifyCode.mockReset().mockResolvedValue({ verified: true, attemptsLeft: null });
     });
 
+    it("keeps phone verification behind the email next step", async () => {
+      const { result } = renderHook(() => useSignupWizardPresenter());
+      reachCombinedStep(result);
+      fillAccount(result);
+      fillAbout(result);
+
+      await act(() => result.current.submitCombinedStep());
+      await waitFor(() => expect(sendCode).toHaveBeenCalledWith("email"));
+      expect(result.current.verifyStep.channel).toBe("email");
+
+      act(() => result.current.verifyStep.email.setCode("123456"));
+      await act(async () => result.current.verifyStep.email.verify());
+
+      expect(result.current.verifyStep.email.verified).toBe(true);
+      expect(result.current.verifyStep.channel).toBe("email");
+      expect(result.current.stage).toBe("verify");
+
+      act(() => result.current.verifyStep.nextStep());
+      expect(result.current.verifyStep.channel).toBe("phone");
+      expect(result.current.stage).toBe("verify");
+    });
+
     it("asks the API to text a code and shows the masked number", async () => {
       const { result } = renderHook(() => useSignupWizardPresenter());
       expect(result.current.verifyStep.sent).toBe(false);

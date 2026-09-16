@@ -46,6 +46,7 @@ export function useSignupWizardPresenter() {
   const [stage, setStage] = useState<WizardStage>("country");
   const [busy, setBusy] = useState(false);
   const [topError, setTopError] = useState<string | null>(null);
+  const [verificationChannel, setVerificationChannel] = useState<"email" | "phone">("email");
 
   // step 1
   const [country, setCountry] = useState<string | null>(null);
@@ -141,6 +142,7 @@ export function useSignupWizardPresenter() {
     emailSendCode();
   }, [stage, emailSendCode]);
 
+  const nextVerificationStep = useCallback(() => setVerificationChannel("phone"), []);
   const skipVerification = useCallback(() => setStage("profile"), []);
 
   const uploadImage = useCallback(
@@ -232,7 +234,13 @@ export function useSignupWizardPresenter() {
       aboutStep: { draft: about, set: setAbout, errors: aboutErrors },
       submitCombinedStep,
       backToCountry,
-      verifyStep: { ...phone, skip: skipVerification, email: emailCode },
+      verifyStep: {
+        ...phone,
+        skip: skipVerification,
+        email: emailCode,
+        channel: verificationChannel,
+        nextStep: nextVerificationStep,
+      },
       profileStep: {
         roles,
         toggleRole,
@@ -260,6 +268,7 @@ export function useSignupWizardPresenter() {
       step,
       busy,
       topError,
+      verificationChannel,
       country,
       ageAttested,
       termsAccepted,
@@ -272,6 +281,7 @@ export function useSignupWizardPresenter() {
       submitCombinedStep,
       backToCountry,
       skipVerification,
+      nextVerificationStep,
       phone,
       emailCode,
       roles,

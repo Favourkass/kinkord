@@ -294,7 +294,7 @@ export default function SignupPage() {
               className="max-w-[564px]"
             />
             <div className="text-center text-[11px] text-kink-help lg:text-[16px]">
-              <p>We&apos;ll send a 6-digit verification code to your phone.</p>
+              <p>We&apos;ll send a 6-digit verification code to your email.</p>
               <p>One number can only be linked to one Kinkord account.</p>
             </div>
           </section>
@@ -310,7 +310,8 @@ export default function SignupPage() {
                 <ShieldCheckIcon className="size-9 text-kink-gold-bright lg:size-12" />
               </span>
             </div>
-            <section className="w-full rounded-[16px] border border-kink-amber/60 bg-kink-surface p-5 text-left">
+            {p.verifyStep.channel === "email" ? (
+              <section className="w-full rounded-[16px] border border-kink-amber/60 bg-kink-surface p-5 text-left">
               <div className="flex items-center justify-between">
                 <p className="text-[15px] font-bold text-white">Email address</p>
                 {p.verifyStep.email.verified && (
@@ -319,10 +320,17 @@ export default function SignupPage() {
                   </span>
                 )}
               </div>
-              {p.verifyStep.email.verified ? (
-                <p className="mt-2 text-[12px] text-kink-cream lg:text-[15px]">
-                  Your email address is confirmed.
-                </p>
+                {p.verifyStep.email.verified ? (
+                  <div className="mt-4 flex flex-col items-center gap-3">
+                    <p className="text-[12px] text-kink-cream lg:text-[15px]">
+                      Your email address is confirmed.
+                    </p>
+                    <GoldCta
+                      label="Next step"
+                      onClick={p.verifyStep.nextStep}
+                      className="max-w-[564px]"
+                    />
+                  </div>
               ) : (
                 <>
                   <p className="mt-2 text-[12px] text-kink-cream lg:text-[15px]">
@@ -365,7 +373,9 @@ export default function SignupPage() {
                   </div>
                 </>
               )}
-            </section>
+              </section>
+            ) : (
+              <>
 
             <div className="rounded-xl border border-kink-amber/60 bg-kink-surface px-5 py-3">
               <p className="text-[12px] text-kink-cream lg:text-[16px]">
@@ -438,6 +448,8 @@ export default function SignupPage() {
             >
               Skip for now
             </button>
+              </>
+            )}
           </section>
         </SignupShell>
       )}
