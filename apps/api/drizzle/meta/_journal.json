@@ -50,6 +50,13 @@
       "when": 1789204967212,
       "tag": "0006_large_kitty_pryde",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789558240887,
+      "tag": "0007_careless_captain_cross",
+      "breakpoints": true
     }
   ]
 }

@@ -104,7 +104,7 @@ export interface PublicProfilePM {
   restricted: boolean;
   /** Only your own profile carries the birth date. */
   dateOfBirth: string | null;
-  verification: { email: boolean; phone: boolean };
+  verification: { email: boolean; phone: boolean; bronze?: boolean };
 }
 
 export type SocialPlatform = "facebook" | "x";
@@ -196,7 +196,7 @@ export interface PublicProfileVM {
   roles: string[];
   limits: string | null;
   socialLinks: SocialLinkVM[];
-  verification: { level: "basic" | "none"; email: boolean; phone: boolean };
+  verification: { level: "bronze" | "basic" | "none"; email: boolean; phone: boolean };
   restricted: boolean;
 }
 
@@ -290,7 +290,7 @@ export function toPublicProfileVM(pm: PublicProfilePM, now = new Date()): Public
       return url ? [{ platform, url, handle: socialHandle(url) }] : [];
     }),
     verification: {
-      level: pm.verification?.email || pm.verification?.phone ? "basic" : "none",
+      level: pm.verification?.bronze ? "bronze" : pm.verification?.email || pm.verification?.phone ? "basic" : "none",
       email: Boolean(pm.verification?.email),
       phone: Boolean(pm.verification?.phone),
     },

@@ -11,6 +11,7 @@ import { MessagingModule } from "./messaging/messaging.module";
 import { PresenceModule } from "./presence/presence.module";
 import { ProfilesModule } from "./profiles/profiles.module";
 import { StorageModule } from "./storage/storage.module";
+import { VerificationModule } from "./verification/verification.module";
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { StorageModule } from "./storage/storage.module";
     ProfilesModule,
     CommunityModule,
     MembersModule,
+    VerificationModule,
   ],
   controllers: [HealthController],
   providers: [HealthService],
