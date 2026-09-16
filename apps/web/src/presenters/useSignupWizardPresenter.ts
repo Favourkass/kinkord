@@ -26,13 +26,7 @@ import { PHOTO_CONFIRMATION_COPY } from "@/constants/photoConfirmation";
 import { useVerification } from "./useVerification";
 
 export type WizardStage =
-  | "country"
-  | "account"
-  | "about"
-  | "email"
-  | "phone"
-  | "profile"
-  | "welcome";
+  "country" | "account" | "about" | "email" | "phone" | "profile" | "welcome";
 const STAGE_STEP: Record<WizardStage, number> = {
   country: 1,
   account: 2,
