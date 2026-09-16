@@ -355,6 +355,7 @@ export default function SignupPage() {
               previewUrl={p.profileStep.avatarUrl}
               uploading={p.profileStep.uploading === "avatar"}
               disabled={!p.profileStep.confirmation.confirmed || p.profileStep.uploading !== null}
+              note={p.profileStep.lockedHint ?? undefined}
               onFile={(f) => p.profileStep.uploadImage("avatar", f)}
             />
             <UploadTile
@@ -365,6 +366,7 @@ export default function SignupPage() {
               previewUrl={p.profileStep.coverUrl}
               uploading={p.profileStep.uploading === "cover"}
               disabled={!p.profileStep.confirmation.confirmed || p.profileStep.uploading !== null}
+              note={p.profileStep.lockedHint ?? undefined}
               onFile={(f) => p.profileStep.uploadImage("cover", f)}
             />
             <div className="w-full">

@@ -227,6 +227,7 @@ export function useSignupWizardPresenter() {
         coverUrl,
         uploading,
         uploadImage,
+        lockedHint: photoConfirmed ? null : PHOTO_CONFIRMATION_COPY.lockedHint,
         confirmation: {
           ...PHOTO_CONFIRMATION_COPY,
           confirmed: photoConfirmed,

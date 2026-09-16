@@ -14,6 +14,7 @@ export interface PhotoCardVM {
   url: string | null;
   uploading: boolean;
   disabled: boolean;
+  lockedHint: string | null;
   uploadingLabel: string;
 }
 
@@ -76,6 +77,11 @@ function Card({
       </div>
       {children}
       <p className="text-center text-[11px] text-pf-muted">{vm.hint}</p>
+      {vm.lockedHint ? (
+        <p className="text-center text-[11px] font-semibold text-kink-gold-bright">
+          {vm.lockedHint}
+        </p>
+      ) : null}
     </section>
   );
 }

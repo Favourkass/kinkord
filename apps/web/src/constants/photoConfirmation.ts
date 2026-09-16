@@ -14,4 +14,6 @@ export const PHOTO_CONFIRMATION_COPY = {
     "⚠️ I understand that violating these requirements may result in removal of the content and the suspension or termination of my Kinkord account.",
   confirmLabel: "I Confirm",
   requiredError: "Confirm the Profile & Cover Photo requirements before uploading.",
+  /** Shown beside a disabled upload control so the member knows why it is inert. */
+  lockedHint: "Tick “I Confirm” above to enable uploads.",
 } as const;
