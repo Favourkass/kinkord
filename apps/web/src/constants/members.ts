@@ -94,7 +94,7 @@ export const MEMBERS_COPY = {
       noSocial: "No links added yet.",
       platforms: { facebook: "Facebook", x: "X (Twitter)" },
       verification: "Verification Status",
-      verified: { basic: "Basic Verified", none: "Not verified yet" },
+      verified: { bronze: "Bronze Verified ✓", basic: "Basic Verified", none: "Not verified yet" },
       verifiedDetail: (email: boolean, phone: boolean) =>
         email && phone
           ? "Email & Phone Verified"

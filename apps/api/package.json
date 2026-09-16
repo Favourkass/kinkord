@@ -29,6 +29,7 @@
     "reflect-metadata": "^0.2.2",
     "resend": "^4.0.0",
     "rxjs": "^7.8.1",
+    "smile-identity-core": "^3.2.1",
     "uuid": "^14.0.1",
     "zod": "^3.24.0"
   },

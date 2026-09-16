@@ -12,6 +12,7 @@ import { PresenceModule } from "./presence/presence.module";
 import { ProfilesModule } from "./profiles/profiles.module";
 import { OtpModule } from "./otp/otp.module";
 import { StorageModule } from "./storage/storage.module";
+import { VerificationModule } from "./verification/verification.module";
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { StorageModule } from "./storage/storage.module";
     CommunityModule,
     MembersModule,
     OtpModule,
+    VerificationModule,
   ],
   controllers: [HealthController],
   providers: [HealthService],

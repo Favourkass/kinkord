@@ -91,6 +91,7 @@ export default function ProfileHero({
             <span className="text-[16px] leading-[19px] text-pf-muted">· {vm.handle}</span>
           )}
         </p>
+        {vm.verification.level === "bronze" ? <span className="rounded-full border border-kink-gold-bright px-3 py-1 text-xs font-bold text-kink-gold-bright">Bronze Verified ✓</span> : null}
         <p className="flex items-center gap-[12px] text-[13px] font-bold leading-[16px] text-pf-muted">
           <span>
             {vm.stats.friends} {labels.stats.friends}

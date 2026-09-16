@@ -18,6 +18,7 @@ export const Routes = {
   settings: "/settings",
   /** Password + 2FA moved here from /profile (CEO, 2026-09-12: "we still need to keep the change password and co"). */
   settingsSecurity: "/settings/security",
+  settingsBronzeVerification: "/settings/verification/bronze",
   // Edit Profile hub (Figma 1542:30) and its five sections.
   profileEdit: "/profile/edit",
   profileEditPhotos: "/profile/edit/photos",

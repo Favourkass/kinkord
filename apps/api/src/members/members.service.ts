@@ -2,7 +2,7 @@ import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, asc, count, desc, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { Db, DRIZZLE } from "../db/db.module";
-import { follow, profile, profileMedia, user, type ProfileMediaKind } from "../db/schema";
+import { bronzeVerification, follow, profile, profileMedia, user, type ProfileMediaKind } from "../db/schema";
 import { ONLINE_WINDOW_SECONDS, PresenceService } from "../presence/presence.service";
 import { StorageService } from "../storage/storage.service";
 import { FollowsService } from "./follows.service";
@@ -184,9 +184,10 @@ export class MembersService {
   async publicProfile(username: string, viewerId: string) {
     const handle = username.replace(/^@/, "").toLowerCase();
     const [row] = await this.db
-      .select({ u: user, p: profile })
+      .select({ u: user, p: profile, bronze: bronzeVerification })
       .from(user)
       .innerJoin(profile, eq(profile.userId, user.id))
+      .leftJoin(bronzeVerification, eq(bronzeVerification.userId, user.id))
       .where(eq(user.username, handle))
       .limit(1);
     if (!row) throw new NotFoundException("Member not found.");
@@ -242,7 +243,11 @@ export class MembersService {
       restricted,
       // Only you see your own birth date; everyone else gets the derived age.
       dateOfBirth: isSelf ? p.dateOfBirth : null,
-      verification: { email: u.emailVerified, phone: p.phoneVerified },
+      verification: {
+        email: u.emailVerified, phone: p.phoneVerified,
+        ...(row.bronze?.status === "verified" && row.bronze.verifiedAvatarKey === p.avatarKey
+          ? { bronze: true as const } : {}),
+      },
     };
   }
 

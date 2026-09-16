@@ -5,4 +5,5 @@ packages:
 allowBuilds:
   esbuild: true
   sharp: true
+  smile-identity-core: false
   unrs-resolver: true
