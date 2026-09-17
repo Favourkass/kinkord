@@ -1,7 +1,7 @@
 import Link from "next/link";
 import MaskIcon from "@/components/app/MaskIcon";
 import type { PublicProfileVM } from "@/domain/member";
-
+import ExpandableAvatar from "./ExpandableAvatar";
 export interface ProfileHeroLabels {
   follow: string;
   following: string;
@@ -60,20 +60,20 @@ export default function ProfileHero({
         </div>
         <div className="absolute left-[20px] top-[114px] size-[110px]">
           <span aria-hidden className="absolute inset-0 rounded-full bg-pf-surface" />
-          {vm.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={vm.avatarUrl}
-              alt={vm.displayName}
-              fetchPriority="high"
-              decoding="async"
-              className="absolute left-[5px] top-[8px] size-[100px] rounded-full object-cover"
-            />
-          ) : (
-            <span className="absolute left-[5px] top-[8px] grid size-[100px] place-items-center rounded-full bg-pf-surface-2 text-pf-muted">
-              <MaskIcon name="people" width={40} />
-            </span>
-          )}
+            {vm.avatarUrl ? (
+              <ExpandableAvatar
+                src={vm.avatarUrl}
+                alt={vm.displayName}
+                fetchPriority="high"
+                closeLabel="Close"
+                wrapperClassName="absolute left-[5px] top-[8px] size-[100px]"
+                className="size-[100px]"
+              />
+            ) : (
+              <span className="absolute left-[5px] top-[8px] grid size-[100px] place-items-center rounded-full bg-pf-surface-2 text-pf-muted">
+                <MaskIcon name="people" width={40} />
+              </span>
+            )}
         </div>
         {presenceText && (
           <p className="absolute right-[16px] top-[188px] text-[12px] italic leading-[15px] text-pf-muted">
