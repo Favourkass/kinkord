@@ -19,7 +19,7 @@ self.addEventListener("install", (event) => {
     caches
       .open(CACHE_NAME)
       .then((cache) => cache.addAll(PRECACHE_ASSETS))
-      .then(() => self.skipWaiting())
+      .then(() => self.skipWaiting()),
   );
 });
 
@@ -34,10 +34,10 @@ self.addEventListener("activate", (event) => {
             if (key !== CACHE_NAME) {
               return caches.delete(key);
             }
-          })
-        )
+          }),
+        ),
       )
-      .then(() => self.clients.claim())
+      .then(() => self.clients.claim()),
   );
 });
 
@@ -66,7 +66,7 @@ self.addEventListener("fetch", (event) => {
           return cachedResponse;
         }
         return cache.match(OFFLINE_URL);
-      })
+      }),
     );
     return;
   }
@@ -92,7 +92,7 @@ self.addEventListener("fetch", (event) => {
           .catch(() => cachedResponse);
 
         return cachedResponse || fetchPromise;
-      })
+      }),
     );
   }
 });
@@ -121,7 +121,7 @@ self.addEventListener("push", (event) => {
       self.registration.showNotification("Kinkord", {
         body: text,
         icon: "/icons/icon-192x192.png",
-      })
+      }),
     );
   }
 });
@@ -132,17 +132,15 @@ self.addEventListener("notificationclick", (event) => {
   const targetUrl = event.notification.data?.url || "/";
 
   event.waitUntil(
-    clients
-      .matchAll({ type: "window", includeUncontrolled: true })
-      .then((clientList) => {
-        for (const client of clientList) {
-          if (client.url === targetUrl && "focus" in client) {
-            return client.focus();
-          }
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url === targetUrl && "focus" in client) {
+          return client.focus();
         }
-        if (clients.openWindow) {
-          return clients.openWindow(targetUrl);
-        }
-      })
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    }),
   );
 });

@@ -98,7 +98,7 @@ describe("useSignupWizardPresenter", () => {
     expect(post).not.toHaveBeenCalled();
   });
 
-  it("posts account + about to the combined sign-up endpoint and advances to verify", async () => {
+  it("posts account + about and advances to email verification", async () => {
     const { result } = renderHook(() => useSignupWizardPresenter());
     reachCombinedStep(result);
     fillAccount(result);
@@ -119,11 +119,9 @@ describe("useSignupWizardPresenter", () => {
         phone: "+2348031234567",
       }),
     );
-    expect(result.current.stage).toBe("verify");
-    // The address was typed moments ago, so the email code goes out on arrival —
-    // once, not on every render.
+    expect(result.current.stage).toBe("email");
     await waitFor(() => expect(sendCode).toHaveBeenCalledWith("email"));
-    expect(sendCode.mock.calls.filter(([c]) => c === "email")).toHaveLength(1);
+    expect(sendCode.mock.calls.filter(([channel]) => channel === "email")).toHaveLength(1);
 
     act(() => result.current.verifyStep.skip());
     expect(result.current.stage).toBe("profile");
@@ -169,9 +167,9 @@ describe("useSignupWizardPresenter", () => {
     expect(result.current.profileStep.lockedHint).toBeNull();
   });
 
-  it("exposes totalSteps as 4", () => {
+  it("exposes totalSteps as 5", () => {
     const { result } = renderHook(() => useSignupWizardPresenter());
-    expect(result.current.totalSteps).toBe(4);
+    expect(result.current.totalSteps).toBe(5);
   });
 
   describe("phone verification", () => {
@@ -183,6 +181,26 @@ describe("useSignupWizardPresenter", () => {
         resendAfterMs: 60_000,
       });
       verifyCode.mockReset().mockResolvedValue({ verified: true, attemptsLeft: null });
+    });
+
+    it("keeps phone verification behind successful email verification", async () => {
+      const { result } = renderHook(() => useSignupWizardPresenter());
+      reachCombinedStep(result);
+      fillAccount(result);
+      fillAbout(result);
+
+      await act(() => result.current.submitCombinedStep());
+      await waitFor(() => expect(sendCode).toHaveBeenCalledWith("email"));
+      expect(result.current.stage).toBe("email");
+
+      act(() => result.current.verifyStep.email.setCode("123456"));
+      await act(async () => result.current.verifyStep.email.verify());
+
+      expect(result.current.verifyStep.email.verified).toBe(true);
+      expect(result.current.stage).toBe("email");
+
+      act(() => result.current.verifyStep.nextStep());
+      expect(result.current.stage).toBe("phone");
     });
 
     it("asks the API to text a code and shows the masked number", async () => {

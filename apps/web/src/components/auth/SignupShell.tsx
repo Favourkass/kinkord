@@ -40,7 +40,7 @@ function ProgressDots({ step, total }: { step: number; total: number }) {
 /** Signup wizard chrome per Figma 560-175: wordmark, tagline, progress dots, step badge. */
 export default function SignupShell({
   step,
-  totalSteps = 4,
+  totalSteps = 5,
   badge,
   backHref,
   onBack,
