@@ -304,40 +304,140 @@ export default function SignupPage() {
       {p.stage === "verify" && (
         <SignupShell step={p.step} badge="STEP 3 OF 4">
           <section className="flex w-full max-w-[706px] flex-col items-center gap-5 text-center lg:gap-7">
-            <StageHeading plain="PHONE" highlight="VERIFICATION" />
+            <StageHeading plain="VERIFY YOUR" highlight="ACCOUNT" />
             <div className="relative grid h-[92px] w-[84px] place-items-center rounded-t-[16px] rounded-b-[42px] border-[3px] border-kink-gold-bright bg-[#1a1400] lg:h-[130px] lg:w-[118px] lg:rounded-b-[56px]">
               <span className="grid h-[70px] w-[62px] place-items-center rounded-t-[10px] rounded-b-[32px] bg-[#2a2000] lg:h-[102px] lg:w-[90px] lg:rounded-b-[44px]">
                 <ShieldCheckIcon className="size-9 text-kink-gold-bright lg:size-12" />
               </span>
             </div>
+            <section className="w-full rounded-[16px] border border-kink-amber/60 bg-kink-surface p-5 text-left">
+              <div className="flex items-center justify-between">
+                <p className="text-[15px] font-bold text-white">Email address</p>
+                {p.verifyStep.email.verified && (
+                  <span className="rounded-full bg-kink-gold-bright px-[10px] py-[3px] text-[11px] font-bold text-black">
+                    VERIFIED
+                  </span>
+                )}
+              </div>
+              {p.verifyStep.email.verified ? (
+                <p className="mt-2 text-[12px] text-kink-cream lg:text-[15px]">
+                  Your email address is confirmed.
+                </p>
+              ) : (
+                <>
+                  <p className="mt-2 text-[12px] text-kink-cream lg:text-[15px]">
+                    {p.verifyStep.email.sentTo
+                      ? `We emailed a 6-digit code to ${p.verifyStep.email.sentTo}. It expires in 10 minutes.`
+                      : "Sending a 6-digit code to your email…"}
+                  </p>
+                  <div className="mt-4 flex flex-col items-center gap-3">
+                    <CodeInput
+                      value={p.verifyStep.email.code}
+                      onChange={p.verifyStep.email.setCode}
+                      disabled={!p.verifyStep.email.sent || p.verifyStep.email.verifying}
+                      label="Enter the code from your email"
+                    />
+                    {p.verifyStep.email.error && (
+                      <p className="text-[13px] text-red-400">{p.verifyStep.email.error}</p>
+                    )}
+                    <GoldCta
+                      label="Verify my email"
+                      arrow={false}
+                      onClick={p.verifyStep.email.verify}
+                      loading={p.verifyStep.email.verifying}
+                      className="max-w-[564px]"
+                    />
+                    <button
+                      type="button"
+                      onClick={p.verifyStep.email.sendCode}
+                      disabled={!p.verifyStep.email.canResend}
+                      className="text-[12px] text-kink-help underline disabled:opacity-60"
+                    >
+                      {p.verifyStep.email.resendIn > 0
+                        ? `Send a new code in ${String(
+                            Math.floor(p.verifyStep.email.resendIn / 60),
+                          ).padStart(
+                            2,
+                            "0",
+                          )}:${String(p.verifyStep.email.resendIn % 60).padStart(2, "0")}`
+                        : "Send a new code"}
+                    </button>
+                  </div>
+                </>
+              )}
+            </section>
+
             <div className="rounded-xl border border-kink-amber/60 bg-kink-surface px-5 py-3">
               <p className="text-[12px] text-kink-cream lg:text-[16px]">
-                SMS verification is{" "}
-                <span className="font-bold text-kink-gold-bright">coming soon</span>. Skip for now —
-                verifying later unlocks the <span className="font-semibold">Basic verified</span>{" "}
-                badge.
+                {p.verifyStep.sent
+                  ? "Enter the code we texted you. It expires in 10 minutes."
+                  : "Verifying your number unlocks the Basic verified badge. You can also skip and do it later."}
               </p>
             </div>
             <div className="flex items-center gap-3 rounded-[12px] border-2 border-kink-gold-bright bg-[#111111] px-5 py-3 lg:px-8 lg:py-4">
               <Smartphone size={20} className="text-kink-gold-bright lg:size-7" aria-hidden />
               <span className="text-[15px] font-medium text-white lg:text-[24px]">
-                {p.accountStep.draft.phoneCountryCode}{" "}
-                {p.accountStep.draft.phoneLocal.replace(/^0/, "") || "your phone number"}
+                {p.verifyStep.sentTo ??
+                  `${p.accountStep.draft.phoneCountryCode} ${
+                    p.accountStep.draft.phoneLocal.replace(/^0/, "") || "your phone number"
+                  }`}
               </span>
             </div>
-            <CodeInput value="" onChange={() => {}} disabled label="Enter the 6-digit code" />
-            <div className="flex items-center gap-2 text-[13px] text-white/60 lg:text-[18px]">
-              <Clock size={16} aria-hidden />
-              <span>
-                Resend code in <span className="font-semibold text-kink-gold-bright/60">--:--</span>
-              </span>
-            </div>
-            <p className="text-[12px] text-kink-help lg:text-[15px]">
-              We also sent a confirmation{" "}
-              <span className="text-kink-gold-bright">link to your email</span> — click it whenever
-              convenient.
-            </p>
-            <GoldCta label="Skip for now" onClick={p.verifyStep.skip} className="max-w-[564px]" />
+            <CodeInput
+              value={p.verifyStep.code}
+              onChange={p.verifyStep.setCode}
+              disabled={!p.verifyStep.sent || p.verifyStep.verifying}
+              label="Enter the 6-digit code"
+            />
+            {p.verifyStep.error && (
+              <p className="text-[13px] text-red-400 lg:text-[15px]">{p.verifyStep.error}</p>
+            )}
+            {p.verifyStep.sent ? (
+              <>
+                <GoldCta
+                  label="Verify my number"
+                  arrow={false}
+                  onClick={p.verifyStep.verify}
+                  loading={p.verifyStep.verifying}
+                  className="max-w-[564px]"
+                />
+                <div className="flex items-center gap-2 text-[13px] text-white/60 lg:text-[18px]">
+                  <Clock size={16} aria-hidden />
+                  {p.verifyStep.canResend ? (
+                    <button
+                      type="button"
+                      onClick={p.verifyStep.sendCode}
+                      className="font-semibold text-kink-gold-bright underline"
+                    >
+                      Send a new code
+                    </button>
+                  ) : (
+                    <span>
+                      Resend code in{" "}
+                      <span className="font-semibold text-kink-gold-bright/60">
+                        {String(Math.floor(p.verifyStep.resendIn / 60)).padStart(2, "0")}:
+                        {String(p.verifyStep.resendIn % 60).padStart(2, "0")}
+                      </span>
+                    </span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <GoldCta
+                label="Text me a code"
+                arrow={false}
+                onClick={p.verifyStep.sendCode}
+                loading={p.verifyStep.sending}
+                className="max-w-[564px]"
+              />
+            )}
+            <button
+              type="button"
+              onClick={p.verifyStep.skip}
+              className="text-[13px] text-kink-help underline lg:text-[16px]"
+            >
+              Skip for now
+            </button>
           </section>
         </SignupShell>
       )}

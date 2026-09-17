@@ -9,7 +9,7 @@ export interface SendSmsResult {
   providerMessageId: string | null;
 }
 
-/** Outbound SMS provider port. Adapters: Termii (NG). Twilio slot reserved. */
+/** Outbound SMS provider port. Adapter: Robase (own per-country routing). */
 export interface SmsPort {
   readonly providerName: string;
   send(input: SendSmsInput): Promise<SendSmsResult>;

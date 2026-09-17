@@ -74,7 +74,7 @@ export class ApiBaseStack extends cdk.Stack {
           secretArn("kinkord/database-url"),
           secretArn("kinkord/auth-secret"),
           secretArn("kinkord/resend"),
-          secretArn("kinkord/termii"),
+          secretArn("kinkord/robase"),
           secretArn("kinkord/smile-id"),
           secretArn("kinkord/didit-api-key"),
           secretArn("kinkord/didit-webhook-secret"),
@@ -119,8 +119,6 @@ export class ApiStack extends cdk.Stack {
               { name: "AUTH_BASE_URL", value: "https://api.kinkord.com" },
               { name: "COOKIE_DOMAIN", value: ".kinkord.com" },
               { name: "EMAIL_FROM", value: "Kinkord <no-reply@kinkord.com>" },
-              { name: "TERMII_SENDER_ID", value: "KINKORD" },
-              { name: "TERMII_CHANNEL", value: "generic" },
               { name: "RUN_MIGRATIONS", value: "true" },
               { name: "SMILE_ID_ENVIRONMENT", value: process.env.SMILE_ID_ENVIRONMENT ?? "sandbox" },
               { name: "SMILE_ID_CALLBACK_URL", value: "https://api.kinkord.com/webhooks/smile-id" },
@@ -153,10 +151,10 @@ export class ApiStack extends cdk.Stack {
                   `arn:aws:secretsmanager:${region}:${account}:secret:kinkord/resend`,
               },
               {
-                name: "TERMII_API_KEY",
+                name: "ROBASE_API_KEY",
                 value:
-                  process.env.ARN_TERMII ??
-                  `arn:aws:secretsmanager:${region}:${account}:secret:kinkord/termii`,
+                  process.env.ARN_ROBASE ??
+                  `arn:aws:secretsmanager:${region}:${account}:secret:kinkord/robase`,
               },
               ...(process.env.ARN_SMILE_ID_API_KEY ? [{
                 name: "SMILE_ID_API_KEY", value: process.env.ARN_SMILE_ID_API_KEY,

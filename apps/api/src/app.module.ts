@@ -10,6 +10,7 @@ import { MembersModule } from "./members/members.module";
 import { MessagingModule } from "./messaging/messaging.module";
 import { PresenceModule } from "./presence/presence.module";
 import { ProfilesModule } from "./profiles/profiles.module";
+import { OtpModule } from "./otp/otp.module";
 import { StorageModule } from "./storage/storage.module";
 import { VerificationModule } from "./verification/verification.module";
 
@@ -26,6 +27,7 @@ import { VerificationModule } from "./verification/verification.module";
     CommunityModule,
     MembersModule,
     VerificationModule,
+    OtpModule,
   ],
   controllers: [HealthController],
   providers: [HealthService],

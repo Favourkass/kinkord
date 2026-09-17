@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { useSignupWizardPresenter } from "./useSignupWizardPresenter";
 
 const push = vi.fn();
@@ -9,12 +9,32 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push, replace: vi.fn() }
 const patch = vi.fn();
 const post = vi.fn();
 vi.mock("@/services/apiClient", () => ({
+  // ApiError must be exported: verificationErrorMessage does `instanceof ApiError`,
+  // which throws outright if the binding is undefined.
+  ApiError: class ApiError extends Error {
+    constructor(
+      public readonly status: number,
+      public readonly body: unknown,
+    ) {
+      super(`HTTP ${status}`);
+    }
+  },
   api: {
     patch: (...a: unknown[]) => patch(...a),
     post: (...a: unknown[]) => post(...a),
     get: vi.fn(),
   },
   uploadToPresignedUrl: vi.fn(async () => {}),
+}));
+
+const sendCode = vi.fn();
+const verifyCode = vi.fn();
+vi.mock("@/services/verification.service", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/services/verification.service")>()),
+  verificationApi: {
+    sendCode: (...a: unknown[]) => sendCode(...a),
+    verify: (...a: unknown[]) => verifyCode(...a),
+  },
 }));
 
 const fillAccount = (result: { current: ReturnType<typeof useSignupWizardPresenter> }) =>
@@ -100,6 +120,10 @@ describe("useSignupWizardPresenter", () => {
       }),
     );
     expect(result.current.stage).toBe("verify");
+    // The address was typed moments ago, so the email code goes out on arrival —
+    // once, not on every render.
+    await waitFor(() => expect(sendCode).toHaveBeenCalledWith("email"));
+    expect(sendCode.mock.calls.filter(([c]) => c === "email")).toHaveLength(1);
 
     act(() => result.current.verifyStep.skip());
     expect(result.current.stage).toBe("profile");
@@ -148,5 +172,84 @@ describe("useSignupWizardPresenter", () => {
   it("exposes totalSteps as 4", () => {
     const { result } = renderHook(() => useSignupWizardPresenter());
     expect(result.current.totalSteps).toBe(4);
+  });
+
+  describe("phone verification", () => {
+    beforeEach(() => {
+      sendCode.mockReset().mockResolvedValue({
+        otpId: "11111111-1111-4111-8111-111111111111",
+        sentTo: "+234******4567",
+        expiresAt: new Date(Date.now() + 600_000).toISOString(),
+        resendAfterMs: 60_000,
+      });
+      verifyCode.mockReset().mockResolvedValue({ verified: true, attemptsLeft: null });
+    });
+
+    it("asks the API to text a code and shows the masked number", async () => {
+      const { result } = renderHook(() => useSignupWizardPresenter());
+      expect(result.current.verifyStep.sent).toBe(false);
+
+      await act(async () => result.current.verifyStep.sendCode());
+
+      expect(sendCode).toHaveBeenCalled();
+      expect(result.current.verifyStep.sent).toBe(true);
+      expect(result.current.verifyStep.sentTo).toBe("+234******4567");
+      // Cooldown starts immediately so the resend link cannot be hammered.
+      expect(result.current.verifyStep.canResend).toBe(false);
+      expect(result.current.verifyStep.resendIn).toBe(60);
+    });
+
+    it("moves on to the profile step once the code checks out", async () => {
+      const { result } = renderHook(() => useSignupWizardPresenter());
+      await act(async () => result.current.verifyStep.sendCode());
+      act(() => result.current.verifyStep.setCode("123456"));
+      await act(async () => result.current.verifyStep.verify());
+
+      expect(verifyCode).toHaveBeenCalledWith(
+        "phone",
+        "11111111-1111-4111-8111-111111111111",
+        "123456",
+      );
+      expect(result.current.verifyStep.verified).toBe(true);
+      expect(result.current.stage).toBe("profile");
+    });
+
+    it("clears the boxes and says how many tries are left on a wrong code", async () => {
+      verifyCode.mockResolvedValueOnce({ verified: false, attemptsLeft: 2 });
+      const { result } = renderHook(() => useSignupWizardPresenter());
+      await act(async () => result.current.verifyStep.sendCode());
+      act(() => result.current.verifyStep.setCode("000000"));
+      await act(async () => result.current.verifyStep.verify());
+
+      expect(result.current.verifyStep.error).toMatch(/2 tries left/);
+      expect(result.current.verifyStep.code).toBe("");
+      // A wrong code must not advance the wizard.
+      expect(result.current.stage).not.toBe("profile");
+    });
+
+    it("will not call the API with a half-typed code", async () => {
+      const { result } = renderHook(() => useSignupWizardPresenter());
+      await act(async () => result.current.verifyStep.sendCode());
+      act(() => result.current.verifyStep.setCode("12"));
+      await act(async () => result.current.verifyStep.verify());
+
+      expect(verifyCode).not.toHaveBeenCalled();
+      expect(result.current.verifyStep.error).toMatch(/6-digit/);
+    });
+
+    it("surfaces a refusal instead of pretending the code was sent", async () => {
+      sendCode.mockRejectedValueOnce(new Error("429"));
+      const { result } = renderHook(() => useSignupWizardPresenter());
+      act(() => result.current.verifyStep.sendCode());
+
+      await waitFor(() => expect(result.current.verifyStep.error).toBeTruthy());
+      expect(result.current.verifyStep.sent).toBe(false);
+    });
+
+    it("still lets someone skip verification", () => {
+      const { result } = renderHook(() => useSignupWizardPresenter());
+      act(() => result.current.verifyStep.skip());
+      expect(result.current.stage).toBe("profile");
+    });
   });
 });

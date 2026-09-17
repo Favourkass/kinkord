@@ -26,6 +26,29 @@ describe("useGuestRedirect", () => {
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/home"));
   });
 
+  it("holds the redirect back while the entry screen is still busy", async () => {
+    getSession.mockResolvedValue({
+      data: { session: { id: "s1" }, user: { id: "u1" } },
+      error: null,
+    });
+    const { result, rerender } = renderHook(({ hold }) => useGuestRedirect({ hold }), {
+      initialProps: { hold: true },
+    });
+    // The lookup still runs — only the navigation waits.
+    await waitFor(() => expect(result.current.checking).toBe(true));
+    expect(replace).not.toHaveBeenCalled();
+
+    rerender({ hold: false });
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/home"));
+  });
+
+  it("never redirects a guest, held or not", async () => {
+    getSession.mockResolvedValue({ data: null, error: null });
+    const { result } = renderHook(() => useGuestRedirect({ hold: true }));
+    await waitFor(() => expect(result.current.checking).toBe(false));
+    expect(replace).not.toHaveBeenCalled();
+  });
+
   it("stays on the guest screen when there is no session", async () => {
     getSession.mockResolvedValue({ data: null, error: null });
     const { result } = renderHook(() => useGuestRedirect());
