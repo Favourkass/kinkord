@@ -75,6 +75,9 @@ export class ApiBaseStack extends cdk.Stack {
           secretArn("kinkord/auth-secret"),
           secretArn("kinkord/resend"),
           secretArn("kinkord/robase"),
+          secretArn("kinkord/smile-id"),
+          secretArn("kinkord/didit-api-key"),
+          secretArn("kinkord/didit-webhook-secret"),
         ],
       }),
     );
@@ -117,6 +120,14 @@ export class ApiStack extends cdk.Stack {
               { name: "COOKIE_DOMAIN", value: ".kinkord.com" },
               { name: "EMAIL_FROM", value: "Kinkord <no-reply@kinkord.com>" },
               { name: "RUN_MIGRATIONS", value: "true" },
+              { name: "SMILE_ID_ENVIRONMENT", value: process.env.SMILE_ID_ENVIRONMENT ?? "sandbox" },
+              { name: "SMILE_ID_CALLBACK_URL", value: "https://api.kinkord.com/webhooks/smile-id" },
+              ...(process.env.SMILE_ID_POLICY_URL ? [{ name: "SMILE_ID_POLICY_URL", value: process.env.SMILE_ID_POLICY_URL }] : []),
+              ...(process.env.SMILE_ID_PARTNER_ID ? [{ name: "SMILE_ID_PARTNER_ID", value: process.env.SMILE_ID_PARTNER_ID }] : []),
+              ...(process.env.DIDIT_WORKFLOW_ID ? [{ name: "DIDIT_WORKFLOW_ID", value: process.env.DIDIT_WORKFLOW_ID }] : []),
+              ...(process.env.BRONZE_POLICY_URL ? [{ name: "BRONZE_POLICY_URL", value: process.env.BRONZE_POLICY_URL }] : []),
+              { name: "DIDIT_RETURN_URL", value: "https://kinkord.com/settings/verification/bronze" },
+              ...(process.env.BRONZE_REVIEWER_EMAILS ? [{ name: "BRONZE_REVIEWER_EMAILS", value: process.env.BRONZE_REVIEWER_EMAILS }] : []),
             ],
             // Full suffixed ARNs, resolved by the deploy script; falls back
             // to name-based ARNs which Secrets Manager also accepts.
@@ -145,6 +156,15 @@ export class ApiStack extends cdk.Stack {
                   process.env.ARN_ROBASE ??
                   `arn:aws:secretsmanager:${region}:${account}:secret:kinkord/robase`,
               },
+              ...(process.env.ARN_SMILE_ID_API_KEY ? [{
+                name: "SMILE_ID_API_KEY", value: process.env.ARN_SMILE_ID_API_KEY,
+              }] : []),
+              ...(process.env.ARN_DIDIT_API_KEY ? [{
+                name: "DIDIT_API_KEY", value: process.env.ARN_DIDIT_API_KEY,
+              }] : []),
+              ...(process.env.ARN_DIDIT_WEBHOOK_SECRET ? [{
+                name: "DIDIT_WEBHOOK_SECRET", value: process.env.ARN_DIDIT_WEBHOOK_SECRET,
+              }] : []),
             ],
           },
         },

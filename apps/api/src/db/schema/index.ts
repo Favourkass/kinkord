@@ -5,4 +5,5 @@ export * from "./auth";
 export * from "./profile";
 export * from "./profile-media";
 export * from "./follow";
+export * from "./bronze-verification";
 export * from "./otp";

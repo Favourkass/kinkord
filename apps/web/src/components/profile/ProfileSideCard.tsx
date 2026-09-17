@@ -85,6 +85,7 @@ export default function ProfileSideCard({
               <span className="text-[15px] leading-[18px] text-pf-muted">{vm.handle}</span>
             )}
           </p>
+          {vm.verification.level === "bronze" ? <span className="self-start rounded-full border border-kink-gold-bright px-3 py-1 text-xs font-bold text-kink-gold-bright">Bronze Verified ✓</span> : null}
           {presenceText && (
             <p className="text-[13px] leading-[16px] text-pf-muted">{presenceText}</p>
           )}
