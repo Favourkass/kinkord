@@ -158,24 +158,12 @@ describe("FollowsService.followers / following", () => {
         ]),
       )
       .mockReturnValueOnce(chain([{ c: 7 }]));
-    const page = await new FollowsService(db).followers("u2", "me", 20, 0);
+        const page = await new FollowsService(db).followers("u2", "me", 20, 0);
     expect(page).toEqual({
       items: [
-        {
-          userId: "u3",
-          username: "kay",
-          displayName: "Kay",
-          avatarUrl: "https://s3/avatars/kay.jpg",
-          age: null,
-          gender: null,
-          city: null,
-          state: null,
-          isFollowing: false,
-        },
+        { userId: "u3", username: "kay", displayName: "Kay", avatarKey: null, isFollowing: false },
       ],
-      total: 1,
-      page: 2,
-      limit: 10,
+      total: 7,
     });
   });
 
