@@ -40,4 +40,8 @@ export const Routes = {
   memberPeople: (username: string, tab: string) =>
     `/u/${encodeURIComponent(username.replace(/^@/, ""))}/people?tab=${encodeURIComponent(tab)}`,
   notifications: "/notifications",
+  /** One post on its own — what Share hands out. */
+  post: (id: string) => `/p/${encodeURIComponent(id)}`,
+  /** The viewer's saved posts. */
+  saved: "/saved",
 } as const;

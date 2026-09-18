@@ -1,4 +1,4 @@
-import { FEED_COPY } from "@/constants/feed";
+import { FEED_COPY, POST_CARD_LABELS } from "@/constants/feed";
 import { MEMBERS_COPY } from "@/constants/members";
 import { COMMENT_BODY_MAX } from "@/domain/post";
 import type { useFeedPresenter } from "./useFeedPresenter";
@@ -19,19 +19,7 @@ export function getProfilePosts(feed: Feed, viewerAvatarUrl: string | null) {
   return {
     posts: {
       posts: feed.posts,
-      labels: {
-        like: FEED_COPY.like,
-        unlike: FEED_COPY.unlike,
-        comment: FEED_COPY.comment,
-        repost: FEED_COPY.repost,
-        save: FEED_COPY.save,
-        share: FEED_COPY.share,
-        comingSoon: FEED_COPY.comingSoon,
-        more: FEED_COPY.more,
-        less: FEED_COPY.less,
-        menu: FEED_COPY.postMenu,
-        delete: FEED_COPY.deletePost,
-      },
+      labels: POST_CARD_LABELS,
       loading: feed.loading,
       loadingText: copy.loading,
       emptyText: copy.empty,
@@ -41,7 +29,10 @@ export function getProfilePosts(feed: Feed, viewerAvatarUrl: string | null) {
       onAskDelete: feed.askDelete,
       onToggleBody: feed.toggleExpanded,
       onLike: feed.toggleLike,
+      onRepost: feed.toggleRepost,
       onComment: feed.openComments,
+      onSave: feed.toggleSave,
+      onShare: feed.share,
       onOpenMedia: feed.openMedia,
       hasMore: feed.hasMore,
       loadingMore: feed.loadingMore,
@@ -90,6 +81,7 @@ export function getProfilePosts(feed: Feed, viewerAvatarUrl: string | null) {
         onClose: feed.closeMedia,
         closeLabel: FEED_COPY.composerCancel,
       },
+      toast: { message: feed.shareNote, onDismiss: feed.dismissShareNote },
     },
   };
 }

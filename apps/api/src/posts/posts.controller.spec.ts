@@ -10,6 +10,9 @@ const postsService = () => ({
   byId: vi.fn(async () => ({ id: ID })),
   remove: vi.fn(async () => ({ deleted: ID })),
   presignMediaUpload: vi.fn(async () => ({ key: `posts/u1/${ID}.jpg` })),
+  repost: vi.fn(async () => ({ postId: ID, reposts: 1, repostedByMe: true })),
+  unrepost: vi.fn(async () => ({ postId: ID, reposts: 0, repostedByMe: false })),
+  savedFeed: vi.fn(async () => ({ items: [], nextCursor: null })),
 });
 
 const interactions = () => ({
@@ -18,6 +21,8 @@ const interactions = () => ({
   comments: vi.fn(async () => ({ items: [], total: 0, nextCursor: null })),
   comment: vi.fn(async () => ({ id: ID })),
   removeComment: vi.fn(async () => ({ deleted: ID })),
+  save: vi.fn(async () => ({ postId: ID, savedByMe: true })),
+  unsave: vi.fn(async () => ({ postId: ID, savedByMe: false })),
 });
 
 const controller = (posts = postsService(), inter = interactions()) =>
@@ -86,6 +91,33 @@ describe("PostsController", () => {
 
   it("rejects an empty comment", () => {
     expect(() => controller().comment(req("u1"), ID, { body: "   " })).toThrow();
+  });
+
+  it("reposts and un-reposts as the caller", async () => {
+    const inter = interactions();
+    const p = postsService();
+    await controller(p, inter).repost(req("u1"), ID);
+    await controller(p, inter).unrepost(req("u1"), ID);
+
+    expect(p.repost).toHaveBeenCalledWith(ID, "u1");
+    expect(p.unrepost).toHaveBeenCalledWith(ID, "u1");
+  });
+
+  it("saves and unsaves as the caller", async () => {
+    const inter = interactions();
+    await controller(postsService(), inter).save(req("u1"), ID);
+    await controller(postsService(), inter).unsave(req("u1"), ID);
+
+    expect(inter.save).toHaveBeenCalledWith(ID, "u1");
+    expect(inter.unsave).toHaveBeenCalledWith(ID, "u1");
+  });
+
+  it('reads the saved list as the caller — "saved" is a route, not a post id', async () => {
+    const p = postsService();
+    await controller(p).saved(req("u1"), { limit: "5" });
+
+    expect(p.savedFeed).toHaveBeenCalledWith("u1", { cursor: undefined, limit: 5 });
+    expect(p.byId).not.toHaveBeenCalled();
   });
 
   it("presigns an upload for the caller's own prefix", async () => {

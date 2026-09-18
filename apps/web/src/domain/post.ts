@@ -24,7 +24,10 @@ export interface PostMediaPM {
 }
 
 export interface PostPM {
+  /** The row in the feed — a repost has its own id, and a delete removes that. */
   id: string;
+  /** The post the content belongs to; every reaction targets this. */
+  postId: string;
   body: string | null;
   visibility: PostVisibility;
   createdAt: string;
@@ -32,7 +35,12 @@ export interface PostPM {
   media: PostMediaPM[];
   likes: number;
   comments: number;
+  reposts: number;
   likedByMe: boolean;
+  repostedByMe: boolean;
+  savedByMe: boolean;
+  /** Set when this row is somebody's repost of the post above. */
+  repostedBy: Pick<PostAuthorPM, "userId" | "username" | "displayName"> | null;
   mine: boolean;
 }
 
@@ -62,6 +70,17 @@ export interface LikePM {
   likedByMe: boolean;
 }
 
+export interface RepostPM {
+  postId: string;
+  reposts: number;
+  repostedByMe: boolean;
+}
+
+export interface SavePM {
+  postId: string;
+  savedByMe: boolean;
+}
+
 /** Matches the API's POST_BODY_MAX / COMMENT_BODY_MAX. */
 export const POST_BODY_MAX = 2000;
 export const COMMENT_BODY_MAX = 1000;
@@ -84,6 +103,10 @@ export interface PostMediaVM {
 
 export interface PostVM {
   id: string;
+  /** What a reaction acts on: the original when this row is a repost. */
+  postId: string;
+  /** "Favour reposted" line above the card; null on an ordinary post. */
+  repostedByName: string | null;
   authorName: string;
   handle: string | null;
   /** Link to the author's profile, or null for a member with no username yet. */
@@ -98,7 +121,10 @@ export interface PostVM {
   media: PostMediaVM[];
   likes: string;
   comments: string;
+  reposts: string;
   likedByMe: boolean;
+  repostedByMe: boolean;
+  savedByMe: boolean;
   mine: boolean;
   /** Friends-only posts say so, so nobody is surprised by who can read them. */
   visibilityNote: string | null;
@@ -164,6 +190,8 @@ export function toPostVM(
   const canExpand = needsClamp(pm.body);
   return {
     id: pm.id,
+    postId: pm.postId,
+    repostedByName: pm.repostedBy?.displayName ?? null,
     authorName: pm.author.displayName,
     handle: handleOf(pm.author.username),
     authorHref: hrefFor(pm.author.username),
@@ -181,7 +209,10 @@ export function toPostVM(
     })),
     likes: compactNumber(pm.likes),
     comments: compactNumber(pm.comments),
+    reposts: compactNumber(pm.reposts),
     likedByMe: pm.likedByMe,
+    repostedByMe: pm.repostedByMe,
+    savedByMe: pm.savedByMe,
     mine: pm.mine,
     visibilityNote: pm.visibility === "friends" ? "Friends only" : null,
   };

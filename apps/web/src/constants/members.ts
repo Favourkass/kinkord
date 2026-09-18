@@ -179,6 +179,7 @@ export const MEMBERS_COPY = {
     notifications: "Notifications",
     profile: "Profile",
     settings: "Settings and Privacy",
+    saved: "Saved",
     logout: "Log Out",
   },
   notifications: {

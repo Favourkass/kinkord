@@ -208,6 +208,7 @@ describe("PostsService.byId", () => {
     visibility: "public" as const,
     createdAt: new Date("2026-09-18T09:00:00.000Z"),
     authorId: "u2",
+    repostOfId: null,
     username: "tega",
     displayName: "Sir T",
     avatarKey: "avatars/u2/a.jpg",
@@ -217,23 +218,44 @@ describe("PostsService.byId", () => {
     await expect(service(makeDb([[]])).byId("p1", "u1")).resolves.toBeNull();
   });
 
-  it("carries the counts, the viewer's own like, and a small avatar", async () => {
+  /** decorate() reads, in order: media, likes, comments, reposts, liked, reposted, saved. */
+  const decorated = (over: Partial<Record<string, unknown[]>> = {}) => [
+    over.media ?? [],
+    over.likes ?? [],
+    over.comments ?? [],
+    over.reposts ?? [],
+    over.liked ?? [],
+    over.reposted ?? [],
+    over.saved ?? [],
+  ];
+
+  it("carries the counts, the viewer's own reactions, and a small avatar", async () => {
     const storage = makeStorage();
     const db = makeDb([
       [row],
-      [{ id: "m1", postId: "p1", kind: "image", key: "posts/u2/a.jpg", position: 0 }],
-      [{ postId: "p1", n: 3 }],
-      [{ postId: "p1", n: 2 }],
-      [{ postId: "p1" }],
+      ...decorated({
+        media: [{ id: "m1", postId: "p1", kind: "image", key: "posts/u2/a.jpg", position: 0 }],
+        likes: [{ postId: "p1", n: 3 }],
+        comments: [{ postId: "p1", n: 2 }],
+        reposts: [{ postId: "p1", n: 9 }],
+        liked: [{ postId: "p1" }],
+        reposted: [{ postId: "p1" }],
+        saved: [{ postId: "p1" }],
+      }),
     ]);
 
     const vm = await service(db, storage).byId("p1", "u1");
 
     expect(vm).toMatchObject({
       id: "p1",
+      postId: "p1",
       likes: 3,
       comments: 2,
+      reposts: 9,
       likedByMe: true,
+      repostedByMe: true,
+      savedByMe: true,
+      repostedBy: null,
       mine: false,
       author: { username: "tega", displayName: "Sir T" },
     });
@@ -242,10 +264,48 @@ describe("PostsService.byId", () => {
   });
 
   it("marks a member's own post so the delete menu can appear", async () => {
-    const db = makeDb([[{ ...row, authorId: "u1" }], [], [], [], []]);
+    const db = makeDb([[{ ...row, authorId: "u1" }], ...decorated()]);
     const vm = await service(db).byId("p1", "u1");
     expect(vm?.mine).toBe(true);
     expect(vm?.likedByMe).toBe(false);
+    expect(vm?.savedByMe).toBe(false);
+  });
+
+  it("shows a repost as the post it points at, credited to whoever reposted it", async () => {
+    const repostRow = {
+      ...row,
+      id: "r1",
+      body: null,
+      authorId: "u1",
+      repostOfId: "p1",
+      username: "favour",
+      displayName: "Favour",
+      avatarKey: null,
+    };
+    const db = makeDb([
+      [repostRow],
+      // originalsById
+      [row],
+      ...decorated({ likes: [{ postId: "p1", n: 4 }] }),
+    ]);
+
+    const vm = await service(db).byId("r1", "u1");
+
+    // The row is the repost (delete removes that), the content is the original.
+    expect(vm?.id).toBe("r1");
+    expect(vm?.postId).toBe("p1");
+    expect(vm?.body).toBe("hello");
+    expect(vm?.author.displayName).toBe("Sir T");
+    expect(vm?.repostedBy).toEqual({ userId: "u1", username: "favour", displayName: "Favour" });
+    expect(vm?.likes).toBe(4);
+    expect(vm?.mine).toBe(true);
+  });
+
+  it("drops a repost whose original has been deleted rather than showing a hole", async () => {
+    const repostRow = { ...row, id: "r1", body: null, authorId: "u1", repostOfId: "gone" };
+    // originalsById finds nothing: the original is deleted or no longer public.
+    const db = makeDb([[repostRow], []]);
+    await expect(service(db).byId("r1", "u1")).resolves.toBeNull();
   });
 });
 
@@ -271,6 +331,21 @@ describe("the feed's visibility rules", () => {
     expect(sql).toContain('"viewer_follows_author"."follower_id" is not null');
     expect(sql).toContain('"author_follows_viewer"."follower_id" is not null');
     expect(params.slice(0, 3)).toEqual(["public", "viewer-1", "friends"]);
+  });
+
+  it("narrows a profile's Posts tab to that member's own rows", async () => {
+    // A member's Posts tab must show what they wrote and what they reposted —
+    // never a post of somebody else's that they only liked or commented on.
+    // A repost row carries the reposter as its author, so one filter covers both.
+    const wheres: SQL[] = [];
+    const svc = new PostsService(makeRecordingDb(wheres) as never, makeStorage() as never);
+    vi.spyOn(svc as never, "resolveAuthor").mockResolvedValue("u2" as never);
+
+    await svc.feed("viewer-1", { author: "tega" });
+    const { sql, params } = new PgDialect().sqlToQuery(wheres[0]);
+
+    expect(sql).toContain('"post"."author_id" = $4');
+    expect(params[3]).toBe("u2");
   });
 
   it("pages by timestamp so a post arriving mid-scroll cannot shift the page", async () => {
@@ -329,5 +404,108 @@ describe("post counts and post media carry the same rule", () => {
       total: 0,
     });
     expect(db.select).not.toHaveBeenCalled();
+  });
+});
+
+describe("PostsService.repost", () => {
+  const publicVm = { postId: "p1", visibility: "public", author: { userId: "u2" } };
+
+  /** `repost` resolves its target through `byId`, which is stubbed here. */
+  const withTarget = (vm: unknown, results: unknown[][] = []) => {
+    const svc = service(makeDb(results), makeStorage());
+    vi.spyOn(svc, "byId").mockResolvedValue(vm as never);
+    return svc;
+  };
+
+  it("refuses to lift a friends-only post into a stranger's feed", async () => {
+    const svc = withTarget({ ...publicVm, visibility: "friends" });
+    await expect(svc.repost("p1", "u1")).rejects.toThrow(/cannot be reposted/);
+  });
+
+  it("is a 404 for a post the viewer cannot see", async () => {
+    const svc = withTarget(null);
+    await expect(svc.repost("p1", "u1")).rejects.toThrow(/not found/i);
+  });
+
+  it("points a repost of a repost at the original, so no chain forms", async () => {
+    // byId on a repost answers with the original's postId.
+    const db = makeDb([[], [{ n: 1 }], [{ id: "r2" }]]);
+    const svc = service(db, makeStorage());
+    vi.spyOn(svc, "byId").mockResolvedValue({
+      ...publicVm,
+      id: "r1",
+      postId: "p1",
+    } as never);
+
+    const result = await svc.repost("r1", "u1");
+
+    const values = db.insert.mock.results[0];
+    expect(values).toBeDefined();
+    expect(result).toEqual({ postId: "p1", reposts: 1, repostedByMe: true });
+  });
+
+  it("answers with the fresh count after an un-repost", async () => {
+    const db = makeDb([[], [{ n: 0 }], []]);
+    const svc = service(db, makeStorage());
+    vi.spyOn(svc, "byId").mockResolvedValue(publicVm as never);
+
+    await expect(svc.unrepost("p1", "u1")).resolves.toEqual({
+      postId: "p1",
+      reposts: 0,
+      repostedByMe: false,
+    });
+    expect(db.update).toHaveBeenCalled();
+  });
+});
+
+describe("PostsService.savedFeed", () => {
+  it("is empty rather than an error when nothing is saved", async () => {
+    await expect(service(makeDb([[]])).savedFeed("u1")).resolves.toEqual({
+      items: [],
+      nextCursor: null,
+    });
+  });
+
+  it("keeps the order the posts were saved in, newest save first", async () => {
+    const mk = (id: string) => ({
+      id,
+      body: id,
+      visibility: "public" as const,
+      createdAt: new Date("2026-09-18T09:00:00.000Z"),
+      authorId: "u2",
+      repostOfId: null,
+      username: "tega",
+      displayName: "Sir T",
+      avatarKey: null,
+    });
+    const db = makeDb([
+      [
+        { postId: "p2", createdAt: new Date("2026-09-18T12:00:00.000Z") },
+        { postId: "p1", createdAt: new Date("2026-09-18T11:00:00.000Z") },
+      ],
+      // selectPosts answers newest-post-first, which is not the save order.
+      [mk("p1"), mk("p2")],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+    ]);
+
+    const page = await service(db).savedFeed("u1");
+
+    expect(page.items.map((i) => i.id)).toEqual(["p2", "p1"]);
+    expect(page.nextCursor).toBeNull();
+  });
+
+  it("silently drops a saved post that is no longer visible", async () => {
+    const db = makeDb([
+      [{ postId: "p1", createdAt: new Date("2026-09-18T12:00:00.000Z") }],
+      // The feed query returns nothing for it: deleted, or the friendship ended.
+      [],
+    ]);
+    await expect(service(db).savedFeed("u1")).resolves.toEqual({ items: [], nextCursor: null });
   });
 });

@@ -11,6 +11,8 @@ import {
   type LikePM,
   type PostPM,
   type PostVisibility,
+  type RepostPM,
+  type SavePM,
 } from "@/domain/post";
 import { IMAGE_VARIANTS, buildUploadSet, type ImageVariant } from "@/util/image";
 import { api, uploadToPresignedUrl } from "./apiClient";
@@ -60,9 +62,21 @@ export const postsApi = {
       visibility: input.visibility,
       media: input.mediaKeys.map((key) => ({ key, kind: "image" as const })),
     }),
+  byId: (id: string) => api.get<PostPM>(`/posts/${encodeURIComponent(id)}`),
   remove: (id: string) => api.del<{ deleted: string }>(`/posts/${encodeURIComponent(id)}`),
   like: (id: string) => api.post<LikePM>(`/posts/${encodeURIComponent(id)}/like`, {}),
   unlike: (id: string) => api.del<LikePM>(`/posts/${encodeURIComponent(id)}/like`),
+  repost: (id: string) => api.post<RepostPM>(`/posts/${encodeURIComponent(id)}/repost`, {}),
+  unrepost: (id: string) => api.del<RepostPM>(`/posts/${encodeURIComponent(id)}/repost`),
+  save: (id: string) => api.post<SavePM>(`/posts/${encodeURIComponent(id)}/save`, {}),
+  unsave: (id: string) => api.del<SavePM>(`/posts/${encodeURIComponent(id)}/save`),
+  saved: (cursor?: string | null, limit?: number) => {
+    const qs = new URLSearchParams();
+    if (cursor) qs.set("cursor", cursor);
+    if (limit) qs.set("limit", String(limit));
+    const q = qs.toString();
+    return api.get<FeedPM>(`/posts/saved${q ? `?${q}` : ""}`);
+  },
   comments: (id: string, cursor?: string | null, limit?: number) => {
     const qs = new URLSearchParams();
     if (cursor) qs.set("cursor", cursor);
@@ -108,9 +122,44 @@ export function toggleLikeOnPost(pm: PostPM): PostPM {
   };
 }
 
-/** Applies the server's answer, which is authoritative over the optimistic flip. */
+export function toggleRepostOnPost(pm: PostPM): PostPM {
+  return {
+    ...pm,
+    repostedByMe: !pm.repostedByMe,
+    reposts: pm.repostedByMe ? Math.max(0, pm.reposts - 1) : pm.reposts + 1,
+  };
+}
+
+export function toggleSaveOnPost(pm: PostPM): PostPM {
+  return { ...pm, savedByMe: !pm.savedByMe };
+}
+
+/**
+ * Applies a server answer to every row showing that post. A post and any number
+ * of reposts of it can sit in one feed, and they must not disagree about how
+ * many likes it has.
+ */
 export function applyLike(pm: PostPM, like: LikePM): PostPM {
-  return pm.id === like.postId ? { ...pm, likes: like.likes, likedByMe: like.likedByMe } : pm;
+  return pm.postId === like.postId ? { ...pm, likes: like.likes, likedByMe: like.likedByMe } : pm;
+}
+
+export function applyRepost(pm: PostPM, result: RepostPM): PostPM {
+  return pm.postId === result.postId
+    ? { ...pm, reposts: result.reposts, repostedByMe: result.repostedByMe }
+    : pm;
+}
+
+export function applySave(pm: PostPM, result: SavePM): PostPM {
+  return pm.postId === result.postId ? { ...pm, savedByMe: result.savedByMe } : pm;
+}
+
+/** Every row showing this post, by the post it points at rather than by row id. */
+export function applyToContent(
+  items: PostPM[],
+  postId: string,
+  fn: (pm: PostPM) => PostPM,
+): PostPM[] {
+  return items.map((p) => (p.postId === postId ? fn(p) : p));
 }
 
 export function replacePost(items: PostPM[], next: PostPM): PostPM[] {
@@ -138,6 +187,16 @@ export function remainingPhotoSlots(current: number): number {
 
 export function toggleFollowOnSuggestion(pm: SuggestedPersonPM): SuggestedPersonPM {
   return { ...pm, isFollowing: !pm.isFollowing };
+}
+
+/**
+ * Where a post lives on its own. Built from the site origin so a shared link
+ * works from any environment, and left to the caller in SSR where there is no
+ * window to read.
+ */
+export function postPermalink(postId: string, origin?: string): string {
+  const base = origin ?? (typeof window === "undefined" ? "" : window.location.origin);
+  return `${base}/p/${encodeURIComponent(postId)}`;
 }
 
 /** Bumps a post's comment count after one is added or removed. */

@@ -2,6 +2,7 @@ import type { AppNavLabels, AppNavLinks, AppTab } from "@/components/app/nav";
 import CommentsPanel, { type CommentsPanelProps } from "@/components/feed/CommentsPanel";
 import ConfirmDialog, { type ConfirmDialogProps } from "@/components/feed/ConfirmDialog";
 import MediaLightbox, { type MediaLightboxProps } from "@/components/feed/MediaLightbox";
+import Toast, { type ToastProps } from "@/components/feed/Toast";
 import type { PublicProfileVM } from "@/domain/member";
 import AboutTab, { type AboutLabels } from "./AboutTab";
 import MediaTab, { type MediaTabProps } from "./MediaTab";
@@ -41,6 +42,7 @@ export interface ProfileScreenProps {
     comments: CommentsPanelProps;
     confirm: ConfirmDialogProps;
     lightbox: MediaLightboxProps;
+    toast: ToastProps;
   };
   media: MediaTabProps;
   suggested: SuggestedFriendsProps;
@@ -102,6 +104,7 @@ export default function ProfileScreen(p: ProfileScreenProps) {
       <CommentsPanel {...p.postOverlays.comments} />
       <ConfirmDialog {...p.postOverlays.confirm} />
       <MediaLightbox {...p.postOverlays.lightbox} />
+      <Toast {...p.postOverlays.toast} />
     </>
   );
 }
