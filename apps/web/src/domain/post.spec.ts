@@ -114,6 +114,28 @@ describe("toPostVM", () => {
     expect(vm.media[0].src).toBe("full1");
   });
 
+  it("marks a repost row so its menu cannot offer to delete somebody else's post", () => {
+    // The card shows the original author's words; only the repost is the
+    // viewer's to remove.
+    const repost = toPostVM(
+      post({
+        id: "r1",
+        postId: "p1",
+        repostedBy: { userId: "u1", username: "favour", displayName: "Favour" },
+        mine: true,
+      }),
+      false,
+      href,
+      NOW,
+    );
+    expect(repost.isRepost).toBe(true);
+    expect(repost.repostedByName).toBe("Favour");
+    // The content still belongs to its author.
+    expect(repost.authorName).toBe("Sir T");
+
+    expect(toPostVM(post(), false, href, NOW).isRepost).toBe(false);
+  });
+
   it("says so on a friends-only post, so nobody misjudges the audience", () => {
     expect(toPostVM(post({ visibility: "friends" }), false, href, NOW).visibilityNote).toBe(
       "Friends only",

@@ -415,6 +415,38 @@ describe("deleting a post", () => {
     expect(result.current.posts).toHaveLength(0);
   });
 
+  it("calls an un-repost an un-repost, not a delete", async () => {
+    // A repost shows somebody else's words. Offering to "delete this post"
+    // there reads as destroying their post, which it never does.
+    feed.mockResolvedValue({
+      items: [
+        pm({
+          id: "r1",
+          postId: "p1",
+          mine: true,
+          repostedBy: { userId: "me", username: "favour", displayName: "Favour" },
+        }),
+      ],
+      nextCursor: null,
+    });
+    const { result } = await loaded();
+    expect(result.current.posts[0].isRepost).toBe(true);
+
+    act(() => result.current.askDelete("r1"));
+    expect(result.current.confirmDeleteIsRepost).toBe(true);
+
+    // And the row that is removed is the repost, not the post it points at.
+    await act(async () => result.current.confirmDeletePost());
+    expect(removePost).toHaveBeenCalledWith("r1");
+  });
+
+  it("still calls deleting your own post a delete", async () => {
+    feed.mockResolvedValue({ items: [pm({ mine: true })], nextCursor: null });
+    const { result } = await loaded();
+    act(() => result.current.askDelete("p1"));
+    expect(result.current.confirmDeleteIsRepost).toBe(false);
+  });
+
   it("leaves the post alone when the member backs out", async () => {
     const { result } = await loaded();
     act(() => result.current.askDelete("p1"));
