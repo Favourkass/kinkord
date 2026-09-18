@@ -458,6 +458,10 @@ describe("MembersService people tabs + media (profile rebuild, 2026-09-12)", () 
       username: "ada",
       displayName: "Ada",
       avatarUrl: "https://s3/avatars/u5/a.jpg",
+      age: null,
+      gender: null,
+      city: null,
+      state: null,
       isFollowing: false,
     });
     const { params } = renderWhere(wheres[0]);
