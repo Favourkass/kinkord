@@ -273,6 +273,10 @@ export class MembersService {
         username: user.username,
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
+        dateOfBirth: profile.dateOfBirth,
+        gender: profile.gender,
+        city: profile.city,
+        state: profile.state,
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
       })
       .from(profile)
@@ -367,8 +371,12 @@ export class MembersService {
         userId: r.userId,
         username: r.username,
         displayName: r.displayName,
-        // Friend rows are 48px circles — the small size is ~8KB.
         avatarUrl: r.avatarKey ? await this.storage.presignDownload(r.avatarKey, "sm") : null,
+        // Same rule as the directory cards: age is derived, the birth date never leaves the API.
+        age: ageFromDob(r.dateOfBirth),
+        gender: r.gender,
+        city: r.city,
+        state: r.state,
         isFollowing: r.isFollowing,
       })),
     );

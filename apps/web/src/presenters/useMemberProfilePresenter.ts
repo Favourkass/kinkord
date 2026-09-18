@@ -22,6 +22,7 @@ import {
   type FriendsTab,
   type MediaFilter,
 } from "@/services/members.service";
+import { genderInitial, displayState } from "@/util/format";
 
 export type ProfileTabKey = "posts" | "about" | "media" | "people";
 
@@ -305,6 +306,9 @@ export function useMemberProfilePresenter(
     displayName: f.displayName,
     handle: f.username ? `@${f.username}` : null,
     avatarUrl: f.avatarUrl,
+    // Mirrors toMemberCardVM: "25F" and "Abraka, Delta State".
+    ageTag: f.age === null ? null : `${f.age}${genderInitial(f.gender)}`,
+    location: [f.city, displayState(f.state)].filter(Boolean).join(", ") || null,
     isFollowing: f.isFollowing,
     busy: rowBusy.has(f.userId),
   });

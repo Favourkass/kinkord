@@ -333,8 +333,13 @@ export interface FriendRowVM {
   userId: string;
   username: string | null;
   displayName: string;
+  /** Still used by the Suggested Friends column; no longer rendered in the People tab. */
   handle: string | null;
   avatarUrl: string | null;
+  /** "25F" — age + gender initial, same format as the directory cards. */
+  ageTag: string | null;
+  /** "Abraka, Delta State" — null when neither city nor state is set. */
+  location: string | null;
   isFollowing: boolean;
   busy: boolean;
 }

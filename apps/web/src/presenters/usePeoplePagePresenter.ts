@@ -14,6 +14,7 @@ import {
   type FriendPM,
   type FriendsTab,
 } from "@/services/members.service";
+import { displayState, genderInitial } from "@/util/format";
 
 const PAGE = 30;
 const TABS: FriendsTab[] = ["all", "followers", "following", "suggested"];
@@ -155,6 +156,9 @@ export function usePeoplePagePresenter(usernameParam: string, tabParam?: string 
     displayName: f.displayName,
     handle: f.username ? `@${f.username}` : null,
     avatarUrl: f.avatarUrl,
+    // Mirrors toMemberCardVM in domain/member.ts: "25F" plus "Abraka, Delta State".
+    ageTag: f.age === null ? null : `${f.age}${genderInitial(f.gender)}`,
+    location: [f.city, displayState(f.state)].filter(Boolean).join(", ") || null,
     isFollowing: f.isFollowing,
     busy: busy.has(f.userId),
     href: Routes.member(f.username ?? f.userId),

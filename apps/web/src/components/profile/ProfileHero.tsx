@@ -60,20 +60,20 @@ export default function ProfileHero({
         </div>
         <div className="absolute left-[20px] top-[114px] size-[110px]">
           <span aria-hidden className="absolute inset-0 rounded-full bg-pf-surface" />
-            {vm.avatarUrl ? (
-              <ExpandableAvatar
-                src={vm.avatarUrl}
-                alt={vm.displayName}
-                fetchPriority="high"
-                closeLabel="Close"
-                wrapperClassName="absolute left-[5px] top-[8px] size-[100px]"
-                className="size-[100px]"
-              />
-            ) : (
-              <span className="absolute left-[5px] top-[8px] grid size-[100px] place-items-center rounded-full bg-pf-surface-2 text-pf-muted">
-                <MaskIcon name="people" width={40} />
-              </span>
-            )}
+          {vm.avatarUrl ? (
+            <ExpandableAvatar
+              src={vm.avatarUrl}
+              alt={vm.displayName}
+              fetchPriority="high"
+              closeLabel="Close"
+              wrapperClassName="absolute left-[5px] top-[8px] size-[100px]"
+              className="size-[100px]"
+            />
+          ) : (
+            <span className="absolute left-[5px] top-[8px] grid size-[100px] place-items-center rounded-full bg-pf-surface-2 text-pf-muted">
+              <MaskIcon name="people" width={40} />
+            </span>
+          )}
         </div>
         {presenceText && (
           <p className="absolute right-[16px] top-[188px] text-[12px] italic leading-[15px] text-pf-muted">
@@ -159,6 +159,7 @@ export default function ProfileHero({
               disabled
               title={labels.comingSoon}
               className="flex h-[36px] w-[64px] items-center justify-center rounded-[12px] border border-pf-border bg-pf-surface-2 text-[11px] font-bold text-pf-muted"
+              hidden
             >
               {labels.gift}
             </button>

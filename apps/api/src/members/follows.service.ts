@@ -17,6 +17,11 @@ export interface FriendRow {
   username: string | null;
   displayName: string;
   avatarKey: string | null;
+  /** Kept server-side; the members service derives `age` and never leaks the DOB. */
+  dateOfBirth: string | null;
+  gender: string | null;
+  city: string | null;
+  state: string | null;
   isFollowing: boolean;
 }
 
@@ -123,6 +128,12 @@ export class FollowsService {
         username: user.username,
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
+
+        dateOfBirth: profile.dateOfBirth,
+        gender: profile.gender,
+        city: profile.city,
+        state: profile.state,
+
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
       })
       .from(follow)
@@ -158,6 +169,10 @@ export class FollowsService {
         username: user.username,
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
+        dateOfBirth: profile.dateOfBirth,
+        gender: profile.gender,
+        city: profile.city,
+        state: profile.state,
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
       })
       .from(follow)
@@ -184,13 +199,19 @@ export class FollowsService {
   ): Promise<FriendsPage> {
     const viewerFollow = alias(follow, "viewer_follow");
     const rows = await this.db
+
       .select({
         userId: user.id,
         username: user.username,
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
+        dateOfBirth: profile.dateOfBirth,
+        gender: profile.gender,
+        city: profile.city,
+        state: profile.state,
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
       })
+
       .from(follow)
       .innerJoin(user, eq(user.id, follow.followingId))
       .innerJoin(profile, eq(profile.userId, user.id))
@@ -223,6 +244,10 @@ export class FollowsService {
           username: user.username,
           displayName: profile.displayName,
           avatarKey: profile.avatarKey,
+          dateOfBirth: profile.dateOfBirth,
+          gender: profile.gender,
+          city: profile.city,
+          state: profile.state,
         })
         .from(follow)
         .innerJoin(
