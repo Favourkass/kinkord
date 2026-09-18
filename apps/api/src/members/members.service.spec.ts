@@ -524,3 +524,43 @@ describe("MembersService people tabs + media (profile rebuild, 2026-09-12)", () 
     expect(locked.areFriends).toHaveBeenCalledWith("me", "u2");
   });
 });
+
+describe("MembersService.suggestedForFeed", () => {
+  it("asks for the medium avatar — the feed card is a photo, not a 48px row", async () => {
+    const { service, select, presignDownload } = makeService();
+    // `suggested` reads the viewer's own profile, then the candidate rows, then a count.
+    select
+      .mockReturnValueOnce(chain([{ country: "NG", state: "Delta", city: "Abraka" }]))
+      .mockReturnValueOnce(
+        chain([
+          {
+            userId: "u3",
+            username: "kay",
+            displayName: "Kay",
+            avatarKey: "avatars/kay.jpg",
+            isFollowing: false,
+          },
+        ]),
+      )
+      .mockReturnValueOnce(chain([{ total: 1 }]));
+
+    const result = await service.suggestedForFeed("u1", 5);
+
+    expect(presignDownload).toHaveBeenCalledWith("avatars/kay.jpg", "md");
+    expect(result.items[0]).toEqual({
+      userId: "u3",
+      username: "kay",
+      displayName: "Kay",
+      avatarUrl: "https://s3/avatars/kay.jpg",
+      isFollowing: false,
+    });
+    expect(result.total).toBe(1);
+  });
+
+  it("is empty rather than an error for a member who has set no state yet", async () => {
+    const { service, select } = makeService();
+    select.mockReturnValueOnce(chain([{ country: "NG", state: null, city: null }]));
+
+    await expect(service.suggestedForFeed("u1")).resolves.toEqual({ items: [], total: 0 });
+  });
+});

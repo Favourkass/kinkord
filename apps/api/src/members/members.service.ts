@@ -293,6 +293,28 @@ export class MembersService {
   }
 
   /**
+   * "People you may know" on the home feed. Same rule as the profile Suggested
+   * tab — `suggested` already excludes the viewer — but the feed card shows a
+   * 221x191 photo rather than a 48px row, so it asks for the medium size.
+   */
+  async suggestedForFeed(viewerId: string, limitArg?: number) {
+    const { limit } = normalizePaging(1, limitArg ?? 10);
+    const { items, total } = await this.suggested(viewerId, viewerId, limit, 0);
+    return {
+      items: await Promise.all(
+        items.map(async (r) => ({
+          userId: r.userId,
+          username: r.username,
+          displayName: r.displayName,
+          avatarUrl: r.avatarKey ? await this.storage.presignDownload(r.avatarKey, "md") : null,
+          isFollowing: r.isFollowing,
+        })),
+      ),
+      total,
+    };
+  }
+
+  /**
    * Media tab: the member's uploaded profile photos and covers, newest first. Friends-only
    * profiles show nothing to non-friends. `isCurrent` marks the photo in use right now.
    */
