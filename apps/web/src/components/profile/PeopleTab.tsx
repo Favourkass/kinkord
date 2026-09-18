@@ -76,9 +76,9 @@ export default function PeopleTab(p: PeopleTabProps) {
                 <span className="truncate text-[13px] font-bold leading-[16px] text-pf-text">
                   {r.displayName}
                 </span>
-                {r.handle ? (
+                {r.ageTag || r.location ? (
                   <span className="truncate text-[11px] leading-[13px] text-pf-muted">
-                    {r.handle}
+                    {[r.ageTag, r.location].filter(Boolean).join(" · ")}
                   </span>
                 ) : null}
               </span>

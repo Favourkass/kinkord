@@ -4,7 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MEMBERS_COPY } from "@/constants/members";
 import { Routes } from "@/constants/Routes";
-import { toPublicProfileVM, type FriendRowVM, type PublicProfilePM } from "@/domain/member";
+import {
+  ageTagOf,
+  locationOf,
+  toPublicProfileVM,
+  type FriendRowVM,
+  type PublicProfilePM,
+} from "@/domain/member";
 import { ApiError } from "@/services/apiClient";
 import {
   decodeParam,
@@ -155,6 +161,8 @@ export function usePeoplePagePresenter(usernameParam: string, tabParam?: string 
     displayName: f.displayName,
     handle: f.username ? `@${f.username}` : null,
     avatarUrl: f.avatarUrl,
+    ageTag: ageTagOf(f.age, f.gender),
+    location: locationOf(f.city, f.state),
     isFollowing: f.isFollowing,
     busy: busy.has(f.userId),
     href: Routes.member(f.username ?? f.userId),

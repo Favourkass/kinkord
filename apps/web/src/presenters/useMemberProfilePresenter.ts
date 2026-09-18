@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { MEMBERS_COPY } from "@/constants/members";
 import { Routes } from "@/constants/Routes";
 import {
+  ageTagOf,
+  locationOf,
   toMediaTiles,
   toPublicProfileVM,
   type FriendRowVM,
@@ -305,6 +307,8 @@ export function useMemberProfilePresenter(
     displayName: f.displayName,
     handle: f.username ? `@${f.username}` : null,
     avatarUrl: f.avatarUrl,
+    ageTag: ageTagOf(f.age, f.gender),
+    location: locationOf(f.city, f.state),
     isFollowing: f.isFollowing,
     busy: rowBusy.has(f.userId),
   });
