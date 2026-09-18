@@ -655,6 +655,8 @@ export function useFeedPresenter({
     closeMenu,
     askDelete,
     confirmDelete,
+    /** The row waiting on a confirm is a repost, so the wording must say so. */
+    confirmDeleteIsRepost: posts.some((p) => p.id === confirmDelete && p.id !== p.postId),
     cancelDelete,
     confirmDeletePost,
     deleting,

@@ -55,6 +55,18 @@ function makeRecordingDb(wheres: SQL[]) {
   return { select: vi.fn(() => chain()) };
 }
 
+/** A one-off chainable that resolves to `rows`, for a hand-built db stub. */
+function chainOnce(rows: unknown[]): unknown {
+  const p: unknown = new Proxy(() => p, {
+    get: (_t, prop) =>
+      prop === "then"
+        ? (resolve: (v: unknown) => void) => Promise.resolve(rows).then(resolve)
+        : () => p,
+    apply: () => p,
+  });
+  return p;
+}
+
 function makeStorage() {
   return {
     presignUpload: vi.fn(async (key: string) => `https://s3.test/put/${key}`),
@@ -183,6 +195,27 @@ describe("PostsService.remove", () => {
   it("is a 404 for a post that is already gone", async () => {
     const db = makeDb([[{ authorId: "u1", deletedAt: new Date() }]]);
     await expect(service(db).remove("p1", "u1")).rejects.toThrow(/not found/i);
+  });
+
+  it("removing your repost touches your own row, never the post it points at", async () => {
+    // The card shows the original author's words, so the one thing this must
+    // not do is delete their post.
+    const storage = makeStorage();
+    const wheres: SQL[] = [];
+    const db = makeRecordingDb(wheres) as unknown as ReturnType<typeof makeDb>;
+    const repostRow = { authorId: "u1", deletedAt: null };
+    let call = 0;
+    db.select = vi.fn(() => {
+      call += 1;
+      return chainOnce(call === 1 ? [repostRow] : []);
+    }) as never;
+    db.update = vi.fn(() => chainOnce([])) as never;
+
+    await service(db, storage).remove("r1", "u1");
+
+    // Nothing was read or removed for the original post's media.
+    expect(storage.remove).not.toHaveBeenCalled();
+    expect(db.update).toHaveBeenCalledTimes(1);
   });
 
   it("soft-deletes the row and clears every stored size from the bucket", async () => {

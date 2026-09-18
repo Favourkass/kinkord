@@ -98,9 +98,12 @@ export default function PostCard({
                 <button
                   type="button"
                   onClick={onDelete}
-                  className="block w-full px-[14px] py-[10px] text-left text-[13px] font-medium text-[#e5484d]"
+                  className={`block w-full px-[14px] py-[10px] text-left text-[13px] font-medium ${
+                    // Undoing a repost is not destructive; only a delete is red.
+                    post.isRepost ? "text-feed-text" : "text-[#e5484d]"
+                  }`}
                 >
-                  {labels.delete}
+                  {post.isRepost ? labels.unrepost : labels.delete}
                 </button>
               </div>
             )}

@@ -131,8 +131,10 @@ export default function HomePage() {
       }}
       confirm={{
         open: feed.confirmDelete !== null,
-        message: FEED_COPY.deletePostConfirm,
-        confirmLabel: FEED_COPY.deletePost,
+        message: feed.confirmDeleteIsRepost
+          ? FEED_COPY.removeRepostConfirm
+          : FEED_COPY.deletePostConfirm,
+        confirmLabel: feed.confirmDeleteIsRepost ? FEED_COPY.removeRepost : FEED_COPY.deletePost,
         cancelLabel: FEED_COPY.composerCancel,
         busy: feed.deleting,
         onConfirm: feed.confirmDeletePost,

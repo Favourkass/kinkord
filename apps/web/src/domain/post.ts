@@ -107,6 +107,12 @@ export interface PostVM {
   postId: string;
   /** "Favour reposted" line above the card; null on an ordinary post. */
   repostedByName: string | null;
+  /**
+   * This row is a repost, not the post itself. The card shows somebody else's
+   * words, so its menu must offer to undo the repost — never to delete a post
+   * that is not the viewer's to delete.
+   */
+  isRepost: boolean;
   authorName: string;
   handle: string | null;
   /** Link to the author's profile, or null for a member with no username yet. */
@@ -192,6 +198,7 @@ export function toPostVM(
     id: pm.id,
     postId: pm.postId,
     repostedByName: pm.repostedBy?.displayName ?? null,
+    isRepost: pm.id !== pm.postId,
     authorName: pm.author.displayName,
     handle: handleOf(pm.author.username),
     authorHref: hrefFor(pm.author.username),
