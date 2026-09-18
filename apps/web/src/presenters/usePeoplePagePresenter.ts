@@ -4,7 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MEMBERS_COPY } from "@/constants/members";
 import { Routes } from "@/constants/Routes";
-import { toPublicProfileVM, type FriendRowVM, type PublicProfilePM } from "@/domain/member";
+import {
+  ageTagOf,
+  locationOf,
+  toPublicProfileVM,
+  type FriendRowVM,
+  type PublicProfilePM,
+} from "@/domain/member";
 import { ApiError } from "@/services/apiClient";
 import {
   decodeParam,
@@ -14,7 +20,6 @@ import {
   type FriendPM,
   type FriendsTab,
 } from "@/services/members.service";
-import { displayState, genderInitial } from "@/util/format";
 
 const PAGE = 30;
 const TABS: FriendsTab[] = ["all", "followers", "following", "suggested"];
@@ -156,9 +161,8 @@ export function usePeoplePagePresenter(usernameParam: string, tabParam?: string 
     displayName: f.displayName,
     handle: f.username ? `@${f.username}` : null,
     avatarUrl: f.avatarUrl,
-    // Mirrors toMemberCardVM in domain/member.ts: "25F" plus "Abraka, Delta State".
-    ageTag: f.age === null ? null : `${f.age}${genderInitial(f.gender)}`,
-    location: [f.city, displayState(f.state)].filter(Boolean).join(", ") || null,
+    ageTag: ageTagOf(f.age, f.gender),
+    location: locationOf(f.city, f.state),
     isFollowing: f.isFollowing,
     busy: busy.has(f.userId),
     href: Routes.member(f.username ?? f.userId),

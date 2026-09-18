@@ -67,6 +67,10 @@ const person = (n: number) => ({
   username: `kinkster${n}`,
   displayName: `Kinkster ${n}`,
   avatarUrl: null,
+  age: 25,
+  gender: "Female",
+  city: "Abraka",
+  state: "Delta",
   isFollowing: false,
 });
 
@@ -95,6 +99,9 @@ describe("usePeoplePagePresenter", () => {
     expect(result.current.people.rows[0]).toMatchObject({
       handle: "@kinkster1",
       href: "/u/kinkster1",
+      // The row's second line, formatted the same way the directory cards do it.
+      ageTag: "25F",
+      location: "Abraka, Delta State",
     });
     expect(result.current.hasMore).toBe(true);
 
@@ -124,5 +131,27 @@ describe("usePeoplePagePresenter", () => {
     apiGet.mockRejectedValue(new ApiError(404, {}));
     const missing = renderHook(() => usePeoplePagePresenter("ghost", null));
     await waitFor(() => expect(missing.result.current.error).toMatch(/couldn’t find/));
+  });
+});
+
+describe("usePeoplePagePresenter meta line", () => {
+  it("leaves the meta fields null for a member who set neither age nor place", async () => {
+    // The row must then render name-only rather than an empty second line.
+    apiGet.mockImplementation((path: string) => {
+      if (path.startsWith("/profiles/nene/friends")) {
+        return Promise.resolve({
+          items: [{ ...person(1), age: null, gender: null, city: null, state: null }],
+          total: 1,
+          page: 1,
+          limit: 30,
+        });
+      }
+      return Promise.resolve(profile);
+    });
+
+    const { result } = renderHook(() => usePeoplePagePresenter("nene", "followers"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.people.rows[0]).toMatchObject({ ageTag: null, location: null });
   });
 });

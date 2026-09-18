@@ -51,10 +51,26 @@ export interface MemberCardVM {
   isFollowing: boolean;
 }
 
+/**
+ * "25F" — age plus the gender initial, or just the initial when the age is
+ * unknown. Null when there is no age at all.
+ *
+ * Directory cards, the profile header and every People row read from this, so
+ * the same member is never labelled two different ways on two screens.
+ */
+export function ageTagOf(age: number | null, gender: string | null): string | null {
+  return age === null ? null : `${age}${genderInitial(gender)}`;
+}
+
+/** "Abraka, Delta State" — null when neither city nor state is set. */
+export function locationOf(city: string | null, state: string | null): string | null {
+  return [city, displayState(state)].filter(Boolean).join(", ") || null;
+}
+
 export function toMemberCardVM(pm: MemberCardPM): MemberCardVM {
-  const ageTag = pm.age === null ? null : `${pm.age}${genderInitial(pm.gender)}`;
+  const ageTag = ageTagOf(pm.age, pm.gender);
   const roles = pm.roles.length > 0 ? pm.roles.join(" | ") : null;
-  const location = [pm.city, displayState(pm.state)].filter(Boolean).join(", ") || null;
+  const location = locationOf(pm.city, pm.state);
   return {
     userId: pm.userId,
     username: pm.username,
@@ -240,7 +256,7 @@ export function toMediaTiles(items: MediaItemPM[]): MediaTileVM[] {
 }
 
 export function toPublicProfileVM(pm: PublicProfilePM, now = new Date()): PublicProfileVM {
-  const ageTag = pm.age === null ? "" : `${pm.age}${genderInitial(pm.gender)}`;
+  const ageTag = ageTagOf(pm.age, pm.gender) ?? "";
   const rolesTag = pm.roles.join(" | ");
   const tagLine = [ageTag, rolesTag].filter(Boolean).join(" · ") || null;
   const locationLine =

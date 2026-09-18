@@ -2,6 +2,7 @@ import Link from "next/link";
 import MaskIcon from "@/components/app/MaskIcon";
 import type { PublicProfileVM } from "@/domain/member";
 import ExpandableAvatar from "./ExpandableAvatar";
+
 export interface ProfileHeroLabels {
   follow: string;
   following: string;
@@ -159,7 +160,6 @@ export default function ProfileHero({
               disabled
               title={labels.comingSoon}
               className="flex h-[36px] w-[64px] items-center justify-center rounded-[12px] border border-pf-border bg-pf-surface-2 text-[11px] font-bold text-pf-muted"
-              hidden
             >
               {labels.gift}
             </button>

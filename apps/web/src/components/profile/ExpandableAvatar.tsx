@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 export interface ExpandableAvatarProps {
   src: string | null;
@@ -34,12 +34,25 @@ export default function ExpandableAvatar({
   const [open, setOpen] = useState(false);
   const layoutId = `avatar-${useId()}`;
   const reduced = useReducedMotion();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  /** Only pull focus back to the avatar if this viewer is what took it away. */
+  const tookFocus = useRef(false);
 
-  // Body scroll lock + Esc to close, active only while the lightbox is open.
+  // Body scroll lock, Esc to close, and Tab held inside, while the viewer is open.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") {
+        setOpen(false);
+        return;
+      }
+      // The dialog has exactly one control, so the trap is "stay on it". Without
+      // this, Tab walks into the page behind an `aria-modal` overlay.
+      if (e.key === "Tab") {
+        e.preventDefault();
+        closeRef.current?.focus();
+      }
     };
     document.addEventListener("keydown", onKey);
     const previous = document.body.style.overflow;
@@ -50,8 +63,27 @@ export default function ExpandableAvatar({
     };
   }, [open]);
 
+  /**
+   * The trigger unmounts while the viewer is open — that is what lets motion
+   * animate between the two rects — so focus would otherwise fall to <body> on
+   * open and stay there on close. Move it onto the close button, then back to
+   * the avatar once it has remounted.
+   */
+  useEffect(() => {
+    if (open) {
+      closeRef.current?.focus();
+      return;
+    }
+    if (tookFocus.current) {
+      triggerRef.current?.focus();
+      tookFocus.current = false;
+    }
+  }, [open]);
+
   const openViewer = useCallback(() => {
-    if (src) setOpen(true);
+    if (!src) return;
+    tookFocus.current = true;
+    setOpen(true);
   }, [src]);
 
   if (!src) return null;
@@ -66,6 +98,7 @@ export default function ExpandableAvatar({
       <div className={wrapperClassName}>
         {!open ? (
           <motion.button
+            ref={triggerRef}
             type="button"
             layoutId={layoutId}
             onClick={openViewer}
@@ -102,6 +135,7 @@ export default function ExpandableAvatar({
             className="fixed inset-0 z-[100] flex items-center justify-center"
           >
             <button
+              ref={closeRef}
               type="button"
               aria-label={closeLabel}
               onClick={() => setOpen(false)}
