@@ -36,6 +36,7 @@ const {
 
 const pm = (over: Partial<PostPM> = {}): PostPM => ({
   id: "p1",
+  postId: "p1",
   body: "hi",
   visibility: "public",
   createdAt: "2026-09-18T11:00:00.000Z",
@@ -43,7 +44,11 @@ const pm = (over: Partial<PostPM> = {}): PostPM => ({
   media: [],
   likes: 5,
   comments: 2,
+  reposts: 0,
   likedByMe: false,
+  repostedByMe: false,
+  savedByMe: false,
+  repostedBy: null,
   mine: false,
   ...over,
 });
@@ -95,9 +100,19 @@ describe("optimistic like", () => {
     expect(next.likes).toBe(41);
   });
 
-  it("leaves other posts alone", () => {
-    const other = pm({ id: "p2", likes: 1 });
+  it("leaves a different post alone", () => {
+    const other = pm({ id: "p2", postId: "p2", likes: 1 });
     expect(applyLike(other, { postId: "p1", likes: 99, likedByMe: true })).toBe(other);
+  });
+
+  it("updates a repost of the post too, so the two never disagree", () => {
+    // A post and a repost of it can sit in the same feed; both show its count.
+    const repost = pm({ id: "r1", postId: "p1", likes: 5 });
+    expect(applyLike(repost, { postId: "p1", likes: 6, likedByMe: true })).toMatchObject({
+      id: "r1",
+      likes: 6,
+      likedByMe: true,
+    });
   });
 });
 

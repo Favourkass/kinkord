@@ -5,62 +5,76 @@ export interface PostActionLabels {
   unlike: string;
   comment: string;
   repost: string;
+  unrepost: string;
   save: string;
+  unsave: string;
   share: string;
-  /** Announced on the controls that have no backend yet. */
-  comingSoon: string;
 }
 
 export interface PostActionsProps {
   likes: string;
   comments: string;
+  reposts: string;
   likedByMe: boolean;
+  repostedByMe: boolean;
+  savedByMe: boolean;
   onLike: () => void;
+  onRepost: () => void;
   onComment: () => void;
+  onSave: () => void;
+  onShare: () => void;
   labels: PostActionLabels;
 }
 
 const ICON = 24;
 
-/**
- * The action row from the Figma card (831:136…831:166): like · repost · comment,
- * then save and share pushed right.
- *
- * Repost, save and share are drawn but inert — none of the three has an API
- * behind it yet, so they carry the same dimmed "coming soon" treatment the
- * footer gives an unlaunched channel rather than looking tappable and doing
- * nothing.
- */
+/** The action row from the Figma card (831:136…831:166): like · repost · comment, then save and share pushed right. */
 export default function PostActions({
   likes,
   comments,
+  reposts,
   likedByMe,
+  repostedByMe,
+  savedByMe,
   onLike,
+  onRepost,
   onComment,
+  onSave,
+  onShare,
   labels,
 }: PostActionsProps) {
-  const soon = (src: string, label: string) => (
-    <span aria-label={`${label} — ${labels.comingSoon}`} role="img" className="opacity-40">
+  /** Gold marks the actions the viewer has already taken, as the like does. */
+  const action = (src: string, on: boolean, label: string, onClick: () => void, count?: string) => (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      aria-label={label}
+      className={`flex items-center gap-[6px] text-[14px] font-medium transition-colors ${
+        on ? "text-kink-gold-bright" : "text-feed-muted hover:text-feed-text"
+      }`}
+    >
       <MaskIcon src={src} width={ICON} />
-    </span>
+      {count}
+    </button>
   );
+
   return (
     <div className="flex items-center gap-[24px] pt-[14px] text-feed-muted">
-      <button
-        type="button"
-        onClick={onLike}
-        aria-pressed={likedByMe}
-        aria-label={likedByMe ? labels.unlike : labels.like}
-        className={`flex items-center gap-[6px] text-[14px] font-medium transition-colors ${
-          likedByMe ? "text-kink-gold-bright" : "text-feed-muted hover:text-feed-text"
-        }`}
-      >
-        <MaskIcon src="/app/feed/icon-like.svg" width={ICON} />
-        {likes}
-      </button>
-
-      {soon("/app/feed/icon-repost.svg", labels.repost)}
-
+      {action(
+        "/app/feed/icon-like.svg",
+        likedByMe,
+        likedByMe ? labels.unlike : labels.like,
+        onLike,
+        likes,
+      )}
+      {action(
+        "/app/feed/icon-repost.svg",
+        repostedByMe,
+        repostedByMe ? labels.unrepost : labels.repost,
+        onRepost,
+        reposts,
+      )}
       <button
         type="button"
         onClick={onComment}
@@ -73,8 +87,20 @@ export default function PostActions({
 
       <span className="flex-1" />
 
-      {soon("/app/feed/icon-bookmark.svg", labels.save)}
-      {soon("/app/feed/icon-share.svg", labels.share)}
+      {action(
+        "/app/feed/icon-bookmark.svg",
+        savedByMe,
+        savedByMe ? labels.unsave : labels.save,
+        onSave,
+      )}
+      <button
+        type="button"
+        onClick={onShare}
+        aria-label={labels.share}
+        className="text-feed-muted transition-colors hover:text-feed-text"
+      >
+        <MaskIcon src="/app/feed/icon-share.svg" width={ICON} />
+      </button>
     </div>
   );
 }

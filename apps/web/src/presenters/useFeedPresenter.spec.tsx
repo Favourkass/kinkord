@@ -19,6 +19,12 @@ const comment = vi.fn();
 const removeComment = vi.fn();
 const removePost = vi.fn();
 const suggested = vi.fn();
+const repost = vi.fn();
+const unrepost = vi.fn();
+const save = vi.fn();
+const unsave = vi.fn();
+const savedFeed = vi.fn();
+const byId = vi.fn();
 const follow = vi.fn();
 const unfollow = vi.fn();
 const uploadPostPhoto = vi.fn();
@@ -34,6 +40,12 @@ vi.mock("@/services/posts.service", async (importOriginal) => ({
     comment: (...a: unknown[]) => comment(...a),
     removeComment: (...a: unknown[]) => removeComment(...a),
     remove: (...a: unknown[]) => removePost(...a),
+    byId: (...a: unknown[]) => byId(...a),
+    repost: (...a: unknown[]) => repost(...a),
+    unrepost: (...a: unknown[]) => unrepost(...a),
+    save: (...a: unknown[]) => save(...a),
+    unsave: (...a: unknown[]) => unsave(...a),
+    saved: (...a: unknown[]) => savedFeed(...a),
     suggested: (...a: unknown[]) => suggested(...a),
     follow: (...a: unknown[]) => follow(...a),
     unfollow: (...a: unknown[]) => unfollow(...a),
@@ -48,6 +60,7 @@ const author = { userId: "u2", username: "tega", displayName: "Sir T", avatarUrl
 
 const pm = (over: Partial<PostPM> = {}): PostPM => ({
   id: "p1",
+  postId: "p1",
   body: "hello",
   visibility: "public",
   createdAt: "2026-09-18T11:00:00.000Z",
@@ -55,7 +68,11 @@ const pm = (over: Partial<PostPM> = {}): PostPM => ({
   media: [],
   likes: 5,
   comments: 1,
+  reposts: 0,
   likedByMe: false,
+  repostedByMe: false,
+  savedByMe: false,
+  repostedBy: null,
   mine: false,
   ...over,
 });
@@ -80,6 +97,12 @@ beforeEach(() => {
   removeComment.mockReset().mockResolvedValue({ deleted: "c1" });
   removePost.mockReset().mockResolvedValue({ deleted: "p1" });
   suggested.mockReset().mockResolvedValue({ items: [], total: 0 });
+  repost.mockReset().mockResolvedValue({ postId: "p1", reposts: 1, repostedByMe: true });
+  unrepost.mockReset().mockResolvedValue({ postId: "p1", reposts: 0, repostedByMe: false });
+  save.mockReset().mockResolvedValue({ postId: "p1", savedByMe: true });
+  unsave.mockReset().mockResolvedValue({ postId: "p1", savedByMe: false });
+  savedFeed.mockReset().mockResolvedValue({ items: [pm()], nextCursor: null });
+  byId.mockReset().mockResolvedValue(pm());
   follow.mockReset().mockResolvedValue({});
   unfollow.mockReset().mockResolvedValue({});
   uploadPostPhoto.mockReset().mockResolvedValue("posts/u1/a.jpg");
@@ -502,5 +525,141 @@ describe("pointed at one member (the profile Posts tab)", () => {
 
     await act(async () => result.current.loadMore());
     expect(feed).toHaveBeenLastCalledWith("2026-09-18T11:00:00.000Z", undefined, "tega");
+  });
+});
+
+describe("reposting", () => {
+  it("shows the repost immediately, then takes the server's count", async () => {
+    const { result } = await loaded();
+    await act(async () => result.current.toggleRepost("p1"));
+
+    expect(repost).toHaveBeenCalledWith("p1");
+    expect(result.current.posts[0].repostedByMe).toBe(true);
+    expect(result.current.posts[0].reposts).toBe("1");
+  });
+
+  it("undoes a repost that was already made", async () => {
+    feed.mockResolvedValue({
+      items: [pm({ repostedByMe: true, reposts: 1 })],
+      nextCursor: null,
+    });
+    const { result } = await loaded();
+    await act(async () => result.current.toggleRepost("p1"));
+
+    expect(unrepost).toHaveBeenCalledWith("p1");
+    expect(result.current.posts[0].repostedByMe).toBe(false);
+  });
+
+  it("rolls back when the request fails", async () => {
+    repost.mockRejectedValue(new ApiError(403, "Friends-only posts cannot be reposted"));
+    const { result } = await loaded();
+    await act(async () => result.current.toggleRepost("p1"));
+
+    expect(result.current.posts[0].repostedByMe).toBe(false);
+    expect(result.current.posts[0].reposts).toBe("0");
+  });
+
+  it("keeps a post and a repost of it in agreement", async () => {
+    // Both rows show the same post, so one server answer has to move both.
+    feed.mockResolvedValue({
+      items: [pm({ id: "r1", postId: "p1" }), pm({ id: "p1", postId: "p1" })],
+      nextCursor: null,
+    });
+    const { result } = await loaded();
+    await act(async () => result.current.toggleLike("p1"));
+
+    expect(result.current.posts.map((p) => p.likedByMe)).toEqual([true, true]);
+    expect(result.current.posts.map((p) => p.likes)).toEqual(["6", "6"]);
+  });
+});
+
+describe("saving", () => {
+  it("saves and unsaves", async () => {
+    const { result } = await loaded();
+    await act(async () => result.current.toggleSave("p1"));
+    expect(save).toHaveBeenCalledWith("p1");
+    expect(result.current.posts[0].savedByMe).toBe(true);
+
+    await act(async () => result.current.toggleSave("p1"));
+    expect(unsave).toHaveBeenCalledWith("p1");
+    expect(result.current.posts[0].savedByMe).toBe(false);
+  });
+
+  it("rolls back a save that failed", async () => {
+    save.mockRejectedValue(new ApiError(500, "boom"));
+    const { result } = await loaded();
+    await act(async () => result.current.toggleSave("p1"));
+    expect(result.current.posts[0].savedByMe).toBe(false);
+  });
+
+  it("reads the saved list instead of the feed when asked", async () => {
+    const hook = renderHook(() => useFeedPresenter({ saved: true }));
+    await waitFor(() => expect(hook.result.current.loading).toBe(false));
+
+    expect(savedFeed).toHaveBeenCalled();
+    expect(feed).not.toHaveBeenCalled();
+    expect(suggested).not.toHaveBeenCalled();
+  });
+});
+
+describe("sharing", () => {
+  const origin = "https://kinkord.com";
+
+  beforeEach(() => {
+    Object.defineProperty(window, "location", {
+      value: { origin, href: `${origin}/home` },
+      writable: true,
+    });
+  });
+
+  it("hands the link to the system share sheet when there is one", async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "share", { value: share, configurable: true });
+
+    const { result } = await loaded();
+    await act(async () => result.current.share("p1"));
+
+    expect(share).toHaveBeenCalledWith({ url: `${origin}/p/p1` });
+    // The sheet is its own confirmation; no toast on top of it.
+    expect(result.current.shareNote).toBeNull();
+    Reflect.deleteProperty(navigator, "share");
+  });
+
+  it("copies the link and says so where there is no share sheet", async () => {
+    Reflect.deleteProperty(navigator, "share");
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+
+    const { result } = await loaded();
+    await act(async () => result.current.share("p1"));
+
+    expect(writeText).toHaveBeenCalledWith(`${origin}/p/p1`);
+    expect(result.current.shareNote).toBe("Link copied");
+
+    act(() => result.current.dismissShareNote());
+    expect(result.current.shareNote).toBeNull();
+  });
+
+  it("stays quiet when the member cancels the share sheet", async () => {
+    const share = vi.fn().mockRejectedValue(new Error("AbortError"));
+    Object.defineProperty(navigator, "share", { value: share, configurable: true });
+
+    const { result } = await loaded();
+    await act(async () => result.current.share("p1"));
+
+    expect(result.current.shareNote).toBeNull();
+    Reflect.deleteProperty(navigator, "share");
+  });
+});
+
+describe("one post on its own", () => {
+  it("reads just that post", async () => {
+    const hook = renderHook(() => useFeedPresenter({ postId: "p1" }));
+    await waitFor(() => expect(hook.result.current.loading).toBe(false));
+
+    expect(byId).toHaveBeenCalledWith("p1");
+    expect(feed).not.toHaveBeenCalled();
+    expect(hook.result.current.posts).toHaveLength(1);
+    expect(hook.result.current.hasMore).toBe(false);
   });
 });

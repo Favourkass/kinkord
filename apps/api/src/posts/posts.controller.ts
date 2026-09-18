@@ -38,6 +38,17 @@ export class PostsController {
     private readonly interactions: PostInteractionsService,
   ) {}
 
+  /** The viewer's saved posts. Declared before ":id" so "saved" is not read as an id. */
+  @Get("saved")
+  saved(@Req() req: AuthedRequest, @Query() query: unknown) {
+    const parsed = feedQuerySchema.safeParse(query);
+    if (!parsed.success) throw new BadRequestException(parsed.error.flatten().fieldErrors);
+    return this.posts.savedFeed(req.user.id, {
+      cursor: parsed.data.cursor,
+      limit: parsed.data.limit,
+    });
+  }
+
   @Get("feed")
   feed(@Req() req: AuthedRequest, @Query() query: unknown) {
     const parsed = feedQuerySchema.safeParse(query);
@@ -87,6 +98,26 @@ export class PostsController {
   @Delete(":id/like")
   unlike(@Req() req: AuthedRequest, @Param("id") id: string) {
     return this.interactions.unlike(parseId(id), req.user.id);
+  }
+
+  @HttpPost(":id/repost")
+  repost(@Req() req: AuthedRequest, @Param("id") id: string) {
+    return this.posts.repost(parseId(id), req.user.id);
+  }
+
+  @Delete(":id/repost")
+  unrepost(@Req() req: AuthedRequest, @Param("id") id: string) {
+    return this.posts.unrepost(parseId(id), req.user.id);
+  }
+
+  @HttpPost(":id/save")
+  save(@Req() req: AuthedRequest, @Param("id") id: string) {
+    return this.interactions.save(parseId(id), req.user.id);
+  }
+
+  @Delete(":id/save")
+  unsave(@Req() req: AuthedRequest, @Param("id") id: string) {
+    return this.interactions.unsave(parseId(id), req.user.id);
   }
 
   @Get(":id/comments")

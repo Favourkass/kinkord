@@ -12,6 +12,8 @@ export interface PostCardProps {
     less: string;
     menu: string;
     delete: string;
+    /** "Favour reposted", above a repost. */
+    repostedBy: (name: string) => string;
   };
   /** Open when this card's overflow menu is showing. */
   menuOpen: boolean;
@@ -20,7 +22,10 @@ export interface PostCardProps {
   onDelete: () => void;
   onToggleBody: () => void;
   onLike: () => void;
+  onRepost: () => void;
   onComment: () => void;
+  onSave: () => void;
+  onShare: () => void;
   onOpenMedia: (media: PostMediaVM) => void;
 }
 
@@ -38,7 +43,10 @@ export default function PostCard({
   onDelete,
   onToggleBody,
   onLike,
+  onRepost,
   onComment,
+  onSave,
+  onShare,
   onOpenMedia,
 }: PostCardProps) {
   const name = (
@@ -46,6 +54,12 @@ export default function PostCard({
   );
   return (
     <article className="border-b border-feed-line px-[25px] py-[18px]">
+      {post.repostedByName && (
+        <p className="flex items-center gap-[8px] pb-[10px] pl-[2px] text-[12px] font-medium text-feed-muted">
+          <MaskIcon src="/app/feed/icon-repost.svg" width={14} />
+          {labels.repostedBy(post.repostedByName)}
+        </p>
+      )}
       <header className="flex items-start gap-[12px]">
         <AvatarCircle src={post.avatarUrl} alt="" size={35} ringClassName="bg-[#4285f4]" />
         <div className="min-w-0 flex-1">
@@ -114,9 +128,15 @@ export default function PostCard({
       <PostActions
         likes={post.likes}
         comments={post.comments}
+        reposts={post.reposts}
         likedByMe={post.likedByMe}
+        repostedByMe={post.repostedByMe}
+        savedByMe={post.savedByMe}
         onLike={onLike}
+        onRepost={onRepost}
         onComment={onComment}
+        onSave={onSave}
+        onShare={onShare}
         labels={labels}
       />
     </article>

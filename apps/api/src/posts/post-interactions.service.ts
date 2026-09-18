@@ -2,7 +2,15 @@ import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nest
 import { and, count, desc, eq, isNull, lt } from "drizzle-orm";
 import { z } from "zod";
 import { Db, DRIZZLE } from "../db/db.module";
-import { post, postComment, postLike, profile, user, COMMENT_BODY_MAX } from "../db/schema";
+import {
+  post,
+  postComment,
+  postLike,
+  postSave,
+  profile,
+  user,
+  COMMENT_BODY_MAX,
+} from "../db/schema";
 import { StorageService } from "../storage/storage.service";
 import {
   clamp,
@@ -10,6 +18,7 @@ import {
   COMMENT_MAX_PAGE_SIZE,
   COMMENT_PAGE_SIZE,
   PostsService,
+  type SaveVM,
 } from "./posts.service";
 
 export const createCommentSchema = z.object({
@@ -70,6 +79,24 @@ export class PostInteractionsService {
       .delete(postLike)
       .where(and(eq(postLike.postId, postId), eq(postLike.userId, userId)));
     return this.likeState(postId, userId);
+  }
+
+  /**
+   * Save a post to read later. Private: the author is never told, and no count
+   * is published anywhere, so saving is not a signal anyone can read.
+   */
+  async save(postId: string, userId: string): Promise<SaveVM> {
+    const target = await this.contentPost(postId, userId);
+    await this.db.insert(postSave).values({ postId: target, userId }).onConflictDoNothing();
+    return { postId: target, savedByMe: true };
+  }
+
+  async unsave(postId: string, userId: string): Promise<SaveVM> {
+    const target = await this.contentPost(postId, userId);
+    await this.db
+      .delete(postSave)
+      .where(and(eq(postSave.postId, target), eq(postSave.userId, userId)));
+    return { postId: target, savedByMe: false };
   }
 
   /** Newest first, so a fresh comment is the first thing under a fresh post. */
@@ -185,6 +212,17 @@ export class PostInteractionsService {
     const vm = await this.posts.byId(postId, viewerId);
     if (!vm) throw new NotFoundException("Post not found");
     return vm.author.userId;
+  }
+
+  /**
+   * Same check, but answers with the post the content belongs to — saving
+   * somebody's repost saves the post itself, so it is still there once the
+   * repost is undone.
+   */
+  private async contentPost(postId: string, viewerId: string): Promise<string> {
+    const vm = await this.posts.byId(postId, viewerId);
+    if (!vm) throw new NotFoundException("Post not found");
+    return vm.postId;
   }
 
   private async likeState(postId: string, userId: string): Promise<LikeVM> {

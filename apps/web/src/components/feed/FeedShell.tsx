@@ -18,7 +18,7 @@ export interface FeedShellProps {
   onLogout: () => void;
   links: AppNavLinks;
   labels: AppNavLabels;
-  /** Desktop right rail; hidden on a phone, where the feed carries it inline. */
+  /** Desktop right rail; hidden on a phone, where the feed carries it inline. Null on the list screens. */
   aside: ReactNode;
   children: ReactNode;
 }
@@ -80,7 +80,11 @@ export default function FeedShell({
 
           <div className="flex w-full justify-center gap-[32px] lg:px-[30px] lg:pt-[28px]">
             <div className="min-w-0 flex-1 lg:max-w-[640px]">{children}</div>
-            <aside className="hidden w-[300px] shrink-0 flex-col gap-[20px] lg:flex">{aside}</aside>
+            {aside && (
+              <aside className="hidden w-[300px] shrink-0 flex-col gap-[20px] lg:flex">
+                {aside}
+              </aside>
+            )}
           </div>
         </main>
       </div>
