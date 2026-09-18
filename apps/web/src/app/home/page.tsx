@@ -1,7 +1,7 @@
 "use client";
 
 import FeedScreen from "@/components/feed/FeedScreen";
-import { FEED_COPY, FEED_VISIBILITIES } from "@/constants/feed";
+import { FEED_COPY, FEED_VISIBILITIES, POST_CARD_LABELS } from "@/constants/feed";
 import { Routes } from "@/constants/Routes";
 import { COMMENT_BODY_MAX, POST_BODY_MAX } from "@/domain/post";
 import { getAppShellNav } from "@/presenters/getAppShellNav";
@@ -32,26 +32,17 @@ export default function HomePage() {
       loading={feed.loading}
       error={home.error ?? feed.error}
       posts={feed.posts}
-      postLabels={{
-        like: FEED_COPY.like,
-        unlike: FEED_COPY.unlike,
-        comment: FEED_COPY.comment,
-        repost: FEED_COPY.repost,
-        save: FEED_COPY.save,
-        share: FEED_COPY.share,
-        comingSoon: FEED_COPY.comingSoon,
-        more: FEED_COPY.more,
-        less: FEED_COPY.less,
-        menu: FEED_COPY.postMenu,
-        delete: FEED_COPY.deletePost,
-      }}
+      postLabels={POST_CARD_LABELS}
       menuFor={feed.menuFor}
       onOpenMenu={feed.openMenu}
       onCloseMenu={feed.closeMenu}
       onAskDelete={feed.askDelete}
       onToggleBody={feed.toggleExpanded}
       onLike={feed.toggleLike}
+      onRepost={feed.toggleRepost}
       onComment={feed.openComments}
+      onSave={feed.toggleSave}
+      onShare={feed.share}
       onOpenMedia={feed.openMedia}
       hasMore={feed.hasMore}
       loadingMore={feed.loadingMore}
@@ -147,6 +138,7 @@ export default function HomePage() {
         onConfirm: feed.confirmDeletePost,
         onCancel: feed.cancelDelete,
       }}
+      toast={{ message: feed.shareNote, onDismiss: feed.dismissShareNote }}
       copy={{
         emptyTitle: FEED_COPY.feedEmptyTitle,
         emptyBody: FEED_COPY.feedEmptyBody,

@@ -13,6 +13,7 @@ import {
   type DraftPhotoVM,
   type FeedSuggestionVM,
   type PostMediaVM,
+  type FeedPM as FeedPagePM,
   type PostPM,
   type PostVM,
   type PostVisibility,
@@ -20,13 +21,19 @@ import {
 import { ApiError } from "@/services/apiClient";
 import {
   applyLike,
+  applyRepost,
+  applySave,
+  applyToContent,
   applyToPost,
   canSubmitComment,
   canSubmitPost,
+  postPermalink,
   postsApi,
   remainingPhotoSlots,
   toggleFollowOnSuggestion,
   toggleLikeOnPost,
+  toggleRepostOnPost,
+  toggleSaveOnPost,
   uploadPostPhoto,
   withCommentDelta,
   type SuggestedPersonPM,
@@ -46,6 +53,10 @@ export interface FeedOptions {
    * stranger browsing the profile exactly as it does in the feed.
    */
   author?: string | null;
+  /** One post on its own — the permalink page. */
+  postId?: string | null;
+  /** The viewer's saved posts instead of the feed. */
+  saved?: boolean;
   /**
    * False while the author is still being resolved. /profile has to ask the API
    * who you are before it can ask for your posts, and without this the first
@@ -64,7 +75,12 @@ export interface FeedOptions {
  * button is instant on the connection most members are on — by the time the
  * caption is typed the bytes are usually already in the bucket.
  */
-export function useFeedPresenter({ author = null, ready = true }: FeedOptions = {}) {
+export function useFeedPresenter({
+  author = null,
+  postId = null,
+  saved = false,
+  ready = true,
+}: FeedOptions = {}) {
   const router = useRouter();
 
   const [posts, setPosts] = useState<PostPM[]>([]);
@@ -75,8 +91,9 @@ export function useFeedPresenter({ author = null, ready = true }: FeedOptions = 
    * shows a load instead of a flash of the previous member's posts — the page
    * component stays mounted across that navigation.
    */
-  const [loadedFor, setLoadedFor] = useState<string | null | undefined>(undefined);
-  const loading = !ready || loadedFor !== author;
+  const [loadedFor, setLoadedFor] = useState<string | undefined>(undefined);
+  const surface = `${postId ?? ""}|${author ?? ""}|${saved}`;
+  const loading = !ready || loadedFor !== surface;
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string[]>([]);
@@ -98,6 +115,8 @@ export function useFeedPresenter({ author = null, ready = true }: FeedOptions = 
   const [commentsError, setCommentsError] = useState<string | null>(null);
 
   const [lightbox, setLightbox] = useState<PostMediaVM | null>(null);
+  /** Brief confirmation after a share; there is nothing else to show for it. */
+  const [shareNote, setShareNote] = useState<string | null>(null);
 
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -109,6 +128,16 @@ export function useFeedPresenter({ author = null, ready = true }: FeedOptions = 
 
   /** Object URLs outlive React state, so they are revoked by hand. */
   const previewUrls = useRef<string[]>([]);
+
+  /** Which page of which list to read — the four surfaces differ only here. */
+  const loadPage = useCallback(
+    async (cursor: string | null): Promise<FeedPagePM> => {
+      if (postId) return { items: [await postsApi.byId(postId)], nextCursor: null };
+      if (saved) return postsApi.saved(cursor);
+      return postsApi.feed(cursor, undefined, author);
+    },
+    [author, postId, saved],
+  );
 
   const onUnauthorized = useCallback(
     (e: unknown) => {
@@ -126,7 +155,7 @@ export function useFeedPresenter({ author = null, ready = true }: FeedOptions = 
     let cancelled = false;
     void (async () => {
       try {
-        const page = await postsApi.feed(null, undefined, author);
+        const page = await loadPage(null);
         if (cancelled) return;
         setPosts(page.items);
         setCursor(page.nextCursor);
@@ -134,17 +163,17 @@ export function useFeedPresenter({ author = null, ready = true }: FeedOptions = 
         if (cancelled || onUnauthorized(e)) return;
         setError(FEED_COPY.feedError);
       } finally {
-        if (!cancelled) setLoadedFor(author);
+        if (!cancelled) setLoadedFor(surface);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [author, ready, onUnauthorized]);
+  }, [surface, loadPage, ready, onUnauthorized]);
 
   useEffect(() => {
-    // A profile has its own Suggested Friends rail; the strip is the home feed's.
-    if (author || !ready) return;
+    // Only the home feed carries the suggestions strip.
+    if (author || postId || saved || !ready) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -157,7 +186,7 @@ export function useFeedPresenter({ author = null, ready = true }: FeedOptions = 
     return () => {
       cancelled = true;
     };
-  }, [author, ready]);
+  }, [author, postId, saved, ready]);
 
   // Revoke every preview on unmount so a long session doesn't leak blobs.
   useEffect(
@@ -172,7 +201,7 @@ export function useFeedPresenter({ author = null, ready = true }: FeedOptions = 
     if (!cursor || loadingMore) return;
     setLoadingMore(true);
     try {
-      const page = await postsApi.feed(cursor, undefined, author);
+      const page = await loadPage(cursor);
       setPosts((prev) => [...prev, ...page.items]);
       setCursor(page.nextCursor);
     } catch (e) {
@@ -180,7 +209,7 @@ export function useFeedPresenter({ author = null, ready = true }: FeedOptions = 
     } finally {
       setLoadingMore(false);
     }
-  }, [author, cursor, loadingMore, onUnauthorized]);
+  }, [cursor, loadPage, loadingMore, onUnauthorized]);
 
   const openMedia = useCallback((media: PostMediaVM) => setLightbox(media), []);
   const closeMedia = useCallback(() => setLightbox(null), []);
@@ -305,22 +334,91 @@ export function useFeedPresenter({ author = null, ready = true }: FeedOptions = 
 
   // ---- reactions --------------------------------------------------------
 
-  const toggleLike = useCallback(
-    async (id: string) => {
-      const before = posts.find((p) => p.id === id);
+  /**
+   * Optimistic reaction. The flip is applied to every row showing that post —
+   * a post and a repost of it can both be on screen, and they must not disagree
+   * — then the server's answer replaces the guess, or the guess is undone.
+   */
+  const react = useCallback(
+    async <T extends { postId: string }>(
+      postId: string,
+      flip: (pm: PostPM) => PostPM,
+      call: (on: boolean) => Promise<T>,
+      reading: (pm: PostPM) => boolean,
+      apply: (pm: PostPM, result: T) => PostPM,
+    ) => {
+      const before = posts.find((p) => p.postId === postId);
       if (!before) return;
-      setPosts((prev) => applyToPost(prev, id, toggleLikeOnPost));
+      const was = reading(before);
+      setPosts((prev) => applyToContent(prev, postId, flip));
       try {
-        const result = before.likedByMe ? await postsApi.unlike(id) : await postsApi.like(id);
-        setPosts((prev) => prev.map((p) => applyLike(p, result)));
+        const result = await call(was);
+        setPosts((prev) => prev.map((p) => apply(p, result)));
       } catch (e) {
         if (onUnauthorized(e)) return;
         // Put the card back the way the server still sees it.
-        setPosts((prev) => applyToPost(prev, id, toggleLikeOnPost));
+        setPosts((prev) => applyToContent(prev, postId, flip));
       }
     },
     [posts, onUnauthorized],
   );
+
+  const toggleLike = useCallback(
+    (postId: string) =>
+      react(
+        postId,
+        toggleLikeOnPost,
+        (was) => (was ? postsApi.unlike(postId) : postsApi.like(postId)),
+        (pm) => pm.likedByMe,
+        applyLike,
+      ),
+    [react],
+  );
+
+  const toggleRepost = useCallback(
+    (postId: string) =>
+      react(
+        postId,
+        toggleRepostOnPost,
+        (was) => (was ? postsApi.unrepost(postId) : postsApi.repost(postId)),
+        (pm) => pm.repostedByMe,
+        applyRepost,
+      ),
+    [react],
+  );
+
+  const toggleSave = useCallback(
+    (postId: string) =>
+      react(
+        postId,
+        toggleSaveOnPost,
+        (was) => (was ? postsApi.unsave(postId) : postsApi.save(postId)),
+        (pm) => pm.savedByMe,
+        applySave,
+      ),
+    [react],
+  );
+
+  /**
+   * Share hands the post's link to the system sheet where there is one, and
+   * otherwise copies it. Either way the member is told what happened — a button
+   * that silently does something is the same as one that does nothing.
+   */
+  const share = useCallback(async (postId: string) => {
+    const url = postPermalink(postId);
+    try {
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share({ url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setShareNote(FEED_COPY.shareCopied);
+    } catch {
+      // A cancelled share sheet lands here too, which is not worth a message.
+    }
+  }, []);
+
+  const dismissShareNote = useCallback(() => setShareNote(null), []);
 
   // ---- comments ---------------------------------------------------------
 
@@ -531,6 +629,11 @@ export function useFeedPresenter({ author = null, ready = true }: FeedOptions = 
     submitPost,
 
     toggleLike,
+    toggleRepost,
+    toggleSave,
+    share,
+    shareNote,
+    dismissShareNote,
 
     commentsFor,
     comments: commentVMs,

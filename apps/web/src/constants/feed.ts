@@ -21,7 +21,16 @@ export const FEED_COPY = {
   comment: "Comment",
   repost: "Repost",
   save: "Save",
+  saved: "Saved",
+  unsave: "Remove from saved",
+  unrepost: "Undo repost",
+  repostedBy: (name: string) => `${name} reposted`,
   share: "Share",
+  shareCopied: "Link copied",
+  postHeading: "Post",
+  postGone: "This post is no longer available.",
+  savedHeading: "Saved",
+  savedEmpty: "Nothing saved yet. Tap the bookmark on a post to keep it here.",
   postMenu: "Post options",
   /** Announced on the controls that are drawn but have no backend yet. */
   comingSoon: "coming soon",
@@ -59,3 +68,20 @@ export const FEED_VISIBILITIES = [
   { value: "public", label: FEED_COPY.visibilityPublic },
   { value: "friends", label: FEED_COPY.visibilityFriends },
 ] as const;
+
+/** Every label a post card needs, shared by the home feed and the profile Posts tab. */
+export const POST_CARD_LABELS = {
+  like: FEED_COPY.like,
+  unlike: FEED_COPY.unlike,
+  comment: FEED_COPY.comment,
+  repost: FEED_COPY.repost,
+  unrepost: FEED_COPY.unrepost,
+  save: FEED_COPY.save,
+  unsave: FEED_COPY.unsave,
+  share: FEED_COPY.share,
+  more: FEED_COPY.more,
+  less: FEED_COPY.less,
+  menu: FEED_COPY.postMenu,
+  delete: FEED_COPY.deletePost,
+  repostedBy: FEED_COPY.repostedBy,
+} as const;

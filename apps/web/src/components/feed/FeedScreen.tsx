@@ -7,6 +7,7 @@ import FeedShell, { type FeedShellProps } from "./FeedShell";
 import MediaLightbox, { type MediaLightboxProps } from "./MediaLightbox";
 import PeopleYouMayKnow, { type PeopleYouMayKnowProps } from "./PeopleYouMayKnow";
 import PostCard, { type PostCardProps } from "./PostCard";
+import Toast, { type ToastProps } from "./Toast";
 
 export interface FeedScreenProps {
   shell: Omit<FeedShellProps, "aside" | "children">;
@@ -19,8 +20,12 @@ export interface FeedScreenProps {
   onCloseMenu: () => void;
   onAskDelete: (id: string) => void;
   onToggleBody: (id: string) => void;
-  onLike: (id: string) => void;
-  onComment: (id: string) => void;
+  /** Reactions target `post.postId`: acting on a repost acts on the post it points at. */
+  onLike: (postId: string) => void;
+  onRepost: (postId: string) => void;
+  onComment: (postId: string) => void;
+  onSave: (postId: string) => void;
+  onShare: (postId: string) => void;
   onOpenMedia: (media: PostMediaVM) => void;
   hasMore: boolean;
   loadingMore: boolean;
@@ -31,6 +36,7 @@ export interface FeedScreenProps {
   people: PeopleYouMayKnowProps;
   lightbox: MediaLightboxProps;
   confirm: ConfirmDialogProps;
+  toast: ToastProps;
   copy: {
     emptyTitle: string;
     emptyBody: string;
@@ -59,8 +65,11 @@ export default function FeedScreen(p: FeedScreenProps) {
       onCloseMenu={p.onCloseMenu}
       onDelete={() => p.onAskDelete(post.id)}
       onToggleBody={() => p.onToggleBody(post.id)}
-      onLike={() => p.onLike(post.id)}
-      onComment={() => p.onComment(post.id)}
+      onLike={() => p.onLike(post.postId)}
+      onRepost={() => p.onRepost(post.postId)}
+      onComment={() => p.onComment(post.postId)}
+      onSave={() => p.onSave(post.postId)}
+      onShare={() => p.onShare(post.postId)}
       onOpenMedia={p.onOpenMedia}
     />
   );
@@ -127,6 +136,7 @@ export default function FeedScreen(p: FeedScreenProps) {
       <CommentsPanel {...p.commentsPanel} />
       <MediaLightbox {...p.lightbox} />
       <ConfirmDialog {...p.confirm} />
+      <Toast {...p.toast} />
     </>
   );
 }

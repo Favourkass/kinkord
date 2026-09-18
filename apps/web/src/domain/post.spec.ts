@@ -22,6 +22,7 @@ const author = {
 
 const post = (over: Partial<PostPM> = {}): PostPM => ({
   id: "p1",
+  postId: "p1",
   body: "Today something exciting happened",
   visibility: "public",
   createdAt: "2026-09-18T11:00:00.000Z",
@@ -29,7 +30,11 @@ const post = (over: Partial<PostPM> = {}): PostPM => ({
   media: [],
   likes: 12500,
   comments: 300,
+  reposts: 42,
   likedByMe: false,
+  repostedByMe: false,
+  savedByMe: false,
+  repostedBy: null,
   mine: false,
   ...over,
 });

@@ -11,6 +11,7 @@ describe("getAppShellNav", () => {
       notifications: "/notifications",
       profile: "/profile",
       settings: "/settings",
+      saved: "/saved",
     });
     expect(nav.labels).toEqual({
       home: "Home",
@@ -19,6 +20,7 @@ describe("getAppShellNav", () => {
       notifications: "Notifications",
       profile: "Profile",
       settings: "Settings and Privacy",
+      saved: "Saved",
       logout: "Log Out",
     });
   });

@@ -1,4 +1,15 @@
-import { index, integer, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import {
+  index,
+  integer,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+  type AnyPgColumn,
+} from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
 /** Who may see a post. Mirrors `profile.profileVisibility`, so the two agree. */
@@ -23,6 +34,15 @@ export const post = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     body: text("body"),
     visibility: text("visibility").$type<PostVisibility>().notNull().default("public"),
+    /**
+     * Set when this row is a repost: it carries no words or photos of its own
+     * and stands in the feed for the post it points at. A repost is a post so
+     * the feed, the profile Posts tab and the visibility rule keep working
+     * unchanged, and so a quote-repost can later just fill in `body`.
+     */
+    repostOfId: uuid("repost_of_id").references((): AnyPgColumn => post.id, {
+      onDelete: "cascade",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
@@ -30,6 +50,16 @@ export const post = pgTable(
     // The feed and a profile's Posts tab both read newest-first by author.
     index("post_author_idx").on(t.authorId, t.createdAt),
     index("post_created_idx").on(t.createdAt),
+    // Counting reposts of a post, and finding the viewer's own.
+    index("post_repost_of_idx").on(t.repostOfId),
+    /**
+     * One live repost per member per post — the rule is the index, so a double
+     * tap cannot leave two. Partial, because a member who un-reposts (soft
+     * delete) and reposts again must be allowed to.
+     */
+    uniqueIndex("post_repost_unique")
+      .on(t.authorId, t.repostOfId)
+      .where(sql`${t.deletedAt} is null and ${t.repostOfId} is not null`),
   ],
 );
 
@@ -94,4 +124,27 @@ export const postComment = pgTable(
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (t) => [index("post_comment_post_idx").on(t.postId, t.createdAt)],
+);
+
+/**
+ * A member's saved posts. Private: nobody is told their post was saved, and no
+ * count is shown anywhere — which is why this is a plain table with no
+ * aggregate read, unlike likes.
+ */
+export const postSave = pgTable(
+  "post_save",
+  {
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => post.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.postId, t.userId] }),
+    // "Saved" reads newest-first by member.
+    index("post_save_user_idx").on(t.userId, t.createdAt),
+  ],
 );

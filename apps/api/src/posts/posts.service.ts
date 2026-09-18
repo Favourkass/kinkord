@@ -16,6 +16,7 @@ import {
   postComment,
   postLike,
   postMedia,
+  postSave,
   profile,
   user,
   POST_BODY_MAX,
@@ -92,23 +93,48 @@ export interface PostMediaVM {
   url: string | null;
 }
 
+export interface PostAuthorVM {
+  userId: string;
+  username: string | null;
+  displayName: string;
+  avatarUrl: string | null;
+}
+
 export interface PostVM {
+  /** The row in the feed — a repost has its own id, and that is what a delete removes. */
   id: string;
+  /**
+   * The post the content belongs to: the original when this row is a repost,
+   * otherwise the same as `id`. Likes, comments, saves and shares all target
+   * this, so reacting to a repost reacts to the post it points at.
+   */
+  postId: string;
   body: string | null;
   visibility: PostVisibility;
   createdAt: string;
-  author: {
-    userId: string;
-    username: string | null;
-    displayName: string;
-    avatarUrl: string | null;
-  };
+  author: PostAuthorVM;
   media: PostMediaVM[];
   likes: number;
   comments: number;
+  reposts: number;
   likedByMe: boolean;
-  /** Whether the viewer may delete it — their own post, nothing else. */
+  repostedByMe: boolean;
+  savedByMe: boolean;
+  /** Who put this in the feed, when the row is their repost of someone's post. */
+  repostedBy: Pick<PostAuthorVM, "userId" | "username" | "displayName"> | null;
+  /** Whether the viewer may delete this row — their own post or their own repost. */
   mine: boolean;
+}
+
+export interface RepostVM {
+  postId: string;
+  reposts: number;
+  repostedByMe: boolean;
+}
+
+export interface SaveVM {
+  postId: string;
+  savedByMe: boolean;
 }
 
 export interface FeedVM {
@@ -219,6 +245,93 @@ export class PostsService {
     if (!rows.length) return null;
     const [vm] = await this.decorate(rows, viewerId);
     return vm ?? null;
+  }
+
+  /**
+   * Repost: a post row of the viewer's own pointing at somebody's post.
+   *
+   * Only a public post can be reposted. A friends-only post is shared with a
+   * chosen circle, and letting it be lifted into a stranger's feed would undo
+   * exactly the choice its author made.
+   *
+   * Reposting a repost points at the original, so a chain never forms.
+   */
+  async repost(postId: string, userId: string): Promise<RepostVM> {
+    const target = await this.repostTarget(postId, userId);
+    await this.db
+      .insert(post)
+      .values({ authorId: userId, repostOfId: target, visibility: "public" })
+      // The partial unique index is the rule; a double tap is simply a no-op.
+      .onConflictDoNothing();
+    return this.repostState(target, userId);
+  }
+
+  async unrepost(postId: string, userId: string): Promise<RepostVM> {
+    const target = await this.repostTarget(postId, userId);
+    await this.db
+      .update(post)
+      .set({ deletedAt: new Date() })
+      .where(and(eq(post.repostOfId, target), eq(post.authorId, userId), isNull(post.deletedAt)));
+    return this.repostState(target, userId);
+  }
+
+  /** The viewer's saved posts, newest save first. Private to them. */
+  async savedFeed(viewerId: string, params: { cursor?: string | null; limit?: number } = {}) {
+    const limit = clamp(params.limit ?? FEED_PAGE_SIZE, 1, FEED_MAX_PAGE_SIZE);
+    const cursor = parseCursor(params.cursor);
+    const saves = await this.db
+      .select({ postId: postSave.postId, createdAt: postSave.createdAt })
+      .from(postSave)
+      .where(
+        and(eq(postSave.userId, viewerId), ...(cursor ? [lt(postSave.createdAt, cursor)] : [])),
+      )
+      .orderBy(desc(postSave.createdAt))
+      .limit(limit + 1);
+    const page = saves.slice(0, limit);
+    if (!page.length) return { items: [], nextCursor: null } satisfies FeedVM;
+    // Re-read through the feed's own rules: a post saved while it was visible
+    // must stop appearing here if it is deleted or the friendship ends.
+    const rows = await this.selectPosts(
+      viewerId,
+      [
+        inArray(
+          post.id,
+          page.map((s) => s.postId),
+        ),
+      ],
+      page.length,
+    );
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    const ordered = page
+      .map((s) => byId.get(s.postId))
+      .filter((r): r is (typeof rows)[number] => Boolean(r));
+    return {
+      items: await this.decorate(ordered, viewerId),
+      nextCursor: saves.length > limit ? (page.at(-1)?.createdAt.toISOString() ?? null) : null,
+    } satisfies FeedVM;
+  }
+
+  /** Resolves what a repost should point at, and refuses what may not be lifted. */
+  private async repostTarget(postId: string, viewerId: string): Promise<string> {
+    const vm = await this.byId(postId, viewerId);
+    if (!vm) throw new NotFoundException("Post not found");
+    if (vm.visibility !== "public") {
+      throw new ForbiddenException("Friends-only posts cannot be reposted");
+    }
+    // Reposting somebody's repost points at the post itself.
+    return vm.postId;
+  }
+
+  private async repostState(postId: string, userId: string): Promise<RepostVM> {
+    const [total] = await this.db
+      .select({ n: count() })
+      .from(post)
+      .where(and(eq(post.repostOfId, postId), isNull(post.deletedAt)));
+    const [mine] = await this.db
+      .select({ id: post.id })
+      .from(post)
+      .where(and(eq(post.repostOfId, postId), eq(post.authorId, userId), isNull(post.deletedAt)));
+    return { postId, reposts: Number(total?.n ?? 0), repostedByMe: Boolean(mine) };
   }
 
   /**
@@ -352,6 +465,7 @@ export class PostsService {
         visibility: post.visibility,
         createdAt: post.createdAt,
         authorId: post.authorId,
+        repostOfId: post.repostOfId,
         username: user.username,
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
@@ -375,13 +489,56 @@ export class PostsService {
   }
 
   /** Attaches media, counts and the viewer's own like to a page of rows. */
+  /**
+   * The post a repost points at. Only public posts can be reposted, and that is
+   * asserted again here: a repost must never become a way to see a friends-only
+   * post, however the row got written.
+   */
+  private async originalsById(ids: string[]) {
+    const rows = await this.db
+      .select({
+        id: post.id,
+        body: post.body,
+        visibility: post.visibility,
+        createdAt: post.createdAt,
+        authorId: post.authorId,
+        repostOfId: post.repostOfId,
+        username: user.username,
+        displayName: profile.displayName,
+        avatarKey: profile.avatarKey,
+      })
+      .from(post)
+      .innerJoin(user, eq(user.id, post.authorId))
+      .leftJoin(profile, eq(profile.userId, post.authorId))
+      .where(and(inArray(post.id, ids), isNull(post.deletedAt), eq(post.visibility, "public")));
+    return new Map(rows.map((r) => [r.id, r]));
+  }
+
+  /** Attaches media, counts and the viewer's own reactions to a page of rows. */
   private async decorate(
     rows: Awaited<ReturnType<PostsService["selectPosts"]>>,
     viewerId: string,
   ): Promise<PostVM[]> {
     if (!rows.length) return [];
-    const ids = rows.map((r) => r.id);
-    const [media, likes, comments, mine] = await Promise.all([
+
+    // A repost carries no words or photos of its own; its content is the post
+    // it points at, so that is what gets counted, reacted to and rendered.
+    const originalIds = [...new Set(rows.map((r) => r.repostOfId).filter(isId))];
+    const originals = originalIds.length ? await this.originalsById(originalIds) : new Map();
+    const pairs = rows
+      .map((row) => ({
+        row,
+        content: row.repostOfId ? (originals.get(row.repostOfId) ?? null) : row,
+      }))
+      // A repost of a post that has since been deleted simply leaves the feed.
+      .filter(
+        (p): p is { row: (typeof rows)[number]; content: (typeof rows)[number] } =>
+          p.content !== null,
+      );
+    if (!pairs.length) return [];
+
+    const ids = [...new Set(pairs.map((p) => p.content.id))];
+    const [media, likes, comments, reposts, liked, reposted, saved] = await Promise.all([
       this.db
         .select()
         .from(postMedia)
@@ -398,13 +555,33 @@ export class PostsService {
         .where(and(inArray(postComment.postId, ids), isNull(postComment.deletedAt)))
         .groupBy(postComment.postId),
       this.db
+        .select({ postId: post.repostOfId, n: count() })
+        .from(post)
+        .where(and(inArray(post.repostOfId, ids), isNull(post.deletedAt)))
+        .groupBy(post.repostOfId),
+      this.db
         .select({ postId: postLike.postId })
         .from(postLike)
         .where(and(inArray(postLike.postId, ids), eq(postLike.userId, viewerId))),
+      this.db
+        .select({ postId: post.repostOfId })
+        .from(post)
+        .where(
+          and(inArray(post.repostOfId, ids), eq(post.authorId, viewerId), isNull(post.deletedAt)),
+        ),
+      this.db
+        .select({ postId: postSave.postId })
+        .from(postSave)
+        .where(and(inArray(postSave.postId, ids), eq(postSave.userId, viewerId))),
     ]);
+
     const likeCount = new Map(likes.map((r) => [r.postId, Number(r.n)]));
     const commentCount = new Map(comments.map((r) => [r.postId, Number(r.n)]));
-    const likedByMe = new Set(mine.map((r) => r.postId));
+    const repostCount = new Map(reposts.map((r) => [r.postId, Number(r.n)]));
+    const likedByMe = new Set(liked.map((r) => r.postId));
+    const repostedByMe = new Set(reposted.map((r) => r.postId).filter(isId));
+    const savedByMe = new Set(saved.map((r) => r.postId));
+
     const mediaByPost = new Map<string, PostMediaVM[]>();
     await Promise.all(
       media.map(async (m) => {
@@ -417,24 +594,41 @@ export class PostsService {
         mediaByPost.set(m.postId, [...(mediaByPost.get(m.postId) ?? []), vm]);
       }),
     );
+
+    // Post headers are 36px circles — the small size is a few KB.
+    const avatar = (key: string | null) =>
+      key ? this.storage.presignDownload(key, "sm") : Promise.resolve(null);
+
     return Promise.all(
-      rows.map(async (r) => ({
-        id: r.id,
-        body: r.body,
-        visibility: r.visibility,
-        createdAt: r.createdAt.toISOString(),
+      pairs.map(async ({ row, content }) => ({
+        id: row.id,
+        postId: content.id,
+        body: content.body,
+        visibility: content.visibility,
+        // The age shown is the age of the repost — that is when it reached the feed.
+        createdAt: row.createdAt.toISOString(),
         author: {
-          userId: r.authorId,
-          username: r.username,
-          displayName: r.displayName ?? r.username ?? "Member",
-          // Post headers are 36px circles — the small size is a few KB.
-          avatarUrl: r.avatarKey ? await this.storage.presignDownload(r.avatarKey, "sm") : null,
+          userId: content.authorId,
+          username: content.username,
+          displayName: content.displayName ?? content.username ?? "Member",
+          avatarUrl: await avatar(content.avatarKey),
         },
-        media: mediaByPost.get(r.id) ?? [],
-        likes: likeCount.get(r.id) ?? 0,
-        comments: commentCount.get(r.id) ?? 0,
-        likedByMe: likedByMe.has(r.id),
-        mine: r.authorId === viewerId,
+        media: mediaByPost.get(content.id) ?? [],
+        likes: likeCount.get(content.id) ?? 0,
+        comments: commentCount.get(content.id) ?? 0,
+        reposts: repostCount.get(content.id) ?? 0,
+        likedByMe: likedByMe.has(content.id),
+        repostedByMe: repostedByMe.has(content.id),
+        savedByMe: savedByMe.has(content.id),
+        repostedBy:
+          row.id === content.id
+            ? null
+            : {
+                userId: row.authorId,
+                username: row.username,
+                displayName: row.displayName ?? row.username ?? "Member",
+              },
+        mine: row.authorId === viewerId,
       })),
     );
   }
@@ -474,6 +668,8 @@ export class PostsService {
 }
 
 const tooLarge = () => `Photo is too large — max ${POST_MEDIA_MAX_MB}MB.`;
+
+const isId = (v: string | null): v is string => v !== null;
 
 /**
  * The one visibility rule: anything public, everything of the viewer's own, and

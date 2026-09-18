@@ -27,8 +27,8 @@ function makeDb(results: unknown[][] = []) {
 const storage = () => ({ presignDownload: vi.fn(async (k: string) => `https://s3.test/${k}`) });
 
 /** `byId` applies the feed's visibility rules; null means "not for this viewer". */
-const posts = (author: string | null = "u2") => ({
-  byId: vi.fn(async () => (author ? { author: { userId: author } } : null)),
+const posts = (author: string | null = "u2", postId = "p1") => ({
+  byId: vi.fn(async () => (author ? { postId, author: { userId: author } } : null)),
 });
 
 const service = (db = makeDb(), p = posts()) =>
@@ -138,5 +138,37 @@ describe("PostInteractionsService.removeComment", () => {
   it("is a 404 for a comment that is already gone", async () => {
     const db = makeDb([[{ commentAuthorId: "u1", postAuthorId: "u1", deletedAt: new Date() }]]);
     await expect(service(db).removeComment("c1", "u1")).rejects.toThrow(/not found/i);
+  });
+});
+
+describe("PostInteractionsService saves", () => {
+  it("is idempotent — saving twice leaves one row", async () => {
+    const db = makeDb();
+    await expect(service(db).save("p1", "u1")).resolves.toEqual({
+      postId: "p1",
+      savedByMe: true,
+    });
+    expect(db.insert).toHaveBeenCalledTimes(1);
+  });
+
+  it("saves the post itself, not somebody's repost of it", async () => {
+    // Otherwise the save would vanish the moment that repost was undone.
+    const db = makeDb();
+    await expect(service(db, posts("u2", "p1")).save("r1", "u1")).resolves.toMatchObject({
+      postId: "p1",
+    });
+  });
+
+  it("unsaves", async () => {
+    const db = makeDb();
+    await expect(service(db).unsave("p1", "u1")).resolves.toEqual({
+      postId: "p1",
+      savedByMe: false,
+    });
+    expect(db.delete).toHaveBeenCalled();
+  });
+
+  it("will not let a stranger save a post they cannot read", async () => {
+    await expect(service(makeDb(), posts(null)).save("p1", "u1")).rejects.toThrow(/not found/i);
   });
 });
