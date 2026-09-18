@@ -126,6 +126,8 @@ export interface MediaItemPM {
   fullUrl: string;
   createdAt: string;
   isCurrent: boolean;
+  /** Uploaded avatars and covers only; a post's photo is removed with its post. */
+  deletable: boolean;
 }
 
 export interface MediaPagePM {
@@ -144,6 +146,7 @@ export interface MediaTileVM {
   /** The current profile photo gets the 2-column "Featured" tile (Figma 1524:1786). */
   featured: boolean;
   isCurrent: boolean;
+  deletable: boolean;
 }
 
 export interface PublicProfileVM {
@@ -232,6 +235,7 @@ export function toMediaTiles(items: MediaItemPM[]): MediaTileVM[] {
     fullUrl: m.fullUrl,
     featured: m.kind === "avatar" && m.isCurrent,
     isCurrent: m.isCurrent,
+    deletable: m.deletable,
   }));
 }
 

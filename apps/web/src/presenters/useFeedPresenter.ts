@@ -39,19 +39,44 @@ interface DraftPhoto extends DraftPhotoVM {
   key: string | null;
 }
 
+export interface FeedOptions {
+  /**
+   * Show only this member's posts — the profile Posts tab. The API applies the
+   * same visibility rule either way, so a friends-only post stays hidden from a
+   * stranger browsing the profile exactly as it does in the feed.
+   */
+  author?: string | null;
+  /**
+   * False while the author is still being resolved. /profile has to ask the API
+   * who you are before it can ask for your posts, and without this the first
+   * render would fetch the home feed and show somebody else's posts under your
+   * own Posts tab.
+   */
+  ready?: boolean;
+}
+
 /**
- * The home feed: reading it, writing to it, and reacting to it.
+ * The feed: reading it, writing to it, and reacting to it. Serves both the home
+ * feed and a profile's Posts tab, so a post behaves the same wherever it is
+ * read — one like, one comment sheet, one delete.
  *
  * Photos upload the moment they are picked rather than on submit, so the Post
  * button is instant on the connection most members are on — by the time the
  * caption is typed the bytes are usually already in the bucket.
  */
-export function useFeedPresenter() {
+export function useFeedPresenter({ author = null, ready = true }: FeedOptions = {}) {
   const router = useRouter();
 
   const [posts, setPosts] = useState<PostPM[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  /**
+   * Which author the loaded posts belong to. Deriving `loading` from it rather
+   * than flipping a flag means walking from one member's profile to another
+   * shows a load instead of a flash of the previous member's posts — the page
+   * component stays mounted across that navigation.
+   */
+  const [loadedFor, setLoadedFor] = useState<string | null | undefined>(undefined);
+  const loading = !ready || loadedFor !== author;
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string[]>([]);
@@ -97,10 +122,11 @@ export function useFeedPresenter() {
   );
 
   useEffect(() => {
+    if (!ready) return;
     let cancelled = false;
     void (async () => {
       try {
-        const page = await postsApi.feed();
+        const page = await postsApi.feed(null, undefined, author);
         if (cancelled) return;
         setPosts(page.items);
         setCursor(page.nextCursor);
@@ -108,15 +134,17 @@ export function useFeedPresenter() {
         if (cancelled || onUnauthorized(e)) return;
         setError(FEED_COPY.feedError);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setLoadedFor(author);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [onUnauthorized]);
+  }, [author, ready, onUnauthorized]);
 
   useEffect(() => {
+    // A profile has its own Suggested Friends rail; the strip is the home feed's.
+    if (author || !ready) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -129,7 +157,7 @@ export function useFeedPresenter() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [author, ready]);
 
   // Revoke every preview on unmount so a long session doesn't leak blobs.
   useEffect(
@@ -144,7 +172,7 @@ export function useFeedPresenter() {
     if (!cursor || loadingMore) return;
     setLoadingMore(true);
     try {
-      const page = await postsApi.feed(cursor);
+      const page = await postsApi.feed(cursor, undefined, author);
       setPosts((prev) => [...prev, ...page.items]);
       setCursor(page.nextCursor);
     } catch (e) {
@@ -152,7 +180,7 @@ export function useFeedPresenter() {
     } finally {
       setLoadingMore(false);
     }
-  }, [cursor, loadingMore, onUnauthorized]);
+  }, [author, cursor, loadingMore, onUnauthorized]);
 
   const openMedia = useCallback((media: PostMediaVM) => setLightbox(media), []);
   const closeMedia = useCallback(() => setLightbox(null), []);

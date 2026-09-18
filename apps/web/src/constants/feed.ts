@@ -23,6 +23,8 @@ export const FEED_COPY = {
   save: "Save",
   share: "Share",
   postMenu: "Post options",
+  /** Announced on the controls that are drawn but have no backend yet. */
+  comingSoon: "coming soon",
   deletePost: "Delete post",
   deletePostConfirm: "Delete this post? This cannot be undone.",
   comments: "Comments",

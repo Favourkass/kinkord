@@ -45,10 +45,12 @@ export interface CreatePostInput {
 }
 
 export const postsApi = {
-  feed: (cursor?: string | null, limit?: number) => {
+  /** `author` narrows the feed to one member — that is the profile Posts tab. */
+  feed: (cursor?: string | null, limit?: number, author?: string | null) => {
     const qs = new URLSearchParams();
     if (cursor) qs.set("cursor", cursor);
     if (limit) qs.set("limit", String(limit));
+    if (author) qs.set("author", author.replace(/^@/, ""));
     const q = qs.toString();
     return api.get<FeedPM>(`/posts/feed${q ? `?${q}` : ""}`);
   },

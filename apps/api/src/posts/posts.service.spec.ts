@@ -284,3 +284,50 @@ describe("the feed's visibility rules", () => {
     expect(sql).not.toContain('"post"."created_at" <');
   });
 });
+
+describe("post counts and post media carry the same rule", () => {
+  const renderWheres = async (run: (svc: PostsService) => Promise<unknown>) => {
+    const wheres: SQL[] = [];
+    const svc = new PostsService(makeRecordingDb(wheres) as never, makeStorage() as never);
+    await run(svc);
+    return wheres.map((w) => new PgDialect().sqlToQuery(w));
+  };
+
+  it("counts only the posts the viewer is allowed to see", async () => {
+    const [q] = await renderWheres((svc) => svc.postCountsFor(["u2", "u3"], "viewer-1"));
+
+    expect(q.sql).toContain('"post"."deleted_at" is null');
+    expect(q.sql).toContain('"post"."author_id" in ($1, $2)');
+    expect(q.sql).toContain('"viewer_follows_author"."follower_id" is not null');
+    expect(q.sql).toContain('"author_follows_viewer"."follower_id" is not null');
+    expect(q.params).toEqual(["u2", "u3", "public", "viewer-1", "friends"]);
+  });
+
+  it("does not query at all for an empty set of members", async () => {
+    const wheres: SQL[] = [];
+    const db = makeRecordingDb(wheres);
+    const svc = new PostsService(db as never, makeStorage() as never);
+    await expect(svc.postCountsFor([], "viewer-1")).resolves.toEqual(new Map());
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it("shows a member's post photos only from posts the viewer may read", async () => {
+    const [q] = await renderWheres((svc) => svc.postMediaFor("u2", "viewer-1", ["image"], 20, 0));
+
+    expect(q.sql).toContain('"post"."author_id" = $1');
+    expect(q.sql).toContain('"post_media"."kind" in ($2)');
+    expect(q.sql).toContain('"viewer_follows_author"."follower_id" is not null');
+    expect(q.params.slice(0, 2)).toEqual(["u2", "image"]);
+  });
+
+  it("asks for nothing when the pill covers no post attachment", async () => {
+    const wheres: SQL[] = [];
+    const db = makeRecordingDb(wheres);
+    const svc = new PostsService(db as never, makeStorage() as never);
+    await expect(svc.postMediaFor("u2", "viewer-1", [], 20, 0)).resolves.toEqual({
+      rows: [],
+      total: 0,
+    });
+    expect(db.select).not.toHaveBeenCalled();
+  });
+});

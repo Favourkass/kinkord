@@ -247,6 +247,85 @@ export class PostsService {
     return { deleted: postId };
   }
 
+  /**
+   * How many posts each of these members has that this viewer may see. The
+   * member cards and the profile header both show the number, and it has to
+   * agree with what the Posts tab will actually list — so it is counted through
+   * the same visibility rule the feed uses rather than a second copy of it.
+   */
+  async postCountsFor(authorIds: string[], viewerId: string): Promise<Map<string, number>> {
+    if (!authorIds.length) return new Map();
+    const viewerFollows = alias(follow, "viewer_follows_author");
+    const authorFollows = alias(follow, "author_follows_viewer");
+    const rows = await this.db
+      .select({ authorId: post.authorId, n: count() })
+      .from(post)
+      .leftJoin(
+        viewerFollows,
+        and(eq(viewerFollows.followerId, viewerId), eq(viewerFollows.followingId, post.authorId)),
+      )
+      .leftJoin(
+        authorFollows,
+        and(eq(authorFollows.followerId, post.authorId), eq(authorFollows.followingId, viewerId)),
+      )
+      .where(
+        and(
+          isNull(post.deletedAt),
+          inArray(post.authorId, authorIds),
+          visibleTo(viewerId, viewerFollows, authorFollows),
+        ),
+      )
+      .groupBy(post.authorId);
+    return new Map(rows.map((r) => [r.authorId, Number(r.n)]));
+  }
+
+  /**
+   * Photos and videos this viewer may see from one member's posts, newest first.
+   * The profile Media tab shows them beside the avatars and covers, so a photo
+   * a member posted is findable from their profile and not only from the feed.
+   */
+  async postMediaFor(
+    authorId: string,
+    viewerId: string,
+    kinds: PostMediaKind[],
+    limit: number,
+    offset: number,
+  ) {
+    if (!kinds.length) return { rows: [], total: 0 };
+    const viewerFollows = alias(follow, "viewer_follows_author");
+    const authorFollows = alias(follow, "author_follows_viewer");
+    const where = and(
+      isNull(post.deletedAt),
+      eq(post.authorId, authorId),
+      inArray(postMedia.kind, kinds),
+      visibleTo(viewerId, viewerFollows, authorFollows),
+    );
+    const base = () =>
+      this.db
+        .select({
+          id: postMedia.id,
+          kind: postMedia.kind,
+          key: postMedia.key,
+          createdAt: postMedia.createdAt,
+        })
+        .from(postMedia)
+        .innerJoin(post, eq(post.id, postMedia.postId))
+        .leftJoin(
+          viewerFollows,
+          and(eq(viewerFollows.followerId, viewerId), eq(viewerFollows.followingId, post.authorId)),
+        )
+        .leftJoin(
+          authorFollows,
+          and(eq(authorFollows.followerId, post.authorId), eq(authorFollows.followingId, viewerId)),
+        )
+        .where(where);
+    const [rows, totalRows] = await Promise.all([
+      base().orderBy(desc(postMedia.createdAt)).limit(limit).offset(offset),
+      base(),
+    ]);
+    return { rows, total: totalRows.length };
+  }
+
   /** Usernames are stored lowercase by the username plugin; accept "@Handle" too. */
   private async resolveAuthor(username: string): Promise<string> {
     const handle = username.replace(/^@/, "").toLowerCase();
@@ -289,19 +368,7 @@ export class PostsService {
         and(eq(authorFollows.followerId, post.authorId), eq(authorFollows.followingId, viewerId)),
       )
       .where(
-        and(
-          isNull(post.deletedAt),
-          or(
-            eq(post.visibility, "public"),
-            eq(post.authorId, viewerId),
-            and(
-              eq(post.visibility, "friends"),
-              sql`${viewerFollows.followerId} is not null`,
-              sql`${authorFollows.followerId} is not null`,
-            ),
-          ),
-          ...extra,
-        ),
+        and(isNull(post.deletedAt), visibleTo(viewerId, viewerFollows, authorFollows), ...extra),
       )
       .orderBy(desc(post.createdAt))
       .limit(limit);
@@ -407,6 +474,28 @@ export class PostsService {
 }
 
 const tooLarge = () => `Photo is too large — max ${POST_MEDIA_MAX_MB}MB.`;
+
+/**
+ * The one visibility rule: anything public, everything of the viewer's own, and
+ * friends-only posts between two members who follow each other. The feed, the
+ * post counts and the profile Media tab all go through this, because three
+ * copies of it would eventually disagree and leak somebody's friends-only post.
+ */
+function visibleTo(
+  viewerId: string,
+  viewerFollows: ReturnType<typeof alias<typeof follow, string>>,
+  authorFollows: ReturnType<typeof alias<typeof follow, string>>,
+) {
+  return or(
+    eq(post.visibility, "public"),
+    eq(post.authorId, viewerId),
+    and(
+      eq(post.visibility, "friends"),
+      sql`${viewerFollows.followerId} is not null`,
+      sql`${authorFollows.followerId} is not null`,
+    ),
+  );
+}
 
 export function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, Math.floor(n)));

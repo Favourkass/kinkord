@@ -1,4 +1,7 @@
 import type { AppNavLabels, AppNavLinks, AppTab } from "@/components/app/nav";
+import CommentsPanel, { type CommentsPanelProps } from "@/components/feed/CommentsPanel";
+import ConfirmDialog, { type ConfirmDialogProps } from "@/components/feed/ConfirmDialog";
+import MediaLightbox, { type MediaLightboxProps } from "@/components/feed/MediaLightbox";
 import type { PublicProfileVM } from "@/domain/member";
 import AboutTab, { type AboutLabels } from "./AboutTab";
 import MediaTab, { type MediaTabProps } from "./MediaTab";
@@ -33,6 +36,12 @@ export interface ProfileScreenProps {
   aboutLabels: AboutLabels;
   people: PeopleTabProps;
   posts: PostsTabProps;
+  /** Comment sheet, delete confirm and photo lightbox for the Posts tab. */
+  postOverlays: {
+    comments: CommentsPanelProps;
+    confirm: ConfirmDialogProps;
+    lightbox: MediaLightboxProps;
+  };
   media: MediaTabProps;
   suggested: SuggestedFriendsProps;
   activeTab?: AppTab;
@@ -59,30 +68,40 @@ export default function ProfileScreen(p: ProfileScreenProps) {
     followBusy: p.followBusy,
   };
   return (
-    <ProfileShell
-      nav={p.nav}
-      topNav={{ ...p.topNav, links: p.links, labels: p.labels, viewerAvatarUrl: p.viewerAvatarUrl }}
-      hero={ready && p.vm ? <ProfileHero vm={p.vm} labels={p.heroLabels} {...actions} /> : null}
-      sideCard={
-        ready && p.vm ? <ProfileSideCard vm={p.vm} labels={p.sideLabels} {...actions} /> : null
-      }
-      aside={ready ? <SuggestedFriends {...p.suggested} /> : null}
-      viewerAvatarUrl={p.viewerAvatarUrl}
-      activeTab={p.activeTab}
-      links={p.links}
-      labels={p.labels}
-    >
-      {ready && p.vm ? (
-        <>
-          <ProfileTabs tabs={p.tabs} active={p.tab} onSelect={p.setTab} />
-          {p.tab === "about" && <AboutTab vm={p.vm} labels={p.aboutLabels} />}
-          {p.tab === "people" && <PeopleTab {...p.people} />}
-          {p.tab === "posts" && <PostsTab {...p.posts} />}
-          {p.tab === "media" && <MediaTab {...p.media} />}
-        </>
-      ) : (
-        statusBlock
-      )}
-    </ProfileShell>
+    <>
+      <ProfileShell
+        nav={p.nav}
+        topNav={{
+          ...p.topNav,
+          links: p.links,
+          labels: p.labels,
+          viewerAvatarUrl: p.viewerAvatarUrl,
+        }}
+        hero={ready && p.vm ? <ProfileHero vm={p.vm} labels={p.heroLabels} {...actions} /> : null}
+        sideCard={
+          ready && p.vm ? <ProfileSideCard vm={p.vm} labels={p.sideLabels} {...actions} /> : null
+        }
+        aside={ready ? <SuggestedFriends {...p.suggested} /> : null}
+        viewerAvatarUrl={p.viewerAvatarUrl}
+        activeTab={p.activeTab}
+        links={p.links}
+        labels={p.labels}
+      >
+        {ready && p.vm ? (
+          <>
+            <ProfileTabs tabs={p.tabs} active={p.tab} onSelect={p.setTab} />
+            {p.tab === "about" && <AboutTab vm={p.vm} labels={p.aboutLabels} />}
+            {p.tab === "people" && <PeopleTab {...p.people} />}
+            {p.tab === "posts" && <PostsTab {...p.posts} />}
+            {p.tab === "media" && <MediaTab {...p.media} />}
+          </>
+        ) : (
+          statusBlock
+        )}
+      </ProfileShell>
+      <CommentsPanel {...p.postOverlays.comments} />
+      <ConfirmDialog {...p.postOverlays.confirm} />
+      <MediaLightbox {...p.postOverlays.lightbox} />
+    </>
   );
 }
