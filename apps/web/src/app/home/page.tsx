@@ -39,7 +39,7 @@ export default function HomePage() {
         repost: FEED_COPY.repost,
         save: FEED_COPY.save,
         share: FEED_COPY.share,
-        comingSoon: "coming soon",
+        comingSoon: FEED_COPY.comingSoon,
         more: FEED_COPY.more,
         less: FEED_COPY.less,
         menu: FEED_COPY.postMenu,

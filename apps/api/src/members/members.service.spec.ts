@@ -4,6 +4,7 @@ import { type SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { type Db } from "../db/db.module";
 import { type StorageService } from "../storage/storage.service";
+import { type PostsService } from "../posts/posts.service";
 import { type FollowsService } from "./follows.service";
 import { MembersService, ageFromDob, normalizePaging } from "./members.service";
 
@@ -76,8 +77,13 @@ const makeService = () => {
     following,
     areFriends,
   } as unknown as FollowsService;
+  const postCountsFor = vi.fn(async () => new Map<string, number>());
+  const postMediaFor = vi.fn(async () => ({ rows: [], total: 0 }));
+  const posts = { postCountsFor, postMediaFor } as unknown as PostsService;
   return {
-    service: new MembersService(db, storage, follows),
+    service: new MembersService(db, storage, follows, posts),
+    postCountsFor,
+    postMediaFor,
     select,
     presignDownload,
     isFollowing,
@@ -501,18 +507,7 @@ describe("MembersService people tabs + media (profile rebuild, 2026-09-12)", () 
     expect(presignDownload).toHaveBeenCalledWith("avatars/u2/new.jpg");
   });
 
-  it("returns nothing for the Videos pill yet, and nothing at all to non-friends of a friends-only profile", async () => {
-    const videos = makeService();
-    videos.select.mockReturnValueOnce(
-      chain([{ avatarKey: null, coverKey: null, visibility: "public" }]),
-    );
-    await expect(videos.service.media("nene", "me", "videos")).resolves.toMatchObject({
-      items: [],
-      total: 0,
-      restricted: false,
-    });
-    expect(videos.select).toHaveBeenCalledTimes(1);
-
+  it("shows nothing at all to a non-friend of a friends-only profile", async () => {
     const locked = makeService();
     locked.select.mockReturnValueOnce(
       chain([{ avatarKey: "avatars/u2/a.jpg", coverKey: null, visibility: "friends" }]),
@@ -522,6 +517,94 @@ describe("MembersService people tabs + media (profile rebuild, 2026-09-12)", () 
       restricted: true,
     });
     expect(locked.areFriends).toHaveBeenCalledWith("me", "u2");
+    // Nothing is even asked of the posts side for a profile the viewer cannot see.
+    expect(locked.postMediaFor).not.toHaveBeenCalled();
+  });
+
+  it("puts post photos in the grid beside the uploads, newest first", async () => {
+    const { service, select, postMediaFor } = makeService();
+    select
+      .mockReturnValueOnce(
+        chain([{ avatarKey: "avatars/u2/new.jpg", coverKey: null, visibility: "public" }]),
+      )
+      .mockReturnValueOnce(
+        chain([
+          {
+            id: "m1",
+            userId: "u2",
+            kind: "cover",
+            key: "covers/u2/a.jpg",
+            createdAt: new Date("2026-09-10T00:00:00Z"),
+          },
+        ]),
+      )
+      .mockReturnValueOnce(chain([{ total: 1 }]));
+    postMediaFor.mockResolvedValueOnce({
+      rows: [
+        {
+          id: "pm1",
+          kind: "image",
+          key: "posts/u2/a.jpg",
+          createdAt: new Date("2026-09-12T00:00:00Z"),
+        },
+      ],
+      total: 1,
+    } as never);
+
+    const page = await service.media("nene", "me", "photos");
+
+    expect(postMediaFor).toHaveBeenCalledWith("u2", "me", ["image"], 20, 0);
+    // The post photo is newer, so it sorts first across both sources.
+    expect(page.items.map((i) => i.id)).toEqual(["pm1", "m1"]);
+    expect(page.items[0]).toMatchObject({ kind: "photo", deletable: false, isCurrent: false });
+    expect(page.items[1]).toMatchObject({ kind: "cover", deletable: true });
+    expect(page.total).toBe(2);
+  });
+
+  it("never asks the posts side for the Profile Photo pill — no post can be an avatar", async () => {
+    const { service, select, postMediaFor } = makeService();
+    select
+      .mockReturnValueOnce(chain([{ avatarKey: null, coverKey: null, visibility: "public" }]))
+      .mockReturnValueOnce(chain([]))
+      .mockReturnValueOnce(chain([{ total: 0 }]));
+
+    await service.media("nene", "me", "profile");
+
+    expect(postMediaFor).toHaveBeenCalledWith("u2", "me", [], 20, 0);
+  });
+});
+
+describe("post counts on the directory cards", () => {
+  it("counts each member's visible posts in one query for the page", async () => {
+    const { service, select, postCountsFor } = makeService();
+    postCountsFor.mockResolvedValueOnce(new Map([["u2", 7]]) as never);
+    select
+      .mockReturnValueOnce(chain(undefined)) // follower_counts subquery (built, not awaited)
+      .mockReturnValueOnce(
+        chain([
+          {
+            userId: "u2",
+            username: "nene",
+            displayName: "Nene",
+            avatarKey: null,
+            dateOfBirth: null,
+            gender: null,
+            roles: [],
+            city: null,
+            state: null,
+            isOnline: false,
+            lastSeenAt: null,
+            followers: 0,
+            isFollowing: false,
+          },
+        ]),
+      )
+      .mockReturnValueOnce(chain([{ total: 1 }]));
+
+    const page = await service.list({ country: "NG", sort: "recent" }, "me");
+
+    expect(postCountsFor).toHaveBeenCalledWith(["u2"], "me");
+    expect(page.items[0].postsCount).toBe(7);
   });
 });
 

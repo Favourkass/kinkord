@@ -129,6 +129,23 @@ html[data-theme="dark"] {
   --color-app-offline: var(--app-offline);
 }
 
+/**
+ * Posts rendered on the profile. The feed's palette is pure black in dark mode
+ * and the profile's is a cooler blue-grey, so instead of a second post
+ * component the feed's tokens are re-pointed at the profile's for this subtree.
+ */
+.feed-profile-tone {
+  --feed-text: var(--pf-text);
+  --feed-muted: var(--pf-muted);
+  --feed-line: var(--pf-border);
+  --feed-card: var(--pf-surface);
+  --feed-media: var(--pf-surface-2);
+  --feed-chip: var(--pf-pill);
+  --feed-chip-text: var(--pf-pill-text);
+  --feed-sheet: var(--pf-sheet);
+  --feed-field: var(--pf-input);
+}
+
 * {
   box-sizing: border-box;
 }

@@ -135,6 +135,9 @@ export const MEMBERS_COPY = {
     },
     posts: {
       empty: "No posts yet.",
+      /** What a visitor sees where a friends-only post would be — the API simply omits it. */
+      loading: "Loading posts…",
+      loadMore: "Load more posts",
       like: "Like",
       comment: "Comment",
       share: "Share",

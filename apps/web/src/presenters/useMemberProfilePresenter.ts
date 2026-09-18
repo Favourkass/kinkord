@@ -429,12 +429,8 @@ export function useMemberProfilePresenter(
       onAdd: addSuggested,
       empty: copy.desktop.noSuggestions,
     },
-    posts: {
-      authorName: vm?.displayName ?? "",
-      authorAvatarUrl: vm?.avatarUrl ?? null,
-      emptyText: copy.posts.empty,
-      labels: { like: copy.posts.like, comment: copy.posts.comment, share: copy.posts.share },
-    },
+    // The Posts tab is fed by `useFeedPresenter` from the page — same posts,
+    // same visibility rule and the same card as the home feed.
     media: {
       heading: copy.media.heading,
       countLabel: copy.media.count(currentMedia?.total ?? 0),
@@ -455,7 +451,8 @@ export function useMemberProfilePresenter(
       lightbox: lightboxTile
         ? {
             tile: lightboxTile,
-            canDelete: Boolean(pm?.isSelf),
+            // Post attachments belong to a post, not to /profile/media/:id.
+            canDelete: Boolean(pm?.isSelf) && lightboxTile.deletable,
             confirming: lightbox?.confirming ?? false,
             deleting: lightbox?.deleting ?? false,
           }

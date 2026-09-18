@@ -439,3 +439,68 @@ describe("people you may know", () => {
     expect(result.current.error).toBeNull();
   });
 });
+
+describe("pointed at one member (the profile Posts tab)", () => {
+  it("asks for that member's posts, not the whole feed", async () => {
+    const hook = renderHook(() => useFeedPresenter({ author: "tega" }));
+    await waitFor(() => expect(hook.result.current.loading).toBe(false));
+
+    expect(feed).toHaveBeenCalledWith(null, undefined, "tega");
+  });
+
+  it("leaves the suggestions strip to the home feed", async () => {
+    const hook = renderHook(() => useFeedPresenter({ author: "tega" }));
+    await waitFor(() => expect(hook.result.current.loading).toBe(false));
+
+    expect(suggested).not.toHaveBeenCalled();
+    expect(hook.result.current.suggestions).toHaveLength(0);
+  });
+
+  it("loads nothing until the handle is known", async () => {
+    // /profile has to ask the API who you are first; without this gate the very
+    // first render would fetch the home feed and show it under your Posts tab.
+    const { result, rerender } = renderHook(
+      ({ author }: { author: string | null }) =>
+        useFeedPresenter({ author, ready: Boolean(author) }),
+      { initialProps: { author: null as string | null } },
+    );
+    expect(feed).not.toHaveBeenCalled();
+    expect(result.current.loading).toBe(true);
+
+    rerender({ author: "favour" });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(feed).toHaveBeenCalledTimes(1);
+    expect(feed).toHaveBeenCalledWith(null, undefined, "favour");
+  });
+
+  it("shows a load, not the last member's posts, when you walk to another profile", async () => {
+    const { result, rerender } = renderHook(
+      ({ author }: { author: string }) => useFeedPresenter({ author }),
+      { initialProps: { author: "tega" } },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.posts).toHaveLength(1);
+
+    let settle: (page: unknown) => void = () => {};
+    feed.mockReturnValueOnce(
+      new Promise((resolve) => {
+        settle = resolve;
+      }),
+    );
+    rerender({ author: "ada" });
+
+    expect(result.current.loading).toBe(true);
+    await act(async () => settle({ items: [pm({ id: "p9" })], nextCursor: null }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.posts.map((p) => p.id)).toEqual(["p9"]);
+  });
+
+  it("keeps the member's handle on the next page too", async () => {
+    feed.mockResolvedValueOnce({ items: [pm()], nextCursor: "2026-09-18T11:00:00.000Z" });
+    const { result } = renderHook(() => useFeedPresenter({ author: "tega" }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => result.current.loadMore());
+    expect(feed).toHaveBeenLastCalledWith("2026-09-18T11:00:00.000Z", undefined, "tega");
+  });
+});
