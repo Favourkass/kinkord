@@ -6,3 +6,4 @@ export * from "./profile";
 export * from "./profile-media";
 export * from "./follow";
 export * from "./otp";
+export * from "./post";

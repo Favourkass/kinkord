@@ -246,6 +246,17 @@ body {
   --pf-input: #f3f4f6;
   --pf-input-border: #e5e7eb;
   --pf-btn-dark: #111827;
+  /* ---- Home feed (Figma "Hompage Light" 344:138 / dark 837:295) ---- */
+  --feed-text: #1f1f1d;
+  --feed-muted: #757575;
+  --feed-line: #e6e1d7;
+  --feed-card: #ffffff;
+  /* Empty media well, before a photo paints. */
+  --feed-media: #d9d9d9;
+  --feed-chip: #e9e9e9;
+  --feed-chip-text: #1f1f1d;
+  --feed-sheet: #ffffff;
+  --feed-field: #f6f6f6;
 }
 
 html[data-theme="dark"] {
@@ -310,6 +321,15 @@ html[data-theme="dark"] {
   --pf-input: #0b0f14;
   --pf-input-border: #1f2937;
   --pf-btn-dark: #000000;
+  --feed-text: #f2efe8;
+  --feed-muted: #97917f;
+  --feed-line: #35332e;
+  --feed-card: #000000;
+  --feed-media: #1a1a17;
+  --feed-chip: #757575;
+  --feed-chip-text: #f2efe8;
+  --feed-sheet: #141310;
+  --feed-field: #141310;
 }
 
 @theme inline {
@@ -374,4 +394,13 @@ html[data-theme="dark"] {
   --color-pf-input: var(--pf-input);
   --color-pf-input-border: var(--pf-input-border);
   --color-pf-btn-dark: var(--pf-btn-dark);
+  --color-feed-text: var(--feed-text);
+  --color-feed-muted: var(--feed-muted);
+  --color-feed-line: var(--feed-line);
+  --color-feed-card: var(--feed-card);
+  --color-feed-media: var(--feed-media);
+  --color-feed-chip: var(--feed-chip);
+  --color-feed-chip-text: var(--feed-chip-text);
+  --color-feed-sheet: var(--feed-sheet);
+  --color-feed-field: var(--feed-field);
 }
