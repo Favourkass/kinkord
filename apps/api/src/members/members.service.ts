@@ -2,7 +2,15 @@ import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, asc, count, desc, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { Db, DRIZZLE } from "../db/db.module";
-import { follow, profile, profileMedia, user, type ProfileMediaKind } from "../db/schema";
+import {
+  follow,
+  profile,
+  profileMedia,
+  user,
+  type PostMediaKind,
+  type ProfileMediaKind,
+} from "../db/schema";
+import { PostsService } from "../posts/posts.service";
 import { ONLINE_WINDOW_SECONDS, PresenceService } from "../presence/presence.service";
 import { StorageService } from "../storage/storage.service";
 import { FollowsService } from "./follows.service";
@@ -16,8 +24,18 @@ const MEDIA_KINDS: Record<MediaFilter, ProfileMediaKind[]> = {
   all: ["avatar", "cover"],
   profile: ["avatar"],
   photos: ["cover"],
-  // Videos arrive with posts; nothing to list yet.
   videos: [],
+};
+/** What a Media tab tile can be: an uploaded avatar or cover, or a post attachment. */
+export type MediaItemKind = ProfileMediaKind | "photo" | "video";
+
+/** The same pills over post attachments: a photo you posted belongs under "Photos". */
+const POST_MEDIA_KINDS: Record<MediaFilter, PostMediaKind[]> = {
+  all: ["image", "video"],
+  // "Profile Photo" means the avatar itself, which no post can be.
+  profile: [],
+  photos: ["image"],
+  videos: ["video"],
 };
 
 export interface ListMembersParams {
@@ -61,6 +79,7 @@ export class MembersService {
     @Inject(DRIZZLE) private readonly db: Db,
     private readonly storage: StorageService,
     private readonly follows: FollowsService,
+    private readonly posts: PostsService,
   ) {}
 
   /** Available countries with how many members have set that country. */
@@ -155,6 +174,11 @@ export class MembersService {
 
     const [totalRow] = await this.db.select({ total: count() }).from(profile).where(where);
 
+    // One grouped query for the page rather than a count per card.
+    const postCounts = await this.posts.postCountsFor(
+      rows.map((r) => r.userId),
+      viewerId,
+    );
     const items = await Promise.all(
       rows.map(async (r) => ({
         userId: r.userId,
@@ -170,8 +194,7 @@ export class MembersService {
         state: r.state,
         isOnline: Boolean(r.isOnline),
         lastSeenAt: r.lastSeenAt ? r.lastSeenAt.toISOString() : null,
-        // Posts ship in a later slice; the card slot stays so the layout is final.
-        postsCount: 0,
+        postsCount: postCounts.get(r.userId) ?? 0,
         followersCount: Number(r.followers ?? 0),
         isFollowing: Boolean(r.isFollowing),
       })),
@@ -340,28 +363,68 @@ export class MembersService {
     const restricted =
       p.visibility === "friends" && !isSelf && !(await this.follows.areFriends(viewerId, targetId));
     const kinds = MEDIA_KINDS[filter];
-    if (restricted || kinds.length === 0) return { items: [], total: 0, page, limit, restricted };
+    const postKinds = POST_MEDIA_KINDS[filter];
+    if (restricted || (kinds.length === 0 && postKinds.length === 0)) {
+      return { items: [], total: 0, page, limit, restricted };
+    }
+
+    // Two sources, both newest-first: uploaded avatars and covers, and the
+    // photos attached to posts. Each is read up to `offset + limit` and the two
+    // are merged, which is exactly right for merging sorted lists and is bounded
+    // because the page size is capped.
+    const reach = offset + limit;
     const where = and(eq(profileMedia.userId, targetId), inArray(profileMedia.kind, kinds));
-    const rows = await this.db
-      .select()
-      .from(profileMedia)
-      .where(where)
-      .orderBy(desc(profileMedia.createdAt))
-      .limit(limit)
-      .offset(offset);
-    const [totalRow] = await this.db.select({ total: count() }).from(profileMedia).where(where);
+    const [uploaded, uploadedTotal, fromPosts] = await Promise.all([
+      kinds.length
+        ? this.db
+            .select()
+            .from(profileMedia)
+            .where(where)
+            .orderBy(desc(profileMedia.createdAt))
+            .limit(reach)
+        : Promise.resolve([]),
+      kinds.length
+        ? this.db.select({ total: count() }).from(profileMedia).where(where)
+        : Promise.resolve([{ total: 0 }]),
+      this.posts.postMediaFor(targetId, viewerId, postKinds, reach, 0),
+    ]);
+
+    const merged = [
+      ...uploaded.map((r) => ({
+        id: r.id,
+        kind: r.kind as MediaItemKind,
+        key: r.key,
+        createdAt: r.createdAt,
+        isCurrent: r.key === (r.kind === "avatar" ? p.avatarKey : p.coverKey),
+      })),
+      ...fromPosts.rows.map((r) => ({
+        id: r.id,
+        // A post attachment is a plain photo or video on the profile grid; only
+        // an uploaded avatar can be the "current" one.
+        kind: (r.kind === "video" ? "video" : "photo") as MediaItemKind,
+        key: r.key,
+        createdAt: r.createdAt,
+        isCurrent: false,
+      })),
+    ]
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(offset, offset + limit);
+
     const items = await Promise.all(
-      rows.map(async (r) => ({
+      merged.map(async (r) => ({
         id: r.id,
         kind: r.kind,
         // Grid tiles use the medium size; the lightbox opens the original.
         url: await this.storage.presignDownload(r.key, "md"),
         fullUrl: await this.storage.presignDownload(r.key),
         createdAt: r.createdAt.toISOString(),
-        isCurrent: r.key === (r.kind === "avatar" ? p.avatarKey : p.coverKey),
+        isCurrent: r.isCurrent,
+        /** Post attachments are not deletable from here — they belong to a post. */
+        deletable: r.kind === "avatar" || r.kind === "cover",
       })),
     );
-    return { items, total: Number(totalRow?.total ?? 0), page, limit, restricted: false };
+    const total = Number(uploadedTotal[0]?.total ?? 0) + fromPosts.total;
+    return { items, total, page, limit, restricted: false };
   }
 
   /** A member's friends ("all" = their mutual follows; "mutual" = friends in common with the viewer). */

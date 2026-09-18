@@ -218,14 +218,66 @@ describe("About cards + media (profile rebuild, 2026-09-12)", () => {
     expect(socialHandle("https://facebook.com/")).toBe("facebook.com");
     expect(socialHandle("not a url")).toBe("not a url");
     const tiles = toMediaTiles([
-      { id: "a", kind: "avatar", url: "u", fullUrl: "f", createdAt: "x", isCurrent: true },
-      { id: "b", kind: "cover", url: "u", fullUrl: "f", createdAt: "x", isCurrent: true },
-      { id: "c", kind: "avatar", url: "u", fullUrl: "f", createdAt: "x", isCurrent: false },
+      {
+        id: "a",
+        kind: "avatar",
+        url: "u",
+        fullUrl: "f",
+        createdAt: "x",
+        isCurrent: true,
+        deletable: true,
+      },
+      {
+        id: "b",
+        kind: "cover",
+        url: "u",
+        fullUrl: "f",
+        createdAt: "x",
+        isCurrent: true,
+        deletable: true,
+      },
+      {
+        id: "c",
+        kind: "avatar",
+        url: "u",
+        fullUrl: "f",
+        createdAt: "x",
+        isCurrent: false,
+        deletable: true,
+      },
     ]);
     expect(tiles.map((t) => [t.id, t.featured])).toEqual([
       ["a", true],
       ["b", false],
       ["c", false],
+    ]);
+  });
+
+  it("carries through that a post's photo cannot be deleted from the profile grid", () => {
+    // It belongs to a post — removing it there would leave the post with a hole.
+    const tiles = toMediaTiles([
+      {
+        id: "p1",
+        kind: "photo",
+        url: "u",
+        fullUrl: "f",
+        createdAt: "x",
+        isCurrent: false,
+        deletable: false,
+      },
+      {
+        id: "a",
+        kind: "avatar",
+        url: "u",
+        fullUrl: "f",
+        createdAt: "x",
+        isCurrent: true,
+        deletable: true,
+      },
+    ]);
+    expect(tiles.map((t) => [t.id, t.deletable])).toEqual([
+      ["p1", false],
+      ["a", true],
     ]);
   });
 });
