@@ -36,6 +36,9 @@ export const FEED_COPY = {
   comingSoon: "coming soon",
   deletePost: "Delete post",
   deletePostConfirm: "Delete this post? This cannot be undone.",
+  /** Undoing a repost touches only your own row; the post itself is untouched. */
+  removeRepost: "Undo repost",
+  removeRepostConfirm: "Remove your repost? The original post stays where it is.",
   comments: "Comments",
   commentsEmpty: "No comments yet. Be the first.",
   commentPlaceholder: "Write a comment…",
