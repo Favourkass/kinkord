@@ -3,6 +3,8 @@
 import { useParams, useSearchParams } from "next/navigation";
 import ProfileScreen from "@/components/profile/ProfileScreen";
 import { getAppShellNav } from "@/presenters/getAppShellNav";
+import { getProfilePosts } from "@/presenters/getProfilePosts";
+import { useFeedPresenter } from "@/presenters/useFeedPresenter";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
 import { useMemberProfilePresenter } from "@/presenters/useMemberProfilePresenter";
 
@@ -13,10 +15,12 @@ export default function MemberProfilePage() {
   const shell = useHomePresenter();
   const nav = getAppShellNav();
   const vm = useMemberProfilePresenter(params.username, search.get("tab"));
+  const feed = useFeedPresenter({ author: params.username });
 
   return (
     <ProfileScreen
       {...vm}
+      {...getProfilePosts(feed, shell.avatarUrl)}
       viewerAvatarUrl={shell.avatarUrl}
       links={nav.links}
       labels={nav.labels}

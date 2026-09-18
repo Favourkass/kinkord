@@ -60,19 +60,14 @@ export default function BrandSplash({
           onTimeUpdate={onPlaying}
           onEnded={onFinished}
           onError={onFinished}
-          // 16:9 source on a tall phone letterboxes to a small strip, so widen it
-          // past the viewport in portrait. The lockup lives inside the middle
-          // ~70% of the frame, so 125% crops black margin only.
-          className="max-h-full w-full object-contain portrait:w-[125%] portrait:max-w-none"
+          // The clip is a 9:16 portrait master, so it fills a phone edge to edge.
+          // `cover` keeps it full-bleed on any other shape — the lockup sits in
+          // the middle band, so a wider screen crops black only.
+          className="size-full object-cover"
         />
       ) : (
         // eslint-disable-next-line @next/next/no-img-element -- static brand asset, no optimisation needed
-        <img
-          src={posterSrc}
-          alt=""
-          aria-hidden
-          className="max-h-full w-full object-contain portrait:w-[125%] portrait:max-w-none"
-        />
+        <img src={posterSrc} alt="" aria-hidden className="size-full object-cover" />
       )}
       <span className="sr-only">{label}</span>
     </div>

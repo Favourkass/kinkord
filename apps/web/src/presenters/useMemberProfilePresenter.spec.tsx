@@ -104,6 +104,7 @@ const mediaPage = {
       fullUrl: "https://s3/a.jpg",
       createdAt: "2026-09-10T00:00:00.000Z",
       isCurrent: true,
+      deletable: true,
     },
     {
       id: "m0",
@@ -112,6 +113,7 @@ const mediaPage = {
       fullUrl: "https://s3/c.jpg",
       createdAt: "2026-08-10T00:00:00.000Z",
       isCurrent: false,
+      deletable: true,
     },
   ],
   total: 2,

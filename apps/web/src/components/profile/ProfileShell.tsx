@@ -24,6 +24,10 @@ export interface ProfileShellProps {
 /**
  * Public-profile chrome. Mobile (Figma 948:2866): nav bar + hero + tabs + icon tab bar.
  * Desktop (Figma 987:5468): top nav + three columns (340 / fluid / 300, gap 32).
+ *
+ * The chrome switches responsively but the tabs are written once, rather than
+ * the screen being rendered twice with one copy hidden — now that the Posts tab
+ * carries photos, a second hidden copy would fetch every one of them again.
  */
 export default function ProfileShell({
   nav,
@@ -39,26 +43,29 @@ export default function ProfileShell({
 }: ProfileShellProps) {
   return (
     <div className="min-h-dvh bg-pf-page text-pf-text">
-      <div className="flex min-h-dvh flex-col lg:hidden">
+      <div className="lg:hidden">
         <ProfileNavBar {...nav} />
-        <main className="flex-1 pb-[calc(57px+env(safe-area-inset-bottom))]">
-          {hero}
+      </div>
+      <div className="hidden lg:block">
+        <ProfileTopNav {...topNav} />
+      </div>
+
+      <main className="pb-[calc(57px+env(safe-area-inset-bottom))] lg:flex lg:items-start lg:gap-[32px] lg:px-[32px] lg:pb-[64px] lg:pt-[32px]">
+        <div className="hidden w-[340px] shrink-0 lg:block">{sideCard}</div>
+        <div className="flex min-w-0 flex-1 flex-col lg:gap-[24px]">
+          <div className="lg:hidden">{hero}</div>
           {children}
-        </main>
+        </div>
+        <div className="hidden w-[300px] shrink-0 flex-col gap-[24px] lg:flex">{aside}</div>
+      </main>
+
+      <div className="lg:hidden">
         <MobileTabBar
           active={activeTab}
           avatarUrl={viewerAvatarUrl}
           links={links}
           labels={labels}
         />
-      </div>
-      <div className="hidden min-h-dvh flex-col lg:flex">
-        <ProfileTopNav {...topNav} />
-        <main className="flex items-start gap-[32px] px-[32px] pb-[64px] pt-[32px]">
-          <div className="w-[340px] shrink-0">{sideCard}</div>
-          <div className="flex min-w-0 flex-1 flex-col gap-[24px]">{children}</div>
-          <div className="flex w-[300px] shrink-0 flex-col gap-[24px]">{aside}</div>
-        </main>
       </div>
     </div>
   );

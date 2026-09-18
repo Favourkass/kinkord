@@ -84,7 +84,7 @@ describe("dob", () => {
     expect(errors.gender).toBeTruthy();
   });
 
-  it("defines WIZARD_STEPS as 4", () => {
-    expect(WIZARD_STEPS).toBe(4);
+  it("defines WIZARD_STEPS as 5", () => {
+    expect(WIZARD_STEPS).toBe(5);
   });
 });

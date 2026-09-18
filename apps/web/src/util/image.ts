@@ -14,7 +14,12 @@ export interface CompressOptions {
 export const IMAGE_UPLOAD_PRESETS = {
   avatar: { maxDim: 512, quality: 0.85, maxBytes: 300 * 1024 },
   cover: { maxDim: 1600, quality: 0.82, maxBytes: 800 * 1024 },
-} as const satisfies Record<"avatar" | "cover", CompressOptions>;
+  /** Feed photos run full card width and open to a lightbox, but four at a time
+      go up over a phone connection — 1440px is the balance. */
+  post: { maxDim: 1440, quality: 0.82, maxBytes: 600 * 1024 },
+} as const satisfies Record<string, CompressOptions>;
+
+export type UploadKind = keyof typeof IMAGE_UPLOAD_PRESETS;
 
 /**
  * Stored sizes, matching the API's IMAGE_VARIANTS. `sm` serves 36-48px rows and
@@ -39,7 +44,7 @@ export interface UploadSet {
  * already-compressed original, so a phone photo is decoded once per size and
  * never re-uploaded at full resolution for a 48px circle.
  */
-export async function buildUploadSet(file: File, kind: "avatar" | "cover"): Promise<UploadSet> {
+export async function buildUploadSet(file: File, kind: UploadKind): Promise<UploadSet> {
   const original = await compressImage(file, IMAGE_UPLOAD_PRESETS[kind]);
   const sizes = await Promise.all(
     IMAGE_VARIANTS.map((v) => compressImage(original, IMAGE_VARIANT_PRESETS[v])),

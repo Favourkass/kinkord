@@ -86,6 +86,28 @@ export function timeAgo(iso: string | null | undefined, now = new Date()): strin
   return y === 1 ? "a year ago" : `${y} years ago`;
 }
 
+/**
+ * Compact relative time for post headers, where the design gives it one line
+ * beside the handle: "now", "3m", "1h", "2d", "5w", "8mo", "2y". `timeAgo` is
+ * the prose version and stays the one used wherever there is room for words.
+ */
+export function shortTimeAgo(iso: string | null | undefined, now = new Date()): string | null {
+  if (!iso) return null;
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return null;
+  const s = Math.max(0, Math.floor((now.getTime() - then.getTime()) / 1000));
+  if (s < 60) return "now";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d`;
+  if (d < 30) return `${Math.floor(d / 7)}w`;
+  if (d < 365) return `${Math.floor(d / 30)}mo`;
+  return `${Math.floor(d / 365)}y`;
+}
+
 /** ISO date or timestamp -> "26 Mar 1998" (UTC, en-GB); null when missing or unparseable. */
 export function shortDate(iso: string | null | undefined): string | null {
   if (!iso) return null;

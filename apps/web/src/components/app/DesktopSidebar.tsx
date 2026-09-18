@@ -75,9 +75,19 @@ export default function DesktopSidebar({
       <div className="mt-auto">
         <div className="ml-[7px] w-[307px] border-t-[1.5px] border-side-divider" />
         <Link
+          href={links.saved}
+          aria-current={active === "saved" ? "page" : undefined}
+          className={`mt-[28px] ${row(active === "saved")}`}
+        >
+          <span className="grid size-[29px] place-items-center text-side-text">
+            <MaskIcon src="/app/feed/icon-bookmark.svg" width={29} />
+          </span>
+          {labels.saved}
+        </Link>
+        <Link
           href={links.settings}
           aria-current={active === "settings" ? "page" : undefined}
-          className={`mt-[28px] ${row(active === "settings")}`}
+          className={`mt-[24px] ${row(active === "settings")}`}
         >
           <span className="grid size-[29px] place-items-center text-side-text">
             <MaskIcon name="settings" width={29} />

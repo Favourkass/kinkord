@@ -1,55 +1,80 @@
-import { MessageSquare, Share2, ThumbsUp } from "lucide-react";
+import type { PostMediaVM, PostVM } from "@/domain/post";
+import PostCard, { type PostCardProps } from "@/components/feed/PostCard";
 
 export interface PostsTabProps {
-  authorName: string;
-  authorAvatarUrl: string | null;
+  posts: PostVM[];
+  labels: PostCardProps["labels"];
+  loading: boolean;
+  loadingText: string;
   emptyText: string;
-  labels: { like: string; comment: string; share: string };
+  menuFor: string | null;
+  onOpenMenu: (id: string) => void;
+  onCloseMenu: () => void;
+  onAskDelete: (id: string) => void;
+  onToggleBody: (id: string) => void;
+  onLike: (postId: string) => void;
+  onRepost: (postId: string) => void;
+  onComment: (postId: string) => void;
+  onSave: (postId: string) => void;
+  onShare: (postId: string) => void;
+  onOpenMedia: (media: PostMediaVM) => void;
+  hasMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => void;
+  loadMoreLabel: string;
 }
 
 /**
- * Figma Posts tab (936:2281): stacked post cards inside a bordered container.
- * Posts don't exist yet, so the first card carries the empty state in the same style.
+ * Posts tab (Figma 936:2281): the member's own posts, newest first.
+ *
+ * The cards are the feed's `PostCard`, so a post looks and behaves the same
+ * wherever it is read. `feed-profile-tone` re-points the feed's colour tokens at
+ * the profile palette, which is cooler in dark mode — one component, the
+ * surface it happens to be sitting on.
  */
-export default function PostsTab({
-  authorName,
-  authorAvatarUrl,
-  emptyText,
-  labels,
-}: PostsTabProps) {
-  const action = (Icon: typeof ThumbsUp, label: string) => (
-    <span className="flex items-center gap-[6px] text-[12px] font-medium leading-[16px] text-pf-post-muted">
-      <Icon size={14} strokeWidth={2} aria-hidden />
-      {label}
-    </span>
-  );
+export default function PostsTab(p: PostsTabProps) {
+  if (p.loading) {
+    return (
+      <p className="px-[16px] py-[40px] text-center text-[14px] text-pf-muted">{p.loadingText}</p>
+    );
+  }
+  if (p.posts.length === 0) {
+    return (
+      <p className="px-[16px] py-[40px] text-center text-[14px] text-pf-muted">{p.emptyText}</p>
+    );
+  }
   return (
-    <div className="mx-[14px] overflow-hidden rounded-[12px] border border-pf-border bg-pf-surface">
-      <article className="rounded-[12px] border-[1.5px] border-pf-post-border bg-pf-surface p-[16px]">
-        <div className="flex items-center gap-[12px]">
-          <span className="block size-[36px] overflow-hidden rounded-full bg-pf-surface-2">
-            {authorAvatarUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={authorAvatarUrl}
-                alt=""
-                loading="lazy"
-                decoding="async"
-                className="size-full object-cover"
-              />
-            )}
-          </span>
-          <span className="text-[14px] font-semibold leading-[20px] text-pf-text">
-            {authorName}
-          </span>
+    <div className="feed-profile-tone mx-[14px] overflow-hidden rounded-[12px] border border-pf-border bg-pf-surface">
+      {p.posts.map((post) => (
+        <PostCard
+          key={post.id}
+          post={post}
+          labels={p.labels}
+          menuOpen={p.menuFor === post.id}
+          onMenu={() => p.onOpenMenu(post.id)}
+          onCloseMenu={p.onCloseMenu}
+          onDelete={() => p.onAskDelete(post.id)}
+          onToggleBody={() => p.onToggleBody(post.id)}
+          onLike={() => p.onLike(post.postId)}
+          onRepost={() => p.onRepost(post.postId)}
+          onComment={() => p.onComment(post.postId)}
+          onSave={() => p.onSave(post.postId)}
+          onShare={() => p.onShare(post.postId)}
+          onOpenMedia={p.onOpenMedia}
+        />
+      ))}
+      {p.hasMore && (
+        <div className="px-[25px] py-[18px] text-center">
+          <button
+            type="button"
+            onClick={p.onLoadMore}
+            disabled={p.loadingMore}
+            className="rounded-[8px] border border-pf-border px-[20px] py-[8px] text-[14px] font-medium text-pf-text disabled:opacity-50"
+          >
+            {p.loadingMore ? p.loadingText : p.loadMoreLabel}
+          </button>
         </div>
-        <p className="pt-[12px] text-[14px] leading-[20px] text-pf-post-text">{emptyText}</p>
-        <div className="mt-[12px] flex gap-[16px] border-t-[1.5px] border-white/[0.04] pt-[8px]">
-          {action(ThumbsUp, labels.like)}
-          {action(MessageSquare, labels.comment)}
-          {action(Share2, labels.share)}
-        </div>
-      </article>
+      )}
     </div>
   );
 }
