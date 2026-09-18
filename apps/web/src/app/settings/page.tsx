@@ -114,20 +114,26 @@ export default function SettingsPage() {
         <SettingsMenuSection
           title="Preferences"
           items={[
-            { id: "content-experience", title: "Content & Experience", icon: <PaletteFilledIcon /> },
+            {
+              id: "content-experience",
+              title: "Content & Experience",
+              icon: <PaletteFilledIcon />,
+            },
           ]}
         />
         <SettingsMenuSection
           title="Safety"
           items={[
-            { id: "community-safety", title: "Community & Safety", icon: <ShieldCheckFilledIcon /> },
+            {
+              id: "community-safety",
+              title: "Community & Safety",
+              icon: <ShieldCheckFilledIcon />,
+            },
           ]}
         />
         <SettingsMenuSection
           title="Support"
-          items={[
-            { id: "help-support", title: "Help & Support", icon: <LifeBuoyFilledIcon /> },
-          ]}
+          items={[{ id: "help-support", title: "Help & Support", icon: <LifeBuoyFilledIcon /> }]}
         />
       </div>
     </AppShell>
