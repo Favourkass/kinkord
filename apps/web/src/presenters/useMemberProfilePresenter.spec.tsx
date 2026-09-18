@@ -72,6 +72,10 @@ const friendsPage = {
       username: "kay",
       displayName: "Kinky Kay",
       avatarUrl: null,
+      age: 25,
+      gender: "Female",
+      city: "Abraka",
+      state: "Delta",
       isFollowing: false,
     },
   ],
@@ -219,7 +223,10 @@ describe("useMemberProfilePresenter", () => {
       "Following (10)",
       "Suggested",
     ]);
+    // The row's second line is age + place, not the handle (CEO, 2026-09-18).
     expect(result.current.people.rows[0]).toMatchObject({
+      ageTag: "25F",
+      location: "Abraka, Delta State",
       displayName: "Kinky Kay",
       handle: "@kay",
       href: "/u/kay",

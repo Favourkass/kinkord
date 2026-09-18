@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  ageTagOf,
+  locationOf,
   socialHandle,
   toMediaTiles,
   toMemberCardVM,
@@ -279,5 +281,34 @@ describe("About cards + media (profile rebuild, 2026-09-12)", () => {
       ["p1", false],
       ["a", true],
     ]);
+  });
+});
+
+describe("ageTagOf / locationOf", () => {
+  // Directory cards, the profile header and every People row read these, so a
+  // member must never be labelled two different ways on two screens.
+  it("builds the age tag the way every surface shows it", () => {
+    expect(ageTagOf(25, "Female")).toBe("25F");
+    expect(ageTagOf(25, "Male")).toBe("25M");
+    expect(ageTagOf(25, null)).toBe("25");
+    expect(ageTagOf(25, "Non-binary")).toBe("25");
+  });
+
+  it("has no tag at all when the age is unknown", () => {
+    // A bare gender initial with no number reads like a typo on a card.
+    expect(ageTagOf(null, "Female")).toBeNull();
+    expect(ageTagOf(null, null)).toBeNull();
+  });
+
+  it("joins city and state, and suffixes the state once", () => {
+    expect(locationOf("Abraka", "Delta")).toBe("Abraka, Delta State");
+    expect(locationOf(null, "Delta")).toBe("Delta State");
+    expect(locationOf("Abraka", null)).toBe("Abraka");
+    expect(locationOf(null, "Delta State")).toBe("Delta State");
+    expect(locationOf(null, "FCT Abuja")).toBe("FCT Abuja");
+  });
+
+  it("is null when there is no location at all, so no empty line renders", () => {
+    expect(locationOf(null, null)).toBeNull();
   });
 });

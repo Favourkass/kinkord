@@ -1,6 +1,7 @@
 import Link from "next/link";
 import MaskIcon from "@/components/app/MaskIcon";
 import type { PublicProfileVM } from "@/domain/member";
+import ExpandableAvatar from "./ExpandableAvatar";
 
 export interface ProfileHeroLabels {
   follow: string;
@@ -61,13 +62,13 @@ export default function ProfileHero({
         <div className="absolute left-[20px] top-[114px] size-[110px]">
           <span aria-hidden className="absolute inset-0 rounded-full bg-pf-surface" />
           {vm.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <ExpandableAvatar
               src={vm.avatarUrl}
               alt={vm.displayName}
               fetchPriority="high"
-              decoding="async"
-              className="absolute left-[5px] top-[8px] size-[100px] rounded-full object-cover"
+              closeLabel="Close"
+              wrapperClassName="absolute left-[5px] top-[8px] size-[100px]"
+              className="size-[100px]"
             />
           ) : (
             <span className="absolute left-[5px] top-[8px] grid size-[100px] place-items-center rounded-full bg-pf-surface-2 text-pf-muted">
