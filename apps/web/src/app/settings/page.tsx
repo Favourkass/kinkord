@@ -4,6 +4,15 @@ import { useState } from "react";
 import Link from "next/link";
 import AppShell from "@/components/app/AppShell";
 import { ChevronRightIcon } from "@/components/app/icons";
+import SettingsMenuSection from "@/components/settings/SettingsMenuSection";
+import {
+  DataBarsIcon,
+  LifeBuoyFilledIcon,
+  LockFilledIcon,
+  PaletteFilledIcon,
+  ShieldCheckFilledIcon,
+  UserCircleIcon,
+} from "@/components/settings/icons";
 import { Routes } from "@/constants/Routes";
 import { getAppShellNav } from "@/presenters/getAppShellNav";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
@@ -55,7 +64,7 @@ export default function SettingsPage() {
       links={nav.links}
       labels={nav.labels}
     >
-      <div className="mx-auto w-full max-w-[440px] px-[29px]">
+      <div className="mx-auto w-full max-w-[440px] px-[29px] pb-[48px]">
         <h1 className="text-[24px] font-medium text-app-value">Settings</h1>
         <p className="pt-[24px] pb-[8px] text-[14px] font-bold text-app-text">Appearance</p>
         <div className="flex gap-[12px]">
@@ -86,6 +95,40 @@ export default function SettingsPage() {
           Security &amp; 2FA
           <ChevronRightIcon className="text-[#b8850f]" />
         </Link>
+
+        {/* Reference image sections (non-functional buttons) */}
+        <SettingsMenuSection
+          title="Account"
+          items={[
+            { id: "account-settings", title: "Account Settings", icon: <UserCircleIcon /> },
+            { id: "your-data", title: "Your Data", icon: <DataBarsIcon /> },
+          ]}
+        />
+        <SettingsMenuSection
+          title="Privacy & Security"
+          items={[
+            { id: "privacy", title: "Privacy", icon: <LockFilledIcon /> },
+            { id: "security", title: "Security", icon: <ShieldCheckFilledIcon /> },
+          ]}
+        />
+        <SettingsMenuSection
+          title="Preferences"
+          items={[
+            { id: "content-experience", title: "Content & Experience", icon: <PaletteFilledIcon /> },
+          ]}
+        />
+        <SettingsMenuSection
+          title="Safety"
+          items={[
+            { id: "community-safety", title: "Community & Safety", icon: <ShieldCheckFilledIcon /> },
+          ]}
+        />
+        <SettingsMenuSection
+          title="Support"
+          items={[
+            { id: "help-support", title: "Help & Support", icon: <LifeBuoyFilledIcon /> },
+          ]}
+        />
       </div>
     </AppShell>
   );
