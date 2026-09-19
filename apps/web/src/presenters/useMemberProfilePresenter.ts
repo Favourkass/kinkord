@@ -9,6 +9,7 @@ import {
   locationOf,
   toMediaTiles,
   toPublicProfileVM,
+  type PlaceHref,
   type FriendRowVM,
   type MediaItemPM,
   type MediaTileVM,
@@ -17,6 +18,7 @@ import {
 import { ApiError } from "@/services/apiClient";
 import {
   decodeParam,
+  isCountryAvailable,
   membersApi,
   toggleFollowOnFriend,
   toggleFollowOnProfile,
@@ -24,6 +26,17 @@ import {
   type FriendsTab,
   type MediaFilter,
 } from "@/services/members.service";
+
+/**
+ * Where a place on a profile links to. Only launched countries are reachable —
+ * everywhere else stays plain text rather than a link into an empty directory.
+ */
+const placeHref: PlaceHref = ({ country, state, city }) => {
+  if (!country || !isCountryAvailable(country)) return null;
+  if (!state) return Routes.membersCountry(country);
+  if (!city) return Routes.membersState(country, state);
+  return Routes.membersRegion(country, state, city);
+};
 
 export type ProfileTabKey = "posts" | "about" | "media" | "people";
 
@@ -290,7 +303,7 @@ export function useMemberProfilePresenter(
       .catch(() => setLightbox((l) => (l ? { ...l, deleting: false, confirming: false } : l)));
   }, [lightbox, pm]);
 
-  const vm = useMemo(() => (pm ? toPublicProfileVM(pm) : null), [pm]);
+  const vm = useMemo(() => (pm ? toPublicProfileVM(pm, placeHref) : null), [pm]);
   const presenceText = vm
     ? vm.isOnline
       ? copy.online
@@ -381,7 +394,6 @@ export function useMemberProfilePresenter(
       yourself: copy.yourself,
       editProfile: copy.editProfile,
       addToStory: copy.addToStory,
-      gift: copy.gift,
       comingSoon: copy.comingSoon,
       stats: copy.stats,
     },

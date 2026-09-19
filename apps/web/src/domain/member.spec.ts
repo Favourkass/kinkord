@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   ageTagOf,
   locationOf,
+  locationPartsOf,
   socialHandle,
   toMediaTiles,
   toMemberCardVM,
   toPublicProfileVM,
   type MemberCardPM,
+  type PlaceHref,
   type PublicProfilePM,
 } from "./member";
 
@@ -100,7 +102,7 @@ const profile: PublicProfilePM = {
 
 describe("toPublicProfileVM", () => {
   it("builds the header lines from the design: handle, stats, location, tag line, presence", () => {
-    const vm = toPublicProfileVM(profile, now);
+    const vm = toPublicProfileVM(profile, () => null, now);
     expect(vm.handle).toBe("@nene");
     expect(vm.stats).toEqual({
       friends: "1.2K",
@@ -131,6 +133,7 @@ describe("toPublicProfileVM", () => {
         country: null,
         lastSeenAt: null,
       },
+      () => null,
       now,
     );
     expect(vm.handle).toBeNull();
@@ -310,5 +313,39 @@ describe("ageTagOf / locationOf", () => {
 
   it("is null when there is no location at all, so no empty line renders", () => {
     expect(locationOf(null, null)).toBeNull();
+  });
+});
+
+describe("locationPartsOf", () => {
+  // Tapping a place on someone's profile is the fastest route to people near them.
+  const href: PlaceHref = ({ country, state, city }) => {
+    if (country !== "NG") return null;
+    if (!state) return "/members/ng";
+    if (!city) return `/members/ng/${state}`;
+    return `/members/ng/${state}?region=${city}`;
+  };
+
+  it("splits the line into city, state and country, each linking one level wider", () => {
+    expect(locationPartsOf({ country: "NG", state: "Lagos", city: "Sangotedo" }, href)).toEqual([
+      { label: "Sangotedo", href: "/members/ng/Lagos?region=Sangotedo" },
+      { label: "Lagos State", href: "/members/ng/Lagos" },
+      { label: "Nigeria", href: "/members/ng" },
+    ]);
+  });
+
+  it("leaves out the pieces a member has not set", () => {
+    expect(locationPartsOf({ country: "NG", state: "Lagos", city: null }, href)).toEqual([
+      { label: "Lagos State", href: "/members/ng/Lagos" },
+      { label: "Nigeria", href: "/members/ng" },
+    ]);
+    expect(locationPartsOf({ country: null, state: null, city: null }, href)).toEqual([]);
+  });
+
+  it("renders a country we do not serve as plain text rather than a dead link", () => {
+    // A link into an empty directory is worse than no link.
+    expect(locationPartsOf({ country: "GH", state: "Accra", city: null }, href)).toEqual([
+      { label: "Accra State", href: null },
+      { label: "Ghana", href: null },
+    ]);
   });
 });

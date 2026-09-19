@@ -9,17 +9,30 @@ import {
   locationOf,
   toPublicProfileVM,
   type FriendRowVM,
+  type PlaceHref,
   type PublicProfilePM,
 } from "@/domain/member";
 import { ApiError } from "@/services/apiClient";
 import {
   decodeParam,
   hasMore,
+  isCountryAvailable,
   membersApi,
   toggleFollowOnFriend,
   type FriendPM,
   type FriendsTab,
 } from "@/services/members.service";
+
+/**
+ * Where a place on a profile links to. Only launched countries are reachable —
+ * everywhere else stays plain text rather than a link into an empty directory.
+ */
+const placeHref: PlaceHref = ({ country, state, city }) => {
+  if (!country || !isCountryAvailable(country)) return null;
+  if (!state) return Routes.membersCountry(country);
+  if (!city) return Routes.membersState(country, state);
+  return Routes.membersRegion(country, state, city);
+};
 
 const PAGE = 30;
 const TABS: FriendsTab[] = ["all", "followers", "following", "suggested"];
@@ -143,7 +156,7 @@ export function usePeoplePagePresenter(usernameParam: string, tabParam?: string 
       );
   }, []);
 
-  const vm = useMemo(() => (pm ? toPublicProfileVM(pm) : null), [pm]);
+  const vm = useMemo(() => (pm ? toPublicProfileVM(pm, placeHref) : null), [pm]);
   const label = (key: FriendsTab) =>
     key === "all"
       ? copy.tabs.all(vm?.stats.friends ?? "0")

@@ -214,3 +214,42 @@ describe("useMembersRegionPresenter", () => {
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
   });
 });
+
+describe("useMembersRegionPresenter with ?region=", () => {
+  beforeEach(() => {
+    apiGet.mockReset().mockImplementation((path: string) => {
+      const url = new URL(`http://x${path}`);
+      const lga = url.searchParams.get("lga");
+      return pageOf([member(9, lga ? { city: lga } : {})], 1, 1);
+    });
+  });
+
+  it("starts narrowed to the city a profile linked to", async () => {
+    // Tapping "Asaba" on a profile must land on Asaba, not the whole state.
+    const { result } = renderHook(() => useMembersRegionPresenter("ng", "Delta", "Asaba"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(apiGet).toHaveBeenCalledWith(
+      "/members?country=NG&state=Delta&lga=Asaba&page=1&limit=20&sort=recent",
+    );
+    expect(result.current.selector.value).toBe("Asaba");
+  });
+
+  it("decodes a region that arrived URL-encoded", async () => {
+    const { result } = renderHook(() =>
+      useMembersRegionPresenter("ng", "Delta", encodeURIComponent("Asaba")),
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.selector.value).toBe("Asaba");
+  });
+
+  it("shows the whole state when no region is given", async () => {
+    const { result } = renderHook(() => useMembersRegionPresenter("ng", "Delta"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(apiGet).toHaveBeenCalledWith(
+      "/members?country=NG&state=Delta&page=1&limit=20&sort=recent",
+    );
+    expect(result.current.selector.value).toBe("All regions");
+  });
+});

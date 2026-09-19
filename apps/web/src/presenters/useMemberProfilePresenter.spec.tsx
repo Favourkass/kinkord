@@ -158,7 +158,7 @@ describe("useMemberProfilePresenter", () => {
     expect(result.current.presenceText).toBe("Last seen an hour ago");
     expect(result.current.tab).toBe("about");
     expect(result.current.tabs.map((t) => t.label)).toEqual(["Posts", "About", "Media", "People"]);
-    expect(result.current.heroLabels).toMatchObject({ addToStory: "Add to story", gift: "Gift" });
+    expect(result.current.heroLabels).toMatchObject({ addToStory: "Add to story" });
     expect(result.current.activeTab).toBeUndefined();
     expect(result.current.status).toBeNull();
   });

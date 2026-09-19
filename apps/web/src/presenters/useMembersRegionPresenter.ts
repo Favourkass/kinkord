@@ -43,7 +43,12 @@ const NO_ITEMS: MemberCardPM[] = [];
  * CEO, 2026-09-12: each click shows everyone in that place; the next click narrows.
  * "{n} Members Found", Sort toggle, online-first cards, infinite scroll, optimistic Follow.
  */
-export function useMembersRegionPresenter(countryParam: string, stateParam?: string | null) {
+export function useMembersRegionPresenter(
+  countryParam: string,
+  stateParam?: string | null,
+  /** From `?region=` — a profile's city links straight to its own area. */
+  initialRegion?: string | null,
+) {
   const router = useRouter();
   const copy = MEMBERS_COPY.region;
   const country = countryParam.toUpperCase();
@@ -55,7 +60,9 @@ export function useMembersRegionPresenter(countryParam: string, stateParam?: str
   );
 
   // null = the whole state (CEO, 2026-09-08); picking an LGA narrows the list.
-  const [region, setRegion] = useState<string | null>(null);
+  const [region, setRegion] = useState<string | null>(
+    initialRegion ? decodeParam(initialRegion) : null,
+  );
   const [sort, setSort] = useState<MembersSort>("recent");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [data, setData] = useState<RegionPage | null>(null);

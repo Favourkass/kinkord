@@ -179,6 +179,8 @@ export interface PublicProfileVM {
   stats: { friends: string; followers: string; following: string; mutualFriends: string };
   /** "Abraka, Delta State, Nigeria" */
   locationLine: string | null;
+  /** The same line split up, each piece linking to the directory filtered to it. */
+  locationParts: PlacePartVM[];
   /** "25F · Dominant | Sadist" */
   tagLine: string | null;
   bio: string | null;
@@ -255,7 +257,59 @@ export function toMediaTiles(items: MediaItemPM[]): MediaTileVM[] {
   }));
 }
 
-export function toPublicProfileVM(pm: PublicProfilePM, now = new Date()): PublicProfileVM {
+/** One clickable piece of a location line. `href` is null for a place we don't serve yet. */
+export interface PlacePartVM {
+  label: string;
+  href: string | null;
+}
+
+/**
+ * Builds the link for a place. Routing lives in the presenter layer, so the
+ * caller supplies this — the domain only decides what the pieces are.
+ */
+export type PlaceHref = (place: {
+  country: string | null;
+  state: string | null;
+  city: string | null;
+}) => string | null;
+
+/**
+ * "Sangotedo, Lagos State, Nigeria" as three links: the city filters to itself,
+ * the state to the whole state, the country to the whole country. Tapping a
+ * place on someone's profile is the fastest way to find people near them.
+ */
+export function locationPartsOf(
+  pm: Pick<PublicProfilePM, "country" | "state" | "city">,
+  placeHref: PlaceHref,
+): PlacePartVM[] {
+  const parts: PlacePartVM[] = [];
+  if (pm.city) {
+    parts.push({
+      label: pm.city,
+      href: placeHref({ country: pm.country, state: pm.state, city: pm.city }),
+    });
+  }
+  if (pm.state) {
+    parts.push({
+      label: displayState(pm.state),
+      href: placeHref({ country: pm.country, state: pm.state, city: null }),
+    });
+  }
+  const country = countryName(pm.country);
+  if (country) {
+    parts.push({
+      label: country,
+      href: placeHref({ country: pm.country, state: null, city: null }),
+    });
+  }
+  return parts;
+}
+
+export function toPublicProfileVM(
+  pm: PublicProfilePM,
+  placeHref: PlaceHref = () => null,
+  now = new Date(),
+): PublicProfileVM {
   const ageTag = ageTagOf(pm.age, pm.gender) ?? "";
   const rolesTag = pm.roles.join(" | ");
   const tagLine = [ageTag, rolesTag].filter(Boolean).join(" · ") || null;
@@ -277,6 +331,7 @@ export function toPublicProfileVM(pm: PublicProfilePM, now = new Date()): Public
       mutualFriends: compactNumber(pm.counts.mutualFriends),
     },
     locationLine,
+    locationParts: locationPartsOf(pm, placeHref),
     tagLine,
     bio: pm.bio,
     basic: {
