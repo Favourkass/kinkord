@@ -8,7 +8,7 @@ import { useFeedPresenter } from "@/presenters/useFeedPresenter";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
 import { useMemberProfilePresenter } from "@/presenters/useMemberProfilePresenter";
 
-/** Another member's profile (Figma 1202:242 / 1502:2854): Follow + Message (+ inert Gift). */
+/** Another member's profile (Figma 1202:242 / 1502:2854): Follow + Message. */
 export default function MemberProfilePage() {
   const params = useParams<{ username: string }>();
   const search = useSearchParams();

@@ -34,6 +34,9 @@ export const Routes = {
   membersCountry: (country: string) => `/members/${country.toLowerCase()}`,
   membersState: (country: string, state: string) =>
     `/members/${country.toLowerCase()}/${encodeURIComponent(state)}`,
+  /** A state narrowed to one city / LGA — what a profile's city links to. */
+  membersRegion: (country: string, state: string, region: string) =>
+    `/members/${country.toLowerCase()}/${encodeURIComponent(state)}?region=${encodeURIComponent(region)}`,
   /** Another member's public profile. */
   member: (username: string) => `/u/${encodeURIComponent(username.replace(/^@/, ""))}`,
   /** People tab "See more" page (Figma 1322:25). */
