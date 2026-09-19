@@ -1,3 +1,4 @@
+import Link from "next/link";
 import MaskIcon from "@/components/app/MaskIcon";
 import type { PublicProfileVM } from "@/domain/member";
 import ExpandableAvatar from "./ExpandableAvatar";
@@ -110,10 +111,27 @@ export default function ProfileSideCard({
             {vm.stats.following} <span className="text-pf-muted">{labels.stats.following}</span>
           </span>
         </p>
-        {vm.locationLine && (
+        {vm.locationParts.length > 0 && (
           <p className="flex items-center gap-[6px] text-[13px] font-semibold leading-[16px] text-pf-muted">
             <MaskIcon name="map-pin" width={14} className="text-kink-gold-bright" />
-            {vm.locationLine}
+            {/* One span, so the comma hugs the word before it rather than the gap. */}
+            <span className="min-w-0 truncate">
+              {vm.locationParts.map((part, i) => (
+                <span key={part.label}>
+                  {part.href ? (
+                    <Link
+                      href={part.href}
+                      className="underline-offset-2 hover:text-kink-gold-bright hover:underline"
+                    >
+                      {part.label}
+                    </Link>
+                  ) : (
+                    part.label
+                  )}
+                  {i < vm.locationParts.length - 1 ? ", " : ""}
+                </span>
+              ))}
+            </span>
           </p>
         )}
         {vm.tagLine && (

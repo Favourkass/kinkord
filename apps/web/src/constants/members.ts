@@ -66,8 +66,6 @@ export const MEMBERS_COPY = {
     /** Own profile (Figma 1167:552): gold "Add to story" (inert until stories) + black "Edit profile". */
     addToStory: "Add to story",
     editProfile: "Edit profile",
-    /** "Gift is not working for now" (CEO, 2026-09-12) — shown, never active. */
-    gift: "Gift",
     comingSoon: "Coming soon",
     online: "Online",
     lastSeen: (ago: string) => `Last seen ${ago}`,
