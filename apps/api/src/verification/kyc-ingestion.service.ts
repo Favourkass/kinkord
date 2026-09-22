@@ -57,6 +57,39 @@ export class KycIngestionService {
     }
   }
 
+  /** Smile carries identity evidence only — never PoA or network location. */
+  async recordSmileIdentityDecision(input: {
+    userId: string; attemptId: string; providerReference: string;
+    identityChecks: BronzeChecks; bronzeStatus: "failed" | "verified" | "manual_review";
+    verifiedIdentity?: { fullName: string; dateOfBirth: string; gender: string };
+  }) {
+    await this.repository.ensureProviderAttempt({
+      id: input.attemptId, userId: input.userId, provider: "smile", providerReference: input.providerReference,
+    });
+    const primaryIdentityPassed = input.bronzeStatus !== "failed" && input.identityChecks.governmentId &&
+      input.identityChecks.liveness && input.identityChecks.idFace && input.identityChecks.dateOfBirth &&
+      input.identityChecks.gender && input.identityChecks.country;
+    const identityPassed = input.bronzeStatus === "verified" && Object.values(input.identityChecks).every(Boolean);
+    const identityBinding = primaryIdentityPassed && input.verifiedIdentity
+      ? kycIdentityBinding(input.verifiedIdentity) : null;
+    await this.repository.upsertDerivedStageResult({
+      userId: input.userId, attemptId: input.attemptId, stage: "identity", provider: "smile",
+      providerReference: input.providerReference,
+      status: input.bronzeStatus === "failed" ? "failed" : identityPassed ? "passed" : "under_review",
+      summary: {
+        governmentId: input.identityChecks.governmentId,
+        liveness: input.identityChecks.liveness,
+        idFace: input.identityChecks.idFace,
+        profileFace: input.identityChecks.profileFace,
+        identityDetails: input.identityChecks.dateOfBirth && input.identityChecks.gender && input.identityChecks.country,
+        ...(identityBinding ? { identityBinding } : {}),
+      },
+      reasonCodes: input.bronzeStatus === "failed"
+        ? ["SMILE_IDENTITY_DECLINED"]
+        : identityPassed ? [] : ["IDENTITY_REVIEW_REQUIRED"],
+    });
+  }
+
   async resolveLegacyIdentityReview(input: { userId: string; attemptId: string; approved: boolean; profileFaceMatches: boolean }) {
     return this.repository.resolveLegacyIdentityReview(input);
   }

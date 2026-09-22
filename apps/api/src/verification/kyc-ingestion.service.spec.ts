@@ -28,4 +28,39 @@ describe("KycIngestionService", () => {
     expect(upsertDerivedStageResult).toHaveBeenCalledWith(expect.objectContaining({ stage: "residence", status: "passed" }));
     expect(upsertDerivedStageResult).toHaveBeenCalledWith(expect.objectContaining({ stage: "location", status: "under_review" }));
   });
+
+  it("writes a Smile outcome through as identity evidence only", async () => {
+    vi.stubEnv("AUTH_SECRET", "test-only-ingestion-binding-secret-long-enough");
+    const upsertDerivedStageResult = vi.fn().mockResolvedValue(undefined);
+    const ensureProviderAttempt = vi.fn().mockResolvedValue(undefined);
+    const service = new KycIngestionService({ ensureProviderAttempt, upsertDerivedStageResult } as unknown as KycRepository);
+    await service.recordSmileIdentityDecision({
+      userId: "member-1", attemptId: "00000000-0000-4000-8000-000000000002", providerReference: "job-1",
+      bronzeStatus: "verified",
+      identityChecks: { governmentId: true, liveness: true, idFace: true, profileFace: true, dateOfBirth: true, gender: true, country: true },
+      verifiedIdentity: { fullName: "MEMBER NAME", dateOfBirth: "1990-02-03", gender: "female" },
+    });
+    expect(ensureProviderAttempt).toHaveBeenCalledWith({
+      id: "00000000-0000-4000-8000-000000000002", userId: "member-1", provider: "smile", providerReference: "job-1",
+    });
+    expect(upsertDerivedStageResult).toHaveBeenCalledTimes(1);
+    expect(upsertDerivedStageResult).toHaveBeenCalledWith(expect.objectContaining({ stage: "identity", status: "passed" }));
+    const persisted = JSON.stringify(upsertDerivedStageResult.mock.calls);
+    expect(persisted).not.toContain("MEMBER NAME");
+  });
+
+  it("keeps a Smile profile-face gap under review instead of passing identity", async () => {
+    const upsertDerivedStageResult = vi.fn().mockResolvedValue(undefined);
+    const service = new KycIngestionService({
+      ensureProviderAttempt: vi.fn().mockResolvedValue(undefined), upsertDerivedStageResult,
+    } as unknown as KycRepository);
+    await service.recordSmileIdentityDecision({
+      userId: "member-1", attemptId: "00000000-0000-4000-8000-000000000003", providerReference: "job-2",
+      bronzeStatus: "manual_review",
+      identityChecks: { governmentId: true, liveness: true, idFace: true, profileFace: false, dateOfBirth: true, gender: true, country: true },
+    });
+    expect(upsertDerivedStageResult).toHaveBeenCalledWith(expect.objectContaining({
+      stage: "identity", status: "under_review", reasonCodes: ["IDENTITY_REVIEW_REQUIRED"],
+    }));
+  });
 });
