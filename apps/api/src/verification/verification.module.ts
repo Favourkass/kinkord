@@ -17,5 +17,6 @@ import { KycReviewService } from "./kyc-review.service";
 @Module({
   controllers: [BronzeController, BronzeReviewController, DiditCallbackController, SmileIdCallbackController, KycController, MonoCallbackController, KycReviewController],
   providers: [BronzeRepository, BronzeService, DiditService, SmileIdService, ProfileMatchService, KycRepository, KycService, KycIngestionService, KycLocationService, MonoService, KycFinancialService, KycReviewService],
+  exports: [KycService, KycRepository],
 })
 export class VerificationModule {}

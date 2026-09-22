@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ForbiddenException } from "@nestjs/common";
+import { ConflictException, ForbiddenException } from "@nestjs/common";
 import { KycReviewService } from "./kyc-review.service";
 import type { KycRepository } from "./kyc.repository";
 

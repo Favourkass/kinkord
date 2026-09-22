@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import type { KycConsentCategory, KycStageStatus } from "../db/schema";
 import { BronzeRepository } from "./bronze.repository";
-import { canAwardKinkordKyc, KYC_REQUIRED_STAGES, type KycRequiredStage, type KycStageDecision } from "./kyc-policy";
+import { canAwardKinkordKyc, KYC_REQUIRED_STAGES, kycResultEnvironment, type KycRequiredStage, type KycStageDecision } from "./kyc-policy";
 import { KycRepository } from "./kyc.repository";
 import { KYC_FINANCIAL_POLICY_VERSION, KycFinancialService } from "./kyc-financial.service";
 import { KYC_LOCATION_POLICY_VERSION, KycLocationService } from "./kyc-location.service";
@@ -14,13 +14,13 @@ const stageDetails: Record<KycRequiredStage, { title: string; description: strin
   },
   location: {
     title: "Live location",
-    description: "Consented live-location evidence. This stage is not open yet.",
+    description: "Consented live-location evidence compared with your approved proof of address.",
     available: false,
   },
   residence: {
     title: "Residence",
-    description: "Proof-of-address verification. This stage is not open yet.",
-    available: false,
+    description: "Proof-of-address verification. Submit a recent document through the identity session.",
+    available: true,
   },
   financial: {
     title: "Financial KYC",
@@ -46,7 +46,7 @@ export class KycService {
     private readonly financial: KycFinancialService,
   ) {}
 
-  async status(userId: string) {
+  private async buildDecisions(userId: string) {
     const [{ caseRow, results }, legacy, financialAttempt] = await Promise.all([
       this.repository.snapshot(userId), this.legacyIdentity.status(userId), this.repository.latestStageAttempt(userId, "financial"),
     ]);
@@ -64,6 +64,7 @@ export class KycService {
           status: result.status,
           checks: stage === "identity" ? result.summary as KycStageDecision["checks"] : undefined,
           expiresAt: result.expiresAt,
+          environment: kycResultEnvironment(result.summary),
         };
       }
       if (stage === "identity" && legacy) {
@@ -75,15 +76,25 @@ export class KycService {
           checks: legacy.status === "verified"
             ? { governmentId: true, liveness: true, idFace: true, profileFace: true, identityDetails: true }
             : undefined,
+          // Legacy Bronze was recorded before environment stamping; it never
+          // seals on its own and must not borrow a live/sandbox stamp here.
+          environment: null,
         };
       }
       if (stage === "financial" && financialAttempt?.status === "pending") return { stage, status: "pending" };
       return { stage, status: "not_started" };
     });
+    return { caseRow, decisions };
+  }
 
-    const verified = canAwardKinkordKyc(decisions);
+  async status(userId: string) {
+    const { caseRow, decisions } = await this.buildDecisions(userId);
+    // A revoked or expired case never reports verified, regardless of stage rows.
+    const caseActive = !caseRow.revokedAt && caseRow.status !== "revoked" &&
+      !(caseRow.expiresAt && caseRow.expiresAt <= new Date());
+    const verified = caseActive && canAwardKinkordKyc(decisions);
     return {
-      status: verified ? "verified" : caseRow.status,
+      status: verified ? "verified" : caseRow.status === "revoked" ? "revoked" : caseRow.status,
       fullKycVerified: verified,
       stages: decisions.map((decision) => ({
         key: decision.stage,
@@ -96,6 +107,14 @@ export class KycService {
       locationPolicyVersion: this.location.enabled ? KYC_LOCATION_POLICY_VERSION : null,
       financialPolicyVersion: this.financial.enabled ? KYC_FINANCIAL_POLICY_VERSION : null,
     };
+  }
+
+  /** Unified public/private seal: policy-service decision plus case-level revocation/expiry. */
+  async isFullyVerified(userId: string) {
+    const { caseRow, decisions } = await this.buildDecisions(userId);
+    if (caseRow.revokedAt || caseRow.status === "revoked") return false;
+    if (caseRow.expiresAt && caseRow.expiresAt <= new Date()) return false;
+    return canAwardKinkordKyc(decisions);
   }
 
   async consent(userId: string, category: KycConsentCategory, policyVersion: string) {

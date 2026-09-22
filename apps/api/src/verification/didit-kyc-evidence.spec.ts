@@ -8,10 +8,19 @@ describe("Didit KYC evidence mapping", () => {
     } });
     expect(result).toEqual({
       status: "passed",
-      summary: { documentApproved: true, addressExtracted: true, issueDateExtracted: true, noIdentityMismatch: true },
+      summary: { documentApproved: true, addressExtracted: true, issueDateExtracted: true, issueDateWithinPolicy: true, noIdentityMismatch: true },
       reasonCodes: [],
     });
     expect(JSON.stringify(result)).not.toContain("sensitive address");
+  });
+
+  it("routes an approved but stale proof-of-address document to review", () => {
+    const result = deriveDiditResidenceEvidence({ poa: {
+      status: "Approved", poa_address: "sensitive", issue_date: "2025-01-01", warnings: [],
+    } }, new Date("2026-09-22T00:00:00Z"));
+    expect(result.status).toBe("under_review");
+    expect(result.summary.issueDateWithinPolicy).toBe(false);
+    expect(result.reasonCodes).toContain("POA_DOCUMENT_TOO_OLD");
   });
 
   it("routes a PoA name mismatch to review", () => {
