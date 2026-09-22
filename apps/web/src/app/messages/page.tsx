@@ -1,37 +1,42 @@
 "use client";
 
 import AppShell from "@/components/app/AppShell";
-import ComingSoonPanel from "@/components/app/ComingSoonPanel";
+import ChatListScreen from "@/components/chat/ChatListScreen";
 import { getAppShellNav } from "@/presenters/getAppShellNav";
-import { useHomePresenter } from "@/presenters/useHomePresenter";
+import { useChatListPresenter } from "@/presenters/useChatListPresenter";
 
 export default function MessagesPage() {
-  const vm = useHomePresenter();
+  const { shell, list } = useChatListPresenter();
   const nav = getAppShellNav();
 
   return (
     <AppShell
       brand="KINKORD"
       tagline="THE WORLD'S KINK COMMUNITY"
-      greeting={vm.greeting}
-      name={vm.name}
-      handle={vm.handle}
-      avatarUrl={vm.avatarUrl}
-      membersCount={vm.membersCount}
+      greeting={shell.greeting}
+      name={shell.name}
+      handle={shell.handle}
+      avatarUrl={shell.avatarUrl}
+      membersCount={shell.membersCount}
       activeTab="chat"
       activeNav="chat"
-      drawerOpen={vm.drawerOpen}
-      onMenu={vm.openDrawer}
-      onCloseDrawer={vm.closeDrawer}
-      onLogout={vm.logout}
+      drawerOpen={shell.drawerOpen}
+      onMenu={shell.openDrawer}
+      onCloseDrawer={shell.closeDrawer}
+      onLogout={shell.logout}
       links={nav.links}
       labels={nav.labels}
     >
-      <ComingSoonPanel
-        headline="COMING SOON"
-        constructionLead="Messages are under"
-        constructionAccent="construction"
-        subcopy="Private, consent-first conversations are on the way."
+      <ChatListScreen
+        rows={list.rows}
+        loading={list.loading}
+        error={list.error}
+        empty={list.empty}
+        heading="Messages"
+        loadingText="Loading conversations…"
+        emptyTitle="No messages yet"
+        emptyBody="Start a conversation from someone's profile."
+        onlineLabel="Online"
       />
     </AppShell>
   );

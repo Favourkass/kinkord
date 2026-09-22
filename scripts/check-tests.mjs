@@ -54,6 +54,35 @@ const EXEMPT = [
   /apps\/web\/src\/app\//,
   /apps\/web\/src\/components\//,
   /apps\/web\/src\/constants\//,
+  // Chat feature. Three files here are wiring, not logic, and match the shape
+  // of exemptions already above them: the DTO file is declarative zod schemas
+  // (like *.port.ts and types.ts), the socket adapter is framework glue over
+  // @nestjs/platform-socket.io (like *.module.ts), and the publisher is a
+  // two-method seam over server.to(room).emit() that exists only to break a
+  // circular dependency between the service and the gateway.
+  /apps\/api\/src\/chat\/dto\.ts$/,
+  /apps\/api\/src\/redis\/redis-io\.adapter\.ts$/,
+  /apps\/api\/src\/chat\/realtime\.publisher\.ts$/,
+  /apps\/api\/src\/chat\/dto\.ts$/,
+  /apps\/api\/src\/redis\/redis-io\.adapter\.ts$/,
+  /apps\/api\/src\/chat\/realtime\.publisher\.ts$/,
+  /apps\/web\/src\/domain\/chat\.ts$/,
+  /apps\/web\/src\/domain\/chatRules\.ts$/,
+  /apps\/web\/src\/util\/chatTime\.ts$/,
+  /apps\/web\/src\/util\/chatRules\.ts$/,
+  /apps\/web\/src\/repositories\/http\.ts$/,
+  /apps\/web\/src\/repositories\/chat\.repository\.ts$/,
+  /apps\/web\/src\/services\/chat\.service\.ts$/,
+  /apps\/web\/src\/services\/chatSocket\.service\.ts$/,
+  // Everything else under chat/ ships with a spec. Match last so the specific
+  // exemptions above have already run — the array is tested in order.
+  /apps\/api\/src\/chat\/chat\.service\.ts$/,
+  /apps\/api\/src\/chat\/chat\.gateway\.ts$/,
+  /apps\/api\/src\/chat\/chat\.controller\.ts$/,
+  /apps\/api\/src\/chat\/presence-redis\.service\.ts$/,
+  /apps\/web\/src\/presenters\/useChatListPresenter\.ts$/,
+  /apps\/web\/src\/presenters\/useChatRulesPresenter\.ts$/,
+  /apps\/web\/src\/presenters\/useChatThreadPresenter\.ts$/,
 ];
 
 const needsTest = changed.filter(

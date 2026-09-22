@@ -9,6 +9,9 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
 import { AppModule } from "./app.module";
 import { AUTH, Auth } from "./auth/auth.instance";
+import { REDIS } from "./redis/redis.module";
+import { RedisIoAdapter } from "./redis/redis-io.adapter";
+import type Redis from "ioredis";
 
 /** Applies pending Drizzle migrations before serving (idempotent; used in
  *  deployed environments so CI never needs database network access). */
@@ -38,6 +41,9 @@ async function bootstrap() {
 
   const express = app.getHttpAdapter().getInstance();
   const authHandler = toNodeHandler(app.get<Auth>(AUTH));
+
+  const redis = app.get<Redis>(REDIS);
+  app.useWebSocketAdapter(new RedisIoAdapter(app, redis));
 
   express.use(cors({ origin: origins, credentials: true }));
   express.use((req, res, next) => {

@@ -13,6 +13,8 @@ import { ProfilesModule } from "./profiles/profiles.module";
 import { OtpModule } from "./otp/otp.module";
 import { PostsModule } from "./posts/posts.module";
 import { StorageModule } from "./storage/storage.module";
+import { RedisModule } from "./redis/redis.module";
+import { ChatModule } from "./chat/chat.module";
 
 @Module({
   imports: [
@@ -28,6 +30,8 @@ import { StorageModule } from "./storage/storage.module";
     MembersModule,
     OtpModule,
     PostsModule,
+    RedisModule,
+    ChatModule,
   ],
   controllers: [HealthController],
   providers: [HealthService],
