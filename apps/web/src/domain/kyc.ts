@@ -14,6 +14,7 @@ export interface KycProgressPM {
   status: string;
   fullKycVerified: boolean;
   locationPolicyVersion: string | null;
+  residencePolicyVersion: string | null;
   financialPolicyVersion: string | null;
   stages: KycStagePM[];
 }

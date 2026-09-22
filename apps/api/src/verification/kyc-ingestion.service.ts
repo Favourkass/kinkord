@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import type { BronzeChecks } from "./bronze-policy";
 import { deriveDiditNetworkLocationEvidence, deriveDiditResidenceEvidence } from "./didit-kyc-evidence";
 import { kycIdentityBinding } from "./kyc-identity-binding";
+import { KYC_RESIDENCE_POLICY_VERSION } from "./kyc-policy";
 import { KycRepository } from "./kyc.repository";
 
 @Injectable()
@@ -42,11 +43,15 @@ export class KycIngestionService {
     });
 
     if (input.decision.poa) {
-      const residence = deriveDiditResidenceEvidence(input.decision);
-      await this.repository.upsertDerivedStageResult({
-        userId: input.userId, attemptId: input.attemptId, stage: "residence", provider: "didit",
-        providerReference: input.providerReference, ...residence,
-      });
+      // Fail closed: no stored residence evidence without recorded member consent.
+      const consented = await this.repository.hasActiveConsent(input.userId, "residence", KYC_RESIDENCE_POLICY_VERSION);
+      if (consented) {
+        const residence = deriveDiditResidenceEvidence(input.decision);
+        await this.repository.upsertDerivedStageResult({
+          userId: input.userId, attemptId: input.attemptId, stage: "residence", provider: "didit",
+          providerReference: input.providerReference, ...residence,
+        });
+      }
     }
     if (Array.isArray(input.decision.ip_analyses)) {
       const location = deriveDiditNetworkLocationEvidence(input.decision, input.profileCountry);

@@ -14,10 +14,14 @@ export interface KycProgressViewProps {
   stages: KycProgressStageVM[];
   locationConsentAccepted: boolean;
   locationBusy: boolean;
+  residenceConsentAccepted: boolean;
+  residenceBusy: boolean;
   financialConsentAccepted: boolean;
   financialBusy: boolean;
   onLocationConsentChange: (accepted: boolean) => void;
   onCaptureLocation: () => void;
+  onResidenceConsentChange: (accepted: boolean) => void;
+  onRecordResidenceConsent: () => void;
   onFinancialConsentChange: (accepted: boolean) => void;
   onStartFinancial: () => void;
   onRefresh: () => void;
@@ -34,7 +38,7 @@ const statusClass: Record<string, string> = {
 };
 
 /** Dumb KYC progress display; all status derivation stays in the presenter/service. */
-export default function KycProgressView({ fullKycVerified, stages, locationConsentAccepted, locationBusy, financialConsentAccepted, financialBusy, onLocationConsentChange, onCaptureLocation, onFinancialConsentChange, onStartFinancial, onRefresh }: KycProgressViewProps) {
+export default function KycProgressView({ fullKycVerified, stages, locationConsentAccepted, locationBusy, residenceConsentAccepted, residenceBusy, financialConsentAccepted, financialBusy, onLocationConsentChange, onCaptureLocation, onResidenceConsentChange, onRecordResidenceConsent, onFinancialConsentChange, onStartFinancial, onRefresh }: KycProgressViewProps) {
   return <section className="rounded-2xl border border-app-card-border bg-app-card p-5 text-app-text sm:p-6">
     <div className="flex items-start justify-between gap-4">
       <div>
@@ -53,6 +57,13 @@ export default function KycProgressView({ fullKycVerified, stages, locationConse
           <span className={`rounded-full border px-2 py-1 text-[11px] font-bold ${statusClass[stage.statusLabel] ?? statusClass["Not started"]}`}>{stage.statusLabel}</span>
         </div>
         <p className="mt-2 text-xs leading-5 text-app-subtle">{stage.description}</p>
+        {stage.key === "residence" && stage.available && stage.status !== "passed" ? <div className="mt-3 rounded-lg border border-kink-amber/30 bg-kink-amber/5 p-3">
+          <label className="flex items-start gap-2 text-xs leading-5 text-app-subtle">
+            <input type="checkbox" checked={residenceConsentAccepted} onChange={(event) => onResidenceConsentChange(event.target.checked)} className="mt-1 accent-kink-amber" />
+            <span>I consent to Kinkord checking a recent proof-of-address document I submit during the identity session, including its issue date, to verify my residence. Kinkord stores only the verification result, not my document or address.</span>
+          </label>
+          <button type="button" disabled={!residenceConsentAccepted || residenceBusy} onClick={onRecordResidenceConsent} className="mt-3 rounded-lg bg-kink-amber px-3 py-2 text-xs font-black text-black disabled:cursor-not-allowed disabled:opacity-50">{residenceBusy ? "Recording consent…" : "Confirm residence consent"}</button>
+        </div> : null}
         {stage.key === "location" && stage.available && stage.status !== "passed" ? <div className="mt-3 rounded-lg border border-kink-amber/30 bg-kink-amber/5 p-3">
           <label className="flex items-start gap-2 text-xs leading-5 text-app-subtle">
             <input type="checkbox" checked={locationConsentAccepted} onChange={(event) => onLocationConsentChange(event.target.checked)} className="mt-1 accent-kink-amber" />
