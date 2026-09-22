@@ -26,6 +26,7 @@ import { VerificationModule } from "./verification/verification.module";
     ProfilesModule,
     CommunityModule,
     MembersModule,
+    VerificationModule,
     OtpModule,
     VerificationModule,
   ],
