@@ -37,8 +37,10 @@ describe("BronzeService", () => {
   const didit = diditAdapter as unknown as DiditService;
   const evaluate = vi.fn();
   const recordDiditDecision = vi.fn();
+  const recordSmileIdentityDecision = vi.fn();
   const service = new BronzeService(repo, smile, didit, { presignDownload } as unknown as StorageService,
-    { evaluate } as unknown as ProfileMatchService, { recordDiditDecision } as unknown as KycIngestionService);
+    { evaluate } as unknown as ProfileMatchService,
+    { recordDiditDecision, recordSmileIdentityDecision } as unknown as KycIngestionService);
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -54,6 +56,7 @@ describe("BronzeService", () => {
     presignDownload.mockResolvedValue("https://media.example.test/profile.jpg");
     evaluate.mockResolvedValue({ outcome: "review", reason: "PROFILE_PHOTO_FACE_MATCH_REQUIRED" });
     recordDiditDecision.mockResolvedValue(undefined);
+    recordSmileIdentityDecision.mockResolvedValue(undefined);
   });
 
   it("requires both the reviewer allowlist and 2FA before exposing the queue", async () => {
@@ -203,6 +206,32 @@ describe("BronzeService", () => {
     await service.smileCallback(providerResult);
     expect(recordCallback).toHaveBeenCalledWith(expect.objectContaining({ status: "processing",
       checks: expect.objectContaining({ governmentId: true, profileFace: false }) }));
+    expect(recordSmileIdentityDecision).not.toHaveBeenCalled();
+  });
+
+  it("writes a terminal Smile outcome through to the KYC identity stage", async () => {
+    findAttempt.mockResolvedValue({
+      id: "attempt-1", userId: "u1", number: 1, profileDob: snapshot.dob,
+      profileGender: snapshot.gender, profileCountry: snapshot.country, checks: {},
+    });
+    recordCallback.mockResolvedValue({
+      status: "manual_review",
+      checks: { governmentId: true, liveness: true, idFace: true, profileFace: false,
+        dateOfBirth: true, gender: true, country: true },
+    });
+    const providerResult = {
+      signature: "signed", timestamp: new Date().toISOString(),
+      PartnerParams: { job_id: "job-1", user_id: "u1" }, ResultCode: "0810",
+      Actions: { Verify_ID_Number: "Verified" }, FullName: "MEMBER NAME",
+      DOB: snapshot.dob, Gender: "F", Country: "NG",
+    };
+    jobResults.mockResolvedValue([providerResult]);
+    await service.smileCallback(providerResult);
+    expect(recordSmileIdentityDecision).toHaveBeenCalledWith(expect.objectContaining({
+      userId: "u1", attemptId: "attempt-1", providerReference: "job-1", bronzeStatus: "manual_review",
+      identityChecks: expect.objectContaining({ governmentId: true, profileFace: false }),
+      verifiedIdentity: { fullName: "MEMBER NAME", dateOfBirth: snapshot.dob, gender: "F" },
+    }));
   });
 
   it("fails closed when the signed provider status cannot confirm a callback result", async () => {

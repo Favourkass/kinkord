@@ -264,10 +264,22 @@ export class BronzeService {
       jobId, code: result.code, timestamp: payload.timestamp, actions: trusted.Actions,
       dob: trusted.DOB, gender: trusted.Gender, country: trusted.Country,
     })).digest("hex");
-    await this.repo.recordCallback({
+    const recorded = await this.repo.recordCallback({
       attemptId: attempt.id, userId: attempt.userId, fingerprint,
       resultCode: result.code, checks, status, failureCodes,
     });
+    if (recorded && recorded.status !== "processing") {
+      // Smile never carries PoA/IP evidence; only the identity stage writes through.
+      const fullName = typeof trusted.FullName === "string" ? trusted.FullName : "";
+      await this.kycIngestion.recordSmileIdentityDecision({
+        userId: attempt.userId, attemptId: attempt.id, providerReference: jobId,
+        identityChecks: recorded.checks, bronzeStatus: recorded.status === "verified" ? "verified"
+          : recorded.status === "failed" ? "failed" : "manual_review",
+        ...(fullName && identity.dateOfBirth && identity.gender
+          ? { verifiedIdentity: { fullName, dateOfBirth: String(trusted.DOB), gender: String(trusted.Gender) } }
+          : {}),
+      });
+    }
     return { received: true };
   }
 }
