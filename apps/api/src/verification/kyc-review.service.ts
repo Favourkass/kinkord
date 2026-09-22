@@ -6,7 +6,7 @@ type Reviewer = { id: string; email: string; twoFactorEnabled?: boolean | null }
 
 const requiredApprovalEvidence: Partial<Record<KycStage, string[]>> = {
   location: ["gpsCaptured", "accuracyAcceptable", "withinResidenceThreshold"],
-  residence: ["documentApproved", "addressExtracted", "issueDateExtracted", "noIdentityMismatch"],
+  residence: ["documentApproved", "addressExtracted", "issueDateExtracted", "issueDateWithinPolicy", "noIdentityMismatch"],
   financial: ["accountLinked", "financialIdentityAvailable", "identityMatchesKyc"],
 };
 

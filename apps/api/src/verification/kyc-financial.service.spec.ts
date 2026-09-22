@@ -61,4 +61,25 @@ describe("KycFinancialService", () => {
     }, "valid-secret");
     expect(repository.upsertDerivedStageResult).toHaveBeenCalledWith(expect.objectContaining({ stage: "financial", status: "under_review" }));
   });
+
+  it("refuses a bank connection when the protected identity reference is unavailable", async () => {
+    const { repository, service } = subject();
+    repository.financialComparisonSnapshot.mockResolvedValue(null);
+    await expect(service.start({ id: "member-1", name: "Member", email: "member@example.test" }))
+      .rejects.toThrow("Complete current identity and profile-photo verification");
+    expect(repository.createProviderAttempt).not.toHaveBeenCalled();
+  });
+
+  it("treats duplicate account_updated deliveries as idempotent receipts", async () => {
+    const { repository, mono, service } = subject();
+    const payload = {
+      event: "mono.events.account_updated",
+      data: { account: { _id: "account_12345678" }, meta: { ref: "mono:reference-1", data_status: "AVAILABLE", retrieved_data: ["identity"] } },
+    };
+    await service.webhook(payload, "valid-secret");
+    await service.webhook(payload, "valid-secret");
+    expect(repository.recordProviderReceipt).toHaveBeenCalledTimes(2);
+    expect(repository.upsertDerivedStageResult).toHaveBeenCalledTimes(2);
+    expect(mono.identity).toHaveBeenCalledTimes(2);
+  });
 });

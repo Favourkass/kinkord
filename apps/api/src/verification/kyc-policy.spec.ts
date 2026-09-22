@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { canAwardKinkordKyc, nextRequiredKycStage, type KycStageDecision } from "./kyc-policy";
+import { canAwardKinkordKyc, kycProviderEnvironment, nextRequiredKycStage, type KycStageDecision } from "./kyc-policy";
+
+const environment = kycProviderEnvironment();
 
 const allPassed = (): KycStageDecision[] => [
-  { stage: "identity", status: "passed", checks: { governmentId: true, liveness: true, idFace: true, profileFace: true, identityDetails: true } },
-  { stage: "location", status: "passed" },
-  { stage: "residence", status: "passed" },
-  { stage: "financial", status: "passed" },
+  { stage: "identity", status: "passed", environment, checks: { governmentId: true, liveness: true, idFace: true, profileFace: true, identityDetails: true } },
+  { stage: "location", status: "passed", environment },
+  { stage: "residence", status: "passed", environment },
+  { stage: "financial", status: "passed", environment },
 ];
 
 describe("Kinkord KYC policy", () => {
@@ -27,5 +29,17 @@ describe("Kinkord KYC policy", () => {
     decisions[2] = { ...decisions[2], expiresAt: new Date("2026-01-01T00:00:00.000Z") };
     expect(canAwardKinkordKyc(decisions, new Date("2026-09-21T00:00:00.000Z"))).toBe(false);
     expect(nextRequiredKycStage(decisions, new Date("2026-09-21T00:00:00.000Z"))).toBe("residence");
+  });
+
+  it("refuses sandbox or missing environment stamps under the current mode", () => {
+    const decisions = allPassed();
+    decisions[1] = { ...decisions[1], environment: environment === "sandbox" ? "live" : "sandbox" };
+    expect(canAwardKinkordKyc(decisions)).toBe(false);
+    expect(nextRequiredKycStage(decisions)).toBe("location");
+    decisions[1] = { ...decisions[1], environment: null };
+    expect(canAwardKinkordKyc(decisions)).toBe(false);
+    decisions[1] = { ...decisions[1], environment };
+    decisions[3] = { ...decisions[3], environment: undefined };
+    expect(canAwardKinkordKyc(decisions)).toBe(false);
   });
 });

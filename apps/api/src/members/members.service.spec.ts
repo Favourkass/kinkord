@@ -106,10 +106,18 @@ const makeService = () => {
   const postCountsFor = vi.fn(async () => new Map<string, number>());
   const postMediaFor = vi.fn(async () => ({ rows: [], total: 0 }));
   const posts = { postCountsFor, postMediaFor } as unknown as PostsService;
+  const kyc = { isFullyVerified: vi.fn(async () => false) };
   return {
-    service: new MembersService(db, storage, follows, posts),
+    service: new MembersService(
+      db,
+      storage,
+      follows,
+      posts,
+      kyc as unknown as import("../verification/kyc.service").KycService,
+    ),
     postCountsFor,
     postMediaFor,
+    kyc,
     select,
     presignDownload,
     isFollowing,
@@ -465,6 +473,20 @@ describe("MembersService.publicProfile visibility (Edit Profile → Privacy)", (
     const pub = await service.publicProfile("nene", "me");
     expect(pub.restricted).toBe(false);
     expect(areFriends).not.toHaveBeenCalled();
+  });
+
+  it("emits the unified kyc flag only when the policy service awards full KYC", async () => {
+    const { service, select, kyc } = makeService();
+    kyc.isFullyVerified.mockResolvedValueOnce(true);
+    select.mockReturnValueOnce(chain(rowFor("public")));
+    const sealed = await service.publicProfile("nene", "me");
+    expect(sealed.verification.kyc).toBe(true);
+    expect(kyc.isFullyVerified).toHaveBeenCalledWith("u2");
+
+    kyc.isFullyVerified.mockResolvedValueOnce(false);
+    select.mockReturnValueOnce(chain(rowFor("public")));
+    const open = await service.publicProfile("nene", "me");
+    expect(open.verification.kyc).toBeUndefined();
   });
 });
 

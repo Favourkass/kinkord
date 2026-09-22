@@ -30,6 +30,7 @@ import { containsPattern } from "../push/notifications.service";
 import { ONLINE_WINDOW_SECONDS, PresenceService } from "../presence/presence.service";
 import { StorageService } from "../storage/storage.service";
 import { silverCheck, silverSince } from "../subscriptions/plans";
+import { KycService } from "../verification/kyc.service";
 import { FollowsService } from "./follows.service";
 
 export type MembersSort = "recent" | "followers" | "name";
@@ -105,6 +106,7 @@ export class MembersService {
     private readonly storage: StorageService,
     private readonly follows: FollowsService,
     private readonly posts: PostsService,
+    private readonly kyc: KycService,
   ) {}
 
   /** Available countries with how many members have set that country. */
@@ -252,7 +254,7 @@ export class MembersService {
     const { u, p } = row;
     const isSelf = u.id === viewerId;
     const friendsOnly = p.profileVisibility === "friends" && !isSelf;
-    const [followCounts, mutualFriends, isFollowing, avatarUrl, coverUrl, isFriend, silver] =
+    const [followCounts, mutualFriends, isFollowing, avatarUrl, coverUrl, isFriend, silver, fullKyc] =
       await Promise.all([
         this.follows.counts(u.id),
         isSelf ? Promise.resolve(0) : this.follows.mutualFriendsCount(u.id, viewerId),
@@ -262,6 +264,7 @@ export class MembersService {
         p.coverKey ? this.storage.presignDownload(p.coverKey) : Promise.resolve(null),
         friendsOnly ? this.follows.areFriends(viewerId, u.id) : Promise.resolve(true),
         silverSince(this.db, u.id),
+        this.kyc.isFullyVerified(u.id),
       ]);
     const counts = { ...followCounts, mutualFriends };
     // Friends-only profile seen by a non-friend: what the directory card already shows
@@ -304,6 +307,9 @@ export class MembersService {
       verification: {
         email: u.emailVerified,
         phone: p.phoneVerified,
+        // Unified seal comes only from the policy service (all four stages,
+        // environment stamp, unexpired, not revoked) — never from legacy Bronze.
+        ...(fullKyc ? { kyc: true as const } : {}),
         // Legacy identity approval has not completed the new location, residence
         // and financial KYC stages, so it must never be promoted automatically.
         ...(row.bronze?.status === "verified" && row.bronze.verifiedAvatarKey === p.avatarKey

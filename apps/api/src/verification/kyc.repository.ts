@@ -3,6 +3,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { Db, DRIZZLE } from "../db/db.module";
 import { bronzeVerification, kycAttempt, kycAuditEvent, kycCase, kycConsent, kycReview, kycStageResult, profile, type KycConsentCategory, type KycStage, type KycStageStatus } from "../db/schema";
+import { kycProviderEnvironment } from "./kyc-policy";
 
 @Injectable()
 export class KycRepository {
@@ -44,13 +45,33 @@ export class KycRepository {
         )).limit(1);
         return existing ?? null;
       }
+      const [currentAttempt] = await tx.select({ createdAt: kycAttempt.createdAt })
+        .from(kycAttempt).where(eq(kycAttempt.id, input.attemptId));
+      // An older attempt's late callback must never shadow a newer attempt's result.
+      if (currentAttempt) {
+        const [newerAttempt] = await tx.select({ id: kycAttempt.id }).from(kycAttempt).where(and(
+          eq(kycAttempt.caseUserId, input.userId), eq(kycAttempt.stage, input.stage),
+        )).orderBy(desc(kycAttempt.createdAt)).limit(1);
+        if (newerAttempt && newerAttempt.id !== input.attemptId) {
+          const [existing] = await tx.select().from(kycStageResult).where(and(
+            eq(kycStageResult.caseUserId, input.userId), eq(kycStageResult.stage, input.stage),
+          )).orderBy(desc(kycStageResult.assessedAt)).limit(1);
+          return existing ?? null;
+        }
+      }
+      const summary = { ...input.summary, environment: kycProviderEnvironment() };
+      const [existingResult] = await tx.select().from(kycStageResult).where(and(
+        eq(kycStageResult.attemptId, input.attemptId), eq(kycStageResult.stage, input.stage),
+      )).limit(1);
+      // A replayed or out-of-order webhook must not downgrade an automated pass.
+      if (existingResult?.status === "passed" && input.status !== "passed") return existingResult;
       const [result] = await tx.insert(kycStageResult).values({
         caseUserId: input.userId, attemptId: input.attemptId, stage: input.stage,
         provider: input.provider, providerReference: input.providerReference,
-        status: input.status, summary: input.summary, reasonCodes: input.reasonCodes,
+        status: input.status, summary, reasonCodes: input.reasonCodes,
       }).onConflictDoUpdate({
         target: [kycStageResult.attemptId, kycStageResult.stage],
-        set: { status: input.status, summary: input.summary, reasonCodes: input.reasonCodes, assessedAt: new Date() },
+        set: { status: input.status, summary, reasonCodes: input.reasonCodes, assessedAt: new Date() },
       }).returning();
       await tx.insert(kycAuditEvent).values({
         caseUserId: input.userId, actorType: "system", eventType: `stage.${input.stage}.${input.status}`,
@@ -97,6 +118,25 @@ export class KycRepository {
       await tx.insert(kycCase).values({ userId: input.userId }).onConflictDoNothing();
       await tx.select({ userId: kycCase.userId }).from(kycCase)
         .where(eq(kycCase.userId, input.userId)).for("update");
+      // Abandoned hosted sessions cannot lock a stage; expire them like Bronze does.
+      const [stale] = await tx.select({ id: kycAttempt.id }).from(kycAttempt).where(and(
+        eq(kycAttempt.caseUserId, input.userId), eq(kycAttempt.stage, input.stage),
+        eq(kycAttempt.status, "pending"),
+      ));
+      if (stale) {
+        const [attempt] = await tx.select({ createdAt: kycAttempt.createdAt }).from(kycAttempt)
+          .where(eq(kycAttempt.id, stale.id));
+        if (attempt && attempt.createdAt.getTime() <= Date.now() - 24 * 60 * 60 * 1000) {
+          await tx.update(kycAttempt).set({ status: "failed", completedAt: new Date() })
+            .where(eq(kycAttempt.id, stale.id));
+          await tx.insert(kycAuditEvent).values({
+            caseUserId: input.userId, actorType: "system", eventType: `stage.${input.stage}.failed`,
+            metadata: { provider: input.provider, reason: "SESSION_EXPIRED" },
+          });
+        } else {
+          return null;
+        }
+      }
       const [pending] = await tx.select({ id: kycAttempt.id }).from(kycAttempt).where(and(
         eq(kycAttempt.caseUserId, input.userId), eq(kycAttempt.stage, input.stage), eq(kycAttempt.status, "pending"),
       )).limit(1);
@@ -235,7 +275,10 @@ export class KycRepository {
         eq(kycStageResult.stage, "identity"),
       )).for("update");
       if (!result) return null;
-      const summary = { ...result.summary, profileFace: input.profileFaceMatches };
+      const summary: Record<string, boolean | number | string> = {
+        ...result.summary, profileFace: input.profileFaceMatches,
+        environment: result.summary.environment ?? kycProviderEnvironment(),
+      };
       const identityChecksPass = summary.governmentId === true && summary.liveness === true &&
         summary.idFace === true && summary.profileFace === true && summary.identityDetails === true;
       const status = input.approved && identityChecksPass ? "passed" as const : "failed" as const;
