@@ -64,6 +64,27 @@ export const presenceQuerySchema = z.object({
     .pipe(z.array(z.string().min(1)).max(200)),
 });
 
+/**
+ * A media attachment as the client sees it. `key` stays on the DTO so a
+ * forwarded or reposted message can be re-verified against the uploader's
+ * prefix; the two URLs are what the bubble and the grid actually render.
+ *
+ * `thumbUrl` is the medium variant (`<key>_md.<ext>`), `url` is the original.
+ * Both are presigned with an hour-rounded signing time by `StorageService`, so
+ * repeat reads within the hour produce identical URLs the browser can cache.
+ */
+export interface MessageMediaDto {
+  id: string;
+  kind: "image" | "video" | "file";
+  key: string;
+  posterKey: string | null;
+  position: number;
+  /** Grid / bubble-size copy: enough to paint, a fraction of the bytes. */
+  thumbUrl: string;
+  /** Full-size copy for the lightbox. */
+  url: string;
+}
+
 export interface MessageDto {
   id: string;
   conversationId: string;
@@ -71,13 +92,7 @@ export interface MessageDto {
   body: string | null;
   createdAt: string;
   editedAt: string | null;
-  media: Array<{
-    id: string;
-    kind: string;
-    key: string;
-    posterKey: string | null;
-    position: number;
-  }>;
+  media: MessageMediaDto[];
 }
 
 export interface ConversationSummaryDto {
@@ -90,6 +105,11 @@ export interface ConversationSummaryDto {
     displayName: string;
     avatarUrl: string | null;
   }>;
+  /**
+   * The last message preview. Media is empty on purpose: the list only ever
+   * renders the text preview, and presigning every attachment of every
+   * conversation on the list call would be wasted work.
+   */
   lastMessage: MessageDto | null;
   unreadCount: number;
 }

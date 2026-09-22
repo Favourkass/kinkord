@@ -9,9 +9,9 @@ import {
   profile,
   user,
 } from "../db/schema";
-import type { ConversationSummaryDto, MessageDto, SendMessageInput } from "./dto";
-import { RealtimePublisher } from "./realtime.publisher";
 import { StorageService } from "../storage/storage.service";
+import type { ConversationSummaryDto, MessageDto, MessageMediaDto, SendMessageInput } from "./dto";
+import { RealtimePublisher } from "./realtime.publisher";
 
 @Injectable()
 export class ChatService {
@@ -150,28 +150,35 @@ export class ChatService {
       .orderBy(desc(message.createdAt))
       .limit(limit);
     if (rows.length === 0) return [];
+
     const ids = rows.map((r) => r.id);
     const media = await this.db
       .select()
       .from(messageMedia)
       .where(inArray(messageMedia.messageId, ids));
-    const byMessage = new Map<string, MessageDto["media"]>();
+
+    // Group by message first, then presign once per (message, key) so a page of
+    // 50 rows doesn't issue 50 × attachments presign calls serially.
+    const byMessage = new Map<string, typeof media>();
     for (const m of media) {
       const list = byMessage.get(m.messageId) ?? [];
-      list.push({
-        id: m.id,
-        kind: m.kind,
-        key: m.key,
-        posterKey: m.posterKey,
-        position: m.position,
-      });
+      list.push(m);
       byMessage.set(m.messageId, list);
     }
-    return rows.map((r) =>
-      this.rowToDto(
-        r,
-        (byMessage.get(r.id) ?? []).sort((a, b) => a.position - b.position),
-      ),
+
+    return Promise.all(
+      rows.map(async (r) => {
+        const own = (byMessage.get(r.id) ?? []).sort((a, b) => a.position - b.position);
+        return {
+          id: r.id,
+          conversationId: r.conversationId,
+          senderId: r.senderId,
+          body: r.body,
+          createdAt: r.createdAt.toISOString(),
+          editedAt: r.editedAt?.toISOString() ?? null,
+          media: await this.presignMedia(own),
+        } satisfies MessageDto;
+      }),
     );
   }
 
@@ -230,9 +237,8 @@ export class ChatService {
       .leftJoin(profile, eq(profile.userId, conversationParticipant.userId))
       .where(inArray(conversationParticipant.conversationId, ids));
 
-    // Last message per conversation. A correlated subquery is the right tool
-    // here — window functions would scan the whole table, and this row count is
-    // bounded by "conversations the member is in".
+    // Last message per conversation. Correlated subquery is the right tool —
+    // a window function would scan the whole table.
     const lastRows = await this.db
       .select({
         conversationId: message.conversationId,
@@ -299,6 +305,8 @@ export class ChatService {
         kind: c.kind,
         lastMessageAt: c.lastMessageAt.toISOString(),
         participants: participantsByConv.get(c.id) ?? [],
+        // Media deliberately omitted: the list row renders `body` only, and
+        // presigning attachments for every conversation would be wasted work.
         lastMessage: last
           ? {
               id: last.id,
@@ -315,6 +323,12 @@ export class ChatService {
     });
   }
 
+  /**
+   * Reads back one message and presigns its attachments. Called on the write
+   * path (`sendMessage`) so the broadcast carries fully-renderable URLs — the
+   * receiving client never has to make a second request to see the photo that
+   * just arrived.
+   */
   private async toDto(messageId: string): Promise<MessageDto> {
     const [row] = await this.db.select().from(message).where(eq(message.id, messageId)).limit(1);
     if (!row) throw new NotFoundException("Message not found.");
@@ -322,21 +336,6 @@ export class ChatService {
       .select()
       .from(messageMedia)
       .where(eq(messageMedia.messageId, messageId));
-    return this.rowToDto(
-      row,
-      media
-        .sort((a, b) => a.position - b.position)
-        .map((m) => ({
-          id: m.id,
-          kind: m.kind,
-          key: m.key,
-          posterKey: m.posterKey,
-          position: m.position,
-        })),
-    );
-  }
-
-  private rowToDto(row: typeof message.$inferSelect, media: MessageDto["media"]): MessageDto {
     return {
       id: row.id,
       conversationId: row.conversationId,
@@ -344,7 +343,33 @@ export class ChatService {
       body: row.body,
       createdAt: row.createdAt.toISOString(),
       editedAt: row.editedAt?.toISOString() ?? null,
-      media,
+      media: await this.presignMedia(media.sort((a, b) => a.position - b.position)),
     };
+  }
+
+  /**
+   * Turns stored media rows into DTOs with presigned URLs. Same shape as the
+   * post feed: `thumbUrl` is the medium variant the bubble paints, `url` is the
+   * original for the lightbox. `StorageService.presignDownload` rounds the
+   * signing time down to the hour, so repeat reads within the hour hand back
+   * identical URLs the browser caches — a message reopened ten times costs one
+   * signing, not ten.
+   */
+  private async presignMedia(
+    rows: Awaited<ReturnType<ChatService["db"]["select"]>> extends never
+      ? never
+      : (typeof messageMedia.$inferSelect)[],
+  ): Promise<MessageMediaDto[]> {
+    return Promise.all(
+      rows.map(async (m) => ({
+        id: m.id,
+        kind: m.kind,
+        key: m.key,
+        posterKey: m.posterKey,
+        position: m.position,
+        thumbUrl: await this.storage.presignDownload(m.key, "md"),
+        url: await this.storage.presignDownload(m.key),
+      })),
+    );
   }
 }
