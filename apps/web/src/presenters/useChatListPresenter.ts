@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { ConversationRowVM, ConversationSummary } from "@/domain/chat";
 import { chatService } from "@/services/chat.service";
 import { chatSocket } from "@/services/chatSocket.service";
-import { conversationTime, presenceLabel } from "@/util/chatTime";
+import { conversationTime } from "@/util/chatTime";
 import { useHomePresenter } from "./useHomePresenter";
 
 const PREVIEW_MAX = 60;
@@ -43,13 +43,11 @@ export function useChatListPresenter() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     chatService
       .listConversations()
       .then((rows) => {
         if (cancelled) return;
         setSummaries(rows);
-        // Batch presence for every peer we just listed, in one request.
         const peerIds = rows
           .map((r) => peerOf(r, null)?.userId)
           .filter((v): v is string => Boolean(v));
@@ -64,7 +62,6 @@ export function useChatListPresenter() {
       cancelled = true;
     };
   }, []);
-
   // Live: a new message bumps its conversation to the top of the list.
   useEffect(() => {
     const release = chatSocket.acquire();
@@ -88,7 +85,8 @@ export function useChatListPresenter() {
     const offPresence = chatSocket.on("presence:update", ({ userId, online: on }) => {
       setOnline((prev) => {
         const next = new Set(prev);
-        on ? next.add(userId) : next.delete(userId);
+        if (on) next.add(userId);
+        else next.delete(userId);
         return next;
       });
     });

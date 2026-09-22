@@ -18,6 +18,12 @@ export function useChatRulesPresenter() {
   const [neverShow, setNeverShow] = useState(false);
 
   useEffect(() => {
+    // One-time read of browser storage, which is unavailable during SSR. The
+    // first paint must be server-consistent (no gate), so the check cannot run
+    // during render. This is a single flip on mount, not a cascading update —
+    // `useSyncExternalStore` would be the "correct" primitive but the store has
+    // no other subscribers and would need a listener map just for this.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!chatRulesStore.isAcknowledged()) setVisible(true);
   }, []);
 

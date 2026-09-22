@@ -24,7 +24,8 @@ export function useChatThreadPresenter(conversationId: string) {
   const [viewerId, setViewerId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ThreadMessageVM[]>([]);
   const [peer, setPeer] = useState<ThreadPeerVM | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loadedId, setLoadedId] = useState<string | null>(null);
+  const loading = loadedId !== conversationId;
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -51,7 +52,6 @@ export function useChatThreadPresenter(conversationId: string) {
   // Load peers and the first page of history.
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     Promise.all([chatService.listConversations(), chatService.history(conversationId)])
       .then(([convs, history]) => {
         if (cancelled) return;
@@ -68,7 +68,6 @@ export function useChatThreadPresenter(conversationId: string) {
               }
             : null,
         );
-        // API returns newest-first; flip for display.
         setMessages(
           history
             .slice()
@@ -86,7 +85,9 @@ export function useChatThreadPresenter(conversationId: string) {
         setHasMore(history.length >= 50);
       })
       .catch((e: Error) => !cancelled && setError(e.message))
-      .finally(() => !cancelled && setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoadedId(conversationId);
+      });
     return () => {
       cancelled = true;
     };
@@ -99,11 +100,9 @@ export function useChatThreadPresenter(conversationId: string) {
       if (raw.conversationId !== conversationId) return;
       const me = viewerIdRef.current;
       setMessages((prev) => {
-        // Ack won the race: the row is already there under its server id.
+        // The ack for this same message may already have landed on the
+        // sender's socket; skip if so.
         if (prev.some((m) => m.id === raw.id)) return prev;
-        // A second tab's own send: reconcile the optimistic row by clientId is
-        // impossible here (broadcast omits clientId), but the sender's own ack
-        // replaces it. So dedupe by body+time is wrong; just append.
         return [
           ...prev,
           {
@@ -117,7 +116,6 @@ export function useChatThreadPresenter(conversationId: string) {
           },
         ];
       });
-      // If it's incoming and the tab is open, mark it read immediately.
       if (raw.senderId !== viewerIdRef.current) chatSocket.markRead(conversationId, raw.id);
     });
     const offTyping = chatSocket.on("typing", (p) => {
