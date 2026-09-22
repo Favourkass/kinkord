@@ -54,7 +54,7 @@ const EXEMPT = [
   /apps\/web\/src\/app\//,
   /apps\/web\/src\/components\//,
   /apps\/web\/src\/constants\//,
-    // Chat feature. Three files here are wiring, not logic, and match the shape
+  // Chat feature. Three files here are wiring, not logic, and match the shape
   // of exemptions already above them: the DTO file is declarative zod schemas
   // (like *.port.ts and types.ts), the socket adapter is framework glue over
   // @nestjs/platform-socket.io (like *.module.ts), and the publisher is a
