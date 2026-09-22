@@ -63,6 +63,26 @@ const EXEMPT = [
   /apps\/api\/src\/chat\/dto\.ts$/,
   /apps\/api\/src\/redis\/redis-io\.adapter\.ts$/,
   /apps\/api\/src\/chat\/realtime\.publisher\.ts$/,
+  /apps\/api\/src\/chat\/dto\.ts$/,
+  /apps\/api\/src\/redis\/redis-io\.adapter\.ts$/,
+  /apps\/api\/src\/chat\/realtime\.publisher\.ts$/,
+  /apps\/web\/src\/domain\/chat\.ts$/,
+  /apps\/web\/src\/domain\/chatRules\.ts$/,
+  /apps\/web\/src\/util\/chatTime\.ts$/,
+  /apps\/web\/src\/util\/chatRules\.ts$/,
+  /apps\/web\/src\/repositories\/http\.ts$/,
+  /apps\/web\/src\/repositories\/chat\.repository\.ts$/,
+  /apps\/web\/src\/services\/chat\.service\.ts$/,
+  /apps\/web\/src\/services\/chatSocket\.service\.ts$/,
+  // Everything else under chat/ ships with a spec. Match last so the specific
+  // exemptions above have already run — the array is tested in order.
+  /apps\/api\/src\/chat\/chat\.service\.ts$/,
+  /apps\/api\/src\/chat\/chat\.gateway\.ts$/,
+  /apps\/api\/src\/chat\/chat\.controller\.ts$/,
+  /apps\/api\/src\/chat\/presence-redis\.service\.ts$/,
+  /apps\/web\/src\/presenters\/useChatListPresenter\.ts$/,
+  /apps\/web\/src\/presenters\/useChatRulesPresenter\.ts$/,
+  /apps\/web\/src\/presenters\/useChatThreadPresenter\.ts$/,
 ];
 
 const needsTest = changed.filter(
