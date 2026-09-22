@@ -1,4 +1,4 @@
-export const BRONZE_POLICY_VERSION = "bronze-2026-09-16";
+export const BRONZE_POLICY_VERSION = "bronze-2026-09-19-profile-match-v2";
 export const BRONZE_MAX_ATTEMPTS = 3;
 
 export interface BronzeChecks {
@@ -22,7 +22,23 @@ export const emptyBronzeChecks = (): BronzeChecks => ({
 });
 
 export function canAwardBronze(checks: BronzeChecks): boolean {
-  return Object.values(checks).every((passed) => passed === true);
+  return (Object.keys(emptyBronzeChecks()) as (keyof BronzeChecks)[]).every((key) => checks[key] === true);
+}
+
+export function bronzeCallbackOutcome(input: {
+  checks: BronzeChecks; status: "processing" | "failed" | "manual_review" | "verified";
+  failureCodes: string[]; attemptNumber: number; profileUnchanged: boolean;
+}) {
+  const checks = { ...input.checks, profileFace: input.checks.profileFace && input.profileUnchanged };
+  if (input.status === "failed") return { checks, status: input.attemptNumber >= BRONZE_MAX_ATTEMPTS
+    ? "manual_review" as const : "failed" as const, failureCodes: input.failureCodes };
+  if (!input.profileUnchanged) return { checks, status: "manual_review" as const, failureCodes: ["PROFILE_CHANGED_DURING_VERIFICATION"] };
+  if (input.status === "manual_review") return { checks, status: "manual_review" as const,
+    failureCodes: input.failureCodes.length ? input.failureCodes : ["PROFILE_PHOTO_FACE_MATCH_REQUIRED"] };
+  if (canAwardBronze(checks)) return { checks, status: "verified" as const, failureCodes: [] };
+  const primary = checks.governmentId && checks.liveness && checks.idFace && checks.dateOfBirth && checks.gender && checks.country;
+  return { checks, status: primary ? "manual_review" as const : "processing" as const,
+    failureCodes: primary ? ["PROFILE_PHOTO_FACE_MATCH_REQUIRED"] : input.failureCodes };
 }
 
 /** Only a final, unambiguously positive callback can pass provider-owned checks. */
@@ -74,7 +90,9 @@ export function interpretDiditResult(payload: Record<string, unknown>, profileCo
       DOB: typeof id.date_of_birth === "string" ? id.date_of_birth : "",
       Gender: typeof id.gender === "string" ? id.gender : "",
       Country: id.issuing_state === "NGA" ? "NG" : typeof id.issuing_state === "string" ? id.issuing_state : "",
-    } : { DOB: "", Gender: "", Country: "" },
+      FullName: typeof id.full_name === "string" ? id.full_name :
+        [id.first_name, id.last_name].filter((value): value is string => typeof value === "string").join(" "),
+    } : { DOB: "", Gender: "", Country: "", FullName: "" },
   };
 }
 

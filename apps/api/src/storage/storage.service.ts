@@ -9,6 +9,7 @@ import {
   type S3ClientConfig,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { verificationImage, VERIFICATION_IMAGE_MAX_BYTES } from "./verification-image";
 
 /** Download URLs are identical within this window, so browsers can cache them. */
 export const DOWNLOAD_URL_WINDOW_S = 3600;
@@ -56,6 +57,23 @@ export function s3ClientConfig(env: NodeJS.ProcessEnv = process.env): S3ClientCo
 export class StorageService {
   private readonly s3 = new S3Client(s3ClientConfig());
   private readonly bucket = process.env.MEDIA_BUCKET ?? "";
+
+  /** Reads only a server-selected profile key; never fetches an arbitrary profile URL. */
+  async readVerificationImage(key: string) {
+    const response = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+      { abortSignal: AbortSignal.timeout(10000) });
+    const body = response.Body;
+    if (!body) throw new Error("Profile image unavailable");
+    // SDK's Node body is a readable stream. Breaking iteration destroys the stream.
+    const chunks: Buffer[] = [];
+    let size = 0;
+    for await (const chunk of body as AsyncIterable<Uint8Array>) {
+      size += chunk.length;
+      if (size > VERIFICATION_IMAGE_MAX_BYTES) throw new Error("Profile image too large");
+      chunks.push(Buffer.from(chunk));
+    }
+    return verificationImage(Buffer.concat(chunks));
+  }
 
   /**
    * Presigned PUT for a direct browser upload. Expires in 10 minutes. When the

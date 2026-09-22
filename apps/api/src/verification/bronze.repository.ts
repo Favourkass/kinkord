@@ -2,8 +2,9 @@ import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import { and, desc, eq } from "drizzle-orm";
 import { Db, DRIZZLE } from "../db/db.module";
-import { bronzeAttempt, bronzeCallback, bronzeConsent, bronzeReview, bronzeVerification, profile, profileMedia } from "../db/schema";
-import { BRONZE_MAX_ATTEMPTS, BRONZE_POLICY_VERSION, canAwardBronze, emptyBronzeChecks, type BronzeChecks } from "./bronze-policy";
+import { bronzeAttempt, bronzeCallback, bronzeConsent, bronzeProfileMatch, bronzeReview, bronzeVerification, profile, profileMedia } from "../db/schema";
+import { BRONZE_MAX_ATTEMPTS, BRONZE_POLICY_VERSION, bronzeCallbackOutcome, canAwardBronze, emptyBronzeChecks, type BronzeChecks } from "./bronze-policy";
+import type { ProfileMatchAudit } from "./profile-match-policy";
 
 @Injectable()
 export class BronzeRepository {
@@ -69,6 +70,7 @@ export class BronzeRepository {
       const id = randomUUID();
       await tx.insert(bronzeAttempt).values({
         id, userId, number: state.attemptsUsed + 1, providerJobId: jobId,
+        provider: jobId.startsWith("didit:") ? "didit" : "smile_id",
         avatarKey: snapshot.avatarKey, profileDob: snapshot.dob,
         profileGender: snapshot.gender, profileCountry: snapshot.country,
       });
@@ -82,6 +84,20 @@ export class BronzeRepository {
   async findAttempt(jobId: string) {
     const [row] = await this.db.select().from(bronzeAttempt).where(eq(bronzeAttempt.providerJobId, jobId));
     return row ?? null;
+  }
+
+  /** Unique attempt key claims the paid request across webhooks, polls and API instances. */
+  async claimProfileMatch(attemptId: string) {
+    const [claimed] = await this.db.insert(bronzeProfileMatch).values({ attemptId })
+      .onConflictDoNothing().returning();
+    if (claimed) return { acquired: true, ...claimed };
+    const [existing] = await this.db.select().from(bronzeProfileMatch).where(eq(bronzeProfileMatch.attemptId, attemptId));
+    return { acquired: false, ...existing };
+  }
+
+  async completeProfileMatch(attemptId: string, result: ProfileMatchAudit) {
+    await this.db.update(bronzeProfileMatch).set({ result, completedAt: new Date() })
+      .where(eq(bronzeProfileMatch.attemptId, attemptId));
   }
 
   async attempt(id: string) {
@@ -122,7 +138,10 @@ export class BronzeRepository {
       if (input.decision === "approve") await tx.update(bronzeVerification).set({
         status: "verified", verifiedAt: new Date(), verifiedAvatarKey: attempt.avatarKey,
       }).where(eq(bronzeVerification.userId, review.userId));
-      return { status: input.decision === "approve" ? "verified" : "manual_review" };
+      return {
+        status: input.decision === "approve" ? "verified" as const : "manual_review" as const,
+        userId: review.userId, attemptId: attempt.id, checks,
+      };
     });
   }
 
@@ -131,30 +150,26 @@ export class BronzeRepository {
     checks: BronzeChecks; status: "processing" | "failed" | "manual_review" | "verified";
     failureCodes: string[];
   }) {
-    await this.db.transaction(async (tx) => {
+    return this.db.transaction(async (tx) => {
       const [current] = await tx.select().from(bronzeVerification)
         .where(eq(bronzeVerification.userId, input.userId)).for("update");
-      if (!current || current.currentAttemptId !== input.attemptId || current.status !== "pending") return;
+      if (!current || current.currentAttemptId !== input.attemptId || current.status !== "pending") return null;
       const [recorded] = await tx.insert(bronzeCallback).values({
         attemptId: input.attemptId, fingerprint: input.fingerprint, resultCode: input.resultCode,
       }).onConflictDoNothing().returning({ id: bronzeCallback.id });
-      if (!recorded) return;
+      if (!recorded) return null;
       const [attempt] = await tx.select().from(bronzeAttempt)
         .where(eq(bronzeAttempt.id, input.attemptId));
       const old = attempt.checks as Partial<BronzeChecks>;
-      const checks = { ...emptyBronzeChecks(), ...old };
-      for (const key of Object.keys(checks) as (keyof BronzeChecks)[]) {
-        checks[key] = Boolean(checks[key] || input.checks[key]);
+      const merged = { ...emptyBronzeChecks(), ...old };
+      for (const key of Object.keys(merged) as (keyof BronzeChecks)[]) {
+        merged[key] = Boolean(merged[key] || input.checks[key]);
       }
-      const primaryPassed = checks.governmentId && checks.liveness && checks.idFace &&
-        checks.dateOfBirth && checks.gender && checks.country;
-      const failed = input.status === "failed" || (input.status === "manual_review" && input.failureCodes.some((code) => code !== "PROFILE_PHOTO_FACE_MATCH_REQUIRED"));
-      const status = failed
-        ? attempt.number >= BRONZE_MAX_ATTEMPTS ? "manual_review" : "failed"
-        : canAwardBronze(checks) ? "verified"
-        : primaryPassed ? "manual_review" : "processing";
-      const failureCodes = status === "manual_review" && primaryPassed
-        ? ["PROFILE_PHOTO_FACE_MATCH_REQUIRED"] : input.failureCodes;
+      const [currentProfile] = await tx.select().from(profile).where(eq(profile.userId, input.userId)).for("update");
+      const { checks, status, failureCodes } = bronzeCallbackOutcome({ ...input, checks: merged,
+        attemptNumber: attempt.number, profileUnchanged: currentProfile?.avatarKey === attempt.avatarKey &&
+          currentProfile?.dateOfBirth === attempt.profileDob && currentProfile?.gender === attempt.profileGender &&
+          currentProfile?.country === attempt.profileCountry });
       await tx.update(bronzeAttempt).set({
         checks: checks as unknown as Record<string, boolean>, status, failureCodes,
         completedAt: status === "processing" ? null : new Date(),
@@ -171,6 +186,7 @@ export class BronzeRepository {
           }).onConflictDoNothing();
         }
       }
+      return { status, checks };
     });
   }
 }

@@ -108,7 +108,7 @@ export function useBronzeVerificationPresenter() {
       canStart: (state.provider === "didit" || widgetReady) && state.providerAvailable && checked && !busy &&
         state.missing.length === 0 && (state.status === "not_started" || state.status === "failed"),
       providerAvailable: state.providerAvailable,
-      policyUrl: state.policyUrl,
+      policyUrl: state.policyUrl || Routes.verificationPrivacy,
       onStart: () => { void start(); },
       onRefresh: () => { void refresh(); },
       editProfileHref: Routes.profileEdit,

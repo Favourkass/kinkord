@@ -124,7 +124,8 @@ export interface PublicProfilePM {
   restricted: boolean;
   /** Only your own profile carries the birth date. */
   dateOfBirth: string | null;
-  verification: { email: boolean; phone: boolean; bronze?: boolean };
+  /** `legacyIdentity` is deliberately not promoted to full KYC during migration. */
+  verification: { email: boolean; phone: boolean; kyc?: boolean; legacyIdentity?: boolean };
   /** The Silver check, with when their Silver began; absent from an older API. */
   silver?: { since: string } | null;
 }
@@ -223,7 +224,7 @@ export interface PublicProfileVM {
   roles: string[];
   limits: string | null;
   socialLinks: SocialLinkVM[];
-  verification: { level: "bronze" | "basic" | "none"; email: boolean; phone: boolean };
+  verification: { level: "kyc" | "identity" | "basic" | "none"; email: boolean; phone: boolean };
   /** The Silver check beside their name; `since` is "October 2026". */
   silver: { since: string | null } | null;
   restricted: boolean;
@@ -373,7 +374,8 @@ export function toPublicProfileVM(
       return url ? [{ platform, url, handle: socialHandle(url) }] : [];
     }),
     verification: {
-      level: pm.verification?.bronze ? "bronze" : pm.verification?.email || pm.verification?.phone ? "basic" : "none",
+      level: pm.verification?.kyc ? "kyc" : pm.verification?.legacyIdentity ? "identity" :
+        pm.verification?.email || pm.verification?.phone ? "basic" : "none",
       email: Boolean(pm.verification?.email),
       phone: Boolean(pm.verification?.phone),
     },

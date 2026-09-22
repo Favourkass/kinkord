@@ -5,13 +5,16 @@ import { BronzeRepository } from "./bronze.repository";
 import { BRONZE_MAX_ATTEMPTS, BRONZE_POLICY_VERSION, canAwardBronze, emptyBronzeChecks, interpretDiditResult, interpretSmileResult, matchIdentity, type BronzeChecks } from "./bronze-policy";
 import { SmileIdService } from "./smile-id.service";
 import { DiditService } from "./didit.service";
+import { ProfileMatchService } from "./profile-match.service";
+import { KycIngestionService } from "./kyc-ingestion.service";
 
 @Injectable()
 export class BronzeService {
   private readonly logger = new Logger(BronzeService.name);
   constructor(private readonly repo: BronzeRepository, private readonly smile: SmileIdService,
     private readonly didit: DiditService,
-    private readonly storage: StorageService) {}
+    private readonly storage: StorageService, private readonly profileMatch: ProfileMatchService,
+    private readonly kycIngestion: KycIngestionService) {}
 
   private reviewer(user: { id: string; email: string; twoFactorEnabled?: boolean | null }) {
     const allowlist = (process.env.BRONZE_REVIEWER_EMAILS ?? "").split(",")
@@ -39,14 +42,19 @@ export class BronzeService {
     this.reviewer(user);
     const result = await this.repo.decideReview({ ...input, reviewerId: user.id });
     if (!result) throw new ConflictException("The review is no longer open or the required checks did not pass.");
+    await this.kycIngestion.resolveLegacyIdentityReview({
+      userId: result.userId, attemptId: result.attemptId,
+      approved: input.decision === "approve", profileFaceMatches: input.profileFaceMatches,
+    });
     this.logger.log(`Bronze review ${input.id} decided ${input.decision} by reviewer ${user.id}`);
     return result;
   }
 
   async status(userId: string) {
-    let [state, snapshot, consent] = await Promise.all([
+    const [initialState, snapshot, consent] = await Promise.all([
       this.repo.status(userId), this.repo.snapshot(userId), this.repo.hasConsent(userId),
     ]);
+    let state = initialState;
     if (state?.status === "pending" && state.currentAttemptId && this.didit.configured) {
       const attempt = await this.repo.attempt(state.currentAttemptId);
       if (attempt?.providerJobId.startsWith("didit:")) {
@@ -83,6 +91,9 @@ export class BronzeService {
   async consent(userId: string, accepted: boolean, version: string) {
     if (accepted !== true || version !== BRONZE_POLICY_VERSION) {
       throw new BadRequestException("The current Bronze verification consent is required.");
+    }
+    if (!this.didit.configured && !this.smile.configured) {
+      throw new ServiceUnavailableException("Bronze verification is not available until its approved privacy notice and provider are configured.");
     }
     await this.repo.consent(userId);
     return this.status(userId);
@@ -136,22 +147,29 @@ export class BronzeService {
       callbackUrl: this.smile.callbackUrl, policyUrl: this.smile.policyUrl };
   }
 
-  async diditCallback(body: Buffer, signature: string | undefined, timestamp: string | undefined) {
-    this.didit.verifyWebhook(body, signature, timestamp);
+  diditCallback(body: Buffer, signatureV2: string | undefined,
+    signatureRaw: string | undefined, timestamp: string | undefined) {
+    this.didit.verifyWebhook(body, signatureV2, signatureRaw, timestamp);
     let payload: Record<string, unknown>;
     try { payload = JSON.parse(body.toString("utf8")) as Record<string, unknown>; }
     catch { throw new BadRequestException("Invalid Didit callback"); }
     if (typeof payload.session_id !== "string") throw new BadRequestException("Missing Didit session");
-    await this.recordDiditDecision(payload.session_id);
+    // Didit treats responses taking more than five seconds as failed deliveries.
+    // Acknowledge after authentication, then re-fetch the authoritative decision.
+    // Pending-status polling is the reconciliation path if this process is interrupted.
+    void this.recordDiditDecision(payload.session_id).catch((error) => {
+      this.logger.error(`Didit callback processing failed: ${error instanceof Error ? error.message : "unknown error"}`);
+    });
     return { received: true };
   }
 
   private async recordDiditDecision(sessionId: string) {
     const attempt = await this.repo.findAttempt(`didit:${sessionId}`);
     if (!attempt) throw new NotFoundException("Unknown Didit session");
+    if (attempt.status !== "started" && attempt.status !== "processing") return;
     const decision = await this.didit.decision(sessionId);
     if (decision.session_id !== sessionId || decision.session_kind !== "user" ||
-        decision.vendor_data !== attempt.userId || decision.workflow_id !== process.env.DIDIT_WORKFLOW_ID) {
+        decision.vendor_data !== attempt.userId || decision.workflow_id !== this.didit.workflowId) {
       throw new BadRequestException("Mismatched Didit decision");
     }
     const result = interpretDiditResult(decision, attempt.profileCountry);
@@ -166,14 +184,29 @@ export class BronzeService {
     };
     const primaryPassed = checks.governmentId && checks.liveness && checks.idFace &&
       checks.dateOfBirth && checks.gender && checks.country;
-    const failureCodes = result.failed ? ["DIDIT_DECLINED"] : !primaryPassed ? ["DIDIT_REQUIRED_CHECK_MISSING"] :
+    let failureCodes = result.failed ? ["DIDIT_DECLINED"] : !primaryPassed ? ["DIDIT_REQUIRED_CHECK_MISSING"] :
       ["PROFILE_PHOTO_FACE_MATCH_REQUIRED"];
+    if (!result.failed && primaryPassed) {
+      const match = await this.profileMatch.evaluate(attempt, decision);
+      if (!match) return;
+      checks.profileFace = match.outcome === "matched";
+      failureCodes = checks.profileFace ? [] : [match.reason ?? "PROFILE_PHOTO_MATCH_INCONCLUSIVE"];
+    }
     const fingerprint = createHash("sha256").update(JSON.stringify({ sessionId, status: decision.status,
       checks })).digest("hex");
-    await this.repo.recordCallback({
+    const recorded = await this.repo.recordCallback({
       attemptId: attempt.id, userId: attempt.userId, fingerprint,
       resultCode: String(decision.status), checks,
-      status: result.failed || !primaryPassed ? "failed" : "manual_review", failureCodes,
+      status: result.failed || !primaryPassed ? "failed" : canAwardBronze(checks) ? "verified" : "manual_review", failureCodes,
+    });
+    if (!recorded) return;
+    await this.kycIngestion.recordDiditDecision({
+      userId: attempt.userId, attemptId: attempt.id, providerReference: sessionId,
+      profileCountry: attempt.profileCountry, decision, identityChecks: recorded.checks,
+      providerDeclined: recorded.status === "failed",
+      verifiedIdentity: {
+        fullName: result.identity.FullName, dateOfBirth: result.identity.DOB, gender: result.identity.Gender,
+      },
     });
   }
 

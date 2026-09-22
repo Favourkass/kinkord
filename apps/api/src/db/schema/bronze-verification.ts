@@ -1,5 +1,6 @@
 import { index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { user } from "./auth";
+import type { ProfileMatchAudit } from "../../verification/profile-match-policy";
 
 export type BronzeStatus = "not_started" | "pending" | "failed" | "manual_review" | "verified";
 export type BronzeAttemptStatus = "started" | "processing" | "failed" | "manual_review" | "verified";
@@ -39,6 +40,14 @@ export const bronzeConsent = pgTable("bronze_verification_consent", {
   policyVersion: text("policy_version").notNull(),
   acceptedAt: timestamp("accepted_at").defaultNow().notNull(),
 }, (t) => [index("bronze_consent_user_idx").on(t.userId, t.acceptedAt)]);
+
+/** Durable single-call claim and derived audit only: no media, embeddings or signed URLs. */
+export const bronzeProfileMatch = pgTable("bronze_profile_match", {
+  attemptId: uuid("attempt_id").primaryKey().references(() => bronzeAttempt.id, { onDelete: "cascade" }),
+  result: jsonb("result").$type<ProfileMatchAudit>(),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+});
 
 /** Minimal idempotency/audit record; do not store Smile's raw PII-bearing callback. */
 export const bronzeCallback = pgTable("bronze_verification_callback", {

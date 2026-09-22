@@ -4,6 +4,9 @@ export const Routes = {
   about: "/about",
   team: "/about/team",
   contact: "/contact",
+  kycPrivacy: "/privacy/kyc",
+  /** Compatibility alias while callers migrate to the KYC-specific name. */
+  verificationPrivacy: "/privacy/kyc",
   invest: "/invest",
   lectures: "/lectures",
   lecture: (slug: string) => `/lectures/${slug}`,
@@ -28,7 +31,11 @@ export const Routes = {
   settings: "/settings",
   /** Password + 2FA moved here from /profile (CEO, 2026-09-12: "we still need to keep the change password and co"). */
   settingsSecurity: "/settings/security",
-  settingsBronzeVerification: "/settings/verification/bronze",
+  settingsKyc: "/settings/kyc",
+  settingsKycReviews: "/settings/kyc/reviews",
+  /** Legacy internal names; do not use in new UI. */
+  settingsBronzeVerification: "/settings/kyc",
+  settingsBronzeReviews: "/settings/kyc/reviews",
   // Edit Profile hub (Figma 1542:30) and its five sections.
   profileEdit: "/profile/edit",
   profileEditPhotos: "/profile/edit/photos",

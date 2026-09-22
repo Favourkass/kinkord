@@ -1,5 +1,15 @@
 export type BronzeStatus = "not_started" | "pending" | "failed" | "manual_review" | "verified";
 
+export interface BronzeChecks {
+  governmentId: boolean;
+  liveness: boolean;
+  idFace: boolean;
+  profileFace: boolean;
+  dateOfBirth: boolean;
+  gender: boolean;
+  country: boolean;
+}
+
 export interface BronzeVerificationPM {
   status: BronzeStatus;
   attemptsUsed: number;
@@ -37,6 +47,6 @@ export function bronzeStatusText(status: BronzeStatus): string {
     pending: "In progress — waiting for verification results",
     failed: "Failed — you may try again",
     manual_review: "Manual review required",
-    verified: "Bronze verified",
+    verified: "Identity stage complete",
   }[status];
 }

@@ -304,8 +304,10 @@ export class MembersService {
       verification: {
         email: u.emailVerified,
         phone: p.phoneVerified,
+        // Legacy identity approval has not completed the new location, residence
+        // and financial KYC stages, so it must never be promoted automatically.
         ...(row.bronze?.status === "verified" && row.bronze.verifiedAvatarKey === p.avatarKey
-          ? { bronze: true as const }
+          ? { legacyIdentity: true as const }
           : {}),
       },
       // The Silver check, X-style: shown with the month their Silver began.

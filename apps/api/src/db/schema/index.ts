@@ -14,3 +14,4 @@ export * from "./safety";
 export * from "./notification";
 export * from "./subscription";
 export * from "./bronze-verification";
+export * from "./kyc";

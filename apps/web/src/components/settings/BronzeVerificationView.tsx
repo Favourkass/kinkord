@@ -1,4 +1,5 @@
 import Link from "next/link";
+import KycVerifiedMark from "@/components/brand/KycVerifiedMark";
 
 export interface BronzeVerificationViewProps {
   status: string;
@@ -20,8 +21,8 @@ const card = "rounded-[16px] border border-app-card-border bg-app-card p-[18px]"
 export default function BronzeVerificationView(p: BronzeVerificationViewProps) {
   return <div className="flex flex-col gap-5 text-app-text">
     <div>
-      <h1 className="text-[24px] font-black text-kink-gold-bright">Bronze verification</h1>
-      <p className="mt-2 text-sm text-app-subtle">Verify your government ID, live face, and current profile photo. Your identity documents and camera capture are never displayed on your profile.</p>
+      <div className="flex items-center gap-3"><KycVerifiedMark size={36} /><h1 className="text-[24px] font-black text-kink-gold-bright">Kinkord KYC</h1></div>
+      <p className="mt-2 text-sm text-app-subtle">Start the identity and live-biometric stage of Kinkord KYC. Your identity documents and camera capture are never displayed on your profile.</p>
     </div>
     <section className={card}>
       <h2 className="font-bold">Status: {p.status}</h2>
@@ -41,16 +42,16 @@ export default function BronzeVerificationView(p: BronzeVerificationViewProps) {
         <li>Your live face against your current Kinkord profile photo.</li>
         <li>Date of birth, gender and country against your profile.</li>
       </ol>
-      <p className="mt-3 text-sm text-app-subtle">An inconclusive result or three failed attempts goes to manual review; the badge is never awarded on a partial result.</p>
+      <p className="mt-3 text-sm text-app-subtle">A clear profile-photo match can complete this identity stage automatically. An uncertain result, changed profile photo, or three failed attempts goes to manual review. Kinkord KYC is awarded only after every required KYC stage has passed.</p>
     </section>
     <section className={card}>
-      {p.policyUrl ? <a href={p.policyUrl} target="_blank" rel="noopener noreferrer" className="mb-3 inline-block text-sm font-bold text-kink-gold-bright underline">Read the biometric & identity privacy notice</a> : null}
+      {p.policyUrl ? <a href={p.policyUrl} target="_blank" rel="noopener noreferrer" className="mb-3 inline-block text-sm font-bold text-kink-gold-bright underline">Read the Kinkord KYC privacy notice</a> : null}
       <label className="flex items-start gap-3 text-sm">
         <input type="checkbox" className="mt-1 accent-kink-amber" checked={p.checked} onChange={(e) => p.onChecked(e.target.checked)} />
-        <span>I consent to Kinkord and its verification provider (Didit, or Smile ID if a fallback is needed) processing my government ID information and live biometric images for Bronze verification, fraud prevention, and review. I understand the results may require manual review.</span>
+        <span>I have read the Kinkord KYC Privacy Notice and explicitly consent to Kinkord and Didit processing my government ID information, live biometric images, and current profile photo for the identity stage, fraud prevention, and review. I understand that a clear result may be decided automatically and that uncertain results may require human review.</span>
       </label>
       <button type="button" disabled={!p.canStart} onClick={p.onStart} className="mt-5 w-full rounded-xl bg-kink-amber p-3 font-bold text-black disabled:opacity-50">
-        {p.busy ? "Starting…" : "Start Bronze verification"}
+        {p.busy ? "Starting…" : "Start identity verification"}
       </button>
       {!p.providerAvailable ? <p className="mt-2 text-sm text-app-subtle">The verification service is not configured yet.</p> : null}
     </section>

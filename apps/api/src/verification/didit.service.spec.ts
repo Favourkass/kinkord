@@ -9,8 +9,9 @@ afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 describe("Didit adapter", () => {
   it("requires the server-side key, published workflow, return URL and privacy notice", () => {
     const service = new DiditService();
+    vi.stubEnv("DIDIT_MODE", "live");
     vi.stubEnv("DIDIT_API_KEY", "");
-    vi.stubEnv("DIDIT_WORKFLOW_ID", "workflow-1");
+    vi.stubEnv("DIDIT_LIVE_WORKFLOW_ID", "workflow-1");
     vi.stubEnv("DIDIT_RETURN_URL", "http://localhost:3000/settings/verification/bronze");
     vi.stubEnv("BRONZE_POLICY_URL", "https://example.test/privacy");
     expect(service.configured).toBe(false);
@@ -19,8 +20,9 @@ describe("Didit adapter", () => {
   });
 
   it("creates a hosted session without exposing the API key in the result", async () => {
+    vi.stubEnv("DIDIT_MODE", "live");
     vi.stubEnv("DIDIT_API_KEY", "test-key");
-    vi.stubEnv("DIDIT_WORKFLOW_ID", "workflow-1");
+    vi.stubEnv("DIDIT_LIVE_WORKFLOW_ID", "workflow-1");
     vi.stubEnv("DIDIT_RETURN_URL", "http://localhost:3000/settings/verification/bronze");
     vi.stubEnv("BRONZE_POLICY_URL", "https://example.test/privacy");
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({
@@ -34,15 +36,44 @@ describe("Didit adapter", () => {
     }));
   });
 
+  it("uses only the sandbox key when sandbox mode is selected", async () => {
+    vi.stubEnv("DIDIT_MODE", "sandbox");
+    vi.stubEnv("DIDIT_API_KEY", "live-test-key");
+    vi.stubEnv("DIDIT_SANDBOX_API_KEY", "sandbox-test-key");
+    vi.stubEnv("DIDIT_SANDBOX_WORKFLOW_ID", "sandbox-workflow");
+    vi.stubEnv("DIDIT_RETURN_URL", "http://localhost:3000/settings/verification/bronze");
+    vi.stubEnv("BRONZE_POLICY_URL", "https://example.test/privacy");
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({
+      session_id: "session-1", url: "https://verify.didit.me/session/token", vendor_data: "u1",
+    }) });
+    vi.stubGlobal("fetch", fetchMock);
+    await new DiditService().createSession("u1");
+    expect(fetchMock).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
+      headers: expect.objectContaining({ "x-api-key": "sandbox-test-key" }),
+    }));
+    vi.stubEnv("DIDIT_SANDBOX_API_KEY", "");
+    expect(new DiditService().configured).toBe(false);
+  });
+
   it("authenticates exact webhook bytes and rejects stale or altered requests", () => {
     vi.stubEnv("DIDIT_WEBHOOK_SECRET", "webhook-test-secret");
     const service = new DiditService();
     const body = Buffer.from('{"session_id":"session-1"}');
     const timestamp = String(Math.floor(Date.now() / 1000));
     const signature = createHmac("sha256", "webhook-test-secret").update(body).digest("hex");
-    expect(() => service.verifyWebhook(body, signature, timestamp)).not.toThrow();
-    expect(() => service.verifyWebhook(Buffer.from("{}"), signature, timestamp)).toThrow(UnauthorizedException);
-    expect(() => service.verifyWebhook(body, signature, "1")).toThrow(UnauthorizedException);
+    expect(() => service.verifyWebhook(body, undefined, signature, timestamp)).not.toThrow();
+    expect(() => service.verifyWebhook(Buffer.from("{}"), undefined, signature, timestamp)).toThrow(UnauthorizedException);
+    expect(() => service.verifyWebhook(body, undefined, signature, "1")).toThrow(UnauthorizedException);
+  });
+
+  it("accepts Didit's recommended canonical V2 signature", () => {
+    vi.stubEnv("DIDIT_WEBHOOK_SECRET", "webhook-test-secret");
+    const service = new DiditService();
+    const body = Buffer.from('{"z":1,"name":"José","nested":{"b":2,"a":1}}');
+    const canonical = Buffer.from('{"name":"José","nested":{"a":1,"b":2},"z":1}');
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const signature = createHmac("sha256", "webhook-test-secret").update(canonical).digest("hex");
+    expect(() => service.verifyWebhook(body, signature, undefined, timestamp)).not.toThrow();
   });
 
   it("never treats a top-level approval as all Bronze checks", () => {
