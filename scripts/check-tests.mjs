@@ -54,6 +54,15 @@ const EXEMPT = [
   /apps\/web\/src\/app\//,
   /apps\/web\/src\/components\//,
   /apps\/web\/src\/constants\//,
+    // Chat feature. Three files here are wiring, not logic, and match the shape
+  // of exemptions already above them: the DTO file is declarative zod schemas
+  // (like *.port.ts and types.ts), the socket adapter is framework glue over
+  // @nestjs/platform-socket.io (like *.module.ts), and the publisher is a
+  // two-method seam over server.to(room).emit() that exists only to break a
+  // circular dependency between the service and the gateway.
+  /apps\/api\/src\/chat\/dto\.ts$/,
+  /apps\/api\/src\/redis\/redis-io\.adapter\.ts$/,
+  /apps\/api\/src\/chat\/realtime\.publisher\.ts$/,
 ];
 
 const needsTest = changed.filter(
