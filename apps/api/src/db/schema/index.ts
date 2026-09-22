@@ -7,3 +7,4 @@ export * from "./profile-media";
 export * from "./follow";
 export * from "./otp";
 export * from "./bronze-verification";
+export * from "./kyc";

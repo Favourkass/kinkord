@@ -1,4 +1,5 @@
 import MaskIcon from "@/components/app/MaskIcon";
+import KycVerifiedMark from "@/components/brand/KycVerifiedMark";
 import type { PublicProfileVM } from "@/domain/member";
 
 export interface ProfileSideCardLabels {
@@ -85,7 +86,8 @@ export default function ProfileSideCard({
               <span className="text-[15px] leading-[18px] text-pf-muted">{vm.handle}</span>
             )}
           </p>
-          {vm.verification.level === "bronze" ? <span className="self-start rounded-full border border-kink-gold-bright px-3 py-1 text-xs font-bold text-kink-gold-bright">Bronze Verified ✓</span> : null}
+          {vm.verification.level === "kyc" ? <span className="flex self-start items-center gap-1.5 rounded-full border border-kink-gold-bright px-3 py-1 text-xs font-bold text-kink-gold-bright"><KycVerifiedMark size={16} />Kinkord KYC Verified</span> : null}
+          {vm.verification.level === "identity" ? <span className="self-start rounded-full border border-kink-gold-bright/60 px-3 py-1 text-xs font-bold text-kink-gold-bright">Identity Verified</span> : null}
           {presenceText && (
             <p className="text-[13px] leading-[16px] text-pf-muted">{presenceText}</p>
           )}

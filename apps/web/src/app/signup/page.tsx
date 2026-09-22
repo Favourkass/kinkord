@@ -568,10 +568,10 @@ export default function SignupPage() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-[18px] font-extrabold uppercase text-kink-gold-bright lg:text-[26px]">
-                    Bronze Verification
+                    Kinkord KYC
                   </p>
                   <p className="text-[12px] text-[#999999] lg:text-[16px]">
-                    Verify that you are a real person.
+                    Begins with identity and liveness verification.
                   </p>
                 </div>
               </div>

@@ -6,6 +6,13 @@ const nextConfig: NextConfig = {
   // No sharp in the runtime image: the build stage runs on the builder's
   // native arch, so native binaries would not match the amd64 runtime.
   images: { unoptimized: true },
+  async rewrites() {
+    // Local public previews need browser API calls on the preview origin.
+    // This route is absent from normal builds and deployments.
+    return process.env.LOCAL_PREVIEW_PROXY === "1"
+      ? [{ source: "/__api/:path*", destination: "http://127.0.0.1:4000/:path*" }]
+      : [];
+  },
   async headers() {
     return [
       {

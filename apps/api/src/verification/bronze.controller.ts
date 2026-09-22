@@ -25,8 +25,9 @@ export class SmileIdCallbackController {
 export class DiditCallbackController {
   constructor(private readonly bronze: BronzeService) {}
   @Post() callback(@Body() body: Buffer,
-    @Headers("x-signature") signature?: string, @Headers("x-timestamp") timestamp?: string) {
-    return this.bronze.diditCallback(body, signature, timestamp);
+    @Headers("x-signature-v2") signatureV2?: string, @Headers("x-signature") signatureRaw?: string,
+    @Headers("x-timestamp") timestamp?: string) {
+    return this.bronze.diditCallback(body, signatureV2, signatureRaw, timestamp);
   }
 }
 
