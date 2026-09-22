@@ -21,6 +21,8 @@ export function useKycPresenter() {
   const [error, setError] = useState<string | null>(null);
   const [locationConsentAccepted, setLocationConsentAccepted] = useState(false);
   const [locationBusy, setLocationBusy] = useState(false);
+  const [residenceConsentAccepted, setResidenceConsentAccepted] = useState(false);
+  const [residenceBusy, setResidenceBusy] = useState(false);
   const [financialConsentAccepted, setFinancialConsentAccepted] = useState(false);
   const [financialBusy, setFinancialBusy] = useState(false);
 
@@ -72,6 +74,24 @@ export function useKycPresenter() {
     }
   };
 
+  const recordResidenceConsent = async () => {
+    if (!progress?.residencePolicyVersion || !residenceConsentAccepted) {
+      setError("Confirm the proof-of-address consent before verifying your residence.");
+      return;
+    }
+    setResidenceBusy(true);
+    setError(null);
+    try {
+      // Consent is recorded before the identity session collects any document.
+      await kycApi.consent("residence", progress.residencePolicyVersion);
+      await load();
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Residence consent could not be recorded.");
+    } finally {
+      setResidenceBusy(false);
+    }
+  };
+
   const startFinancial = async () => {
     if (!progress?.financialPolicyVersion || !financialConsentAccepted) {
       setError("Confirm the financial-verification consent before connecting a bank account.");
@@ -98,12 +118,16 @@ export function useKycPresenter() {
       stages: progress.stages.map((stage) => ({ ...stage, statusLabel: labels[stage.status] })),
       locationConsentAccepted,
       locationBusy,
+      residenceConsentAccepted,
+      residenceBusy,
       financialConsentAccepted,
       financialBusy,
     } : null,
     refresh: () => { void load(); },
     setLocationConsentAccepted,
     captureLocation: () => { void captureLocation(); },
+    setResidenceConsentAccepted,
+    recordResidenceConsent: () => { void recordResidenceConsent(); },
     setFinancialConsentAccepted,
     startFinancial: () => { void startFinancial(); },
   };

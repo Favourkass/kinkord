@@ -1,5 +1,8 @@
 export const KYC_REQUIRED_STAGES = ["identity", "location", "residence", "financial"] as const;
 
+/** Consent version a member must accept before proof-of-address evidence is stored. */
+export const KYC_RESIDENCE_POLICY_VERSION = "kyc-residence-2026-09-22-v1";
+
 export type KycRequiredStage = (typeof KYC_REQUIRED_STAGES)[number];
 export type KycDecisionStatus = "not_started" | "pending" | "passed" | "failed" | "under_review" | "unavailable" | "expired";
 

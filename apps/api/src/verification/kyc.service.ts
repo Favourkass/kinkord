@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import type { KycConsentCategory, KycStageStatus } from "../db/schema";
 import { BronzeRepository } from "./bronze.repository";
-import { canAwardKinkordKyc, KYC_REQUIRED_STAGES, kycResultEnvironment, type KycRequiredStage, type KycStageDecision } from "./kyc-policy";
+import { canAwardKinkordKyc, KYC_REQUIRED_STAGES, KYC_RESIDENCE_POLICY_VERSION, kycResultEnvironment, type KycRequiredStage, type KycStageDecision } from "./kyc-policy";
 import { KycRepository } from "./kyc.repository";
 import { KYC_FINANCIAL_POLICY_VERSION, KycFinancialService } from "./kyc-financial.service";
 import { KYC_LOCATION_POLICY_VERSION, KycLocationService } from "./kyc-location.service";
@@ -105,6 +105,7 @@ export class KycService {
         expiresAt: decision.expiresAt?.toISOString() ?? null,
       })),
       locationPolicyVersion: this.location.enabled ? KYC_LOCATION_POLICY_VERSION : null,
+      residencePolicyVersion: KYC_RESIDENCE_POLICY_VERSION,
       financialPolicyVersion: this.financial.enabled ? KYC_FINANCIAL_POLICY_VERSION : null,
     };
   }

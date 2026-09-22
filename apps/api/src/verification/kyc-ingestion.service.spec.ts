@@ -1,12 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import type { KycRepository } from "./kyc.repository";
 import { KycIngestionService } from "./kyc-ingestion.service";
+import { KYC_RESIDENCE_POLICY_VERSION } from "./kyc-policy";
 
 describe("KycIngestionService", () => {
   it("stores derived Didit stage outcomes without sensitive provider data", async () => {
     const upsertDerivedStageResult = vi.fn().mockResolvedValue(undefined);
     const ensureProviderAttempt = vi.fn().mockResolvedValue(undefined);
-    const service = new KycIngestionService({ ensureProviderAttempt, upsertDerivedStageResult } as unknown as KycRepository);
+    const hasActiveConsent = vi.fn().mockResolvedValue(true);
+    const service = new KycIngestionService({ ensureProviderAttempt, upsertDerivedStageResult, hasActiveConsent } as unknown as KycRepository);
     await service.recordDiditDecision({
       userId: "member-1", attemptId: "00000000-0000-4000-8000-000000000001", providerReference: "session-1",
       profileCountry: "NG", providerDeclined: false,
@@ -27,6 +29,24 @@ describe("KycIngestionService", () => {
     expect(upsertDerivedStageResult).toHaveBeenCalledWith(expect.objectContaining({ stage: "identity", status: "passed" }));
     expect(upsertDerivedStageResult).toHaveBeenCalledWith(expect.objectContaining({ stage: "residence", status: "passed" }));
     expect(upsertDerivedStageResult).toHaveBeenCalledWith(expect.objectContaining({ stage: "location", status: "under_review" }));
+    expect(hasActiveConsent).toHaveBeenCalledWith("member-1", "residence", KYC_RESIDENCE_POLICY_VERSION);
+  });
+
+  it("stores no residence evidence when proof-of-address consent is missing", async () => {
+    const upsertDerivedStageResult = vi.fn().mockResolvedValue(undefined);
+    const service = new KycIngestionService({
+      ensureProviderAttempt: vi.fn().mockResolvedValue(undefined),
+      upsertDerivedStageResult,
+      hasActiveConsent: vi.fn().mockResolvedValue(false),
+    } as unknown as KycRepository);
+    await service.recordDiditDecision({
+      userId: "member-1", attemptId: "00000000-0000-4000-8000-000000000009", providerReference: "session-9",
+      profileCountry: "NG", providerDeclined: false,
+      identityChecks: { governmentId: true, liveness: true, idFace: true, profileFace: true, dateOfBirth: true, gender: true, country: true },
+      decision: { poa: { status: "Approved", poa_address: "private address", issue_date: "2026-09-01", warnings: [] } },
+    });
+    const stages = upsertDerivedStageResult.mock.calls.map((call) => call[0].stage);
+    expect(stages).toEqual(["identity"]);
   });
 
   it("writes a Smile outcome through as identity evidence only", async () => {
