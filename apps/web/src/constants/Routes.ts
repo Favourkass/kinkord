@@ -11,6 +11,11 @@ export const Routes = {
   adminLogin: "/admin/login",
   adminLecturesNew: "/admin/lectures/new",
   adminLectureEdit: (id: string) => `/admin/lectures/${id}/edit`,
+  // Member moderation. Not under /admin: that prefix is the legacy lectures admin,
+  // gated by its own login in middleware.ts.
+  moderation: "/moderation",
+  moderationMember: (id: string) => `/moderation/members/${encodeURIComponent(id)}`,
+  moderationBlocklist: "/moderation/blocklist",
   signup: "/signup",
   login: "/login",
   appHome: "/home",

@@ -5,7 +5,9 @@ import Link from "next/link";
 import AppShell from "@/components/app/AppShell";
 import { ChevronRightIcon } from "@/components/app/icons";
 import { Routes } from "@/constants/Routes";
+import { MODERATION_COPY } from "@/constants/moderation";
 import { getAppShellNav } from "@/presenters/getAppShellNav";
+import { useAdminAccessPresenter } from "@/presenters/useAdminAccessPresenter";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
 import { usePwaPresenter } from "@/presenters/usePwaPresenter";
 import { getTheme, setTheme, type Theme } from "@/util/theme";
@@ -13,6 +15,7 @@ import { getTheme, setTheme, type Theme } from "@/util/theme";
 export default function SettingsPage() {
   const vm = useHomePresenter();
   const pwa = usePwaPresenter();
+  const admin = useAdminAccessPresenter();
   const nav = getAppShellNav();
   const [theme, setThemeState] = useState<Theme>(() =>
     typeof document === "undefined" ? "light" : getTheme(),
@@ -86,6 +89,15 @@ export default function SettingsPage() {
           Security &amp; 2FA
           <ChevronRightIcon className="text-[#b8850f]" />
         </Link>
+        {admin.isAdmin ? (
+          <Link
+            href={Routes.moderation}
+            className="mt-[12px] flex h-[52px] items-center justify-between rounded-[16px] bg-app-members px-[18px] text-[18px] font-medium text-app-name"
+          >
+            {MODERATION_COPY.settingsEntry}
+            <ChevronRightIcon className="text-[#b8850f]" />
+          </Link>
+        ) : null}
       </div>
     </AppShell>
   );
