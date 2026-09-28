@@ -1,7 +1,13 @@
-import { Inject, Injectable, InternalServerErrorException } from "@nestjs/common";
+import {
+  ForbiddenException,
+  Inject,
+  Injectable,
+  InternalServerErrorException,
+} from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { Db, DRIZZLE } from "../db/db.module";
 import { profile, user } from "../db/schema";
+import { SIGNUP_REFUSED, SignupGuardService } from "../moderation/signup-guard.service";
 import { AUTH, Auth } from "./auth.instance";
 
 export interface SignUpAccount {
@@ -41,6 +47,7 @@ export class SignUpService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Db,
     @Inject(AUTH) private readonly auth: Auth,
+    private readonly signupGuard: SignupGuardService,
   ) {}
 
   async signUpWithProfile(
@@ -48,6 +55,14 @@ export class SignUpService {
     fields: SignUpProfileFields,
     headers: Headers,
   ): Promise<SignUpResult> {
+    // Email, name and IP are checked where Better Auth creates the user, which
+    // every sign-up route passes through. The phone only arrives on this route,
+    // so it is checked here, before anything is created.
+    if (fields.phone) {
+      const verdict = await this.signupGuard.review({ phone: fields.phone }, "sign-up");
+      if (verdict.action === "block") throw new ForbiddenException(SIGNUP_REFUSED);
+    }
+
     // Better Auth's signUpEmail is heavily overloaded (and carries plugin +
     // additional fields); assert the exact call shape we use so it types as a
     // Response instead of the object-return overload.
