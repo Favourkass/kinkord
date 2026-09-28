@@ -8,6 +8,7 @@ import { HealthController } from "./health/health.controller";
 import { HealthService } from "./health/health.service";
 import { MembersModule } from "./members/members.module";
 import { MessagingModule } from "./messaging/messaging.module";
+import { ModerationModule } from "./moderation/moderation.module";
 import { PresenceModule } from "./presence/presence.module";
 import { ProfilesModule } from "./profiles/profiles.module";
 import { OtpModule } from "./otp/otp.module";
@@ -19,6 +20,7 @@ import { StorageModule } from "./storage/storage.module";
     ConfigModule.forRoot({ isGlobal: true }),
     DbModule,
     EmailModule,
+    ModerationModule,
     PresenceModule,
     AuthModule,
     MessagingModule,
