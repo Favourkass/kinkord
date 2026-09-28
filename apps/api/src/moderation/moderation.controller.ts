@@ -4,7 +4,6 @@ import {
   Controller,
   Delete,
   Get,
-  Inject,
   Param,
   Post,
   Query,
@@ -13,9 +12,7 @@ import {
 } from "@nestjs/common";
 import { z } from "zod";
 import { AuthGuard, type AuthedRequest } from "../auth/auth.guard";
-import { DRIZZLE, type Db } from "../db/db.module";
 import { AdminGuard } from "./admin.guard";
-import { isAdmin } from "./admins";
 import { ModerationService } from "./moderation.service";
 
 const reasonSchema = z.string().trim().max(300).nullish();
@@ -33,7 +30,7 @@ const ruleSchema = z.object({
 });
 
 function parse<T>(schema: z.ZodType<T>, body: unknown): T {
-  const parsed = schema.safeParse(body ?? {});
+  const parsed = schema.safeParse(body);
   if (!parsed.success) {
     throw new BadRequestException(parsed.error.issues[0]?.message ?? "Invalid request.");
   }
@@ -43,15 +40,12 @@ function parse<T>(schema: z.ZodType<T>, body: unknown): T {
 @Controller("admin")
 @UseGuards(AuthGuard)
 export class ModerationController {
-  constructor(
-    private readonly moderation: ModerationService,
-    @Inject(DRIZZLE) private readonly db: Db,
-  ) {}
+  constructor(private readonly moderation: ModerationService) {}
 
   /** Lets the app decide whether to show the admin entry point. Any member may ask. */
   @Get("access")
   async access(@Req() req: AuthedRequest) {
-    return { isAdmin: await isAdmin(this.db, req.user) };
+    return { isAdmin: await this.moderation.isAdmin(req.user) };
   }
 
   @Get("members")
@@ -68,8 +62,8 @@ export class ModerationController {
 
   @Post("members/:id/block")
   @UseGuards(AdminGuard)
-  block(@Req() req: AuthedRequest, @Param("id") id: string, @Body() body: unknown) {
-    return this.moderation.block(req.user.id, id, parse(blockSchema, body));
+  async block(@Req() req: AuthedRequest, @Param("id") id: string, @Body() body: unknown) {
+    return this.moderation.block(req.user.id, id, parse(blockSchema, body ?? {}));
   }
 
   @Post("members/:id/unblock")
@@ -81,7 +75,7 @@ export class ModerationController {
   /** `?block=1` also stops them signing up again with the same email or phone. */
   @Delete("members/:id")
   @UseGuards(AdminGuard)
-  deleteMember(
+  async deleteMember(
     @Req() req: AuthedRequest,
     @Param("id") id: string,
     @Query("block") block?: string,
@@ -113,8 +107,8 @@ export class ModerationController {
 
   @Post("blocklist")
   @UseGuards(AdminGuard)
-  addRule(@Req() req: AuthedRequest, @Body() body: unknown) {
-    return this.moderation.addRule(req.user.id, parse(ruleSchema, body));
+  async addRule(@Req() req: AuthedRequest, @Body() body: unknown) {
+    return this.moderation.addRule(req.user.id, parse(ruleSchema, body ?? {}));
   }
 
   @Delete("blocklist/:id")

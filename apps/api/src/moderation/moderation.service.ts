@@ -149,6 +149,10 @@ export class ModerationService {
     };
   }
 
+  isAdmin(who: { id: string; email: string; emailVerified: boolean }): Promise<boolean> {
+    return isAdmin(this.db, who);
+  }
+
   /** Newest members first; with a query, anyone whose name, handle, email or phone contains it. */
   async searchMembers(query: string): Promise<AdminMemberSummary[]> {
     const q = query.trim();
@@ -245,7 +249,13 @@ export class ModerationService {
     );
     await this.db.delete(user).where(eq(user.id, id));
     const who = [target.username && `@${target.username}`, target.email].filter(Boolean).join(" ");
-    await this.log(actorId, opts.block ? "delete+block" : "delete", id, null, `${who}${reason ? ` — ${reason}` : ""}`);
+    await this.log(
+      actorId,
+      opts.block ? "delete+block" : "delete",
+      id,
+      null,
+      `${who}${reason ? ` — ${reason}` : ""}`,
+    );
     return { deleted: id };
   }
 
@@ -341,7 +351,10 @@ export class ModerationService {
     trail: { ips: string[]; verifiedPhones: string[] },
     reason: string | null,
   ) {
-    const rules = new Map<string, { kind: SignupRuleKind; value: string; action: SignupRuleAction }>();
+    const rules = new Map<
+      string,
+      { kind: SignupRuleKind; value: string; action: SignupRuleAction }
+    >();
     const add = (kind: SignupRuleKind, value: string, action: SignupRuleAction) =>
       rules.set(`${kind}:${value}`, { kind, value, action });
     add("email", normalizeEmail(target.email), "block");
@@ -451,6 +464,8 @@ export class ModerationService {
     subjectPostId: string | null,
     detail: string | null,
   ) {
-    await this.db.insert(moderationLog).values({ actorId, action, subjectUserId, subjectPostId, detail });
+    await this.db
+      .insert(moderationLog)
+      .values({ actorId, action, subjectUserId, subjectPostId, detail });
   }
 }

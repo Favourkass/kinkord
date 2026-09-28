@@ -1,4 +1,10 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Inject, Injectable } from "@nestjs/common";
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Inject,
+  Injectable,
+} from "@nestjs/common";
 import type { AuthedRequest } from "../auth/auth.guard";
 import { DRIZZLE, type Db } from "../db/db.module";
 import { isAdmin } from "./admins";
