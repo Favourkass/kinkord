@@ -234,6 +234,25 @@ describe("PostsService.remove", () => {
   });
 });
 
+describe("PostsService.removeAsModerator", () => {
+  it("removes someone else's post and says whose it was", async () => {
+    const storage = makeStorage();
+    const db = makeDb([[{ authorId: "u9", deletedAt: null }], [], [{ key: "posts/u9/a.jpg" }]]);
+
+    await expect(service(db, storage).removeAsModerator("p1")).resolves.toEqual({
+      deleted: "p1",
+      authorId: "u9",
+    });
+    expect(db.update).toHaveBeenCalled();
+    expect(storage.remove).toHaveBeenCalledTimes(3);
+  });
+
+  it("is a 404 for a post that is already gone", async () => {
+    const db = makeDb([[{ authorId: "u9", deletedAt: new Date() }]]);
+    await expect(service(db).removeAsModerator("p1")).rejects.toThrow(/not found/i);
+  });
+});
+
 describe("PostsService.byId", () => {
   const row = {
     id: "p1",

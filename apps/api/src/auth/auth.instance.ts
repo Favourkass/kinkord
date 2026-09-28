@@ -8,6 +8,7 @@ import { EmailService } from "../email/email.service";
 import { resetPasswordEmail, verificationEmail } from "../email/templates";
 import { SIGNUP_REFUSED, SignupGuardService } from "../moderation/signup-guard.service";
 import { clientIpFrom } from "../moderation/signup-rules";
+import { ACCOUNT_SUSPENDED, isBanned } from "../moderation/admins";
 
 export const AUTH = Symbol("AUTH");
 export type Auth = ReturnType<typeof buildAuth>;
@@ -91,6 +92,19 @@ export function buildAuth(db: Db, email: EmailService, signupGuard: SignupGuardS
         },
         update: {
           before: async (u) => rejectUsernameChanges(u),
+        },
+      },
+      session: {
+        create: {
+          // A suspended member can't start a session by any route: email,
+          // phone or a password reset. Their existing sessions were deleted
+          // when the ban was made.
+          before: async (s) => {
+            if (await isBanned(db, s.userId)) {
+              throw new APIError("FORBIDDEN", { message: ACCOUNT_SUSPENDED });
+            }
+            return { data: s };
+          },
         },
       },
     },
