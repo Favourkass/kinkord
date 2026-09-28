@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   HttpException,
   Inject,
   Injectable,
@@ -13,6 +14,7 @@ import { otpChallenge } from "../db/schema";
 import { EmailService } from "../email/email.service";
 import { verificationCodeEmail } from "../email/templates";
 import { SmsService } from "../messaging/sms.service";
+import { SignupGuardService } from "../moderation/signup-guard.service";
 
 export type OtpChannel = "email" | "sms";
 
@@ -74,6 +76,7 @@ export class OtpService {
     @Inject(DRIZZLE) private readonly db: Db,
     private readonly email: EmailService,
     private readonly sms: SmsService,
+    private readonly signupGuard: SignupGuardService,
   ) {}
 
   /**
@@ -83,6 +86,18 @@ export class OtpService {
    */
   async send(userId: string, channel: OtpChannel, destination: string) {
     const to = normalizeDestination(channel, destination);
+    // A removed member's phone or email must not verify a new account.
+    const verdict = await this.signupGuard.review(
+      channel === "sms" ? { phone: to } : { email: to },
+      `${channel} code`,
+    );
+    if (verdict.action === "block") {
+      throw new ForbiddenException(
+        channel === "sms"
+          ? "We couldn't send a code to that number."
+          : "We couldn't send a code to that address.",
+      );
+    }
     const now = new Date();
     await this.enforceRate(userId, to, now);
 
