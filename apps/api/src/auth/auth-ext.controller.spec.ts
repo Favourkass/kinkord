@@ -118,6 +118,22 @@ describe("AuthExtController", () => {
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
+  it("refuses a sign-up without a phone number", async () => {
+    const { controller, signUpWithProfile } = makeController();
+    const withoutPhone = Object.fromEntries(
+      Object.entries(validSignUp).filter(([field]) => field !== "phone"),
+    );
+    const err = await controller.signUpCombined(req, makeRes(), withoutPhone).catch((e) => e);
+    expect(err).toBeInstanceOf(BadRequestException);
+    expect((err as BadRequestException).getResponse()).toMatchObject({
+      phone: ["Enter your phone number."],
+    });
+    await expect(
+      controller.signUpCombined(req, makeRes(), { ...validSignUp, phone: null }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(signUpWithProfile).not.toHaveBeenCalled();
+  });
+
   it("rejects a sign-up whose date of birth is under 18", async () => {
     const { controller, signUpWithProfile } = makeController();
     const underage = new Date().toISOString().slice(0, 10);

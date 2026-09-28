@@ -32,7 +32,9 @@ export function validateAccount(d: AccountDraft): Partial<Record<keyof AccountDr
     errors.displayName = "Display name must be 3–30 characters.";
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email.trim()))
     errors.email = "Enter a valid email address.";
-  if (d.phoneLocal.trim() && !toE164(d.phoneCountryCode, d.phoneLocal))
+  // Required: a number is what stops a removed member coming back with a fresh email.
+  if (!d.phoneLocal.trim()) errors.phoneLocal = "Enter your phone number.";
+  else if (!toE164(d.phoneCountryCode, d.phoneLocal))
     errors.phoneLocal = "Enter a valid phone number.";
   if (d.password.length < 10) errors.password = "Use at least 10 characters.";
   else if (!/[a-zA-Z]/.test(d.password) || !/\d/.test(d.password))

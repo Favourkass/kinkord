@@ -119,9 +119,7 @@ export function useSignupWizardPresenter() {
         city: about.city.trim() || null,
         dateOfBirth: dobToIso(about),
         gender: about.gender,
-        phone: account.phoneLocal.trim()
-          ? toE164(account.phoneCountryCode, account.phoneLocal)
-          : null,
+        phone: toE164(account.phoneCountryCode, account.phoneLocal),
       });
       setStage("email");
     } catch (e) {

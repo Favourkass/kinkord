@@ -41,6 +41,12 @@ async function bootstrap() {
 
   express.use(cors({ origin: origins, credentials: true }));
   express.use((req, res, next) => {
+    // Every sign-up goes through POST /auth-ext/sign-up, which requires a phone
+    // number. Better Auth's own route would open an account without one, so it
+    // is closed to the outside; the combined route calls it in-process.
+    if (req.method === "POST" && req.path === "/api/auth/sign-up/email") {
+      return void res.status(404).json({ message: "Not found" });
+    }
     if (req.url.startsWith("/api/auth")) return void authHandler(req, res);
     next();
   });
