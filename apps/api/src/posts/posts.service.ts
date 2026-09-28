@@ -10,6 +10,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { Db, DRIZZLE } from "../db/db.module";
+import { notBanned } from "../moderation/admins";
 import {
   follow,
   post,
@@ -346,6 +347,25 @@ export class PostsService {
       .where(eq(post.id, postId));
     if (!row || row.deletedAt) throw new NotFoundException("Post not found");
     if (row.authorId !== userId) throw new ForbiddenException("That isn't your post");
+    await this.purge(postId);
+    return { deleted: postId };
+  }
+
+  /**
+   * The same removal for a moderator, who by definition isn't the author.
+   * Returns the author so the moderation log can say whose post it was.
+   */
+  async removeAsModerator(postId: string): Promise<{ deleted: string; authorId: string }> {
+    const [row] = await this.db
+      .select({ authorId: post.authorId, deletedAt: post.deletedAt })
+      .from(post)
+      .where(eq(post.id, postId));
+    if (!row || row.deletedAt) throw new NotFoundException("Post not found");
+    await this.purge(postId);
+    return { deleted: postId, authorId: row.authorId };
+  }
+
+  private async purge(postId: string) {
     await this.db.update(post).set({ deletedAt: new Date() }).where(eq(post.id, postId));
     const media = await this.db
       .select({ key: postMedia.key })
@@ -357,7 +377,6 @@ export class PostsService {
         ...IMAGE_VARIANTS.map((v) => this.storage.remove(variantKey(m.key, v))),
       ]),
     );
-    return { deleted: postId };
   }
 
   /**
@@ -673,7 +692,8 @@ const isId = (v: string | null): v is string => v !== null;
 
 /**
  * The one visibility rule: anything public, everything of the viewer's own, and
- * friends-only posts between two members who follow each other. The feed, the
+ * friends-only posts between two members who follow each other, never from a
+ * suspended author. The feed, the
  * post counts and the profile Media tab all go through this, because three
  * copies of it would eventually disagree and leak somebody's friends-only post.
  */
@@ -682,13 +702,16 @@ function visibleTo(
   viewerFollows: ReturnType<typeof alias<typeof follow, string>>,
   authorFollows: ReturnType<typeof alias<typeof follow, string>>,
 ) {
-  return or(
-    eq(post.visibility, "public"),
-    eq(post.authorId, viewerId),
-    and(
-      eq(post.visibility, "friends"),
-      sql`${viewerFollows.followerId} is not null`,
-      sql`${authorFollows.followerId} is not null`,
+  return and(
+    notBanned(post.authorId),
+    or(
+      eq(post.visibility, "public"),
+      eq(post.authorId, viewerId),
+      and(
+        eq(post.visibility, "friends"),
+        sql`${viewerFollows.followerId} is not null`,
+        sql`${authorFollows.followerId} is not null`,
+      ),
     ),
   );
 }
