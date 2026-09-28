@@ -5,7 +5,7 @@ export const MODERATION_COPY = {
   denied: "This area is for admins only.",
   checking: "Checking access…",
   search: {
-    placeholder: "Search name, @username, email or phone",
+    placeholder: "Name, @username, email or phone",
     newest: "Newest members",
     results: (q: string) => `Results for “${q}”`,
     empty: "No members match.",
