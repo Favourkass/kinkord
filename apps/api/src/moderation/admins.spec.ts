@@ -17,6 +17,10 @@ describe("isSuperAdmin", () => {
     expect(isSuperAdmin({ email: " MaxiHandsome@gmail.com", emailVerified: true })).toBe(true);
   });
 
+  it("recognises the second founder address too", () => {
+    expect(isSuperAdmin({ email: "nnabuekassidy@gmail.com", emailVerified: true })).toBe(true);
+  });
+
   it("refuses the same address until it is verified", () => {
     expect(isSuperAdmin({ email: "maxihandsome@gmail.com", emailVerified: false })).toBe(false);
   });

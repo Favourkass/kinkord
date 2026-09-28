@@ -61,11 +61,24 @@ describe("SignupGuardService.review", () => {
     expect(html).toContain("&lt;img");
   });
 
-  it("still logs but sends nothing when no moderator address is configured", async () => {
+  it("alerts every super admin when no moderator address is configured", async () => {
     delete process.env.MODERATION_EMAIL;
     const { guard, send } = make();
     expect((await guard.review({ name: "Durowara" }, "sign-up")).action).toBe("flag");
-    expect(send).not.toHaveBeenCalled();
+    expect(send.mock.calls.map((c) => c[0].to)).toEqual([
+      "maxihandsome@gmail.com",
+      "nnabuekassidy@gmail.com",
+    ]);
+  });
+
+  it("links the alert to the admin panel on the site's own address", async () => {
+    process.env.WEB_ORIGINS = "https://kinkord.com,https://www.kinkord.com";
+    const { guard, send } = make();
+    await guard.review({ name: "Durowara" }, "sign-up");
+    expect(send.mock.calls[0][0].text).toContain(
+      "Review in the admin panel: https://kinkord.com/moderation",
+    );
+    delete process.env.WEB_ORIGINS;
   });
 
   it("does not let a failed alert change the verdict", async () => {

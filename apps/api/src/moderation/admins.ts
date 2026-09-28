@@ -3,12 +3,12 @@ import type { Db } from "../db/db.module";
 import { memberBan, staff } from "../db/schema";
 
 /**
- * The founder's account is an admin by its email rather than by a row, so
+ * The founder's accounts are admins by their email rather than by a row, so
  * admin access doesn't depend on a migration running after the account exists.
  * The email must be verified: without that, anyone could sign up with this
  * address before the founder does and inherit the admin tools.
  */
-export const SUPER_ADMIN_EMAILS = ["maxihandsome@gmail.com"];
+export const SUPER_ADMIN_EMAILS = ["maxihandsome@gmail.com", "nnabuekassidy@gmail.com"];
 
 export interface AdminCandidate {
   id: string;

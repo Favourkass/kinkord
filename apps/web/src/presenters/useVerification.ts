@@ -23,6 +23,8 @@ export interface VerificationVM {
   resendIn: number;
   canResend: boolean;
   verified: boolean;
+  /** Forget the code in flight, e.g. after the number it went to was corrected. */
+  reset: () => void;
 }
 
 /**
@@ -99,6 +101,12 @@ export function useVerification(
   const verify = useCallback(() => {
     void runVerify();
   }, [runVerify]);
+  const reset = useCallback(() => {
+    setChallenge(null);
+    setCode("");
+    setError(null);
+    setResendIn(0);
+  }, []);
 
   return {
     sentTo: challenge?.sentTo ?? null,
@@ -113,5 +121,6 @@ export function useVerification(
     resendIn,
     canResend: resendIn === 0 && !sending,
     verified,
+    reset,
   };
 }
