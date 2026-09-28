@@ -43,9 +43,13 @@ interface ProfileVM {
   coverUrl: string | null;
 }
 
-export function useSignupWizardPresenter() {
+/**
+ * `initialStage` lets a member who left mid-way come back to the step they
+ * still owe: the API sends anyone with an unverified phone back to "phone".
+ */
+export function useSignupWizardPresenter(initialStage: WizardStage = "country") {
   const router = useRouter();
-  const [stage, setStage] = useState<WizardStage>("country");
+  const [stage, setStage] = useState<WizardStage>(initialStage);
   const [busy, setBusy] = useState(false);
   const [topError, setTopError] = useState<string | null>(null);
 
@@ -142,7 +146,61 @@ export function useSignupWizardPresenter() {
   }, [stage, emailSendCode]);
 
   const nextVerificationStep = useCallback(() => setStage("phone"), []);
-  const skipVerification = useCallback(() => setStage("profile"), []);
+
+  // The phone code can't be skipped, so a mistyped number has to be fixable here
+  // or the member is stuck on this step for good.
+  const [knownPhone, setKnownPhone] = useState<string | null>(null);
+  const [changingPhone, setChangingPhone] = useState(false);
+  const [phoneDraft, setPhoneDraft] = useState({ countryCode: "+234", local: "" });
+  const [phoneChangeError, setPhoneChangeError] = useState<string | null>(null);
+  const [savingPhone, setSavingPhone] = useState(false);
+
+  // Someone resuming at this step has no draft in memory; show the number on file.
+  const hasDraftPhone = Boolean(account.phoneLocal.trim());
+  useEffect(() => {
+    if (stage !== "phone" || hasDraftPhone) return;
+    let live = true;
+    api.get<{ phone: string | null }>("/profile").then(
+      (p) => live && setKnownPhone(p.phone),
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [stage, hasDraftPhone]);
+
+  const phoneReset = phone.reset;
+  const savePhone = useCallback(async () => {
+    const e164 = toE164(phoneDraft.countryCode, phoneDraft.local);
+    if (!e164) {
+      setPhoneChangeError("Enter a valid phone number.");
+      return;
+    }
+    setSavingPhone(true);
+    setPhoneChangeError(null);
+    try {
+      await api.patch("/profile", { phone: e164 });
+      setKnownPhone(e164);
+      setAccount((a) => ({
+        ...a,
+        phoneCountryCode: phoneDraft.countryCode,
+        phoneLocal: phoneDraft.local,
+      }));
+      phoneReset();
+      setChangingPhone(false);
+    } catch (e) {
+      setPhoneChangeError(
+        e instanceof Error ? e.message : "Could not save that number. Try again.",
+      );
+    } finally {
+      setSavingPhone(false);
+    }
+  }, [phoneDraft, phoneReset]);
+
+  const phoneNumber =
+    phone.sentTo ??
+    (hasDraftPhone ? toE164(account.phoneCountryCode, account.phoneLocal) : null) ??
+    knownPhone;
 
   const uploadImage = useCallback(
     async (kind: "avatar" | "cover", rawFile: File) => {
@@ -235,9 +293,25 @@ export function useSignupWizardPresenter() {
       backToCountry,
       verifyStep: {
         ...phone,
-        skip: skipVerification,
+        number: phoneNumber,
         email: emailCode,
         nextStep: nextVerificationStep,
+        changePhone: {
+          open: changingPhone,
+          countryCode: phoneDraft.countryCode,
+          local: phoneDraft.local,
+          error: phoneChangeError,
+          saving: savingPhone,
+          start: () => {
+            setPhoneDraft({ countryCode: account.phoneCountryCode, local: account.phoneLocal });
+            setPhoneChangeError(null);
+            setChangingPhone(true);
+          },
+          cancel: () => setChangingPhone(false),
+          setCountryCode: (countryCode: string) => setPhoneDraft((d) => ({ ...d, countryCode })),
+          setLocal: (local: string) => setPhoneDraft((d) => ({ ...d, local })),
+          save: () => void savePhone(),
+        },
       },
       profileStep: {
         roles,
@@ -277,9 +351,14 @@ export function useSignupWizardPresenter() {
       aboutErrors,
       submitCombinedStep,
       backToCountry,
-      skipVerification,
       nextVerificationStep,
       phone,
+      phoneNumber,
+      changingPhone,
+      phoneDraft,
+      phoneChangeError,
+      savingPhone,
+      savePhone,
       emailCode,
       roles,
       toggleRole,

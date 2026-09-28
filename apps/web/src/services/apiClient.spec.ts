@@ -77,3 +77,38 @@ describe("uploadToPresignedUrl", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 });
+
+describe("new accounts without a verified phone", () => {
+  const blocked = () =>
+    errJson(403, {
+      code: "PHONE_VERIFICATION_REQUIRED",
+      message: "Verify your phone number to continue.",
+    });
+
+  it("are sent back to the phone step, and still see the error", async () => {
+    const assign = vi.fn();
+    vi.stubGlobal("window", { location: { pathname: "/home", assign } });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(blocked());
+    await expect(api.get("/posts")).rejects.toBeInstanceOf(ApiError);
+    expect(assign).toHaveBeenCalledWith("/signup?resume=phone");
+    vi.unstubAllGlobals();
+  });
+
+  it("are left alone while already on the sign-up page", async () => {
+    const assign = vi.fn();
+    vi.stubGlobal("window", { location: { pathname: "/signup", assign } });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(blocked());
+    await expect(api.get("/community/stats")).rejects.toBeInstanceOf(ApiError);
+    expect(assign).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it("isn't triggered by an ordinary 403", async () => {
+    const assign = vi.fn();
+    vi.stubGlobal("window", { location: { pathname: "/home", assign } });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(errJson(403, { message: "Admins only." }));
+    await expect(api.get("/admin/members")).rejects.toBeInstanceOf(ApiError);
+    expect(assign).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+});

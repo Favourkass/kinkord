@@ -1,4 +1,19 @@
+import { Routes } from "@/constants/Routes";
+
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+
+/** Sent by the API for a new account whose phone isn't verified yet. */
+const PHONE_VERIFICATION_REQUIRED = "PHONE_VERIFICATION_REQUIRED";
+
+/**
+ * A member who left sign-up before verifying their phone can't use anything
+ * else, so wherever they land, they are taken back to that step.
+ */
+function sendToPhoneStep(): void {
+  if (typeof window === "undefined") return;
+  if (window.location.pathname.startsWith(Routes.signup)) return;
+  window.location.assign(`${Routes.signup}?resume=phone`);
+}
 
 export class ApiError extends Error {
   constructor(
@@ -29,7 +44,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(0, NETWORK_MESSAGE);
   }
   const body = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(res.status, body);
+  if (!res.ok) {
+    if (
+      res.status === 403 &&
+      (body as { code?: string } | null)?.code === PHONE_VERIFICATION_REQUIRED
+    ) {
+      sendToPhoneStep();
+    }
+    throw new ApiError(res.status, body);
+  }
   return body as T;
 }
 
