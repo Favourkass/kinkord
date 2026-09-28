@@ -46,6 +46,19 @@ describe("validateAccount", () => {
   });
 });
 
+describe("validateAccount: phone", () => {
+  it("requires a phone number", () => {
+    expect(validateAccount(account({ phoneLocal: "  " })).phoneLocal).toBe(
+      "Enter your phone number.",
+    );
+  });
+  it("still rejects a number that isn't one", () => {
+    expect(validateAccount(account({ phoneLocal: "12" })).phoneLocal).toBe(
+      "Enter a valid phone number.",
+    );
+  });
+});
+
 describe("toE164", () => {
   it("builds E.164 from NG local format, stripping the leading zero", () => {
     expect(toE164("+234", "0803 123 4567")).toBe("+2348031234567");

@@ -47,11 +47,11 @@ const signUpSchema = z.object({
     .refine((s) => new Date(s) <= eighteenYearsAgo(), "You must be 18 or older to join")
     .nullish(),
   gender: z.string().trim().min(1).max(20).nullish(),
+  // Required: a number is what stops a removed member coming back with a fresh email.
   phone: z
-    .string()
+    .string({ required_error: "Enter your phone number." })
     .trim()
-    .regex(/^\+\d{8,15}$/, "phone must be E.164, e.g. +2348012345678")
-    .nullish(),
+    .regex(/^\+\d{8,15}$/, "phone must be E.164, e.g. +2348012345678"),
 });
 
 @Controller("auth-ext")
@@ -103,7 +103,7 @@ export class AuthExtController {
         city: about.city ?? null,
         dateOfBirth: about.dateOfBirth ?? null,
         gender: about.gender ?? null,
-        phone: about.phone ?? null,
+        phone: about.phone,
       },
       fromNodeHeaders(req.headers),
     );
