@@ -2,6 +2,7 @@ import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, asc, count, desc, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { Db, DRIZZLE } from "../db/db.module";
+import { notBanned } from "../moderation/admins";
 import {
   follow,
   profile,
@@ -120,6 +121,7 @@ export class MembersService {
     const conditions = [
       eq(profile.country, params.country.toUpperCase()),
       ne(profile.userId, viewerId),
+      notBanned(profile.userId),
     ];
     if (params.state) conditions.push(eq(profile.state, params.state));
     if (params.state && params.lga) conditions.push(eq(profile.city, params.lga));
@@ -210,7 +212,7 @@ export class MembersService {
       .select({ u: user, p: profile })
       .from(user)
       .innerJoin(profile, eq(profile.userId, user.id))
-      .where(eq(user.username, handle))
+      .where(and(eq(user.username, handle), notBanned(user.id)))
       .limit(1);
     if (!row) throw new NotFoundException("Member not found.");
 
@@ -283,6 +285,7 @@ export class MembersService {
       eq(profile.state, target.state),
       ne(profile.userId, targetId),
       ne(profile.userId, viewerId),
+      notBanned(profile.userId),
     ];
     if (target.country) conditions.push(eq(profile.country, target.country));
     const where = and(...conditions);

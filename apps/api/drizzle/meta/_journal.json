@@ -78,6 +78,13 @@
       "when": 1790580578629,
       "tag": "0010_signup_block",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790581610069,
+      "tag": "0011_admin_moderation",
+      "breakpoints": true
     }
   ]
 }
