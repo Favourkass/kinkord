@@ -8,6 +8,9 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push, replace: vi.fn() }
 
 const patch = vi.fn();
 const post = vi.fn();
+const get = vi.fn<(...a: unknown[]) => Promise<{ phone: string }>>(async () => ({
+  phone: "+2348031234567",
+}));
 vi.mock("@/services/apiClient", () => ({
   // ApiError must be exported: verificationErrorMessage does `instanceof ApiError`,
   // which throws outright if the binding is undefined.
@@ -22,7 +25,7 @@ vi.mock("@/services/apiClient", () => ({
   api: {
     patch: (...a: unknown[]) => patch(...a),
     post: (...a: unknown[]) => post(...a),
-    get: vi.fn(),
+    get: (...a: unknown[]) => get(...a),
   },
   uploadToPresignedUrl: vi.fn(async () => {}),
 }));
@@ -123,8 +126,8 @@ describe("useSignupWizardPresenter", () => {
     await waitFor(() => expect(sendCode).toHaveBeenCalledWith("email"));
     expect(sendCode.mock.calls.filter(([channel]) => channel === "email")).toHaveLength(1);
 
-    act(() => result.current.verifyStep.skip());
-    expect(result.current.stage).toBe("profile");
+    act(() => result.current.verifyStep.nextStep());
+    expect(result.current.stage).toBe("phone");
   });
 
   it("surfaces a server error on the combined step without advancing", async () => {
@@ -264,10 +267,41 @@ describe("useSignupWizardPresenter", () => {
       expect(result.current.verifyStep.sent).toBe(false);
     });
 
-    it("still lets someone skip verification", () => {
+    it("offers no way past the phone code without verifying it", () => {
       const { result } = renderHook(() => useSignupWizardPresenter());
-      act(() => result.current.verifyStep.skip());
-      expect(result.current.stage).toBe("profile");
+      expect("skip" in result.current.verifyStep).toBe(false);
+    });
+  });
+
+  describe("coming back to the phone step", () => {
+    it("resumes there and shows the number on file", async () => {
+      const { result } = renderHook(() => useSignupWizardPresenter("phone"));
+      expect(result.current.stage).toBe("phone");
+      await waitFor(() => expect(result.current.verifyStep.number).toBe("+2348031234567"));
+    });
+
+    it("saves a corrected number and starts the code over", async () => {
+      const { result } = renderHook(() => useSignupWizardPresenter("phone"));
+      act(() => result.current.verifyStep.changePhone.start());
+      act(() => result.current.verifyStep.changePhone.setLocal("0805 555 0142"));
+      act(() => result.current.verifyStep.changePhone.save());
+
+      await waitFor(() => expect(result.current.verifyStep.changePhone.open).toBe(false));
+      expect(patch).toHaveBeenCalledWith("/profile", { phone: "+2348055550142" });
+      expect(result.current.verifyStep.number).toBe("+2348055550142");
+      expect(result.current.verifyStep.sent).toBe(false);
+    });
+
+    it("refuses a number that isn't one, without calling the server", async () => {
+      const { result } = renderHook(() => useSignupWizardPresenter("phone"));
+      act(() => result.current.verifyStep.changePhone.start());
+      act(() => result.current.verifyStep.changePhone.setLocal("12"));
+      act(() => result.current.verifyStep.changePhone.save());
+
+      await waitFor(() =>
+        expect(result.current.verifyStep.changePhone.error).toBe("Enter a valid phone number."),
+      );
+      expect(patch).not.toHaveBeenCalled();
     });
   });
 });

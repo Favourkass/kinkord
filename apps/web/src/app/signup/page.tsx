@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   AtSign,
   CheckCircle2,
@@ -46,8 +47,18 @@ function StageHeading({ plain, highlight }: { plain: string; highlight: string }
   );
 }
 
+// useSearchParams needs a Suspense boundary for the page to prerender.
 export default function SignupPage() {
-  const p = useSignupWizardPresenter();
+  return (
+    <Suspense fallback={null}>
+      <SignupWizard />
+    </Suspense>
+  );
+}
+
+function SignupWizard() {
+  const resume = useSearchParams().get("resume");
+  const p = useSignupWizardPresenter(resume === "phone" ? "phone" : undefined);
   const [rolesOpen, setRolesOpen] = useState(false);
 
   return (
@@ -380,18 +391,74 @@ export default function SignupPage() {
                   <p className="text-[12px] text-kink-cream lg:text-[16px]">
                     {p.verifyStep.sent
                       ? "Enter the code we texted you. It expires in 10 minutes."
-                      : "Verifying your number unlocks the Basic verified badge. You can also skip and do it later."}
+                      : "We'll text a code to this number to confirm it's yours. You need it to use Kinkord."}
                   </p>
                 </div>
                 <div className="flex items-center gap-3 rounded-[12px] border-2 border-kink-gold-bright bg-[#111111] px-5 py-3 lg:px-8 lg:py-4">
                   <Smartphone size={20} className="text-kink-gold-bright lg:size-7" aria-hidden />
                   <span className="text-[15px] font-medium text-white lg:text-[24px]">
-                    {p.verifyStep.sentTo ??
-                      `${p.accountStep.draft.phoneCountryCode} ${
-                        p.accountStep.draft.phoneLocal.replace(/^0/, "") || "your phone number"
-                      }`}
+                    {p.verifyStep.number ?? "your phone number"}
                   </span>
                 </div>
+                {p.verifyStep.changePhone.open ? (
+                  <div className="flex w-full flex-col gap-3">
+                    <TextField
+                      label="New phone number"
+                      icon={Phone}
+                      placeholder="803 123 4567"
+                      autoComplete="tel"
+                      leftAddon={
+                        <span className="flex h-full items-center gap-2">
+                          <span aria-hidden className="h-[26px] w-px bg-kink-edge" />
+                          <select
+                            aria-label="Country code"
+                            value={p.verifyStep.changePhone.countryCode}
+                            onChange={(e) =>
+                              p.verifyStep.changePhone.setCountryCode(e.target.value)
+                            }
+                            className="bg-transparent text-white outline-none [&>option]:bg-kink-field"
+                          >
+                            {PHONE_COUNTRY_CODES.map((c) => (
+                              <option
+                                key={c.code}
+                                value={c.dialCode}
+                              >{`${c.flag} ${c.dialCode}`}</option>
+                            ))}
+                          </select>
+                          <ChevronDown size={14} aria-hidden className="-ml-1 text-white" />
+                          <span aria-hidden className="h-[26px] w-px bg-kink-edge" />
+                        </span>
+                      }
+                      value={p.verifyStep.changePhone.local}
+                      onChange={p.verifyStep.changePhone.setLocal}
+                      error={p.verifyStep.changePhone.error ?? undefined}
+                    />
+                    <div className="flex items-center gap-4">
+                      <GoldCta
+                        label="Save number"
+                        arrow={false}
+                        onClick={p.verifyStep.changePhone.save}
+                        loading={p.verifyStep.changePhone.saving}
+                        className="max-w-[240px]"
+                      />
+                      <button
+                        type="button"
+                        onClick={p.verifyStep.changePhone.cancel}
+                        className="text-[13px] text-kink-help underline lg:text-[16px]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={p.verifyStep.changePhone.start}
+                    className="text-[13px] text-kink-help underline lg:text-[16px]"
+                  >
+                    Wrong number? Change it
+                  </button>
+                )}
                 <CodeInput
                   value={p.verifyStep.code}
                   onChange={p.verifyStep.setCode}
@@ -440,13 +507,6 @@ export default function SignupPage() {
                     className="max-w-[564px]"
                   />
                 )}
-                <button
-                  type="button"
-                  onClick={p.verifyStep.skip}
-                  className="text-[13px] text-kink-help underline lg:text-[16px]"
-                >
-                  Skip for now
-                </button>
               </>
             )}
           </section>

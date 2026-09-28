@@ -53,6 +53,16 @@ describe("useVerification", () => {
     expect(result.current.canResend).toBe(false);
   });
 
+  it("forgets the code in flight when reset, so a new number starts clean", async () => {
+    const { result } = renderHook(() => useVerification("phone"));
+    act(() => result.current.sendCode());
+    await waitFor(() => expect(result.current.sent).toBe(true));
+    act(() => result.current.reset());
+    expect(result.current.sent).toBe(false);
+    expect(result.current.resendIn).toBe(0);
+    expect(result.current.canResend).toBe(true);
+  });
+
   it("calls back once the code checks out", async () => {
     const onVerified = vi.fn();
     const { result } = renderHook(() => useVerification("phone", onVerified));

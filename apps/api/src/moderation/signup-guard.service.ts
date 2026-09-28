@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import { DRIZZLE, type Db } from "../db/db.module";
 import { signupBlock } from "../db/schema";
 import { EmailService } from "../email/email.service";
+import { SUPER_ADMIN_EMAILS } from "./admins";
 import { evaluateSignup, type SignupCandidate, type SignupVerdict } from "./signup-rules";
 
 /**
@@ -27,10 +28,10 @@ export class SignupGuardService {
   ) {}
 
   /**
-   * Checks a would-be member against the block list. Every hit is logged, and
-   * emailed to MODERATION_EMAIL when that is set, so neither a flagged sign-up
-   * nor a blocked member trying again goes unnoticed. Refusing is the caller's
-   * job, because each entry point words its own error.
+   * Checks a would-be member against the block list. Every hit is logged and
+   * emailed to the moderators, so neither a flagged sign-up nor a blocked
+   * member trying again goes unnoticed. Refusing is the caller's job, because
+   * each entry point words its own error.
    */
   async review(candidate: SignupCandidate, where: string): Promise<SignupVerdict> {
     const rules = await this.db
@@ -50,22 +51,45 @@ export class SignupGuardService {
     return verdict;
   }
 
+  /**
+   * MODERATION_EMAIL (comma-separated) overrides who hears about hits; without
+   * it the super admins do, so alerts work without any deploy-time setting.
+   */
+  private recipients(): string[] {
+    const configured = (process.env.MODERATION_EMAIL ?? "")
+      .split(",")
+      .map((a) => a.trim())
+      .filter(Boolean);
+    return configured.length ? configured : SUPER_ADMIN_EMAILS;
+  }
+
   private async alert(action: string, where: string, who: string, matched: string) {
-    const to = process.env.MODERATION_EMAIL;
-    if (!to) return;
     const heading =
       action === "block" ? "A blocked member tried again" : "Sign-up flagged for review";
-    const text = `${heading}\n\nWhere: ${where}\nWho: ${who}\nMatched: ${matched}`;
-    try {
-      await this.email.send({
-        to,
-        subject: `Kinkord moderation: ${heading.toLowerCase()}`,
-        text,
-        html: `<pre>${escapeHtml(text)}</pre>`,
-      });
-    } catch (error) {
-      // An alert that can't be sent must not decide whether someone can sign up.
-      this.log.error(`[moderation] alert email failed: ${String(error)}`);
-    }
+    const site = (process.env.WEB_ORIGINS ?? "http://localhost:3000").split(",")[0].trim();
+    const text = [
+      heading,
+      "",
+      `Where: ${where}`,
+      `Who: ${who}`,
+      `Matched: ${matched}`,
+      "",
+      `Review in the admin panel: ${site}/moderation`,
+    ].join("\n");
+    await Promise.all(
+      this.recipients().map(async (to) => {
+        try {
+          await this.email.send({
+            to,
+            subject: `Kinkord moderation: ${heading.toLowerCase()}`,
+            text,
+            html: `<pre>${escapeHtml(text)}</pre>`,
+          });
+        } catch (error) {
+          // An alert that can't be sent must not decide whether someone can sign up.
+          this.log.error(`[moderation] alert email to ${to} failed: ${String(error)}`);
+        }
+      }),
+    );
   }
 }
