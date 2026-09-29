@@ -19,6 +19,8 @@ const MONTHS = [
 ];
 
 interface Props {
+  /** Goes on the row; lets a screen scroll to this field. */
+  id?: string;
   day: number | null;
   month: number | null;
   year: number | null;
@@ -34,6 +36,7 @@ function WheelDropdown<T extends number>({
   label,
   open,
   onToggle,
+  grow,
 }: {
   items: T[];
   render: (v: T) => string;
@@ -42,6 +45,8 @@ function WheelDropdown<T extends number>({
   label: string;
   open: boolean;
   onToggle: () => void;
+  /** Flex weight; min-w-0 lets the column shrink and truncate instead of overflowing. */
+  grow: string;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -52,7 +57,7 @@ function WheelDropdown<T extends number>({
   }, [open, value]);
 
   return (
-    <div className="relative flex-1">
+    <div className={`relative min-w-0 ${grow}`}>
       <button
         type="button"
         aria-haspopup="listbox"
@@ -62,9 +67,9 @@ function WheelDropdown<T extends number>({
           open ? "border-kink-amber" : "border-kink-edge"
         }`}
       >
-        <Calendar size={16} className="shrink-0 text-kink-help" aria-hidden />
+        <Calendar size={16} className="hidden shrink-0 text-kink-help sm:block" aria-hidden />
         <span
-          className={`truncate text-[13px] lg:text-[16px] ${
+          className={`min-w-0 truncate text-[13px] lg:text-[16px] ${
             value == null ? "text-kink-help" : "text-white"
           }`}
         >
@@ -109,7 +114,7 @@ function WheelDropdown<T extends number>({
 }
 
 /** Date-of-birth row: three dropdown triggers that open scrollable wheels. */
-export default function DobPicker({ day, month, year, onChange, error }: Props) {
+export default function DobPicker({ id, day, month, year, onChange, error }: Props) {
   const now = new Date().getFullYear();
   const days = Array.from({ length: 31 }, (_, i) => i + 1);
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -118,7 +123,7 @@ export default function DobPicker({ day, month, year, onChange, error }: Props) 
   const toggle = (key: "day" | "month" | "year") => setOpen((o) => (o === key ? null : key));
 
   return (
-    <div className="w-full">
+    <div id={id} className="w-full">
       <p className="mb-2 text-[12px] font-medium text-white lg:text-[20px]">Date of birth</p>
       {open ? (
         <button
@@ -128,12 +133,13 @@ export default function DobPicker({ day, month, year, onChange, error }: Props) 
           className="fixed inset-0 z-20 cursor-default"
         />
       ) : null}
-      <div className="flex gap-3 lg:gap-4">
+      <div className="flex gap-2 sm:gap-3 lg:gap-4">
         <WheelDropdown
           items={days}
           render={String}
           value={day}
           label="Day"
+          grow="flex-1"
           open={open === "day"}
           onToggle={() => toggle("day")}
           onSelect={(d) => {
@@ -146,6 +152,7 @@ export default function DobPicker({ day, month, year, onChange, error }: Props) 
           render={(m) => MONTHS[m - 1]}
           value={month}
           label="Month"
+          grow="flex-[1.4]"
           open={open === "month"}
           onToggle={() => toggle("month")}
           onSelect={(m) => {
@@ -158,6 +165,7 @@ export default function DobPicker({ day, month, year, onChange, error }: Props) 
           render={String}
           value={year}
           label="Year"
+          grow="flex-[1.1]"
           open={open === "year"}
           onToggle={() => toggle("year")}
           onSelect={(y) => {

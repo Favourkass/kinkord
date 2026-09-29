@@ -98,7 +98,56 @@ describe("useSignupWizardPresenter", () => {
     expect(result.current.stage).toBe("account");
     expect(Object.keys(result.current.accountStep.errors).length).toBeGreaterThan(0);
     expect(Object.keys(result.current.aboutStep.errors).length).toBeGreaterThan(0);
+    expect(result.current.topError).toBe("Fill in the fields marked in red above.");
+    expect(result.current.firstInvalid).toEqual({ field: "username" });
     expect(post).not.toHaveBeenCalled();
+  });
+
+  it("says by the button which fields to fix, and points the screen at the first", async () => {
+    const { result } = renderHook(() => useSignupWizardPresenter());
+    reachCombinedStep(result);
+    fillAccount(result);
+    fillAbout(result);
+    act(() => {
+      result.current.accountStep.set({
+        ...result.current.accountStep.draft,
+        confirmPassword: "different123",
+      });
+      result.current.aboutStep.set({ ...result.current.aboutStep.draft, gender: null });
+    });
+
+    await act(() => result.current.submitCombinedStep());
+
+    expect(result.current.topError).toBe("Check your password confirmation and gender above.");
+    expect(result.current.firstInvalid).toEqual({ field: "confirmPassword" });
+    expect(post).not.toHaveBeenCalled();
+
+    // Tapping again with the same mistake scrolls again: a new object each time.
+    const first = result.current.firstInvalid;
+    await act(() => result.current.submitCombinedStep());
+    expect(result.current.firstInvalid).not.toBe(first);
+  });
+
+  it("sends the number Chrome autofills with its country code as E.164", async () => {
+    const { result } = renderHook(() => useSignupWizardPresenter());
+    reachCombinedStep(result);
+    fillAccount(result);
+    fillAbout(result);
+    act(() =>
+      result.current.accountStep.set({
+        ...result.current.accountStep.draft,
+        phoneLocal: "+234 803 123 4567",
+      }),
+    );
+
+    await act(() => result.current.submitCombinedStep());
+
+    expect(post).toHaveBeenCalledWith(
+      "/auth-ext/sign-up",
+      expect.objectContaining({ phone: "+2348031234567" }),
+    );
+    expect(result.current.topError).toBeNull();
+    expect(result.current.stage).toBe("email");
   });
 
   it("posts account + about and advances to email verification", async () => {

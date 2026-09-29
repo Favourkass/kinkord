@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -38,6 +38,9 @@ import {
 } from "@/constants/onboarding";
 import { NG_LGAS } from "@/constants/nigeria";
 import { Routes } from "@/constants/Routes";
+import type { SignupField } from "@/domain/onboarding";
+
+const fieldId = (field: SignupField) => `signup-${field}`;
 
 function StageHeading({ plain, highlight }: { plain: string; highlight: string }) {
   return (
@@ -60,6 +63,16 @@ function SignupWizard() {
   const resume = useSearchParams().get("resume");
   const p = useSignupWizardPresenter(resume === "phone" ? "phone" : undefined);
   const [rolesOpen, setRolesOpen] = useState(false);
+
+  // A failed Send OTP says what's wrong by the button; bring the first bad
+  // field into view too, since on a phone it's usually scrolled off the top.
+  const firstInvalid = p.firstInvalid;
+  useEffect(() => {
+    if (!firstInvalid) return;
+    document
+      .getElementById(fieldId(firstInvalid.field))
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [firstInvalid]);
 
   return (
     <>
@@ -143,6 +156,7 @@ function SignupWizard() {
             </p>
             <div className="flex w-full flex-col gap-4 lg:gap-7">
               <TextField
+                id={fieldId("username")}
                 label="Username"
                 icon={AtSign}
                 placeholder="@yourhandle"
@@ -154,6 +168,7 @@ function SignupWizard() {
                 helper="This is your unique username on Kinkord."
               />
               <TextField
+                id={fieldId("displayName")}
                 label="Display name"
                 icon={User}
                 placeholder="How members will see you"
@@ -164,6 +179,7 @@ function SignupWizard() {
                 helper="This is the name other members will see."
               />
               <TextField
+                id={fieldId("email")}
                 label="Email address"
                 icon={Mail}
                 type="email"
@@ -176,15 +192,17 @@ function SignupWizard() {
                 helper="We'll never share your email with anyone."
               />
               <TextField
+                id={fieldId("phoneLocal")}
                 label="Phone number"
                 icon={Phone}
                 placeholder="803 123 4567"
-                autoComplete="tel"
+                autoComplete="tel-national"
                 leftAddon={
                   <span className="flex h-full items-center gap-2">
                     <span aria-hidden className="h-[26px] w-px bg-kink-edge" />
                     <select
                       aria-label="Country code"
+                      autoComplete="tel-country-code"
                       value={p.accountStep.draft.phoneCountryCode}
                       onChange={(e) =>
                         p.accountStep.set({
@@ -192,7 +210,7 @@ function SignupWizard() {
                           phoneCountryCode: e.target.value,
                         })
                       }
-                      className="bg-transparent text-white outline-none [&>option]:bg-kink-field"
+                      className="appearance-none bg-transparent text-white outline-none [color-scheme:dark] [&>option]:bg-kink-field"
                     >
                       {PHONE_COUNTRY_CODES.map((c) => (
                         <option key={c.code} value={c.dialCode}>{`${c.flag} ${c.dialCode}`}</option>
@@ -208,6 +226,7 @@ function SignupWizard() {
                 helper="This will be used for verification. One number can only be linked to one account."
               />
               <TextField
+                id={fieldId("password")}
                 label="Password"
                 icon={Lock}
                 type="password"
@@ -218,6 +237,7 @@ function SignupWizard() {
                 helper="Use 10+ characters with letters & numbers."
               />
               <TextField
+                id={fieldId("confirmPassword")}
                 label="Confirm password"
                 icon={Lock}
                 type="password"
@@ -236,6 +256,7 @@ function SignupWizard() {
             <StageHeading plain="TELL US" highlight="ABOUT YOU" />
             <div className="grid w-full gap-4 sm:grid-cols-2 lg:gap-6">
               <SelectField
+                id={fieldId("state")}
                 label="State"
                 icon={MapPin}
                 options={NG_STATES}
@@ -259,6 +280,7 @@ function SignupWizard() {
               Your state and area help us show you local communities and events.
             </p>
             <DobPicker
+              id={fieldId("dob")}
               day={p.aboutStep.draft.dobDay}
               month={p.aboutStep.draft.dobMonth}
               year={p.aboutStep.draft.dobYear}
@@ -272,7 +294,7 @@ function SignupWizard() {
               }
               error={p.aboutStep.errors.dob}
             />
-            <div className="w-full">
+            <div id={fieldId("gender")} className="w-full">
               <p className="mb-2 text-[12px] font-medium text-white lg:text-[20px]">Gender</p>
               <div className="grid grid-cols-2 gap-4 lg:gap-6">
                 {(["male", "female"] as const).map((g) => (
@@ -406,17 +428,18 @@ function SignupWizard() {
                       label="New phone number"
                       icon={Phone}
                       placeholder="803 123 4567"
-                      autoComplete="tel"
+                      autoComplete="tel-national"
                       leftAddon={
                         <span className="flex h-full items-center gap-2">
                           <span aria-hidden className="h-[26px] w-px bg-kink-edge" />
                           <select
                             aria-label="Country code"
+                            autoComplete="tel-country-code"
                             value={p.verifyStep.changePhone.countryCode}
                             onChange={(e) =>
                               p.verifyStep.changePhone.setCountryCode(e.target.value)
                             }
-                            className="bg-transparent text-white outline-none [&>option]:bg-kink-field"
+                            className="appearance-none bg-transparent text-white outline-none [color-scheme:dark] [&>option]:bg-kink-field"
                           >
                             {PHONE_COUNTRY_CODES.map((c) => (
                               <option
