@@ -1,3 +1,5 @@
+import type { SignupField } from "@/domain/onboarding";
+
 export const LAUNCH_COUNTRIES = [
   { code: "NG", name: "Nigeria", flag: "🇳🇬", dialCode: "+234" },
 ] as const;
@@ -82,3 +84,29 @@ export const SIGNUP_STEP_LABELS = [
   "Profile",
   "Welcome",
 ] as const;
+
+/** How the Send OTP message names each field that needs fixing. */
+export const SIGNUP_FIELD_NAMES: Record<SignupField, string> = {
+  username: "username",
+  displayName: "display name",
+  email: "email address",
+  phoneLocal: "phone number",
+  password: "password",
+  confirmPassword: "password confirmation",
+  state: "state",
+  dob: "date of birth",
+  gender: "gender",
+};
+
+/**
+ * Shown by the Send OTP button when a field above it fails: on a phone the
+ * field itself is usually scrolled out of view, so the tap has to say why
+ * nothing happened.
+ */
+export function signupFixFieldsMessage(fields: SignupField[]): string {
+  if (fields.length > 3) return "Fill in the fields marked in red above.";
+  const names = fields.map((f) => SIGNUP_FIELD_NAMES[f]);
+  const list =
+    names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0];
+  return `Check your ${list} above.`;
+}
