@@ -43,11 +43,31 @@ export function validateAccount(d: AccountDraft): Partial<Record<keyof AccountDr
   return errors;
 }
 
-/** "+234" + "0803 123 4567" -> "+2348031234567"; returns null when invalid. */
+/**
+ * "+234" + "0803 123 4567" -> "+2348031234567"; returns null when invalid.
+ *
+ * Autofill and copy-paste often put the whole international number in the
+ * local box ("+234 803…", "00234 803…", "234803…"), so a leading country code
+ * is recognised rather than doubled. A "+" number for another country is kept
+ * as typed.
+ */
 export function toE164(countryCode: string, local: string): string | null {
-  const digits = local.replace(/\D/g, "").replace(/^0+/, "");
   const cc = countryCode.replace(/\D/g, "");
-  if (!cc || digits.length < 7 || digits.length > 12) return null;
+  if (!cc) return null;
+  const typed = local.trim();
+  let digits = typed.replace(/\D/g, "");
+  const international = typed.startsWith("+") || digits.startsWith("00");
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  if (international && !digits.startsWith(cc)) {
+    return /^\d{8,15}$/.test(digits) ? `+${digits}` : null;
+  }
+  // Without a "+", only drop digits that match the code when a full national
+  // number is left after them: shorter numbers can legitimately start that way.
+  if (digits.startsWith(cc) && (international || digits.length - cc.length >= 9)) {
+    digits = digits.slice(cc.length);
+  }
+  digits = digits.replace(/^0+/, "");
+  if (digits.length < 7 || digits.length > 12) return null;
   const full = `+${cc}${digits}`;
   return /^\+\d{8,15}$/.test(full) ? full : null;
 }
@@ -80,4 +100,25 @@ export function validateAbout(a: AboutDraft): { dob?: string; state?: string; ge
   if (!a.state.trim()) errors.state = "Select your state.";
   if (!a.gender) errors.gender = "Select an option.";
   return errors;
+}
+
+/** Every field the combined account + about screen checks, top to bottom. */
+export const SIGNUP_FIELDS = [
+  "username",
+  "displayName",
+  "email",
+  "phoneLocal",
+  "password",
+  "confirmPassword",
+  "state",
+  "dob",
+  "gender",
+] as const;
+export type SignupField = (typeof SIGNUP_FIELDS)[number];
+
+/** The fields with an error, in the order they appear on screen. */
+export function invalidSignupFields(
+  ...errorSets: Partial<Record<string, string>>[]
+): SignupField[] {
+  return SIGNUP_FIELDS.filter((f) => errorSets.some((errors) => errors[f]));
 }

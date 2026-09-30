@@ -4,6 +4,8 @@ import { useId } from "react";
 import { ChevronDown, type LucideIcon } from "lucide-react";
 
 interface Props {
+  /** Goes on the select; lets a screen scroll to or label this field. */
+  id?: string;
   label: string;
   value: string;
   onChange: (v: string) => void;
@@ -15,6 +17,7 @@ interface Props {
 }
 
 export default function SelectField({
+  id: idProp,
   label,
   value,
   onChange,
@@ -24,7 +27,8 @@ export default function SelectField({
   error,
   icon: Icon,
 }: Props) {
-  const id = useId();
+  const autoId = useId();
+  const id = idProp ?? autoId;
   return (
     <div className="w-full">
       <label
@@ -43,7 +47,7 @@ export default function SelectField({
           id={id}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="h-full w-full appearance-none bg-transparent pr-8 text-[15px] text-white outline-none lg:text-[20px] [&>option]:bg-kink-field"
+          className="h-full w-full appearance-none bg-transparent pr-8 text-[15px] text-white outline-none [color-scheme:dark] lg:text-[20px] [&>option]:bg-kink-field"
         >
           <option value="" disabled>
             {placeholder}

@@ -15,12 +15,15 @@ interface UploadSlots {
 import {
   validateAccount,
   validateAbout,
+  invalidSignupFields,
   toE164,
   dobToIso,
   WIZARD_STEPS,
   type AccountDraft,
   type AboutDraft,
+  type SignupField,
 } from "@/domain/onboarding";
+import { signupFixFieldsMessage } from "@/constants/onboarding";
 import { Routes } from "@/constants/Routes";
 import { PHOTO_CONFIRMATION_COPY } from "@/constants/photoConfirmation";
 import { useVerification } from "./useVerification";
@@ -79,6 +82,9 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
     gender: null,
   });
   const [aboutErrors, setAboutErrors] = useState<ReturnType<typeof validateAbout>>({});
+  // The field a failed Send OTP should bring into view. A fresh object per
+  // attempt, so the screen scrolls again even when it's the same field.
+  const [firstInvalid, setFirstInvalid] = useState<{ field: SignupField } | null>(null);
 
   // step 4
   const [roles, setRoles] = useState<string[]>([]);
@@ -109,7 +115,12 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
     const abtErrors = validateAbout(about);
     setAccountErrors(accErrors);
     setAboutErrors(abtErrors);
-    if (Object.keys(accErrors).length > 0 || Object.keys(abtErrors).length > 0) return;
+    const invalid = invalidSignupFields(accErrors, abtErrors);
+    if (invalid.length > 0) {
+      setTopError(signupFixFieldsMessage(invalid));
+      setFirstInvalid({ field: invalid[0] });
+      return;
+    }
     setBusy(true);
     setTopError(null);
     try {
@@ -289,6 +300,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
       },
       accountStep: { draft: account, set: setAccount, errors: accountErrors },
       aboutStep: { draft: about, set: setAbout, errors: aboutErrors },
+      firstInvalid,
       submitCombinedStep,
       backToCountry,
       verifyStep: {
@@ -349,6 +361,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
       accountErrors,
       about,
       aboutErrors,
+      firstInvalid,
       submitCombinedStep,
       backToCountry,
       nextVerificationStep,

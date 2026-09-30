@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   dobToIso,
+  invalidSignupFields,
   isAdult,
   toE164,
   validateAccount,
@@ -57,15 +58,48 @@ describe("validateAccount: phone", () => {
       "Enter a valid phone number.",
     );
   });
+  it("accepts the full international number Chrome autofill puts in the box", () => {
+    expect(validateAccount(account({ phoneLocal: "+2348031234567" })).phoneLocal).toBeUndefined();
+  });
 });
 
 describe("toE164", () => {
   it("builds E.164 from NG local format, stripping the leading zero", () => {
     expect(toE164("+234", "0803 123 4567")).toBe("+2348031234567");
   });
+  it("recognises a country code typed or autofilled into the local box", () => {
+    for (const typed of [
+      "+2348031234567",
+      "+234 803 123 4567",
+      "+234 0803 123 4567",
+      "002348031234567",
+      "2348031234567",
+      "(+234) 803-123-4567",
+    ]) {
+      expect(toE164("+234", typed)).toBe("+2348031234567");
+    }
+    expect(toE164("+44", "+44 7911 123456")).toBe("+447911123456");
+    expect(toE164("+1", "1 555 123 4567")).toBe("+15551234567");
+  });
+  it("keeps a full number for another country as typed", () => {
+    expect(toE164("+234", "+44 7911 123456")).toBe("+447911123456");
+  });
+  it("doesn't mistake a short national number for one with the code", () => {
+    // 10 digits that merely start with 234: too short to also hold the code.
+    expect(toE164("+234", "2341234567")).toBe("+2342341234567");
+  });
   it("rejects junk", () => {
     expect(toE164("+234", "12")).toBeNull();
     expect(toE164("", "08031234567")).toBeNull();
+  });
+});
+
+describe("invalidSignupFields", () => {
+  it("lists failing fields in on-screen order across both steps", () => {
+    expect(
+      invalidSignupFields({ confirmPassword: "x", phoneLocal: "x" }, { gender: "x", dob: "x" }),
+    ).toEqual(["phoneLocal", "confirmPassword", "dob", "gender"]);
+    expect(invalidSignupFields({}, {})).toEqual([]);
   });
 });
 

@@ -4,6 +4,8 @@ import { useId, useState } from "react";
 import { Eye, EyeOff, CheckCircle2, type LucideIcon } from "lucide-react";
 
 interface Props {
+  /** Goes on the input; lets a screen scroll to or label this field. */
+  id?: string;
   label: string;
   value: string;
   onChange: (v: string) => void;
@@ -19,6 +21,7 @@ interface Props {
 
 /** Dark input with label, helper, validity tick / password eye, per Figma. */
 export default function TextField({
+  id: idProp,
   label,
   value,
   onChange,
@@ -31,7 +34,8 @@ export default function TextField({
   autoComplete,
   leftAddon,
 }: Props) {
-  const id = useId();
+  const autoId = useId();
+  const id = idProp ?? autoId;
   const [reveal, setReveal] = useState(false);
   const inputType = type === "password" && reveal ? "text" : type;
 
@@ -57,7 +61,7 @@ export default function TextField({
           placeholder={placeholder}
           autoComplete={autoComplete}
           onChange={(e) => onChange(e.target.value)}
-          className="h-full w-full bg-transparent text-[15px] text-white outline-none placeholder:text-kink-help lg:text-[20px]"
+          className="h-full w-full bg-transparent text-[15px] text-white outline-none [color-scheme:dark] placeholder:text-kink-help lg:text-[20px]"
         />
         {type === "password" ? (
           <button
