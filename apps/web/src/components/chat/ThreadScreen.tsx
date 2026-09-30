@@ -17,6 +17,11 @@ export interface ThreadScreenProps {
   sendError: string | null;
   unavailable: boolean;
   unavailableText: string;
+  /**
+   * Today's new-chat allowance, while nobody has written yet: a hint above the
+   * composer, or, once it's used, a notice in place of it.
+   */
+  newChat: { text: string; blocking: boolean } | null;
   onlineLabel: string;
   backHref: string;
   backLabel: string;
@@ -127,16 +132,23 @@ export default function ThreadScreen(p: ThreadScreenProps) {
           {p.sendError}
         </p>
       )}
-      {p.unavailable ? (
+      {p.unavailable || p.newChat?.blocking ? (
         <p className="border-t border-app-line bg-app-surface px-[16px] py-[14px] text-center text-[13px] text-app-muted">
-          {p.unavailableText}
+          {p.unavailable ? p.unavailableText : p.newChat?.text}
         </p>
       ) : (
-        <MessageComposer
-          onSend={p.onSend}
-          disabled={p.loading || Boolean(p.error)}
-          {...p.composer}
-        />
+        <>
+          {p.newChat && (
+            <p className="border-t border-app-line bg-app-surface px-[16px] pt-[8px] text-[12px] text-app-muted">
+              {p.newChat.text}
+            </p>
+          )}
+          <MessageComposer
+            onSend={p.onSend}
+            disabled={p.loading || Boolean(p.error)}
+            {...p.composer}
+          />
+        </>
       )}
     </div>
   );

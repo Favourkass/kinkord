@@ -1,7 +1,8 @@
 import { BadRequestException, HttpException, NotFoundException } from "@nestjs/common";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { conversation, conversationParticipant, message } from "../db/schema";
 import type { StorageService } from "../storage/storage.service";
+import { NEW_CHAT_LIMIT } from "./allowance";
 import {
   ChatService,
   MAX_MESSAGES_PER_MINUTE,
@@ -51,6 +52,10 @@ function make(answers: unknown[]) {
 }
 
 const at = new Date("2026-09-28T10:00:00.000Z");
+/** A signed-in member on the free allowance. */
+const member = (id: string) => ({ id, email: `${id}@example.com`, emailVerified: true });
+/** A super admin: no daily limits. */
+const admin = { id: "a1", email: "maxihandsome@gmail.com", emailVerified: true };
 const row = (id: string, over: Record<string, unknown> = {}) => ({
   id,
   conversationId: "c1",
@@ -65,17 +70,17 @@ const row = (id: string, over: Record<string, unknown> = {}) => ({
 describe("ChatService.startDm", () => {
   it("won't open a thread with yourself", async () => {
     const { service } = make([]);
-    await expect(service.startDm("u1", "u1")).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.startDm(member("u1"), "u1")).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it("is a 404 for a member who doesn't exist or is suspended", async () => {
     const { service } = make([[]]);
-    await expect(service.startDm("u1", "u9")).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.startDm(member("u1"), "u9")).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it("reuses the pair's thread and makes sure both members are in it", async () => {
     const { service, after, left } = make([[{ id: "u2" }], [{ id: "c1" }], undefined]);
-    await expect(service.startDm("u1", "u2")).resolves.toBe("c1");
+    await expect(service.startDm(member("u1"), "u2")).resolves.toBe("c1");
     expect(after("insert", conversationParticipant, "values")).toEqual([
       { conversationId: "c1", userId: "u1" },
       { conversationId: "c1", userId: "u2" },
@@ -91,7 +96,7 @@ describe("ChatService.startDm", () => {
       [{ id: "c9" }], // created
       undefined, // members added
     ]);
-    await expect(service.startDm("u2", "u1")).resolves.toBe("c9");
+    await expect(service.startDm(member("u2"), "u1")).resolves.toBe("c9");
     expect(after("insert", conversation, "values")).toEqual({
       kind: "dm",
       dmKey: "u1:u2",
@@ -101,23 +106,34 @@ describe("ChatService.startDm", () => {
 
   it("stops someone opening too many new threads in a day", async () => {
     const { service } = make([[{ id: "u2" }], [], [{ n: MAX_NEW_CONVERSATIONS_PER_DAY }]]);
-    const err = await service.startDm("u1", "u2").catch((e: unknown) => e);
+    const err = await service.startDm(member("u1"), "u2").catch((e: unknown) => e);
     expect(err).toBeInstanceOf(HttpException);
     expect((err as HttpException).getStatus()).toBe(429);
+  });
+
+  it("doesn't cap how many threads the super admins open", async () => {
+    const { service, left } = make([
+      [{ id: "u2" }], // target
+      [], // no thread yet
+      [{ id: "c9" }], // created, with no count asked first
+      undefined, // members added
+    ]);
+    await expect(service.startDm(admin, "u2")).resolves.toBe("c9");
+    expect(left()).toBe(0);
   });
 });
 
 describe("ChatService.sendMessage", () => {
   it("is a 404 for a thread you aren't in", async () => {
     const { service } = make([[]]);
-    await expect(service.sendMessage("u1", "c1", { body: "hi" })).rejects.toBeInstanceOf(
+    await expect(service.sendMessage(member("u1"), "c1", { body: "hi" })).rejects.toBeInstanceOf(
       NotFoundException,
     );
   });
 
   it("refuses when the other member has been removed or suspended", async () => {
     const { service } = make([[{ userId: "u1" }], []]);
-    await expect(service.sendMessage("u1", "c1", { body: "hi" })).rejects.toThrow(
+    await expect(service.sendMessage(member("u1"), "c1", { body: "hi" })).rejects.toThrow(
       "This member is no longer on Kinkord.",
     );
   });
@@ -128,21 +144,24 @@ describe("ChatService.sendMessage", () => {
       [{ userId: "u2" }],
       [{ n: MAX_MESSAGES_PER_MINUTE }],
     ]);
-    const err = await service.sendMessage("u1", "c1", { body: "hi" }).catch((e: unknown) => e);
+    const err = await service
+      .sendMessage(member("u1"), "c1", { body: "hi" })
+      .catch((e: unknown) => e);
     expect((err as HttpException).getStatus()).toBe(429);
   });
 
-  it("saves the message, bumps the thread and echoes the client id", async () => {
+  it("saves a reply, bumps the thread and echoes the client id", async () => {
     const saved = row("m1", { senderId: "u1", body: "hi" });
-    const { service, after } = make([
-      [{ userId: "u1" }],
-      [{ userId: "u2" }],
-      [{ n: 0 }],
+    const { service, after, calls } = make([
+      [{ userId: "u1" }], // a member of the thread
+      [{ userId: "u2" }], // the other member is still here
+      [{ n: 0 }], // not sending too fast
+      [{ id: "m0" }], // the thread already has messages: not a new chat
       [saved],
       undefined,
     ]);
     await expect(
-      service.sendMessage("u1", "c1", { body: "hi", clientId: "tmp-1" }),
+      service.sendMessage(member("u1"), "c1", { body: "hi", clientId: "tmp-1" }),
     ).resolves.toEqual({
       id: "m1",
       conversationId: "c1",
@@ -158,6 +177,94 @@ describe("ChatService.sendMessage", () => {
       body: "hi",
     });
     expect(after("update", conversation, "set")).toEqual({ lastMessageAt: at });
+    // Replies never take the new-chat lock.
+    expect(calls.some((c) => c.op === "execute")).toBe(false);
+  });
+
+  describe("the daily new-chat allowance", () => {
+    it("lets a member start today's new chat", async () => {
+      const saved = row("m1", { senderId: "u1", body: "hi" });
+      const { service, after, calls, left } = make([
+        [{ userId: "u1" }],
+        [{ userId: "u2" }],
+        [{ n: 0 }],
+        [], // nobody has written in this thread yet
+        undefined, // the member's new-chat lock
+        [{ n: 0 }], // no chats started today
+        [saved],
+        undefined,
+      ]);
+      await expect(service.sendMessage(member("u1"), "c1", { body: "hi" })).resolves.toMatchObject({
+        id: "m1",
+      });
+      expect(calls.some((c) => c.op === "execute")).toBe(true);
+      expect(after("insert", message, "values")).toEqual({
+        conversationId: "c1",
+        senderId: "u1",
+        body: "hi",
+      });
+      expect(left()).toBe(0);
+    });
+
+    it("refuses a second new chat the same day, saying when it resets", async () => {
+      const { service, after } = make([
+        [{ userId: "u1" }],
+        [{ userId: "u2" }],
+        [{ n: 0 }],
+        [], // an empty thread: this would be a new chat
+        undefined, // lock
+        [{ n: 1 }], // today's chat is already used
+      ]);
+      const err = await service
+        .sendMessage(member("u1"), "c1", { body: "hi" })
+        .catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(HttpException);
+      expect((err as HttpException).getStatus()).toBe(429);
+      expect((err as HttpException).getResponse()).toMatchObject({
+        code: NEW_CHAT_LIMIT,
+        resetsAt: expect.stringMatching(/T23:00:00\.000Z$/),
+      });
+      expect(after("insert", message, "values")).toBeUndefined();
+    });
+
+    it("doesn't limit the super admins", async () => {
+      const saved = row("m1", { senderId: "a1", body: "hi" });
+      const { service, calls, left } = make([
+        [{ userId: "a1" }],
+        [{ userId: "u2" }],
+        [{ n: 0 }],
+        [saved], // straight to the insert: no emptiness check, no lock
+        undefined,
+      ]);
+      await expect(service.sendMessage(admin, "c1", { body: "hi" })).resolves.toMatchObject({
+        id: "m1",
+      });
+      expect(calls.some((c) => c.op === "execute")).toBe(false);
+      expect(left()).toBe(0);
+    });
+  });
+});
+
+describe("ChatService.allowance", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("reports today's use and when it resets, at Lagos midnight", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-30T10:00:00Z"));
+    const { service } = make([[{ n: 1 }]]);
+    await expect(service.allowance(member("u1"))).resolves.toEqual({
+      newChatsPerDay: 1,
+      usedToday: 1,
+      resetsAt: "2026-09-30T23:00:00.000Z",
+    });
+  });
+
+  it("is unlimited for the super admins, without asking the database", async () => {
+    const { service, left } = make([]);
+    await expect(service.allowance(admin)).resolves.toEqual({ newChatsPerDay: null });
+    expect(left()).toBe(0);
   });
 });
 
@@ -205,8 +312,8 @@ describe("ChatService.listConversations", () => {
   it("builds each row and leaves out threads with nobody left to answer", async () => {
     const { service } = make([
       [
-        { id: "c1", kind: "dm", lastMessageAt: at },
-        { id: "c2", kind: "dm", lastMessageAt: at }, // peer suspended or deleted
+        { id: "c1", kind: "dm", lastMessageAt: at, createdBy: "u2" },
+        { id: "c2", kind: "dm", lastMessageAt: at, createdBy: "u1" }, // peer suspended or deleted
       ],
       [
         {
@@ -235,6 +342,29 @@ describe("ChatService.listConversations", () => {
       lastMessage: { id: "m1", body: "hello" },
       unreadCount: 2,
     });
+  });
+
+  it("hides a thread nobody has written in from everyone but whoever opened it", async () => {
+    const peer = (conversationId: string, userId: string) => ({
+      conversationId,
+      userId,
+      username: userId,
+      name: userId,
+      displayName: userId,
+      avatarKey: null,
+      lastSeenAt: null,
+    });
+    const { service } = make([
+      [
+        { id: "c1", kind: "dm", lastMessageAt: at, createdBy: "u2" }, // they opened it, no message yet
+        { id: "c3", kind: "dm", lastMessageAt: at, createdBy: "u1" }, // I opened it
+      ],
+      [peer("c1", "u2"), peer("c3", "u3")],
+      [], // no messages in either
+      [],
+    ]);
+    const rows = await service.listConversations("u1");
+    expect(rows.map((r) => r.id)).toEqual(["c3"]);
   });
 
   it("is empty without asking for more when there are no threads", async () => {

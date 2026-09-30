@@ -41,7 +41,13 @@ export class ChatController {
   @Post("conversations")
   async start(@Req() req: AuthedRequest, @Body() body: unknown) {
     const { userId } = parse(startDmSchema, body);
-    return { conversationId: await this.chat.startDm(req.user.id, userId) };
+    return { conversationId: await this.chat.startDm(req.user, userId) };
+  }
+
+  /** Today's new-chat allowance: the app warns before a first message it would refuse. */
+  @Get("allowance")
+  allowance(@Req() req: AuthedRequest) {
+    return this.chat.allowance(req.user);
   }
 
   @Get("conversations/:id")
@@ -64,7 +70,7 @@ export class ChatController {
     @Param("id", new ParseUUIDPipe()) id: string,
     @Body() body: unknown,
   ) {
-    return this.chat.sendMessage(req.user.id, id, parse(sendMessageSchema, body));
+    return this.chat.sendMessage(req.user, id, parse(sendMessageSchema, body));
   }
 
   @Post("conversations/:id/read")

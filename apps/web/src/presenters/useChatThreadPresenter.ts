@@ -1,16 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CHAT_COPY } from "@/constants/chat";
 import { Routes } from "@/constants/Routes";
 import {
+  isNewChatLimit,
   mergeMessages,
+  newChatNotice,
   toPendingMessageVM,
   toThreadMessageVM,
   toThreadPeerVM,
+  type ChatAllowancePM,
   type ChatMessagePM,
   type ConversationSummaryPM,
   type PendingMessage,
 } from "@/domain/chat";
+import { ApiError } from "@/services/apiClient";
 import { chatService } from "@/services/chat.service";
 import { useHomePresenter } from "./useHomePresenter";
 import { usePolling } from "./usePolling";
@@ -47,6 +52,10 @@ export function useChatThreadPresenter(conversationId: string) {
   const [sendError, setSendError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  // Today's new-chat allowance, and whether the server refused a first message
+  // here: each remembered with the thread it was for.
+  const [allowance, setAllowance] = useState<{ for: string; value: ChatAllowancePM } | null>(null);
+  const [refusedIn, setRefusedIn] = useState<string | null>(null);
   const lastMarked = useRef<string | null>(null);
 
   useEffect(() => {
@@ -77,6 +86,21 @@ export function useChatThreadPresenter(conversationId: string) {
   }, [conversationId]);
 
   const loaded = loadedFor === conversationId && !error;
+  // Nobody has written here yet: a first message would start a new chat.
+  const empty = loaded && messages.length === 0 && pending.length === 0;
+
+  useEffect(() => {
+    if (!empty) return;
+    let live = true;
+    chatService.allowance().then(
+      (value) => live && setAllowance({ for: conversationId, value }),
+      // Without it the composer stays open; the server still enforces the limit.
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [empty, conversationId]);
 
   const pollNew = useCallback(async () => {
     const newest = messages[messages.length - 1];
@@ -117,6 +141,13 @@ export function useChatThreadPresenter(conversationId: string) {
         setMessages((m) => mergeMessages(m, [saved]));
         setSendError(null);
       } catch (e) {
+        if (e instanceof ApiError && isNewChatLimit(e.body)) {
+          // Retrying can't help until tomorrow: say so instead of offering it.
+          setPending((p) => p.filter((x) => x.clientId !== clientId));
+          setRefusedIn(conversationId);
+          setSendError(null);
+          return;
+        }
         setPending((p) => p.map((x) => (x.clientId === clientId ? { ...x, status: "failed" } : x)));
         setSendError(messageOf(e, "Couldn't send. Tap the message to try again."));
       }
@@ -164,6 +195,11 @@ export function useChatThreadPresenter(conversationId: string) {
   }, [conversationId, hasMore, loadingMore, messages]);
 
   const peer = useMemo(() => toThreadPeerVM(summary?.peer ?? null), [summary]);
+  const notice = newChatNotice({
+    empty,
+    allowance: allowance?.for === conversationId ? allowance.value : null,
+    refused: refusedIn === conversationId,
+  });
   const bubbles = useMemo(
     () => [
       ...messages.map((m) => toThreadMessageVM(m, viewerId)),
@@ -185,6 +221,14 @@ export function useChatThreadPresenter(conversationId: string) {
       loadingMore,
       /** The other member left or was removed: read-only from here. */
       unavailable: loaded && peer === null,
+      /** The daily new-chat allowance, shown while nobody has written yet. */
+      newChat:
+        notice === null
+          ? null
+          : {
+              text: notice === "blocked" ? CHAT_COPY.newChatLimit : CHAT_COPY.newChatHint,
+              blocking: notice === "blocked",
+            },
     },
     backHref: Routes.messages,
     send,

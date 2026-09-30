@@ -152,6 +152,39 @@ export function mergeMessages(
 }
 
 /**
+ * How many new chats (a first message to someone) the member may start today.
+ * The super admins have no limit.
+ */
+export type ChatAllowancePM =
+  { newChatsPerDay: null } | { newChatsPerDay: number; usedToday: number; resetsAt: string };
+
+/** The API's code for a first message refused because today's new chat is used. */
+export const NEW_CHAT_LIMIT = "NEW_CHAT_LIMIT";
+
+/** Whether an API error body is that refusal. */
+export function isNewChatLimit(body: unknown): boolean {
+  return (body as { code?: unknown } | null)?.code === NEW_CHAT_LIMIT;
+}
+
+/**
+ * What an empty thread tells the member about today's allowance: "hint" when
+ * sending here would use it, "blocked" when it's already used. Nothing once
+ * the thread has messages, since replies aren't limited, and nothing for
+ * members without a limit.
+ */
+export function newChatNotice(opts: {
+  empty: boolean;
+  allowance: ChatAllowancePM | null;
+  refused: boolean;
+}): "hint" | "blocked" | null {
+  if (!opts.empty) return null;
+  if (opts.refused) return "blocked";
+  const a = opts.allowance;
+  if (!a || a.newChatsPerDay === null) return null;
+  return a.usedToday < a.newChatsPerDay ? "hint" : "blocked";
+}
+
+/**
  * Shape of the community rule shown before a member can use messaging. The
  * copy itself lives in constants/chatRules.ts.
  */

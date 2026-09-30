@@ -44,4 +44,9 @@ describe("chatService", () => {
       ["/chat/conversations/c1/read", { messageId: "m3" }],
     ]);
   });
+
+  it("asks for today's new-chat allowance", async () => {
+    await chatService.allowance();
+    expect(get).toHaveBeenCalledWith("/chat/allowance");
+  });
 });

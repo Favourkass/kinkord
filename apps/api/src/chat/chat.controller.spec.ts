@@ -4,7 +4,9 @@ import type { AuthedRequest } from "../auth/auth.guard";
 import { ChatController } from "./chat.controller";
 import type { ChatService } from "./chat.service";
 
-const req = { user: { id: "u1" } } as unknown as AuthedRequest;
+const req = {
+  user: { id: "u1", email: "u1@example.com", emailVerified: true },
+} as unknown as AuthedRequest;
 
 function make() {
   const chat = {
@@ -12,6 +14,7 @@ function make() {
     history: vi.fn(async () => []),
     sendMessage: vi.fn(async () => ({ id: "m1" })),
     markRead: vi.fn(async () => undefined),
+    allowance: vi.fn(async () => ({ newChatsPerDay: 1, usedToday: 0, resetsAt: "x" })),
   };
   return { controller: new ChatController(chat as unknown as ChatService), chat };
 }
@@ -22,7 +25,18 @@ describe("ChatController", () => {
     await expect(controller.start(req, { userId: "u2" })).resolves.toEqual({
       conversationId: "c1",
     });
-    expect(chat.startDm).toHaveBeenCalledWith("u1", "u2");
+    // The whole session user: their verified email decides their limits.
+    expect(chat.startDm).toHaveBeenCalledWith(req.user, "u2");
+  });
+
+  it("reports today's new-chat allowance for the signed-in member", async () => {
+    const { controller, chat } = make();
+    await expect(controller.allowance(req)).resolves.toEqual({
+      newChatsPerDay: 1,
+      usedToday: 0,
+      resetsAt: "x",
+    });
+    expect(chat.allowance).toHaveBeenCalledWith(req.user);
   });
 
   it("refuses an empty message before the service sees it", async () => {
@@ -37,7 +51,7 @@ describe("ChatController", () => {
     const { controller, chat } = make();
     await controller.send(req, "c1", { body: "hi", media: [{ key: "posts/u9/secret.jpg" }] });
     // Unknown fields are dropped: only the text reaches the service.
-    expect(chat.sendMessage).toHaveBeenCalledWith("u1", "c1", { body: "hi" });
+    expect(chat.sendMessage).toHaveBeenCalledWith(req.user, "c1", { body: "hi" });
   });
 
   it("defaults the page size and passes the polling cursor", async () => {

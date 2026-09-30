@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  isNewChatLimit,
   mergeMessages,
+  newChatNotice,
   previewOf,
   toConversationRowVM,
   toPendingMessageVM,
@@ -93,5 +95,38 @@ describe("mergeMessages", () => {
     const at = "2026-09-28T10:00:00.000Z";
     const out = mergeMessages([msg("b", { createdAt: at })], [msg("a", { createdAt: at })]);
     expect(out.map((m) => m.id)).toEqual(["a", "b"]);
+  });
+});
+
+describe("newChatNotice", () => {
+  const limited = (usedToday: number) =>
+    ({ newChatsPerDay: 1, usedToday, resetsAt: "2026-09-30T23:00:00.000Z" }) as const;
+
+  it("hints while today's new chat is still free, and blocks once it's used", () => {
+    expect(newChatNotice({ empty: true, allowance: limited(0), refused: false })).toBe("hint");
+    expect(newChatNotice({ empty: true, allowance: limited(1), refused: false })).toBe("blocked");
+  });
+
+  it("says nothing once a thread has messages: replies aren't limited", () => {
+    expect(newChatNotice({ empty: false, allowance: limited(1), refused: true })).toBeNull();
+  });
+
+  it("says nothing to members without a limit, or before the allowance loads", () => {
+    const unlimited = { newChatsPerDay: null } as const;
+    expect(newChatNotice({ empty: true, allowance: unlimited, refused: false })).toBeNull();
+    expect(newChatNotice({ empty: true, allowance: null, refused: false })).toBeNull();
+  });
+
+  it("blocks after the server refused a first message, whatever it said before", () => {
+    expect(newChatNotice({ empty: true, allowance: limited(0), refused: true })).toBe("blocked");
+  });
+});
+
+describe("isNewChatLimit", () => {
+  it("recognises the API's refusal and nothing else", () => {
+    expect(isNewChatLimit({ code: "NEW_CHAT_LIMIT", message: "x" })).toBe(true);
+    expect(isNewChatLimit({ message: "You're sending messages too fast." })).toBe(false);
+    expect(isNewChatLimit(null)).toBe(false);
+    expect(isNewChatLimit("NEW_CHAT_LIMIT")).toBe(false);
   });
 });

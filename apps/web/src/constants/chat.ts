@@ -14,4 +14,7 @@ export const CHAT_COPY = {
   send: "Send",
   opening: "Opening conversation…",
   loadError: "Couldn't load this. Check your connection and try again.",
+  newChatHint: "You can start one new chat a day. Sending a message here uses today's.",
+  newChatLimit:
+    "You've already started a new chat today. You can message someone new after midnight. Replies in your existing chats aren't limited.",
 } as const;

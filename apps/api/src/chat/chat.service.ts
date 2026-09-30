@@ -7,21 +7,29 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from "@nestjs/common";
-import { and, asc, count, desc, eq, gt, inArray, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, gte, inArray, isNull, ne, sql } from "drizzle-orm";
 import { DRIZZLE, type Db } from "../db/db.module";
 import { conversation, conversationParticipant, message, profile, user } from "../db/schema";
 import { notBanned } from "../moderation/admins";
 import { PresenceService } from "../presence/presence.service";
 import { StorageService } from "../storage/storage.service";
-import type { ChatPeerDto, ConversationSummaryDto, MessageDto } from "./dto";
+import { chatDay, NEW_CHAT_LIMIT, newChatsPerDay } from "./allowance";
+import type { ChatAllowanceDto, ChatPeerDto, ConversationSummaryDto, MessageDto } from "./dto";
 
-/** New threads a member may open per day: enough to be social, too few to spam. */
+/**
+ * Threads a member may open per day, written in or not. The new-chat allowance
+ * is what limits reaching out; this only stops empty threads piling up.
+ */
 export const MAX_NEW_CONVERSATIONS_PER_DAY = 30;
 /** Messages a member may send per minute, across all their threads. */
 export const MAX_MESSAGES_PER_MINUTE = 30;
 const LIST_LIMIT = 50;
 
 type MessageRow = typeof message.$inferSelect;
+/** Who's asking: the session user, whose verified email decides their limits. */
+type Member = { id: string; email: string; emailVerified: boolean };
+/** The client or an open transaction: both run the same queries. */
+type Queryable = Db | Parameters<Parameters<Db["transaction"]>[0]>[0];
 
 function toDto(m: MessageRow): MessageDto {
   return {
@@ -55,7 +63,8 @@ export class ChatService {
     return [a, b].sort().join(":");
   }
 
-  async startDm(selfId: string, otherId: string): Promise<string> {
+  async startDm(self: Member, otherId: string): Promise<string> {
+    const selfId = self.id;
     if (selfId === otherId) throw new BadRequestException("You can't message yourself.");
     const [target] = await this.db
       .select({ id: user.id })
@@ -70,7 +79,7 @@ export class ChatService {
       .from(conversation)
       .where(eq(conversation.dmKey, key))
       .limit(1);
-    if (!existing) await this.assertCanOpenConversation(selfId);
+    if (!existing && newChatsPerDay(self) !== null) await this.assertCanOpenConversation(selfId);
 
     // One transaction, so a thread can never exist without both members in it.
     // Re-adding the members on an existing thread is a no-op, and repairs one
@@ -139,10 +148,11 @@ export class ChatService {
   }
 
   async sendMessage(
-    senderId: string,
+    sender: Member,
     conversationId: string,
     input: { body: string; clientId?: string },
   ): Promise<MessageDto & { clientId: string | null }> {
+    const senderId = sender.id;
     await this.assertMember(conversationId, senderId);
     const [peer] = await this.db
       .select({ userId: conversationParticipant.userId })
@@ -173,16 +183,87 @@ export class ChatService {
       );
     }
 
-    const [created] = await this.db
+    const limit = newChatsPerDay(sender);
+    if (limit !== null && !(await this.hasMessages(conversationId))) {
+      // A first message starts a new chat, which the daily allowance counts.
+      // The lock queues this member's first messages one at a time, so two
+      // sent at once can't both slip in under the limit.
+      return this.db.transaction(async (tx) => {
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`new-chat:${senderId}`}))`);
+        const day = chatDay(new Date());
+        if ((await this.chatsStartedSince(tx, senderId, day.start)) >= limit) {
+          throw new HttpException(
+            {
+              code: NEW_CHAT_LIMIT,
+              message:
+                "You've already started a new chat today. You can message someone new after midnight.",
+              resetsAt: day.end.toISOString(),
+            },
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
+        }
+        return this.insertMessage(tx, senderId, conversationId, input);
+      });
+    }
+    return this.insertMessage(this.db, senderId, conversationId, input);
+  }
+
+  private async insertMessage(
+    q: Queryable,
+    senderId: string,
+    conversationId: string,
+    input: { body: string; clientId?: string },
+  ): Promise<MessageDto & { clientId: string | null }> {
+    const [created] = await q
       .insert(message)
       .values({ conversationId, senderId, body: input.body })
       .returning();
     // Keeps the list ordered by activity without a join on message.
-    await this.db
+    await q
       .update(conversation)
       .set({ lastMessageAt: created.createdAt })
       .where(eq(conversation.id, conversationId));
     return { ...toDto(created), clientId: input.clientId ?? null };
+  }
+
+  private async hasMessages(conversationId: string): Promise<boolean> {
+    const [first] = await this.db
+      .select({ id: message.id })
+      .from(message)
+      .where(eq(message.conversationId, conversationId))
+      .limit(1);
+    return Boolean(first);
+  }
+
+  /**
+   * Chats this member started since a moment: messages they sent that were
+   * the first in their thread. Deleted ones still count, so deleting and
+   * resending can't win a second chat.
+   */
+  private async chatsStartedSince(q: Queryable, userId: string, since: Date): Promise<number> {
+    const [row] = await q
+      .select({ n: count() })
+      .from(message)
+      .where(
+        and(
+          eq(message.senderId, userId),
+          gte(message.createdAt, since),
+          sql`not exists (select 1 from "message" as "earlier" where "earlier"."conversation_id" = ${message.conversationId} and ("earlier"."created_at", "earlier"."id") < (${message.createdAt}, ${message.id}))`,
+        ),
+      );
+    return Number(row?.n ?? 0);
+  }
+
+  /** Today's new-chat allowance, so the app can say so before anyone types. */
+  async allowance(who: Member): Promise<ChatAllowanceDto> {
+    const limit = newChatsPerDay(who);
+    if (limit === null) return { newChatsPerDay: null };
+    const day = chatDay(new Date());
+    return {
+      newChatsPerDay: limit,
+      usedToday: await this.chatsStartedSince(this.db, who.id, day.start),
+      resetsAt: day.end.toISOString(),
+    };
   }
 
   /**
@@ -250,28 +331,39 @@ export class ChatService {
 
   /**
    * The inbox. Threads whose other member was suspended or deleted are left
-   * out: they can't be answered, and a block should read as gone.
+   * out: they can't be answered, and a block should read as gone. A thread
+   * nobody has written in yet belongs to whoever opened it: the other member
+   * first hears of it with the first message, which the daily allowance counts.
    */
   async listConversations(userId: string): Promise<ConversationSummaryDto[]> {
-    const summaries = await this.summaries(userId, null);
-    return summaries.filter((s) => s.peer !== null);
+    const rows = await this.summaries(userId, null);
+    return rows
+      .filter(
+        ({ summary, openedBy }) =>
+          summary.peer !== null && (summary.lastMessage !== null || openedBy === userId),
+      )
+      .map((r) => r.summary);
   }
 
   /** One thread's header: who it's with and whether they're around. */
   async conversation(userId: string, conversationId: string): Promise<ConversationSummaryDto> {
     await this.assertMember(conversationId, userId);
-    const [summary] = await this.summaries(userId, conversationId);
-    if (!summary) throw new NotFoundException("Conversation not found.");
-    return summary;
+    const [row] = await this.summaries(userId, conversationId);
+    if (!row) throw new NotFoundException("Conversation not found.");
+    return row.summary;
   }
 
   /** A fixed handful of queries however many threads there are, not one per row. */
-  private async summaries(userId: string, only: string | null): Promise<ConversationSummaryDto[]> {
+  private async summaries(
+    userId: string,
+    only: string | null,
+  ): Promise<Array<{ summary: ConversationSummaryDto; openedBy: string | null }>> {
     const mine = await this.db
       .select({
         id: conversation.id,
         kind: conversation.kind,
         lastMessageAt: conversation.lastMessageAt,
+        createdBy: conversation.createdBy,
       })
       .from(conversationParticipant)
       .innerJoin(conversation, eq(conversation.id, conversationParticipant.conversationId))
@@ -357,12 +449,15 @@ export class ChatService {
     const unreadByConv = new Map(unreadRows.map((u) => [u.conversationId, Number(u.unread)]));
 
     return mine.map((c) => ({
-      id: c.id,
-      kind: c.kind,
-      lastMessageAt: c.lastMessageAt.toISOString(),
-      peer: peerByConv.get(c.id) ?? null,
-      lastMessage: lastByConv.get(c.id) ?? null,
-      unreadCount: unreadByConv.get(c.id) ?? 0,
+      summary: {
+        id: c.id,
+        kind: c.kind,
+        lastMessageAt: c.lastMessageAt.toISOString(),
+        peer: peerByConv.get(c.id) ?? null,
+        lastMessage: lastByConv.get(c.id) ?? null,
+        unreadCount: unreadByConv.get(c.id) ?? 0,
+      },
+      openedBy: c.createdBy,
     }));
   }
 }

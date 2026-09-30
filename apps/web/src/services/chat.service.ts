@@ -2,7 +2,12 @@
  * Chat API. Delivery is by asking: an open thread polls for anything newer than
  * its last message, because the API's host can't hold WebSockets open.
  */
-import type { ChatMessagePM, ConversationSummaryPM, SentMessagePM } from "@/domain/chat";
+import type {
+  ChatAllowancePM,
+  ChatMessagePM,
+  ConversationSummaryPM,
+  SentMessagePM,
+} from "@/domain/chat";
 import { api } from "./apiClient";
 
 const thread = (id: string) => `/chat/conversations/${encodeURIComponent(id)}`;
@@ -29,6 +34,9 @@ export const chatService = {
 
   markRead: (id: string, messageId: string) =>
     api.post<{ ok: true }>(`${thread(id)}/read`, { messageId }),
+
+  /** Today's new-chat allowance: how many first messages to someone new are left. */
+  allowance: () => api.get<ChatAllowancePM>("/chat/allowance"),
 
   me: () => api.get<{ id: string }>("/me"),
 };

@@ -59,3 +59,10 @@ export interface ConversationSummaryDto {
   lastMessage: MessageDto | null;
   unreadCount: number;
 }
+
+/**
+ * How many new chats (first messages to someone) the member may start today.
+ * The super admins have no limit.
+ */
+export type ChatAllowanceDto =
+  { newChatsPerDay: null } | { newChatsPerDay: number; usedToday: number; resetsAt: string };

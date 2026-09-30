@@ -41,6 +41,7 @@ export default function ThreadPage({ params }: { params: Promise<{ id: string }>
         sendError={thread.sendError}
         unavailable={thread.unavailable}
         unavailableText={CHAT_COPY.unavailable}
+        newChat={thread.newChat}
         onlineLabel={CHAT_COPY.online}
         backHref={backHref}
         backLabel={CHAT_COPY.back}

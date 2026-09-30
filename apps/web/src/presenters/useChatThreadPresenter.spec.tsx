@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { CHAT_COPY } from "@/constants/chat";
 import type { ChatMessagePM, ConversationSummaryPM } from "@/domain/chat";
+import { ApiError } from "@/services/apiClient";
 import { THREAD_POLL_MS, useChatThreadPresenter } from "./useChatThreadPresenter";
 
 vi.mock("./useHomePresenter", () => ({ useHomePresenter: () => ({}) }));
@@ -19,6 +21,7 @@ const svc = {
   history: vi.fn(),
   send: vi.fn(),
   markRead: vi.fn(),
+  allowance: vi.fn(),
 };
 vi.mock("@/services/chat.service", () => ({
   chatService: new Proxy(
@@ -65,6 +68,11 @@ describe("useChatThreadPresenter", () => {
     svc.conversation.mockResolvedValue(header());
     svc.history.mockResolvedValue([msg("m1", "u2", 1), msg("m2", "u1", 2)]);
     svc.markRead.mockResolvedValue({ ok: true });
+    svc.allowance.mockResolvedValue({
+      newChatsPerDay: 1,
+      usedToday: 0,
+      resetsAt: "2026-09-30T23:00:00.000Z",
+    });
   });
   afterEach(cleanup);
 
@@ -151,5 +159,69 @@ describe("useChatThreadPresenter", () => {
     const { result } = await ready();
     expect(result.current.thread.error).toBe("Conversation not found.");
     expect(polls.get(THREAD_POLL_MS)?.enabled).toBe(false);
+  });
+
+  describe("the daily new-chat allowance", () => {
+    it("hints that a first message here uses today's new chat", async () => {
+      svc.history.mockResolvedValue([]);
+      const { result } = await ready();
+      await waitFor(() =>
+        expect(result.current.thread.newChat).toEqual({
+          text: CHAT_COPY.newChatHint,
+          blocking: false,
+        }),
+      );
+    });
+
+    it("replaces the composer with a notice once today's new chat is used", async () => {
+      svc.history.mockResolvedValue([]);
+      svc.allowance.mockResolvedValue({
+        newChatsPerDay: 1,
+        usedToday: 1,
+        resetsAt: "2026-09-30T23:00:00.000Z",
+      });
+      const { result } = await ready();
+      await waitFor(() =>
+        expect(result.current.thread.newChat).toEqual({
+          text: CHAT_COPY.newChatLimit,
+          blocking: true,
+        }),
+      );
+    });
+
+    it("says nothing to members without a limit", async () => {
+      svc.history.mockResolvedValue([]);
+      svc.allowance.mockResolvedValue({ newChatsPerDay: null });
+      const { result } = await ready();
+      await waitFor(() => expect(svc.allowance).toHaveBeenCalled());
+      expect(result.current.thread.newChat).toBeNull();
+    });
+
+    it("doesn't ask in a thread that already has messages: replies aren't limited", async () => {
+      const { result } = await ready();
+      expect(svc.allowance).not.toHaveBeenCalled();
+      expect(result.current.thread.newChat).toBeNull();
+    });
+
+    it("drops the hint once the first message is on its way", async () => {
+      svc.history.mockResolvedValue([]);
+      svc.send.mockReturnValue(new Promise(() => {}));
+      const { result } = await ready();
+      await waitFor(() => expect(result.current.thread.newChat?.blocking).toBe(false));
+      act(() => result.current.send("hi"));
+      expect(result.current.thread.newChat).toBeNull();
+    });
+
+    it("turns a first message the server refuses into the notice, not a retry", async () => {
+      svc.history.mockResolvedValue([]);
+      svc.send.mockRejectedValueOnce(
+        new ApiError(429, { code: "NEW_CHAT_LIMIT", message: "Already used today." }),
+      );
+      const { result } = await ready();
+      act(() => result.current.send("hi"));
+      await waitFor(() => expect(result.current.thread.newChat?.blocking).toBe(true));
+      expect(result.current.thread.messages).toEqual([]);
+      expect(result.current.thread.sendError).toBeNull();
+    });
   });
 });
