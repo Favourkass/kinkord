@@ -4,6 +4,7 @@ import { BillingStack } from "../lib/billing-stack";
 import { NetworkStack } from "../lib/network-stack";
 import { DataStack } from "../lib/data-stack";
 import { ApiBaseStack, ApiStack } from "../lib/api-stack";
+import { DnsRecordsStack } from "../lib/dns-records-stack";
 import { RealtimeStack } from "../lib/realtime-stack";
 import { WebStack } from "../lib/web-stack";
 
@@ -46,3 +47,10 @@ new RealtimeStack(app, "KinkordRealtime", {
 });
 
 new WebStack(app, "KinkordWeb", { env: primary });
+
+// Records in the kinkord.com zone, attached by id so they deploy without
+// KinkordFoundation (which has drifted from the code).
+new DnsRecordsStack(app, "KinkordDnsRecords", {
+  env: primary,
+  hostedZoneId: "Z1029069WMDN1XV54QJU",
+});
