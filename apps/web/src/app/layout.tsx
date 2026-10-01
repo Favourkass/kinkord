@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { SEO_COPY, SITE_URL } from "@/constants/seo";
 import { Playfair_Display, Inter } from "next/font/google";
 import { themeInitScript } from "@/util/theme";
 import { pwaInitScript } from "@/util/pwaInit";
@@ -26,12 +27,14 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
+// Site-wide defaults. No canonical here: a page without its own would inherit
+// it and tell search engines it's a copy of the homepage.
 export const metadata: Metadata = {
-  title: "Kinkord — Where Kinksters Connect",
-  description:
-    "Where kinksters connect, explore their interests, build meaningful relationships, and find a community where they truly belong.",
+  metadataBase: new URL(SITE_URL),
+  title: SEO_COPY.site.title,
+  description: SEO_COPY.site.description,
   applicationName: "Kinkord",
-  keywords: ["kinkord", "lifestyle community", "adult community", "consent", "education"],
+  keywords: [...SEO_COPY.site.keywords],
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -48,11 +51,13 @@ export const metadata: Metadata = {
     apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
   openGraph: {
-    title: "Kinkord — Where Kinksters Connect",
-    description:
-      "Where kinksters connect, explore their interests, build meaningful relationships, and find a community where they truly belong.",
     type: "website",
+    siteName: "Kinkord",
+    locale: "en_NG",
+    title: SEO_COPY.site.title,
+    description: SEO_COPY.site.description,
   },
+  twitter: { card: "summary", title: SEO_COPY.site.title, description: SEO_COPY.site.description },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

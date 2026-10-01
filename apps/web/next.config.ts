@@ -1,5 +1,23 @@
 import type { NextConfig } from "next";
 
+/** First path segments of the members' area, kept out of search results. */
+const PRIVATE_SECTIONS = [
+  "home",
+  "messages",
+  "members",
+  "u",
+  "p",
+  "profile",
+  "settings",
+  "saved",
+  "notifications",
+  "moderation",
+  "offline",
+  "verify-email",
+  "reset-password",
+  "forgot-password",
+];
+
 const nextConfig: NextConfig = {
   // Self-contained server bundle for the App Runner image.
   output: "standalone",
@@ -8,6 +26,14 @@ const nextConfig: NextConfig = {
   images: { unoptimized: true },
   async headers() {
     return [
+      {
+        // The members' area never belongs in search results: profiles, posts,
+        // chats and the directory are private, and a kinkster can be outed by
+        // a search result. A header covers every page under these sections,
+        // including ones that render in the browser.
+        source: `/:section(${PRIVATE_SECTIONS.join("|")})/:rest*`,
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      },
       {
         // Versioned brand assets (kinkord-splash-v1.*): ship a new animation as
         // -v2 rather than overwriting, so this can be cached for good.
