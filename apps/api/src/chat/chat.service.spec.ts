@@ -1,4 +1,9 @@
-import { BadRequestException, HttpException, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ForbiddenException,
+  HttpException,
+  NotFoundException,
+} from "@nestjs/common";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { conversation, conversationParticipant, message } from "../db/schema";
 import type { PushService } from "../push/push.service";
@@ -6,9 +11,11 @@ import type { RealtimeService } from "../realtime/realtime.service";
 import type { StorageService } from "../storage/storage.service";
 import { NEW_CHAT_LIMIT } from "./allowance";
 import {
+  CHAT_PHOTO_MAX_MB,
   ChatService,
   MAX_MESSAGES_PER_MINUTE,
   MAX_NEW_CONVERSATIONS_PER_DAY,
+  PHOTOS_LOCKED,
 } from "./chat.service";
 
 /**
@@ -49,6 +56,14 @@ function make(answers: unknown[]) {
     presignDownload: vi.fn(
       async (key: string, variant?: string) => `https://media/${key}?${variant}`,
     ),
+    presignUpload: vi.fn(async (key: string) => `https://upload/${key}`),
+    // Every upload exists as a small JPEG unless a spec says otherwise.
+    describe: vi.fn(async (): Promise<{ size: number; contentType: string | null } | null> => ({
+      size: 1000,
+      contentType: "image/jpeg",
+    })),
+    copy: vi.fn(async () => undefined),
+    remove: vi.fn(async () => undefined),
   };
   const realtime = { notify: vi.fn(async () => undefined) };
   const push = { newMessage: vi.fn() };
@@ -182,6 +197,7 @@ describe("ChatService.sendMessage", () => {
       conversationId: "c1",
       senderId: "u1",
       body: "hi",
+      photo: null,
       createdAt: at.toISOString(),
       editedAt: null,
       clientId: "tmp-1",
@@ -435,11 +451,227 @@ describe("ChatService.conversation", () => {
       [],
       [],
     ]);
-    await expect(service.conversation("u1", "c1")).resolves.toMatchObject({ id: "c1", peer: null });
+    await expect(service.conversation("u1", "c1")).resolves.toMatchObject({
+      id: "c1",
+      peer: null,
+      canSendPhotos: false,
+    });
   });
 
   it("is a 404 for a thread you aren't in", async () => {
     const { service } = make([[]]);
     await expect(service.conversation("u1", "c1")).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe("chat photos", () => {
+  const photoKey = "chat/c1/u1/0b5c6c3e-1d0e-4c55-9d4e-3c1f2a9b8e71.jpg";
+  /** The database's answers up to the photo check, for u1 replying to u2 in c1. */
+  const upToPhoto = [[{ userId: "u1" }], [{ userId: "u2" }], [{ n: 0 }]];
+  const peer = {
+    conversationId: "c1",
+    userId: "u2",
+    username: "ada",
+    name: "Adaeze Obi",
+    displayName: "Ada",
+    avatarKey: null,
+    lastSeenAt: null,
+  };
+
+  describe("upload slots", () => {
+    it("are a 404 for a thread you aren't in", async () => {
+      const { service } = make([[]]);
+      await expect(service.presignPhotoUpload("u1", "c1", "image/jpeg")).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it("stay shut until the other member has written in the thread", async () => {
+      const { service, storage } = make([[{ userId: "u1" }], []]);
+      const err = await service.presignPhotoUpload("u1", "c1", "image/jpeg").catch((e) => e);
+      expect(err).toBeInstanceOf(ForbiddenException);
+      expect((err as Error).message).toBe(PHOTOS_LOCKED);
+      expect(storage.presignUpload).not.toHaveBeenCalled();
+    });
+
+    it("refuse a file that isn't a photo, or is over the size cap", async () => {
+      const gif = make([[{ userId: "u1" }], [{ id: "m1" }]]);
+      await expect(gif.service.presignPhotoUpload("u1", "c1", "image/gif")).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      const huge = make([[{ userId: "u1" }], [{ id: "m1" }]]);
+      await expect(
+        huge.service.presignPhotoUpload(
+          "u1",
+          "c1",
+          "image/jpeg",
+          CHAT_PHOTO_MAX_MB * 1024 * 1024 + 1,
+        ),
+      ).rejects.toThrow(`max ${CHAT_PHOTO_MAX_MB}MB`);
+    });
+
+    it("sit under the uploader's own prefix for this thread, one per stored size", async () => {
+      const { service, storage } = make([[{ userId: "u1" }], [{ id: "m1" }]]);
+      const slot = await service.presignPhotoUpload("u1", "c1", "image/jpeg", 2048);
+      expect(slot.key).toMatch(/^chat\/c1\/u1\/[0-9a-f-]{36}\.jpg$/);
+      const base = slot.key.slice(0, -".jpg".length);
+      expect(slot).toMatchObject({
+        uploadUrl: `https://upload/${slot.key}`,
+        variantUploadUrls: {
+          sm: `https://upload/${base}_sm.jpg`,
+          md: `https://upload/${base}_md.jpg`,
+        },
+        maxSizeMb: CHAT_PHOTO_MAX_MB,
+      });
+      // The size the browser declared is signed into the original's slot.
+      expect(storage.presignUpload).toHaveBeenCalledWith(slot.key, "image/jpeg", 2048);
+    });
+  });
+
+  describe("sending", () => {
+    it("won't take a photo before the other member has written", async () => {
+      const { service, storage, calls } = make([...upToPhoto, []]);
+      await expect(
+        service.sendMessage(member("u1"), "c1", { body: "", photoKey }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(storage.describe).not.toHaveBeenCalled();
+      expect(calls.some((c) => c.op === "insert")).toBe(false);
+    });
+
+    it("only accepts a photo the sender uploaded for this thread", async () => {
+      for (const key of ["chat/c1/u2/a.jpg", "chat/c9/u1/a.jpg", "posts/u1/a.jpg"]) {
+        const { service, storage } = make([...upToPhoto, [{ id: "m0" }]]);
+        await expect(
+          service.sendMessage(member("u1"), "c1", { body: "", photoKey: key }),
+        ).rejects.toThrow("photo: unknown upload");
+        expect(storage.describe).not.toHaveBeenCalled();
+      }
+    });
+
+    it("refuses an upload that isn't there", async () => {
+      const { service, storage } = make([...upToPhoto, [{ id: "m0" }]]);
+      storage.describe.mockResolvedValueOnce(null);
+      await expect(service.sendMessage(member("u1"), "c1", { body: "", photoKey })).rejects.toThrow(
+        "photo: upload not found",
+      );
+    });
+
+    it("deletes and refuses an upload that's too big or isn't a photo", async () => {
+      const big = make([...upToPhoto, [{ id: "m0" }]]);
+      big.storage.describe.mockResolvedValueOnce({
+        size: CHAT_PHOTO_MAX_MB * 1024 * 1024 + 1,
+        contentType: "image/jpeg",
+      });
+      await expect(
+        big.service.sendMessage(member("u1"), "c1", { body: "", photoKey }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(big.storage.remove).toHaveBeenCalledWith(photoKey);
+
+      const html = make([...upToPhoto, [{ id: "m0" }]]);
+      html.storage.describe.mockResolvedValueOnce({ size: 1000, contentType: "text/html" });
+      await expect(
+        html.service.sendMessage(member("u1"), "c1", { body: "", photoKey }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(html.storage.remove).toHaveBeenCalledWith(photoKey);
+    });
+
+    it("saves the photo with its caption and returns a link to every size", async () => {
+      const saved = row("m1", { senderId: "u1", body: "look", photoKey });
+      const { service, storage, after } = make([
+        ...upToPhoto,
+        [{ id: "m0" }], // the other member has written here
+        [{ id: "m0" }], // the thread has messages: not a new chat
+        [saved],
+        undefined,
+      ]);
+      const sent = await service.sendMessage(member("u1"), "c1", { body: "look", photoKey });
+      expect(after("insert", message, "values")).toEqual({
+        conversationId: "c1",
+        senderId: "u1",
+        body: "look",
+        photoKey,
+      });
+      expect(sent.photo).toEqual({
+        previewUrl: `https://media/${photoKey}?sm`,
+        thumbUrl: `https://media/${photoKey}?md`,
+        url: `https://media/${photoKey}?undefined`,
+      });
+      // Every stored size was already there.
+      expect(storage.copy).not.toHaveBeenCalled();
+    });
+
+    it("stores a photo sent without a caption with no body", async () => {
+      const saved = row("m1", { senderId: "u1", body: null, photoKey });
+      const { service, after } = make([
+        ...upToPhoto,
+        [{ id: "m0" }],
+        [{ id: "m0" }],
+        [saved],
+        undefined,
+      ]);
+      const sent = await service.sendMessage(member("u1"), "c1", { body: "", photoKey });
+      expect(after("insert", message, "values")).toMatchObject({ body: null, photoKey });
+      expect(sent.body).toBe("");
+    });
+
+    it("fills a stored size the upload is missing by copying the original", async () => {
+      const saved = row("m1", { senderId: "u1", body: null, photoKey });
+      const { service, storage } = make([
+        ...upToPhoto,
+        [{ id: "m0" }],
+        [{ id: "m0" }],
+        [saved],
+        undefined,
+      ]);
+      const small = photoKey.replace(".jpg", "_sm.jpg");
+      storage.describe.mockImplementation(async (key?: unknown) =>
+        key === small ? null : { size: 1000, contentType: "image/jpeg" },
+      );
+      await service.sendMessage(member("u1"), "c1", { body: "", photoKey });
+      expect(storage.copy).toHaveBeenCalledTimes(1);
+      expect(storage.copy).toHaveBeenCalledWith(photoKey, small);
+    });
+  });
+
+  it("links the photo of a photo message in the thread, and none for text", async () => {
+    const theirs = "chat/c1/u2/p.jpg";
+    const { service } = make([
+      [{ userId: "u1" }],
+      [row("m2", { photoKey: theirs, body: null }), row("m1")],
+    ]);
+    const page = await service.history("u1", "c1", { limit: 50 });
+    expect(page.map((m) => [m.id, m.body, m.photo?.thumbUrl ?? null])).toEqual([
+      ["m1", "hello", null],
+      ["m2", "", `https://media/${theirs}?md`],
+    ]);
+  });
+
+  describe("the thread header", () => {
+    const header = (last: ReturnType<typeof row>) => [
+      [{ userId: "u1" }],
+      [{ id: "c1", kind: "dm", lastMessageAt: at, createdBy: "u2" }],
+      [peer],
+      [last],
+      [],
+    ];
+
+    it("opens photos when the other member wrote last, without asking again", async () => {
+      const { service, left } = make(header(row("m1", { senderId: "u2" })));
+      await expect(service.conversation("u1", "c1")).resolves.toMatchObject({
+        canSendPhotos: true,
+      });
+      expect(left()).toBe(0);
+    });
+
+    it("asks whether the other member ever wrote when the last message is the viewer's", async () => {
+      const replied = make([...header(row("m2", { senderId: "u1" })), [{ id: "m1" }]]);
+      await expect(replied.service.conversation("u1", "c1")).resolves.toMatchObject({
+        canSendPhotos: true,
+      });
+      const waiting = make([...header(row("m2", { senderId: "u1" })), []]);
+      await expect(waiting.service.conversation("u1", "c1")).resolves.toMatchObject({
+        canSendPhotos: false,
+      });
+    });
   });
 });

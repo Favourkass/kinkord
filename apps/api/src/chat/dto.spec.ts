@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { historyQuerySchema, MESSAGE_BODY_MAX, sendMessageSchema, startDmSchema } from "./dto";
+import {
+  historyQuerySchema,
+  MESSAGE_BODY_MAX,
+  photoUploadSchema,
+  sendMessageSchema,
+  startDmSchema,
+} from "./dto";
 
 describe("sendMessageSchema", () => {
   it("trims the text and refuses an empty message", () => {
@@ -13,9 +19,41 @@ describe("sendMessageSchema", () => {
     );
   });
 
-  it("drops attachment keys: nothing yet proves who uploaded them", () => {
+  it("drops fields it doesn't know, like a post's media list", () => {
     const parsed = sendMessageSchema.parse({ body: "hi", media: [{ key: "posts/u9/a.jpg" }] });
     expect(parsed).toEqual({ body: "hi" });
+  });
+
+  it("takes a photo on its own, or with the text as its caption", () => {
+    expect(sendMessageSchema.parse({ photoKey: " chat/c1/u1/a.jpg " })).toEqual({
+      body: "",
+      photoKey: "chat/c1/u1/a.jpg",
+    });
+    expect(sendMessageSchema.parse({ body: "look", photoKey: "chat/c1/u1/a.jpg" })).toMatchObject({
+      body: "look",
+      photoKey: "chat/c1/u1/a.jpg",
+    });
+  });
+
+  it("refuses a message with neither text nor a photo", () => {
+    const parsed = sendMessageSchema.safeParse({ body: " ", photoKey: "" });
+    expect(parsed.success).toBe(false);
+    expect(sendMessageSchema.safeParse({}).error?.issues[0]?.message).toBe(
+      "Write a message first.",
+    );
+  });
+});
+
+describe("photoUploadSchema", () => {
+  it("needs the photo's type, and takes its size when the browser knows it", () => {
+    expect(photoUploadSchema.parse({ contentType: "image/jpeg", contentLength: 2048 })).toEqual({
+      contentType: "image/jpeg",
+      contentLength: 2048,
+    });
+    expect(photoUploadSchema.safeParse({}).success).toBe(false);
+    expect(
+      photoUploadSchema.safeParse({ contentType: "image/jpeg", contentLength: 0 }).success,
+    ).toBe(false);
   });
 });
 

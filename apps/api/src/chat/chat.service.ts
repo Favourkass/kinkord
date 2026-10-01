@@ -1,5 +1,7 @@
+import { randomUUID } from "node:crypto";
 import {
   BadRequestException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Inject,
@@ -14,9 +16,22 @@ import { notBanned } from "../moderation/admins";
 import { PresenceService } from "../presence/presence.service";
 import { PushService } from "../push/push.service";
 import { RealtimeService } from "../realtime/realtime.service";
-import { StorageService } from "../storage/storage.service";
+import {
+  IMAGE_VARIANTS,
+  StorageService,
+  variantKey,
+  type ImageVariant,
+} from "../storage/storage.service";
 import { chatDay, NEW_CHAT_LIMIT, newChatsPerDay } from "./allowance";
-import type { ChatAllowanceDto, ChatPeerDto, ConversationSummaryDto, MessageDto } from "./dto";
+import type {
+  ChatAllowanceDto,
+  ChatPeerDto,
+  ChatPhotoDto,
+  ConversationSummaryDto,
+  ConversationThreadDto,
+  MessageDto,
+  SendMessageInput,
+} from "./dto";
 
 /**
  * Threads a member may open per day, written in or not. The new-chat allowance
@@ -27,22 +42,28 @@ export const MAX_NEW_CONVERSATIONS_PER_DAY = 30;
 export const MAX_MESSAGES_PER_MINUTE = 30;
 const LIST_LIMIT = 50;
 
+/** A chat photo opens full screen, so it gets the same budget as a post photo. */
+export const CHAT_PHOTO_MAX_MB = 10;
+const photoMaxBytes = CHAT_PHOTO_MAX_MB * 1024 * 1024;
+const PHOTO_TYPES: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+/** `chat/<conversationId>/<senderId>/<uuid>.jpg`: who uploaded it, for which thread. */
+export const CHAT_PHOTO_PREFIX = "chat";
+const photoPrefix = (conversationId: string, userId: string) =>
+  `${CHAT_PHOTO_PREFIX}/${conversationId}/${userId}/`;
+/** Photos open up once the other member has written in the thread. */
+export const PHOTOS_LOCKED = "You can send photos once they've written to you.";
+const photoTooLarge = () => `Photo is too large — max ${CHAT_PHOTO_MAX_MB}MB.`;
+const photoTypes = () => `contentType must be one of: ${Object.keys(PHOTO_TYPES).join(", ")}`;
+
 type MessageRow = typeof message.$inferSelect;
 /** Who's asking: the session user, whose verified email decides their limits. */
 type Member = { id: string; email: string; emailVerified: boolean };
 /** The client or an open transaction: both run the same queries. */
 type Queryable = Db | Parameters<Parameters<Db["transaction"]>[0]>[0];
-
-function toDto(m: MessageRow): MessageDto {
-  return {
-    id: m.id,
-    conversationId: m.conversationId,
-    senderId: m.senderId,
-    body: m.body ?? "",
-    createdAt: m.createdAt.toISOString(),
-    editedAt: m.editedAt?.toISOString() ?? null,
-  };
-}
 
 /** A sortable, unique position for a message: time first, id to break ties. */
 function positionOf(id: string) {
@@ -154,7 +175,7 @@ export class ChatService {
   async sendMessage(
     sender: Member,
     conversationId: string,
-    input: { body: string; clientId?: string },
+    input: SendMessageInput,
   ): Promise<MessageDto & { clientId: string | null }> {
     const senderId = sender.id;
     await this.assertMember(conversationId, senderId);
@@ -186,6 +207,10 @@ export class ChatService {
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
+    if (input.photoKey) {
+      await this.assertPhotosAllowed(conversationId, senderId);
+      await this.verifyPhoto(senderId, conversationId, input.photoKey);
+    }
 
     const limit = newChatsPerDay(sender);
     const saved =
@@ -207,7 +232,7 @@ export class ChatService {
   private startChat(
     senderId: string,
     conversationId: string,
-    input: { body: string; clientId?: string },
+    input: SendMessageInput,
     limit: number,
   ): Promise<MessageDto & { clientId: string | null }> {
     return this.db.transaction(async (tx) => {
@@ -232,18 +257,23 @@ export class ChatService {
     q: Queryable,
     senderId: string,
     conversationId: string,
-    input: { body: string; clientId?: string },
+    input: SendMessageInput,
   ): Promise<MessageDto & { clientId: string | null }> {
     const [created] = await q
       .insert(message)
-      .values({ conversationId, senderId, body: input.body })
+      .values({
+        conversationId,
+        senderId,
+        body: input.body || null,
+        ...(input.photoKey ? { photoKey: input.photoKey } : {}),
+      })
       .returning();
     // Keeps the list ordered by activity without a join on message.
     await q
       .update(conversation)
       .set({ lastMessageAt: created.createdAt })
       .where(eq(conversation.id, conversationId));
-    return { ...toDto(created), clientId: input.clientId ?? null };
+    return { ...(await this.toDto(created)), clientId: input.clientId ?? null };
   }
 
   private async hasMessages(conversationId: string): Promise<boolean> {
@@ -324,7 +354,7 @@ export class ChatService {
           : [desc(message.createdAt), desc(message.id)]),
       )
       .limit(opts.limit);
-    return (opts.after ? rows : rows.reverse()).map(toDto);
+    return Promise.all((opts.after ? rows : rows.reverse()).map((m) => this.toDto(m)));
   }
 
   /** Moves this member's read pointer forward to a message; never backwards. */
@@ -365,12 +395,21 @@ export class ChatService {
       .map((r) => r.summary);
   }
 
-  /** One thread's header: who it's with and whether they're around. */
-  async conversation(userId: string, conversationId: string): Promise<ConversationSummaryDto> {
+  /**
+   * One thread's header: who it's with, whether they're around, and whether
+   * the composer may offer photos. A last message from the other member
+   * already answers that, without another query.
+   */
+  async conversation(userId: string, conversationId: string): Promise<ConversationThreadDto> {
     await this.assertMember(conversationId, userId);
     const [row] = await this.summaries(userId, conversationId);
     if (!row) throw new NotFoundException("Conversation not found.");
-    return row.summary;
+    const { peer, lastMessage } = row.summary;
+    const canSendPhotos =
+      peer !== null &&
+      ((lastMessage !== null && lastMessage.senderId !== userId) ||
+        (await this.peerHasWritten(conversationId, userId)));
+    return { ...row.summary, canSendPhotos };
   }
 
   /** A fixed handful of queries however many threads there are, not one per row. */
@@ -465,7 +504,11 @@ export class ChatService {
         ),
       ),
     );
-    const lastByConv = new Map(lastRows.map((m) => [m.conversationId, toDto(m)]));
+    const lastByConv = new Map(
+      await Promise.all(
+        lastRows.map(async (m) => [m.conversationId, await this.toDto(m)] as const),
+      ),
+    );
     const unreadByConv = new Map(unreadRows.map((u) => [u.conversationId, Number(u.unread)]));
 
     return mine.map((c) => ({
@@ -479,5 +522,112 @@ export class ChatService {
       },
       openedBy: c.createdBy,
     }));
+  }
+
+  /**
+   * A slot to upload one photo into before sending it: the original, plus a
+   * slot per stored size, as for a post photo. Only a member of the thread
+   * gets one, and only once photos are open there.
+   */
+  async presignPhotoUpload(
+    userId: string,
+    conversationId: string,
+    contentType: string,
+    contentLength?: number,
+  ) {
+    await this.assertMember(conversationId, userId);
+    await this.assertPhotosAllowed(conversationId, userId);
+    const ext = PHOTO_TYPES[contentType];
+    if (!ext) throw new BadRequestException(photoTypes());
+    if (contentLength !== undefined && contentLength > photoMaxBytes) {
+      throw new BadRequestException(photoTooLarge());
+    }
+    const key = `${photoPrefix(conversationId, userId)}${randomUUID()}.${ext}`;
+    const [uploadUrl, ...variantUrls] = await Promise.all([
+      this.storage.presignUpload(key, contentType, contentLength),
+      ...IMAGE_VARIANTS.map((v) => this.storage.presignUpload(variantKey(key, v), contentType)),
+    ]);
+    const variantUploadUrls = Object.fromEntries(
+      IMAGE_VARIANTS.map((v, i) => [v, variantUrls[i]]),
+    ) as Record<ImageVariant, string>;
+    return {
+      key,
+      uploadUrl,
+      variantUploadUrls,
+      expiresInSeconds: 600,
+      maxSizeMb: CHAT_PHOTO_MAX_MB,
+    };
+  }
+
+  /** Whether the other member has written in this thread. */
+  private async peerHasWritten(conversationId: string, userId: string): Promise<boolean> {
+    const [row] = await this.db
+      .select({ id: message.id })
+      .from(message)
+      .where(and(eq(message.conversationId, conversationId), ne(message.senderId, userId)))
+      .limit(1);
+    return Boolean(row);
+  }
+
+  /**
+   * Photos open up once the other member has written in the thread, so nobody
+   * gets a photo from someone they've never answered.
+   */
+  private async assertPhotosAllowed(conversationId: string, userId: string): Promise<void> {
+    if (!(await this.peerHasWritten(conversationId, userId))) {
+      throw new ForbiddenException(PHOTOS_LOCKED);
+    }
+  }
+
+  /**
+   * A key only becomes a message's photo once S3 confirms the upload exists,
+   * sits under the sender's own prefix for this thread, and is an allowed
+   * image within the size cap. The prefix check is the important one: without
+   * it a member could attach, and so get a link to, somebody else's photo.
+   */
+  private async verifyPhoto(senderId: string, conversationId: string, key: string) {
+    if (!key.startsWith(photoPrefix(conversationId, senderId))) {
+      throw new BadRequestException("photo: unknown upload");
+    }
+    const info = await this.storage.describe(key);
+    if (!info) throw new BadRequestException("photo: upload not found");
+    if (info.size > photoMaxBytes) {
+      await this.storage.remove(key);
+      throw new BadRequestException(photoTooLarge());
+    }
+    if (!info.contentType || !PHOTO_TYPES[info.contentType]) {
+      await this.storage.remove(key);
+      throw new BadRequestException(photoTypes());
+    }
+    // An upload missing a stored size gets it by copy, so the thread never
+    // asks for an object that isn't there.
+    await Promise.all(
+      IMAGE_VARIANTS.map(async (v) => {
+        const target = variantKey(key, v);
+        if (!(await this.storage.describe(target))) await this.storage.copy(key, target);
+      }),
+    );
+  }
+
+  private async toDto(m: MessageRow): Promise<MessageDto> {
+    return {
+      id: m.id,
+      conversationId: m.conversationId,
+      senderId: m.senderId,
+      body: m.body ?? "",
+      photo: m.photoKey ? await this.photoLinks(m.photoKey) : null,
+      createdAt: m.createdAt.toISOString(),
+      editedAt: m.editedAt?.toISOString() ?? null,
+    };
+  }
+
+  /** Links to every size the thread shows; signed per hour, so the browser caches them. */
+  private async photoLinks(key: string): Promise<ChatPhotoDto> {
+    const [previewUrl, thumbUrl, url] = await Promise.all([
+      this.storage.presignDownload(key, "sm"),
+      this.storage.presignDownload(key, "md"),
+      this.storage.presignDownload(key),
+    ]);
+    return { previewUrl, thumbUrl, url };
   }
 }

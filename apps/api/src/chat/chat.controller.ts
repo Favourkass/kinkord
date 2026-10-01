@@ -14,7 +14,13 @@ import type { z } from "zod";
 import { AuthGuard, type AuthedRequest } from "../auth/auth.guard";
 import { RealtimeService } from "../realtime/realtime.service";
 import { ChatService } from "./chat.service";
-import { historyQuerySchema, markReadSchema, sendMessageSchema, startDmSchema } from "./dto";
+import {
+  historyQuerySchema,
+  markReadSchema,
+  photoUploadSchema,
+  sendMessageSchema,
+  startDmSchema,
+} from "./dto";
 
 function parse<S extends z.ZodTypeAny>(schema: S, input: unknown): z.infer<S> {
   const parsed = schema.safeParse(input ?? {});
@@ -85,6 +91,20 @@ export class ChatController {
     @Body() body: unknown,
   ) {
     return this.chat.sendMessage(req.user, id, parse(sendMessageSchema, body));
+  }
+
+  /**
+   * A slot to upload one photo into, before sending it. Refused (403) until
+   * the other member has written in the thread.
+   */
+  @Post("conversations/:id/photo-upload-url")
+  async photoUpload(
+    @Req() req: AuthedRequest,
+    @Param("id", new ParseUUIDPipe()) id: string,
+    @Body() body: unknown,
+  ) {
+    const { contentType, contentLength } = parse(photoUploadSchema, body);
+    return this.chat.presignPhotoUpload(req.user.id, id, contentType, contentLength);
   }
 
   @Post("conversations/:id/read")

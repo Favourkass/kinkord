@@ -17,6 +17,7 @@ const msg = (id: string, over: Partial<ChatMessagePM> = {}): ChatMessagePM => ({
   conversationId: "c1",
   senderId: "u2",
   body: "hello",
+  photo: null,
   createdAt: "2026-09-28T10:00:00.000Z",
   editedAt: null,
   ...over,
@@ -30,6 +31,64 @@ const summary = (over: Partial<ConversationSummaryPM> = {}): ConversationSummary
   lastMessage: msg("m1"),
   unreadCount: 2,
   ...over,
+});
+
+const photo = {
+  previewUrl: "https://media/p_sm.jpg",
+  thumbUrl: "https://media/p_md.jpg",
+  url: "https://media/p.jpg",
+};
+
+describe("chat photos", () => {
+  it("previews a photo in the inbox, with its caption when it has one", () => {
+    expect(previewOf(summary({ lastMessage: msg("m1", { body: "", photo }) }), "u1")).toBe(
+      "📷 Photo",
+    );
+    expect(previewOf(summary({ lastMessage: msg("m1", { body: "look", photo }) }), "u1")).toBe(
+      "📷 look",
+    );
+    const mine = msg("m1", { senderId: "u1", body: "", photo });
+    expect(previewOf(summary({ lastMessage: mine }), "u1")).toBe("You: 📷 Photo");
+  });
+
+  it("blurs someone else's photo, loading only its smallest copy, until it's revealed", () => {
+    const theirs = msg("m1", { photo });
+    expect(toThreadMessageVM(theirs, "u1").photo).toEqual({
+      src: photo.previewUrl,
+      fullSrc: null,
+      hidden: true,
+    });
+    expect(toThreadMessageVM(theirs, "u1", new Set(["m1"])).photo).toEqual({
+      src: photo.thumbUrl,
+      fullSrc: photo.url,
+      hidden: false,
+    });
+  });
+
+  it("never hides the viewer's own photos", () => {
+    expect(toThreadMessageVM(msg("m1", { senderId: "u1", photo }), "u1").photo).toMatchObject({
+      hidden: false,
+      src: photo.thumbUrl,
+    });
+  });
+
+  it("shows a photo still sending from the device", () => {
+    const vm = toPendingMessageVM(
+      {
+        clientId: "tmp",
+        body: "",
+        photo: { localUrl: "blob:local", key: "chat/c1/u1/p.jpg" },
+        createdAt: "2026-09-28T10:00:00Z",
+        status: "sending",
+      },
+      "u1",
+    );
+    expect(vm.photo).toEqual({ src: "blob:local", fullSrc: null, hidden: false });
+  });
+
+  it("has no photo on a text message", () => {
+    expect(toThreadMessageVM(msg("m1"), "u1").photo).toBeNull();
+  });
 });
 
 describe("previewOf", () => {
@@ -71,7 +130,13 @@ describe("thread view models", () => {
 
   it("keeps a pending bubble's client id so it can be retried", () => {
     const vm = toPendingMessageVM(
-      { clientId: "tmp", body: "hi", createdAt: "2026-09-28T10:00:00Z", status: "failed" },
+      {
+        clientId: "tmp",
+        body: "hi",
+        photo: null,
+        createdAt: "2026-09-28T10:00:00Z",
+        status: "failed",
+      },
       "u1",
     );
     expect(vm).toMatchObject({ id: "tmp", clientId: "tmp", isOwn: true, status: "failed" });

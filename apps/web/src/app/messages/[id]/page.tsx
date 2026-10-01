@@ -12,7 +12,21 @@ const MESSAGE_BODY_MAX = 4000;
 
 export default function ThreadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { shell, thread, backHref, send, retry, loadMore } = useChatThreadPresenter(id);
+  const {
+    shell,
+    thread,
+    composerPhoto,
+    backHref,
+    send,
+    retry,
+    loadMore,
+    attachPhoto,
+    removePhoto,
+    photoLocked,
+    revealPhoto,
+    openPhoto,
+    closePhoto,
+  } = useChatThreadPresenter(id);
   const nav = getAppShellNav();
 
   return (
@@ -53,7 +67,27 @@ export default function ThreadPage({ params }: { params: Promise<{ id: string }>
           placeholder: CHAT_COPY.placeholder,
           sendLabel: CHAT_COPY.send,
           maxLength: MESSAGE_BODY_MAX,
+          photo: {
+            ...composerPhoto,
+            addLabel: CHAT_COPY.photoAdd,
+            removeLabel: CHAT_COPY.photoRemove,
+            uploadingLabel: CHAT_COPY.photoUploading,
+            onPick: attachPhoto,
+            onRemove: removePhoto,
+            onLocked: photoLocked,
+          },
         }}
+        photoNotice={thread.photoNotice}
+        photoLabels={{
+          alt: CHAT_COPY.photoAlt,
+          reveal: CHAT_COPY.photoReveal,
+          open: CHAT_COPY.photoOpen,
+        }}
+        onRevealPhoto={revealPhoto}
+        onOpenPhoto={openPhoto}
+        viewingPhoto={thread.viewingPhoto}
+        photoCloseLabel={CHAT_COPY.photoClose}
+        onClosePhoto={closePhoto}
         hasMore={thread.hasMore}
         loadingMore={thread.loadingMore}
         loadMoreLabel={CHAT_COPY.loadMore}

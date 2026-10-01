@@ -65,11 +65,13 @@ export const message = pgTable(
     senderId: text("sender_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    /**
-     * Required by the API today. Nullable so attachment-only messages can
-     * arrive later without a migration.
-     */
+    /** Optional when the message carries a photo, which then needs no caption. */
     body: text("body"),
+    /**
+     * The photo's S3 key, under `chat/<conversationId>/<senderId>/`: the prefix
+     * is what proves the sender uploaded it, for this thread.
+     */
+    photoKey: text("photo_key"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     editedAt: timestamp("edited_at", { withTimezone: true }),
     /** Soft delete — a reply in flight still has a row to point at. */
