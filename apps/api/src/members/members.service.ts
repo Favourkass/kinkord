@@ -289,9 +289,12 @@ export class MembersService {
     ];
     if (target.country) conditions.push(eq(profile.country, target.country));
     const where = and(...conditions);
-    const sameArea = target.city
-      ? sql<number>`case when ${profile.city} = ${target.city} then 1 else 0 end`
-      : sql<number>`0`;
+    // Same city first when the member has one. Without a city there is nothing
+    // to rank by: a constant would render as `order by 0`, which Postgres reads
+    // as "output column 0" and rejects.
+    const sameAreaFirst = target.city
+      ? [desc(sql<number>`case when ${profile.city} = ${target.city} then 1 else 0 end`)]
+      : [];
     const viewerFollow = alias(follow, "viewer_follow");
     const rows = await this.db
       .select({
@@ -312,7 +315,7 @@ export class MembersService {
         and(eq(viewerFollow.followerId, viewerId), eq(viewerFollow.followingId, profile.userId)),
       )
       .where(where)
-      .orderBy(desc(sameArea), desc(profile.createdAt))
+      .orderBy(...sameAreaFirst, desc(profile.createdAt))
       .limit(limit)
       .offset(offset);
     const [totalRow] = await this.db.select({ total: count() }).from(profile).where(where);

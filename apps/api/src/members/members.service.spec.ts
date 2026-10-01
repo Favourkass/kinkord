@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { NotFoundException } from "@nestjs/common";
-import { type SQL } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { type Db } from "../db/db.module";
 import { type StorageService } from "../storage/storage.service";
@@ -40,6 +40,27 @@ const recordingChain = (result: unknown, wheres: SQL[]) => {
 };
 
 const renderWhere = (w: SQL) => new PgDialect().sqlToQuery(w);
+
+/** Like `chain`, but remembers the arguments of every `.orderBy(...)` so the ordering can be asserted. */
+const orderRecordingChain = (result: unknown, orders: SQL[][]) => {
+  const p: unknown = new Proxy(() => p, {
+    get: (_t, prop) => {
+      if (prop === "then")
+        return (res: (v: unknown) => unknown, rej: (e: unknown) => unknown) =>
+          Promise.resolve(result).then(res, rej);
+      if (prop === "orderBy")
+        return (...args: SQL[]) => {
+          orders.push(args);
+          return p;
+        };
+      return () => p;
+    },
+    apply: () => p,
+  });
+  return p;
+};
+
+const renderOrder = (args: SQL[]) => new PgDialect().sqlToQuery(sql.join(args, sql`, `));
 
 const makeService = () => {
   const select = vi.fn();
@@ -477,6 +498,52 @@ describe("MembersService people tabs + media (profile rebuild, 2026-09-12)", () 
     const { params } = renderWhere(wheres[0]);
     expect(params).toEqual(["Delta", "u2", "me", "NG"]);
     expect(renderWhere(wheres[1])).toEqual(renderWhere(wheres[0]));
+  });
+
+  it("ranks suggestions by their own city first when the member has one", async () => {
+    const { service, select } = makeService();
+    const orders: SQL[][] = [];
+    select
+      .mockReturnValueOnce(chain([{ country: "NG", state: "Delta", city: "Abraka" }]))
+      .mockReturnValueOnce(orderRecordingChain([], orders))
+      .mockReturnValueOnce(chain([{ total: 0 }]));
+    await service.friends("nene", "me", "suggested");
+    expect(renderOrder(orders[0])).toMatchObject({
+      sql: `case when "profile"."city" = $1 then 1 else 0 end desc, "profile"."created_at" desc`,
+      params: ["Abraka"],
+    });
+  });
+
+  it("ranks by newest alone when the member has a state but no city — never `order by 0`", async () => {
+    // Production bug (2026-10-01): a constant fallback rendered `order by 0 desc`,
+    // which Postgres rejects as "ORDER BY position 0 is not in select list".
+    const { service, select } = makeService();
+    const orders: SQL[][] = [];
+    select
+      .mockReturnValueOnce(chain([{ country: "NG", state: "Delta", city: null }]))
+      .mockReturnValueOnce(
+        orderRecordingChain(
+          [
+            {
+              userId: "u5",
+              username: "ada",
+              displayName: "Ada",
+              avatarKey: null,
+              dateOfBirth: null,
+              gender: null,
+              city: null,
+              state: "Delta",
+              isFollowing: null,
+            },
+          ],
+          orders,
+        ),
+      )
+      .mockReturnValueOnce(chain([{ total: 1 }]));
+    const page = await service.friends("nene", "me", "suggested");
+    expect(page.total).toBe(1);
+    expect(page.items.map((m) => m.username)).toEqual(["ada"]);
+    expect(renderOrder(orders[0])).toEqual({ sql: `"profile"."created_at" desc`, params: [] });
   });
 
   it("suggests nobody when the member has no state on file", async () => {
