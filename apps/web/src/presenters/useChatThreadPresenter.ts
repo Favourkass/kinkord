@@ -20,6 +20,7 @@ import type { RealtimeEventPM } from "@/domain/realtime";
 import { ApiError } from "@/services/apiClient";
 import { chatService } from "@/services/chat.service";
 import { useHomePresenter } from "./useHomePresenter";
+import { useChatSafety } from "./useChatSafety";
 import { usePolling } from "./usePolling";
 import { useRealtime } from "./useRealtime";
 
@@ -155,6 +156,10 @@ export function useChatThreadPresenter(conversationId: string) {
     }
   }, [conversationId]);
   usePolling(pollHeader, HEADER_POLL_MS, loaded);
+
+  // A block made or lifted changes the header and the composer: refetch it.
+  const refreshHeader = useCallback(() => void pollHeader(), [pollHeader]);
+  const safety = useChatSafety(conversationId, summary?.peer ?? null, refreshHeader);
 
   // Tell the server what's been seen, so the inbox badge clears.
   useEffect(() => {
@@ -320,6 +325,7 @@ export function useChatThreadPresenter(conversationId: string) {
           }
         : null,
     },
+    safety,
     backHref: Routes.messages,
     send,
     retry,

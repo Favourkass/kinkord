@@ -36,6 +36,8 @@ export interface ChatPeerPM {
   displayName: string;
   avatarUrl: string | null;
   online: boolean;
+  /** The viewer blocked them: the thread stays, read-only until they unblock. */
+  blockedByMe: boolean;
 }
 
 export interface ConversationSummaryPM {
@@ -100,6 +102,7 @@ export interface ThreadPeerVM {
   displayName: string;
   avatarUrl: string | null;
   isOnline: boolean;
+  blockedByMe: boolean;
 }
 
 const PREVIEW_MAX = 60;
@@ -138,6 +141,7 @@ export function toThreadPeerVM(peer: ChatPeerPM | null): ThreadPeerVM | null {
     displayName: peer.displayName,
     avatarUrl: peer.avatarUrl,
     isOnline: peer.online,
+    blockedByMe: peer.blockedByMe,
   };
 }
 

@@ -74,6 +74,8 @@ export interface ChatPeerDto {
   displayName: string;
   avatarUrl: string | null;
   online: boolean;
+  /** The viewer blocked them: the thread stays, read-only until they unblock. */
+  blockedByMe: boolean;
 }
 
 export interface ConversationSummaryDto {

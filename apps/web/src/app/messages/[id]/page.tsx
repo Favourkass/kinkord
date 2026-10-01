@@ -16,6 +16,7 @@ export default function ThreadPage({ params }: { params: Promise<{ id: string }>
     shell,
     thread,
     composerPhoto,
+    safety,
     backHref,
     send,
     retry,
@@ -92,6 +93,11 @@ export default function ThreadPage({ params }: { params: Promise<{ id: string }>
         loadingMore={thread.loadingMore}
         loadMoreLabel={CHAT_COPY.loadMore}
         onLoadMore={loadMore}
+        menu={safety.menu}
+        blocked={safety.blocked}
+        blockDialog={safety.blockDialog}
+        report={safety.report}
+        safetyError={safety.error}
       />
     </AppShell>
   );

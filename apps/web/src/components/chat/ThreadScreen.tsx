@@ -4,12 +4,15 @@ import { useEffect, useRef, type CSSProperties } from "react";
 import Link from "next/link";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import MaskIcon from "@/components/app/MaskIcon";
+import ConfirmDialog, { type ConfirmDialogProps } from "@/components/feed/ConfirmDialog";
 import MediaLightbox from "@/components/feed/MediaLightbox";
 import type { ThreadMessageVM, ThreadPeerVM } from "@/domain/chat";
 import type { PostMediaVM } from "@/domain/post";
 import MessageBubble, { type MessageBubblePhotoLabels } from "./MessageBubble";
 import MessageComposer, { type MessageComposerProps } from "./MessageComposer";
 import PresenceDot from "./PresenceDot";
+import ReportSheet, { type ReportSheetProps } from "./ReportSheet";
+import ThreadMenu, { type ThreadMenuProps } from "./ThreadMenu";
 import { useVisibleViewport } from "./useVisibleViewport";
 
 export interface ThreadScreenProps {
@@ -46,6 +49,13 @@ export interface ThreadScreenProps {
   loadingMore: boolean;
   loadMoreLabel: string;
   onLoadMore: () => void;
+  /** Report or block the other member; null once they're gone. */
+  menu: ThreadMenuProps | null;
+  /** In place of the composer while the viewer has them blocked. */
+  blocked: { text: string; actionLabel: string; busy: boolean; onAction: () => void } | null;
+  blockDialog: Omit<ConfirmDialogProps, "open"> | null;
+  report: ReportSheetProps | null;
+  safetyError: string | null;
 }
 
 /**
@@ -113,6 +123,7 @@ export default function ThreadScreen(p: ThreadScreenProps) {
             </p>
             {p.peer?.isOnline && <p className="text-[12px] text-app-online">{p.onlineLabel}</p>}
           </div>
+          {p.menu && <ThreadMenu {...p.menu} />}
         </header>
 
         <div
@@ -163,12 +174,24 @@ export default function ThreadScreen(p: ThreadScreenProps) {
           </ul>
         </div>
 
-        {p.sendError && (
+        {(p.sendError || p.safetyError) && (
           <p className="border-t border-app-line bg-app-surface px-[16px] pt-[8px] text-[12px] text-app-danger">
-            {p.sendError}
+            {p.safetyError ?? p.sendError}
           </p>
         )}
-        {p.unavailable || p.newChat?.blocking ? (
+        {p.blocked && !p.unavailable ? (
+          <div className="flex items-center gap-[12px] border-t border-app-line bg-app-surface px-[16px] py-[12px] pb-[calc(12px+env(safe-area-inset-bottom))]">
+            <p className="min-w-0 flex-1 text-[13px] text-app-muted">{p.blocked.text}</p>
+            <button
+              type="button"
+              onClick={p.blocked.onAction}
+              disabled={p.blocked.busy}
+              className="shrink-0 rounded-full border border-app-line px-[14px] py-[7px] text-[13px] font-bold text-app-text disabled:opacity-50"
+            >
+              {p.blocked.actionLabel}
+            </button>
+          </div>
+        ) : p.unavailable || p.newChat?.blocking ? (
           <p className="border-t border-app-line bg-app-surface px-[16px] py-[14px] text-center text-[13px] text-app-muted">
             {p.unavailable ? p.unavailableText : p.newChat?.text}
           </p>
@@ -194,6 +217,8 @@ export default function ThreadScreen(p: ThreadScreenProps) {
         onClose={p.onClosePhoto}
         closeLabel={p.photoCloseLabel}
       />
+      {p.blockDialog && <ConfirmDialog open {...p.blockDialog} />}
+      {p.report && <ReportSheet {...p.report} />}
     </>
   );
 }

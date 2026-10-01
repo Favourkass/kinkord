@@ -1,7 +1,22 @@
 /** Copy for the admin moderation screens. */
 export const MODERATION_COPY = {
   title: "Admin",
-  tabs: { members: "Members", blocklist: "Block list" },
+  tabs: { members: "Members", reports: "Reports", blocklist: "Block list" },
+  reports: {
+    statuses: { open: "Open", resolved: "Resolved", dismissed: "Dismissed" },
+    loading: "Loading reports…",
+    empty: "Nothing to review.",
+    reportedBy: "Reported by",
+    deletedAccount: "a deleted account",
+    details: "Their note",
+    evidence: "Last messages in the chat",
+    noEvidence: "No chat attached.",
+    reported: "Reported",
+    openMember: "Open member",
+    resolve: "Resolve",
+    dismiss: "Dismiss",
+    photo: "Photo",
+  },
   denied: "This area is for admins only.",
   checking: "Checking access…",
   search: {

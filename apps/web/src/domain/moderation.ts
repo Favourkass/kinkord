@@ -3,6 +3,7 @@
  * (VMs). Routing isn't known here, so the presenters pass the href builder in.
  */
 import { shortDate, timeAgo } from "@/util/format";
+import type { ReportReason } from "./safety";
 
 export type BlockRuleKind = "email" | "phone" | "ip" | "name";
 export type BlockRuleAction = "block" | "flag";
@@ -239,4 +240,107 @@ export function validateNewRule(draft: NewBlockRulePM): string | null {
     return "Use at least 4 letters, or it will catch too many people.";
   }
   return null;
+}
+
+export type AdminReportStatus = "open" | "resolved" | "dismissed";
+
+export interface AdminReportMemberPM {
+  userId: string;
+  username: string | null;
+  displayName: string;
+}
+
+export interface AdminReportEvidencePM {
+  id: string;
+  /** Written by the reported member, rather than by whoever reported them. */
+  fromReported: boolean;
+  body: string;
+  photo: { thumbUrl: string; url: string } | null;
+  createdAt: string;
+}
+
+export interface AdminReportPM {
+  id: string;
+  reason: ReportReason;
+  details: string | null;
+  status: AdminReportStatus;
+  createdAt: string;
+  reviewedAt: string | null;
+  reportedUserId: string;
+  /** Null once the account is gone; the report stays. */
+  reporter: AdminReportMemberPM | null;
+  reported: AdminReportMemberPM | null;
+  evidence: AdminReportEvidencePM[];
+}
+
+export interface AdminReportEvidenceVM {
+  id: string;
+  fromReported: boolean;
+  who: string;
+  body: string;
+  photo: { thumbUrl: string; url: string } | null;
+  time: string;
+}
+
+export interface AdminReportVM {
+  id: string;
+  reason: string;
+  /** Under 18, illegal, or shared without consent: act on these first. */
+  urgent: boolean;
+  when: string;
+  reportedName: string;
+  reportedHandle: string | null;
+  /** The member's moderation page, where they can be blocked. */
+  reportedHref: string;
+  reporter: string;
+  details: string | null;
+  evidence: AdminReportEvidenceVM[];
+  open: boolean;
+}
+
+const REASON_LABEL: Record<ReportReason, string> = {
+  underage: "May be under 18",
+  illegal: "Illegal content",
+  non_consensual: "Intimate images shared without consent",
+  unwanted_sexual: "Unwanted sexual messages or photos",
+  harassment: "Harassment or threats",
+  spam: "Spam or a scam",
+  other: "Something else",
+};
+
+const URGENT: ReadonlySet<ReportReason> = new Set(["underage", "illegal", "non_consensual"]);
+
+function memberLabel(m: AdminReportMemberPM | null, deleted: string): string {
+  if (!m) return deleted;
+  return m.username ? `${m.displayName} (@${m.username})` : m.displayName;
+}
+
+export function toAdminReportVM(
+  pm: AdminReportPM,
+  memberHref: (userId: string) => string,
+  labels: { deletedAccount: string },
+  now = new Date(),
+): AdminReportVM {
+  const reportedName = pm.reported?.displayName ?? labels.deletedAccount;
+  const reporterName = pm.reporter?.displayName ?? labels.deletedAccount;
+  return {
+    id: pm.id,
+    reason: REASON_LABEL[pm.reason] ?? pm.reason,
+    urgent: URGENT.has(pm.reason),
+    when: timeAgo(pm.createdAt, now) ?? "",
+    reportedName,
+    reportedHandle: pm.reported?.username ? `@${pm.reported.username}` : null,
+    reportedHref: memberHref(pm.reportedUserId),
+    reporter: memberLabel(pm.reporter, labels.deletedAccount),
+    details: pm.details?.trim() || null,
+    evidence: pm.evidence.map((e) => ({
+      id: e.id,
+      fromReported: e.fromReported,
+      who: e.fromReported ? reportedName : reporterName,
+      body: e.body,
+      photo: e.photo,
+      time: timeAgo(e.createdAt, now) ?? "",
+    })),
+    open: pm.status === "open",
+  };
 }

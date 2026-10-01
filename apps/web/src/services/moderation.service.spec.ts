@@ -20,6 +20,17 @@ describe("moderationService", () => {
     del.mockReset().mockResolvedValue({});
   });
 
+  it("reads the report queue by status, and closes a report", async () => {
+    await moderationService.reports();
+    await moderationService.reports("dismissed");
+    await moderationService.resolveReport("r1", "resolved");
+    expect(get.mock.calls).toEqual([
+      ["/admin/reports?status=open"],
+      ["/admin/reports?status=dismissed"],
+    ]);
+    expect(post).toHaveBeenCalledWith("/admin/reports/r1/resolve", { status: "resolved" });
+  });
+
   it("encodes the search so an email or a + in it survives the URL", async () => {
     await moderationService.search(" tolu+1@gmail.com ");
     expect(get).toHaveBeenCalledWith("/admin/members?q=tolu%2B1%40gmail.com");
