@@ -6,16 +6,24 @@ import type {
   ChatAllowancePM,
   ChatMessagePM,
   ConversationSummaryPM,
+  ConversationThreadPM,
   SentMessagePM,
 } from "@/domain/chat";
-import { api } from "./apiClient";
+import { IMAGE_VARIANTS, buildUploadSet, type ImageVariant } from "@/util/image";
+import { api, uploadToPresignedUrl } from "./apiClient";
 
 const thread = (id: string) => `/chat/conversations/${encodeURIComponent(id)}`;
+
+interface PhotoUploadSlot {
+  key: string;
+  uploadUrl: string;
+  variantUploadUrls: Record<ImageVariant, string>;
+}
 
 export const chatService = {
   list: () => api.get<ConversationSummaryPM[]>("/chat/conversations"),
 
-  conversation: (id: string) => api.get<ConversationSummaryPM>(thread(id)),
+  conversation: (id: string) => api.get<ConversationThreadPM>(thread(id)),
 
   start: (userId: string) =>
     api.post<{ conversationId: string }>("/chat/conversations", { userId }),
@@ -29,8 +37,31 @@ export const chatService = {
     return api.get<ChatMessagePM[]>(`${thread(id)}/messages${query ? `?${query}` : ""}`);
   },
 
-  send: (id: string, body: string, clientId: string) =>
-    api.post<SentMessagePM>(`${thread(id)}/messages`, { body, clientId }),
+  /** Text, a photo by its uploaded key, or both: the text is then its caption. */
+  send: (id: string, body: string, clientId: string, photoKey?: string) =>
+    api.post<SentMessagePM>(`${thread(id)}/messages`, {
+      body,
+      clientId,
+      ...(photoKey ? { photoKey } : {}),
+    }),
+
+  /**
+   * One photo into the thread's upload slot, in every stored size, before the
+   * message exists. The key that comes back is what `send` names; a photo the
+   * member never sends is simply never referenced.
+   */
+  uploadPhoto: async (id: string, rawFile: File): Promise<string> => {
+    const { original, variants } = await buildUploadSet(rawFile, "chat");
+    const slot = await api.post<PhotoUploadSlot>(`${thread(id)}/photo-upload-url`, {
+      contentType: original.type,
+      contentLength: original.size,
+    });
+    await Promise.all(
+      IMAGE_VARIANTS.map((v) => uploadToPresignedUrl(slot.variantUploadUrls[v], variants[v])),
+    );
+    await uploadToPresignedUrl(slot.uploadUrl, original);
+    return slot.key;
+  },
 
   markRead: (id: string, messageId: string) =>
     api.post<{ ok: true }>(`${thread(id)}/read`, { messageId }),

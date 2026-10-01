@@ -36,6 +36,7 @@ const row: ConversationSummaryPM = {
     conversationId: "c1",
     senderId: "u1",
     body: "see you",
+    photo: null,
     createdAt: "2026-09-28T10:00:00.000Z",
     editedAt: null,
   },

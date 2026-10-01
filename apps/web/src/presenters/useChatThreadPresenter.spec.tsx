@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
-import { CHAT_COPY } from "@/constants/chat";
-import type { ChatMessagePM, ConversationSummaryPM } from "@/domain/chat";
+import { CHAT_COPY, photosLockedText } from "@/constants/chat";
+import type { ChatMessagePM, ConversationThreadPM } from "@/domain/chat";
 import { ApiError } from "@/services/apiClient";
 import {
   THREAD_FALLBACK_POLL_MS,
@@ -35,6 +35,7 @@ const svc = {
   send: vi.fn(),
   markRead: vi.fn(),
   allowance: vi.fn(),
+  uploadPhoto: vi.fn(),
 };
 vi.mock("@/services/chat.service", () => ({
   chatService: new Proxy(
@@ -53,17 +54,19 @@ const msg = (id: string, senderId: string, second: number): ChatMessagePM => ({
   conversationId: "c1",
   senderId,
   body: `message ${id}`,
+  photo: null,
   createdAt: `2026-09-28T10:00:${String(second).padStart(2, "0")}.000Z`,
   editedAt: null,
 });
 
-const header = (over: Partial<ConversationSummaryPM> = {}): ConversationSummaryPM => ({
+const header = (over: Partial<ConversationThreadPM> = {}): ConversationThreadPM => ({
   id: "c1",
   kind: "dm",
   lastMessageAt: "2026-09-28T10:00:00.000Z",
   peer: { userId: "u2", username: "ada", displayName: "Ada", avatarUrl: null, online: false },
   lastMessage: null,
   unreadCount: 0,
+  canSendPhotos: false,
   ...over,
 });
 
@@ -87,6 +90,9 @@ describe("useChatThreadPresenter", () => {
       usedToday: 0,
       resetsAt: "2026-09-30T23:00:00.000Z",
     });
+    // jsdom has no object URLs; a picked photo's local preview is stood in for.
+    URL.createObjectURL = vi.fn(() => "blob:local-photo");
+    URL.revokeObjectURL = vi.fn();
   });
   afterEach(cleanup);
 
@@ -123,7 +129,8 @@ describe("useChatThreadPresenter", () => {
     act(() => result.current.send("  hi there  "));
     const bubble = result.current.thread.messages[2];
     expect(bubble).toMatchObject({ body: "hi there", status: "sending", isOwn: true });
-    expect(svc.send).toHaveBeenCalledWith("c1", "hi there", bubble.clientId);
+    // Text only: no photo key goes with it.
+    expect(svc.send).toHaveBeenCalledWith("c1", "hi there", bubble.clientId, undefined);
 
     await act(async () => confirm({ ...msg("m9", "u1", 9), clientId: bubble.clientId }));
     expect(result.current.thread.messages.map((m) => [m.id, m.status])).toEqual([
@@ -260,6 +267,136 @@ describe("useChatThreadPresenter", () => {
       await ready();
       expect(polls.has(THREAD_FALLBACK_POLL_MS)).toBe(true);
       expect(polls.has(THREAD_POLL_MS)).toBe(false);
+    });
+  });
+
+  describe("photos", () => {
+    const photoFile = () => new File(["x"], "p.jpg", { type: "image/jpeg" });
+    const theirPhoto = {
+      previewUrl: "https://media/p_sm.jpg",
+      thumbUrl: "https://media/p_md.jpg",
+      url: "https://media/p.jpg",
+    };
+
+    it("won't attach one before the other member has written, and says why", async () => {
+      const { result } = await ready();
+      expect(result.current.composerPhoto.allowed).toBe(false);
+      expect(result.current.thread.photoNotice).toBeNull();
+      act(() => result.current.attachPhoto(photoFile()));
+      expect(svc.uploadPhoto).not.toHaveBeenCalled();
+      expect(result.current.composerPhoto.draft).toBeNull();
+      expect(result.current.thread.photoNotice).toBe(photosLockedText("Ada"));
+    });
+
+    it("uploads a picked photo at once, and sends it with the caption once it's ready", async () => {
+      svc.conversation.mockResolvedValue(header({ canSendPhotos: true }));
+      let uploaded: (key: string) => void = () => undefined;
+      svc.uploadPhoto.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            uploaded = resolve;
+          }),
+      );
+      svc.send.mockImplementation(() => new Promise(() => undefined));
+      const { result } = await ready();
+
+      const file = photoFile();
+      act(() => result.current.attachPhoto(file));
+      expect(svc.uploadPhoto).toHaveBeenCalledWith("c1", file);
+      expect(result.current.composerPhoto.draft).toEqual({
+        previewUrl: "blob:local-photo",
+        uploading: true,
+        error: null,
+      });
+      // Still uploading: Send waits for it.
+      act(() => result.current.send("look"));
+      expect(svc.send).not.toHaveBeenCalled();
+
+      await act(async () => uploaded("chat/c1/u1/p.jpg"));
+      expect(result.current.composerPhoto.draft).toMatchObject({ uploading: false, error: null });
+      act(() => result.current.send("look"));
+      const bubble = result.current.thread.messages[2];
+      expect(svc.send).toHaveBeenCalledWith("c1", "look", bubble.clientId, "chat/c1/u1/p.jpg");
+      expect(bubble).toMatchObject({
+        body: "look",
+        status: "sending",
+        photo: { src: "blob:local-photo", hidden: false },
+      });
+      expect(result.current.composerPhoto.draft).toBeNull();
+    });
+
+    it("sends a photo with no caption", async () => {
+      svc.conversation.mockResolvedValue(header({ canSendPhotos: true }));
+      svc.uploadPhoto.mockResolvedValue("chat/c1/u1/p.jpg");
+      svc.send.mockImplementation(() => new Promise(() => undefined));
+      const { result } = await ready();
+      act(() => result.current.attachPhoto(photoFile()));
+      await waitFor(() => expect(result.current.composerPhoto.draft?.uploading).toBe(false));
+      act(() => result.current.send("   "));
+      expect(svc.send).toHaveBeenCalledWith("c1", "", expect.any(String), "chat/c1/u1/p.jpg");
+    });
+
+    it("says why an upload failed, and lets the member take the photo off", async () => {
+      svc.conversation.mockResolvedValue(header({ canSendPhotos: true }));
+      svc.uploadPhoto.mockRejectedValue(
+        new ApiError(400, { message: "Photo is too large — max 10MB." }),
+      );
+      const { result } = await ready();
+      act(() => result.current.attachPhoto(photoFile()));
+      await waitFor(() =>
+        expect(result.current.composerPhoto.draft?.error).toBe("Photo is too large — max 10MB."),
+      );
+      act(() => result.current.send("look"));
+      expect(svc.send).not.toHaveBeenCalled();
+      act(() => result.current.removePhoto());
+      expect(result.current.composerPhoto.draft).toBeNull();
+    });
+
+    it("says a generic sorry when the upload fails off the API, like a dropped connection", async () => {
+      svc.conversation.mockResolvedValue(header({ canSendPhotos: true }));
+      svc.uploadPhoto.mockRejectedValue(new TypeError("Failed to fetch"));
+      const { result } = await ready();
+      act(() => result.current.attachPhoto(photoFile()));
+      await waitFor(() =>
+        expect(result.current.composerPhoto.draft?.error).toBe(CHAT_COPY.photoUploadFailed),
+      );
+    });
+
+    it("resends a failed photo message without uploading the photo again", async () => {
+      svc.conversation.mockResolvedValue(header({ canSendPhotos: true }));
+      svc.uploadPhoto.mockResolvedValue("chat/c1/u1/p.jpg");
+      svc.send.mockRejectedValueOnce(new Error("You're sending messages too fast. Wait a moment."));
+      const { result } = await ready();
+      act(() => result.current.attachPhoto(photoFile()));
+      await waitFor(() => expect(result.current.composerPhoto.draft?.uploading).toBe(false));
+      act(() => result.current.send(""));
+      await waitFor(() => expect(result.current.thread.messages[2].status).toBe("failed"));
+
+      svc.send.mockResolvedValueOnce({ ...msg("m9", "u1", 9), clientId: "x" });
+      act(() => result.current.retry(result.current.thread.messages[2].clientId as string));
+      await waitFor(() => expect(result.current.thread.messages[2].id).toBe("m9"));
+      expect(svc.send).toHaveBeenLastCalledWith("c1", "", expect.any(String), "chat/c1/u1/p.jpg");
+      expect(svc.uploadPhoto).toHaveBeenCalledTimes(1);
+    });
+
+    it("blurs the other member's photo until it's tapped, then opens it full size", async () => {
+      svc.history.mockResolvedValue([{ ...msg("m1", "u2", 1), body: "", photo: theirPhoto }]);
+      const { result } = await ready();
+      expect(result.current.thread.messages[0].photo).toEqual({
+        src: theirPhoto.previewUrl,
+        fullSrc: null,
+        hidden: true,
+      });
+      act(() => result.current.revealPhoto("m1"));
+      expect(result.current.thread.messages[0].photo).toEqual({
+        src: theirPhoto.thumbUrl,
+        fullSrc: theirPhoto.url,
+        hidden: false,
+      });
+      act(() => result.current.openPhoto(theirPhoto.url));
+      expect(result.current.thread.viewingPhoto).toMatchObject({ fullSrc: theirPhoto.url });
+      act(() => result.current.closePhoto());
+      expect(result.current.thread.viewingPhoto).toBeNull();
     });
   });
 });

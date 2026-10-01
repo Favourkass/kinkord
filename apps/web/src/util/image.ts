@@ -17,6 +17,8 @@ export const IMAGE_UPLOAD_PRESETS = {
   /** Feed photos run full card width and open to a lightbox, but four at a time
       go up over a phone connection — 1440px is the balance. */
   post: { maxDim: 1440, quality: 0.82, maxBytes: 600 * 1024 },
+  /** Chat photos open full screen like a post photo, over the same phone connection. */
+  chat: { maxDim: 1440, quality: 0.82, maxBytes: 600 * 1024 },
 } as const satisfies Record<string, CompressOptions>;
 
 export type UploadKind = keyof typeof IMAGE_UPLOAD_PRESETS;

@@ -4,11 +4,23 @@
  */
 import { bubbleTime, conversationTime } from "@/util/chatTime";
 
+/** Short-lived links to one chat photo, in the sizes the thread shows. */
+export interface ChatPhotoPM {
+  /** The 160px copy: what a blurred, not-yet-opened photo shows. */
+  previewUrl: string;
+  /** The 480px copy: the photo in its bubble. */
+  thumbUrl: string;
+  /** The full photo, for viewing on its own. */
+  url: string;
+}
+
 export interface ChatMessagePM {
   id: string;
   conversationId: string;
   senderId: string;
+  /** Empty for a photo sent without a caption. */
   body: string;
+  photo: ChatPhotoPM | null;
   createdAt: string;
   editedAt: string | null;
 }
@@ -36,10 +48,18 @@ export interface ConversationSummaryPM {
   unreadCount: number;
 }
 
+/** One open thread's header: the summary, plus whether photos are open in it. */
+export interface ConversationThreadPM extends ConversationSummaryPM {
+  /** Photos open up once the other member has written in the thread. */
+  canSendPhotos: boolean;
+}
+
 /** A message the member has sent that the server hasn't confirmed yet. */
 export interface PendingMessage {
   clientId: string;
   body: string;
+  /** Its photo, uploaded already and shown from the device until the server's copy arrives. */
+  photo: { localUrl: string; key: string } | null;
   createdAt: string;
   status: "sending" | "failed";
 }
@@ -55,12 +75,21 @@ export interface ConversationRowVM {
   isOnline: boolean;
 }
 
+/** A photo in a bubble. Someone else's stays blurred until the viewer opens it. */
+export interface ThreadPhotoVM {
+  src: string;
+  /** What a tap opens full size; null while it's hidden, or still only on this device. */
+  fullSrc: string | null;
+  hidden: boolean;
+}
+
 export interface ThreadMessageVM {
   id: string;
   /** Set on bubbles still waiting on the server, so a retry can find them. */
   clientId: string | null;
   senderId: string;
   body: string;
+  photo: ThreadPhotoVM | null;
   time: string;
   isOwn: boolean;
   status: "sending" | "sent" | "failed";
@@ -78,7 +107,8 @@ const PREVIEW_MAX = 60;
 export function previewOf(summary: ConversationSummaryPM, viewerId: string | null): string {
   const last = summary.lastMessage;
   if (!last) return "Say hi 👋";
-  const text = last.body.trim();
+  const caption = last.body.trim();
+  const text = last.photo ? (caption ? `📷 ${caption}` : "📷 Photo") : caption;
   const clipped = text.length > PREVIEW_MAX ? `${text.slice(0, PREVIEW_MAX - 1)}…` : text;
   return viewerId !== null && last.senderId === viewerId ? `You: ${clipped}` : clipped;
 }
@@ -111,14 +141,31 @@ export function toThreadPeerVM(peer: ChatPeerPM | null): ThreadPeerVM | null {
   };
 }
 
-export function toThreadMessageVM(pm: ChatMessagePM, viewerId: string | null): ThreadMessageVM {
+/**
+ * A hidden photo shows only its smallest copy, blurred: nothing larger reaches
+ * the device until the viewer chooses to see it. The sender's own photos, and
+ * ones the viewer has opened, show as they are.
+ */
+function toThreadPhotoVM(photo: ChatPhotoPM, shown: boolean): ThreadPhotoVM {
+  return shown
+    ? { src: photo.thumbUrl, fullSrc: photo.url, hidden: false }
+    : { src: photo.previewUrl, fullSrc: null, hidden: true };
+}
+
+export function toThreadMessageVM(
+  pm: ChatMessagePM,
+  viewerId: string | null,
+  revealed: ReadonlySet<string> = new Set(),
+): ThreadMessageVM {
+  const isOwn = viewerId !== null && pm.senderId === viewerId;
   return {
     id: pm.id,
     clientId: null,
     senderId: pm.senderId,
     body: pm.body,
+    photo: pm.photo ? toThreadPhotoVM(pm.photo, isOwn || revealed.has(pm.id)) : null,
     time: bubbleTime(pm.createdAt),
-    isOwn: viewerId !== null && pm.senderId === viewerId,
+    isOwn,
     status: "sent",
   };
 }
@@ -129,6 +176,7 @@ export function toPendingMessageVM(p: PendingMessage, viewerId: string | null): 
     clientId: p.clientId,
     senderId: viewerId ?? "",
     body: p.body,
+    photo: p.photo ? { src: p.photo.localUrl, fullSrc: null, hidden: false } : null,
     time: bubbleTime(p.createdAt),
     isOwn: true,
     status: p.status,

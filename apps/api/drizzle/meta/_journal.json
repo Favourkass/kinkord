@@ -99,6 +99,13 @@
       "when": 1790853747272,
       "tag": "0013_push",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1790858527230,
+      "tag": "0014_chat_photos",
+      "breakpoints": true
     }
   ]
 }
