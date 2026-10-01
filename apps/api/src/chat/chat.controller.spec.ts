@@ -2,6 +2,7 @@ import { BadRequestException } from "@nestjs/common";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthedRequest } from "../auth/auth.guard";
 import { ChatController } from "./chat.controller";
+import type { RealtimeService } from "../realtime/realtime.service";
 import type { ChatService } from "./chat.service";
 
 const req = {
@@ -16,7 +17,17 @@ function make() {
     markRead: vi.fn(async () => undefined),
     allowance: vi.fn(async () => ({ newChatsPerDay: 1, usedToday: 0, resetsAt: "x" })),
   };
-  return { controller: new ChatController(chat as unknown as ChatService), chat };
+  const realtime = {
+    connectionFor: vi.fn(async () => ({ enabled: true, channel: "/chat/u1", token: "v1.a.b" })),
+  };
+  return {
+    controller: new ChatController(
+      chat as unknown as ChatService,
+      realtime as unknown as RealtimeService,
+    ),
+    chat,
+    realtime,
+  };
 }
 
 describe("ChatController", () => {
@@ -27,6 +38,15 @@ describe("ChatController", () => {
     });
     // The whole session user: their verified email decides their limits.
     expect(chat.startDm).toHaveBeenCalledWith(req.user, "u2");
+  });
+
+  it("hands the signed-in member their live connection details", async () => {
+    const { controller, realtime } = make();
+    await expect(controller.connection(req)).resolves.toMatchObject({
+      enabled: true,
+      channel: "/chat/u1",
+    });
+    expect(realtime.connectionFor).toHaveBeenCalledWith("u1");
   });
 
   it("reports today's new-chat allowance for the signed-in member", async () => {

@@ -15,13 +15,17 @@ import {
   type ConversationSummaryPM,
   type PendingMessage,
 } from "@/domain/chat";
+import type { RealtimeEventPM } from "@/domain/realtime";
 import { ApiError } from "@/services/apiClient";
 import { chatService } from "@/services/chat.service";
 import { useHomePresenter } from "./useHomePresenter";
 import { usePolling } from "./usePolling";
+import { useRealtime } from "./useRealtime";
 
-/** How often an open thread asks for new messages. */
+/** How often an open thread asks for new messages without a live connection. */
 export const THREAD_POLL_MS = 3_000;
+/** With one, polling is only a safety net for a missed event. */
+export const THREAD_FALLBACK_POLL_MS = 30_000;
 /** How often it refreshes the header (is the other member still online?). */
 export const HEADER_POLL_MS = 20_000;
 /** Matches the API's page size: a full page means there may be more before it. */
@@ -111,7 +115,15 @@ export function useChatThreadPresenter(conversationId: string) {
       // A missed poll is caught up by the next one.
     }
   }, [conversationId, messages]);
-  usePolling(pollNew, THREAD_POLL_MS, loaded);
+  // A live event for this thread fetches what's new at once.
+  const onRealtime = useCallback(
+    (e: RealtimeEventPM) => {
+      if (e.type === "message" && e.conversationId === conversationId) void pollNew();
+    },
+    [conversationId, pollNew],
+  );
+  const { live } = useRealtime(onRealtime);
+  usePolling(pollNew, live ? THREAD_FALLBACK_POLL_MS : THREAD_POLL_MS, loaded);
 
   const pollHeader = useCallback(async () => {
     try {

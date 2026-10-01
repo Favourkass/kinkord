@@ -1,6 +1,7 @@
 import { BadRequestException, HttpException, NotFoundException } from "@nestjs/common";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { conversation, conversationParticipant, message } from "../db/schema";
+import type { RealtimeService } from "../realtime/realtime.service";
 import type { StorageService } from "../storage/storage.service";
 import { NEW_CHAT_LIMIT } from "./allowance";
 import {
@@ -48,7 +49,17 @@ function make(answers: unknown[]) {
       async (key: string, variant?: string) => `https://media/${key}?${variant}`,
     ),
   };
-  return { ...q, service: new ChatService(q.db, storage as unknown as StorageService), storage };
+  const realtime = { notify: vi.fn(async () => undefined) };
+  return {
+    ...q,
+    service: new ChatService(
+      q.db,
+      storage as unknown as StorageService,
+      realtime as unknown as RealtimeService,
+    ),
+    storage,
+    realtime,
+  };
 }
 
 const at = new Date("2026-09-28T10:00:00.000Z");
@@ -179,6 +190,29 @@ describe("ChatService.sendMessage", () => {
     expect(after("update", conversation, "set")).toEqual({ lastMessageAt: at });
     // Replies never take the new-chat lock.
     expect(calls.some((c) => c.op === "execute")).toBe(false);
+  });
+
+  it("tells both members' open apps, live, that the thread changed", async () => {
+    const saved = row("m1", { senderId: "u1", body: "hi" });
+    const { service, realtime } = make([
+      [{ userId: "u1" }],
+      [{ userId: "u2" }],
+      [{ n: 0 }],
+      [{ id: "m0" }],
+      [saved],
+      undefined,
+    ]);
+    await service.sendMessage(member("u1"), "c1", { body: "hi" });
+    expect(realtime.notify).toHaveBeenCalledWith(["u2", "u1"], {
+      type: "message",
+      conversationId: "c1",
+    });
+  });
+
+  it("says nothing live about a message that was refused", async () => {
+    const { service, realtime } = make([[{ userId: "u1" }], []]);
+    await service.sendMessage(member("u1"), "c1", { body: "hi" }).catch(() => undefined);
+    expect(realtime.notify).not.toHaveBeenCalled();
   });
 
   describe("the daily new-chat allowance", () => {

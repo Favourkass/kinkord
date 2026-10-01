@@ -4,7 +4,11 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { CHAT_COPY } from "@/constants/chat";
 import type { ChatMessagePM, ConversationSummaryPM } from "@/domain/chat";
 import { ApiError } from "@/services/apiClient";
-import { THREAD_POLL_MS, useChatThreadPresenter } from "./useChatThreadPresenter";
+import {
+  THREAD_FALLBACK_POLL_MS,
+  THREAD_POLL_MS,
+  useChatThreadPresenter,
+} from "./useChatThreadPresenter";
 
 vi.mock("./useHomePresenter", () => ({ useHomePresenter: () => ({}) }));
 
@@ -13,6 +17,15 @@ const polls = new Map<number, { tick: () => Promise<void> | void; enabled: boole
 vi.mock("./usePolling", () => ({
   usePolling: (tick: () => Promise<void> | void, ms: number, enabled: boolean) =>
     polls.set(ms, { tick, enabled }),
+}));
+
+// The live connection, driven by hand: each test says when an event arrives.
+const live = { up: false, hear: null as null | ((e: unknown) => void) };
+vi.mock("./useRealtime", () => ({
+  useRealtime: (fn: (e: unknown) => void) => {
+    live.hear = fn;
+    return { live: live.up };
+  },
 }));
 
 const svc = {
@@ -63,6 +76,7 @@ async function ready() {
 describe("useChatThreadPresenter", () => {
   beforeEach(() => {
     polls.clear();
+    live.up = false;
     Object.values(svc).forEach((f) => f.mockReset());
     svc.me.mockResolvedValue({ id: "u1" });
     svc.conversation.mockResolvedValue(header());
@@ -222,6 +236,30 @@ describe("useChatThreadPresenter", () => {
       await waitFor(() => expect(result.current.thread.newChat?.blocking).toBe(true));
       expect(result.current.thread.messages).toEqual([]);
       expect(result.current.thread.sendError).toBeNull();
+    });
+  });
+
+  describe("live delivery", () => {
+    it("fetches what's new the moment a live event names this thread", async () => {
+      const { result } = await ready();
+      svc.history.mockResolvedValueOnce([msg("m3", "u2", 3)]);
+      await act(async () => live.hear?.({ type: "message", conversationId: "c1" }));
+      expect(svc.history).toHaveBeenLastCalledWith("c1", { after: "m2" });
+      expect(result.current.thread.messages.map((m) => m.id)).toEqual(["m1", "m2", "m3"]);
+    });
+
+    it("ignores events for other threads", async () => {
+      await ready();
+      const calls = svc.history.mock.calls.length;
+      await act(async () => live.hear?.({ type: "message", conversationId: "c9" }));
+      expect(svc.history.mock.calls.length).toBe(calls);
+    });
+
+    it("polls only as a slow safety net while the live connection is up", async () => {
+      live.up = true;
+      await ready();
+      expect(polls.has(THREAD_FALLBACK_POLL_MS)).toBe(true);
+      expect(polls.has(THREAD_POLL_MS)).toBe(false);
     });
   });
 });

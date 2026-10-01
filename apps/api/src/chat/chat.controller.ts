@@ -12,6 +12,7 @@ import {
 } from "@nestjs/common";
 import type { z } from "zod";
 import { AuthGuard, type AuthedRequest } from "../auth/auth.guard";
+import { RealtimeService } from "../realtime/realtime.service";
 import { ChatService } from "./chat.service";
 import { historyQuerySchema, markReadSchema, sendMessageSchema, startDmSchema } from "./dto";
 
@@ -31,7 +32,10 @@ function parse<S extends z.ZodTypeAny>(schema: S, input: unknown): z.infer<S> {
 @Controller("chat")
 @UseGuards(AuthGuard)
 export class ChatController {
-  constructor(private readonly chat: ChatService) {}
+  constructor(
+    private readonly chat: ChatService,
+    private readonly realtime: RealtimeService,
+  ) {}
 
   @Get("conversations")
   list(@Req() req: AuthedRequest) {
@@ -42,6 +46,16 @@ export class ChatController {
   async start(@Req() req: AuthedRequest, @Body() body: unknown) {
     const { userId } = parse(startDmSchema, body);
     return { conversationId: await this.chat.startDm(req.user, userId) };
+  }
+
+  /**
+   * Where this member's app opens its live connection, with a short-lived
+   * token for it. `{ enabled: false }` when live delivery isn't set up, and
+   * the app keeps polling.
+   */
+  @Get("realtime")
+  async connection(@Req() req: AuthedRequest) {
+    return this.realtime.connectionFor(req.user.id);
   }
 
   /** Today's new-chat allowance: the app warns before a first message it would refuse. */

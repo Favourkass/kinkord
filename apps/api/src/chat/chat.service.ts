@@ -12,6 +12,7 @@ import { DRIZZLE, type Db } from "../db/db.module";
 import { conversation, conversationParticipant, message, profile, user } from "../db/schema";
 import { notBanned } from "../moderation/admins";
 import { PresenceService } from "../presence/presence.service";
+import { RealtimeService } from "../realtime/realtime.service";
 import { StorageService } from "../storage/storage.service";
 import { chatDay, NEW_CHAT_LIMIT, newChatsPerDay } from "./allowance";
 import type { ChatAllowanceDto, ChatPeerDto, ConversationSummaryDto, MessageDto } from "./dto";
@@ -52,6 +53,7 @@ export class ChatService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Db,
     private readonly storage: StorageService,
+    private readonly realtime: RealtimeService,
   ) {}
 
   /**
@@ -184,28 +186,42 @@ export class ChatService {
     }
 
     const limit = newChatsPerDay(sender);
-    if (limit !== null && !(await this.hasMessages(conversationId))) {
-      // A first message starts a new chat, which the daily allowance counts.
-      // The lock queues this member's first messages one at a time, so two
-      // sent at once can't both slip in under the limit.
-      return this.db.transaction(async (tx) => {
-        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`new-chat:${senderId}`}))`);
-        const day = chatDay(new Date());
-        if ((await this.chatsStartedSince(tx, senderId, day.start)) >= limit) {
-          throw new HttpException(
-            {
-              code: NEW_CHAT_LIMIT,
-              message:
-                "You've already started a new chat today. You can message someone new after midnight.",
-              resetsAt: day.end.toISOString(),
-            },
-            HttpStatus.TOO_MANY_REQUESTS,
-          );
-        }
-        return this.insertMessage(tx, senderId, conversationId, input);
-      });
-    }
-    return this.insertMessage(this.db, senderId, conversationId, input);
+    const saved =
+      limit !== null && !(await this.hasMessages(conversationId))
+        ? await this.startChat(senderId, conversationId, input, limit)
+        : await this.insertMessage(this.db, senderId, conversationId, input);
+    // Both members' open apps hear of it at once, the sender's other tabs too.
+    void this.realtime.notify([peer.userId, senderId], { type: "message", conversationId });
+    return saved;
+  }
+
+  /**
+   * A first message starts a new chat, which the daily allowance counts. The
+   * lock queues this member's first messages one at a time, so two sent at
+   * once can't both slip in under the limit.
+   */
+  private startChat(
+    senderId: string,
+    conversationId: string,
+    input: { body: string; clientId?: string },
+    limit: number,
+  ): Promise<MessageDto & { clientId: string | null }> {
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`new-chat:${senderId}`}))`);
+      const day = chatDay(new Date());
+      if ((await this.chatsStartedSince(tx, senderId, day.start)) >= limit) {
+        throw new HttpException(
+          {
+            code: NEW_CHAT_LIMIT,
+            message:
+              "You've already started a new chat today. You can message someone new after midnight.",
+            resetsAt: day.end.toISOString(),
+          },
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+      return this.insertMessage(tx, senderId, conversationId, input);
+    });
   }
 
   private async insertMessage(

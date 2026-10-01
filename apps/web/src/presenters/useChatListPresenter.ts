@@ -6,9 +6,12 @@ import { toConversationRowVM, type ConversationSummaryPM } from "@/domain/chat";
 import { chatService } from "@/services/chat.service";
 import { useHomePresenter } from "./useHomePresenter";
 import { usePolling } from "./usePolling";
+import { useRealtime } from "./useRealtime";
 
-/** How often the inbox re-reads itself while it's on screen. */
+/** How often the inbox re-reads itself while it's on screen without a live connection. */
 export const LIST_POLL_MS = 10_000;
+/** With one, any message re-reads it at once and polling is only a safety net. */
+export const LIST_FALLBACK_POLL_MS = 60_000;
 
 function messageOf(e: unknown): string {
   return e instanceof Error ? e.message : "Couldn't load your messages.";
@@ -40,7 +43,9 @@ export function useChatListPresenter() {
       setError(messageOf(e));
     }
   }, []);
-  usePolling(refresh, LIST_POLL_MS, true);
+  const onRealtime = useCallback(() => void refresh(), [refresh]);
+  const { live } = useRealtime(onRealtime);
+  usePolling(refresh, live ? LIST_FALLBACK_POLL_MS : LIST_POLL_MS, true);
 
   const rows = useMemo(
     () => (summaries ?? []).map((s) => toConversationRowVM(s, viewerId, Routes.messageThread)),
