@@ -1,6 +1,7 @@
 import { BadRequestException, HttpException, NotFoundException } from "@nestjs/common";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { conversation, conversationParticipant, message } from "../db/schema";
+import type { PushService } from "../push/push.service";
 import type { RealtimeService } from "../realtime/realtime.service";
 import type { StorageService } from "../storage/storage.service";
 import { NEW_CHAT_LIMIT } from "./allowance";
@@ -50,15 +51,18 @@ function make(answers: unknown[]) {
     ),
   };
   const realtime = { notify: vi.fn(async () => undefined) };
+  const push = { newMessage: vi.fn() };
   return {
     ...q,
     service: new ChatService(
       q.db,
       storage as unknown as StorageService,
       realtime as unknown as RealtimeService,
+      push as unknown as PushService,
     ),
     storage,
     realtime,
+    push,
   };
 }
 
@@ -207,6 +211,20 @@ describe("ChatService.sendMessage", () => {
       type: "message",
       conversationId: "c1",
     });
+  });
+
+  it("sends the recipient a push notification for a new message", async () => {
+    const saved = row("m1", { senderId: "u1", body: "hi" });
+    const { service, push } = make([
+      [{ userId: "u1" }],
+      [{ userId: "u2" }],
+      [{ n: 0 }],
+      [{ id: "m0" }],
+      [saved],
+      undefined,
+    ]);
+    await service.sendMessage(member("u1"), "c1", { body: "hi" });
+    expect(push.newMessage).toHaveBeenCalledWith("u1", "u2", "c1");
   });
 
   it("says nothing live about a message that was refused", async () => {

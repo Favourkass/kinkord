@@ -13,6 +13,14 @@ vi.mock("@/services/authClient", () => ({
   authClient: { signOut: (...a: unknown[]) => signOut(...a) },
 }));
 
+// Push is its own service; here we only check the shell keeps it in step.
+const order: string[] = [];
+const pushSync = vi.fn(async () => undefined);
+const forgetDevice = vi.fn(async () => void order.push("forget"));
+vi.mock("@/services/push.service", () => ({
+  pushService: { sync: () => pushSync(), forgetDevice: () => forgetDevice() },
+}));
+
 const apiGet = vi.fn();
 vi.mock("@/services/apiClient", () => {
   class ApiError extends Error {
@@ -41,7 +49,10 @@ describe("useHomePresenter", () => {
   beforeEach(() => {
     push.mockClear();
     replace.mockClear();
-    signOut.mockReset().mockResolvedValue({});
+    signOut.mockReset().mockImplementation(async () => void order.push("signOut"));
+    order.length = 0;
+    pushSync.mockClear();
+    forgetDevice.mockClear();
     apiGet.mockReset().mockImplementation(routeGet);
   });
 
@@ -75,6 +86,14 @@ describe("useHomePresenter", () => {
     });
     await waitFor(() => expect(push).toHaveBeenCalledWith("/login"));
     expect(signOut).toHaveBeenCalled();
+    // The device is forgotten while still signed in, then the session ends.
+    expect(order).toEqual(["forget", "signOut"]);
+  });
+
+  it("keeps this device's notification subscription current once signed in", async () => {
+    const { result } = renderHook(() => useHomePresenter());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(pushSync).toHaveBeenCalledTimes(1);
   });
 
   it("surfaces a friendly error on non-auth failures", async () => {

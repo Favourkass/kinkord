@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import Link from "next/link";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import MaskIcon from "@/components/app/MaskIcon";
@@ -8,6 +8,7 @@ import type { ThreadMessageVM, ThreadPeerVM } from "@/domain/chat";
 import MessageBubble from "./MessageBubble";
 import MessageComposer, { type MessageComposerProps } from "./MessageComposer";
 import PresenceDot from "./PresenceDot";
+import { useVisibleViewport } from "./useVisibleViewport";
 
 export interface ThreadScreenProps {
   peer: ThreadPeerVM | null;
@@ -40,19 +41,36 @@ export interface ThreadScreenProps {
  * One conversation: header, scrolling messages, composer. The list follows the
  * newest message as it arrives, unless the reader has scrolled up to read
  * history, in which case it stays where they are.
+ *
+ * On a phone the thread is its own full-screen layer, sized to the part of the
+ * screen the keyboard leaves visible: the header stays put, only the messages
+ * scroll, and the composer sits on the keyboard. The page behind can't scroll
+ * it away. On desktop it's a column in the page, as before.
  */
 export default function ThreadScreen(p: ThreadScreenProps) {
   const scroller = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
   const count = p.messages.length;
+  const viewport = useVisibleViewport();
 
+  // New messages, and the keyboard opening, both keep the newest one in view.
   useEffect(() => {
     const el = scroller.current;
     if (el && pinned.current) el.scrollTop = el.scrollHeight;
-  }, [count]);
+  }, [count, viewport?.height]);
+
+  const fit = viewport
+    ? ({
+        "--thread-h": `${viewport.height}px`,
+        "--thread-top": `${viewport.top}px`,
+      } as CSSProperties)
+    : undefined;
 
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col border-x border-app-line lg:mx-auto lg:max-w-[640px]">
+    <div
+      style={fit}
+      className="fixed inset-x-0 top-0 z-30 flex h-[var(--thread-h,100dvh)] w-full translate-y-[var(--thread-top,0px)] flex-col bg-app-page pt-[env(safe-area-inset-top)] lg:static lg:z-auto lg:mx-auto lg:h-auto lg:min-h-0 lg:max-w-[640px] lg:flex-1 lg:translate-y-0 lg:border-x lg:border-app-line lg:bg-transparent lg:pt-0"
+    >
       <header className="flex items-center gap-[12px] border-b border-app-line bg-app-surface px-[16px] py-[10px]">
         <Link
           href={p.backHref}

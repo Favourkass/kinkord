@@ -31,8 +31,10 @@ const posts = (author: string | null = "u2", postId = "p1") => ({
   byId: vi.fn(async () => (author ? { postId, author: { userId: author } } : null)),
 });
 
+const push = { newComment: vi.fn() };
+
 const service = (db = makeDb(), p = posts()) =>
-  new PostInteractionsService(db as never, p as never, storage() as never);
+  new PostInteractionsService(db as never, p as never, storage() as never, push as never);
 
 describe("createCommentSchema", () => {
   it("refuses whitespace", () => {
@@ -53,6 +55,20 @@ describe("visibility", () => {
     await expect(service(makeDb(), posts(null)).comment("p1", "u1", "hi")).rejects.toThrow(
       /not found/i,
     );
+    expect(push.newComment).not.toHaveBeenCalled();
+  });
+
+  it("posts a comment and tells the post's author", async () => {
+    push.newComment.mockClear();
+    const db = makeDb([
+      [{ id: "c9", body: "hi", createdAt: new Date("2026-10-01T12:00:00Z") }],
+      [{ username: "ada", displayName: "Ada", avatarKey: null }],
+    ]);
+    await expect(service(db, posts("u2")).comment("p1", "u1", "hi")).resolves.toMatchObject({
+      id: "c9",
+      body: "hi",
+    });
+    expect(push.newComment).toHaveBeenCalledWith("p1", "u2", "u1");
   });
 
   it("will not list comments on a post they cannot read", async () => {

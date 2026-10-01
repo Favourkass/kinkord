@@ -2,6 +2,7 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from "@nes
 import { and, count, desc, eq, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { Db, DRIZZLE } from "../db/db.module";
+import { PushService } from "../push/push.service";
 import { follow, profile, user } from "../db/schema";
 
 export interface FollowCounts {
@@ -36,15 +37,21 @@ export interface FriendsPage {
  */
 @Injectable()
 export class FollowsService {
-  constructor(@Inject(DRIZZLE) private readonly db: Db) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: Db,
+    private readonly push: PushService,
+  ) {}
 
   async follow(viewerId: string, username: string) {
     const targetId = await this.resolveUserId(username);
     if (targetId === viewerId) throw new BadRequestException("You can’t follow yourself.");
-    await this.db
+    const added = await this.db
       .insert(follow)
       .values({ followerId: viewerId, followingId: targetId })
-      .onConflictDoNothing();
+      .onConflictDoNothing()
+      .returning({ followerId: follow.followerId });
+    // Only a new follow is news: tapping Follow twice notifies once.
+    if (added.length > 0) this.push.newFollower(viewerId, targetId);
     return { following: true, followersCount: await this.followersCount(targetId) };
   }
 
