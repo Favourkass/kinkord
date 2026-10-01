@@ -293,15 +293,23 @@ describe("ProfilesService", () => {
   });
 
   it("exposes the new fields and lock dates in the own-profile VM", async () => {
-    const { service, row } = makeService();
-    row.usernameChangedAt = new Date("2026-09-01T00:00:00Z");
-    const vm = await service.getOwn("u1", "Favour");
-    expect(vm.socialLinks).toEqual({});
-    expect(vm.profileVisibility).toBe("public");
-    expect(vm.nationality).toBeNull();
-    expect(vm.canChangeDisplayNameAt).toBeNull();
-    expect(vm.usernameChangedAt).toBe("2026-09-01T00:00:00.000Z");
-    expect(typeof vm.canChangeUsernameAt).toBe("string");
+    // getOwn reads the clock: pin it, or the 30-day lock below runs out on the
+    // real calendar (it did, on 1 Oct 2026).
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(now);
+    try {
+      const { service, row } = makeService();
+      row.usernameChangedAt = new Date("2026-09-01T00:00:00Z");
+      const vm = await service.getOwn("u1", "Favour");
+      expect(vm.socialLinks).toEqual({});
+      expect(vm.profileVisibility).toBe("public");
+      expect(vm.nationality).toBeNull();
+      expect(vm.canChangeDisplayNameAt).toBeNull();
+      expect(vm.usernameChangedAt).toBe("2026-09-01T00:00:00.000Z");
+      expect(vm.canChangeUsernameAt).toBe("2026-10-01T00:00:00.000Z");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   describe("changeUsername", () => {
