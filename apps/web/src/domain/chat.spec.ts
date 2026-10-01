@@ -23,6 +23,8 @@ const msg = (id: string, over: Partial<ChatMessagePM> = {}): ChatMessagePM => ({
   ...over,
 });
 
+const href = (usernameOrId: string) => `/u/${usernameOrId}`;
+
 const summary = (over: Partial<ConversationSummaryPM> = {}): ConversationSummaryPM => ({
   id: "c1",
   kind: "dm",
@@ -108,7 +110,7 @@ describe("a blocked peer", () => {
       online: false,
       blockedByMe: true,
     };
-    expect(toThreadPeerVM(peer)).toMatchObject({ userId: "u2", blockedByMe: true });
+    expect(toThreadPeerVM(peer, href)).toMatchObject({ userId: "u2", blockedByMe: true });
   });
 });
 
@@ -164,8 +166,17 @@ describe("thread view models", () => {
   });
 
   it("has no peer once the other member is gone", () => {
-    expect(toThreadPeerVM(null)).toBeNull();
-    expect(toThreadPeerVM(summary().peer)).toMatchObject({ displayName: "Ada", isOnline: true });
+    expect(toThreadPeerVM(null, href)).toBeNull();
+    expect(toThreadPeerVM(summary().peer, href)).toMatchObject({
+      displayName: "Ada",
+      isOnline: true,
+    });
+  });
+
+  it("links the header to their profile, by username or, without one, by id", () => {
+    expect(toThreadPeerVM(summary().peer, href)?.profileHref).toBe("/u/ada");
+    const noHandle = { ...summary().peer!, username: null };
+    expect(toThreadPeerVM(noHandle, href)?.profileHref).toBe("/u/u2");
   });
 });
 

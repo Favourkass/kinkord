@@ -83,6 +83,33 @@ export default function ThreadScreen(p: ThreadScreenProps) {
     if (el && pinned.current) el.scrollTop = el.scrollHeight;
   }, [count, viewport?.height]);
 
+  // Who the thread is with. Tapping them opens their profile.
+  const who = (
+    <>
+      <span className="relative shrink-0">
+        <AvatarCircle
+          src={p.peer?.avatarUrl ?? null}
+          alt=""
+          size={38}
+          ringClassName="bg-app-line"
+        />
+        <PresenceDot
+          online={Boolean(p.peer?.isOnline)}
+          label={p.onlineLabel}
+          className="absolute -bottom-[1px] -right-[1px]"
+        />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[15px] font-bold text-app-text">
+          {p.peer?.displayName ?? (p.loading ? "…" : "Member")}
+        </span>
+        {p.peer?.isOnline && (
+          <span className="block text-[12px] text-app-online">{p.onlineLabel}</span>
+        )}
+      </span>
+    </>
+  );
+
   const fit = viewport
     ? ({
         "--thread-h": `${viewport.height}px`,
@@ -104,25 +131,18 @@ export default function ThreadScreen(p: ThreadScreenProps) {
           >
             <MaskIcon name="chevron-right" width={20} className="rotate-180" />
           </Link>
-          <span className="relative shrink-0">
-            <AvatarCircle
-              src={p.peer?.avatarUrl ?? null}
-              alt=""
-              size={38}
-              ringClassName="bg-app-line"
-            />
-            <PresenceDot
-              online={Boolean(p.peer?.isOnline)}
-              label={p.onlineLabel}
-              className="absolute -bottom-[1px] -right-[1px]"
-            />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[15px] font-bold text-app-text">
-              {p.peer?.displayName ?? (p.loading ? "…" : "Member")}
-            </p>
-            {p.peer?.isOnline && <p className="text-[12px] text-app-online">{p.onlineLabel}</p>}
-          </div>
+          {p.peer ? (
+            // select-none: a long press opens the link's menu rather than
+            // selecting the name (and Android's "Tap to search" with it).
+            <Link
+              href={p.peer.profileHref}
+              className="flex min-w-0 flex-1 select-none items-center gap-[12px] rounded-[12px]"
+            >
+              {who}
+            </Link>
+          ) : (
+            <div className="flex min-w-0 flex-1 select-none items-center gap-[12px]">{who}</div>
+          )}
           {p.menu && <ThreadMenu {...p.menu} />}
         </header>
 

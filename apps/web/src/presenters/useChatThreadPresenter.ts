@@ -272,7 +272,7 @@ export function useChatThreadPresenter(conversationId: string) {
     }
   }, [conversationId, hasMore, loadingMore, messages]);
 
-  const peer = useMemo(() => toThreadPeerVM(summary?.peer ?? null), [summary]);
+  const peer = useMemo(() => toThreadPeerVM(summary?.peer ?? null, Routes.member), [summary]);
   const notice = newChatNotice({
     empty,
     allowance: allowance?.for === conversationId ? allowance.value : null,
