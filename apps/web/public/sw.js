@@ -98,49 +98,55 @@ self.addEventListener("fetch", (event) => {
 });
 
 // Web Push notifications (VAPID)
+// Push: what the API sends is { title, body, url, tag }. The same tag replaces
+// the last notification, so a busy chat stays one notification, not twenty.
 self.addEventListener("push", (event) => {
-  if (!event.data) return;
-
+  let data = {};
   try {
-    const data = event.data.json();
-    const title = data.title || "Kinkord";
-    const options = {
-      body: data.body || "New update on Kinkord",
-      icon: data.icon || "/icons/icon-192x192.png",
-      badge: data.badge || "/icons/icon-192x192.png",
-      data: {
-        url: data.url || "/",
-      },
-    };
-
-    event.waitUntil(self.registration.showNotification(title, options));
+    data = event.data ? event.data.json() : {};
   } catch {
-    // Fallback for raw text push messages
-    const text = event.data.text();
-    event.waitUntil(
-      self.registration.showNotification("Kinkord", {
-        body: text,
-        icon: "/icons/icon-192x192.png",
-      }),
-    );
+    data = { body: event.data ? event.data.text() : "" };
   }
-});
-
-// Notification click: Open or focus matching tab
-self.addEventListener("notificationclick", (event) => {
-  event.notification.close();
-  const targetUrl = event.notification.data?.url || "/";
+  const url = new URL(data.url || "/", self.location.origin).href;
+  const options = {
+    body: data.body || "New activity on Kinkord",
+    icon: "/icons/icon-192x192.png",
+    badge: "/icons/icon-192x192.png",
+    tag: data.tag,
+    renotify: Boolean(data.tag),
+    data: { url },
+  };
 
   event.waitUntil(
-    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
-      for (const client of clientList) {
-        if (client.url === targetUrl && "focus" in client) {
-          return client.focus();
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+      // Already looking at that very screen: nothing to tell them.
+      const watching = windows.some(
+        (w) => w.visibilityState === "visible" && new URL(w.url).pathname === new URL(url).pathname,
+      );
+      if (watching) return undefined;
+      return self.registration.showNotification(data.title || "Kinkord", options);
+    }),
+  );
+});
+
+// Tap: bring an open Kinkord window to that screen, or open one there.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || new URL("/", self.location.origin).href;
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (windows) => {
+      const open = windows.find((w) => new URL(w.url).origin === self.location.origin);
+      if (open) {
+        try {
+          // Only a window this worker controls can be moved; others just open fresh.
+          if (open.url !== url) await open.navigate(url);
+          return await open.focus();
+        } catch {
+          return self.clients.openWindow(url);
         }
       }
-      if (clients.openWindow) {
-        return clients.openWindow(targetUrl);
-      }
+      return self.clients.openWindow(url);
     }),
   );
 });

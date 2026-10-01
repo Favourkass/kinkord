@@ -2,12 +2,15 @@
 
 import AppShell from "@/components/app/AppShell";
 import ChatListScreen from "@/components/chat/ChatListScreen";
+import PushPrompt from "@/components/chat/PushPrompt";
 import { CHAT_COPY } from "@/constants/chat";
 import { getAppShellNav } from "@/presenters/getAppShellNav";
 import { useChatListPresenter } from "@/presenters/useChatListPresenter";
+import { usePushPresenter } from "@/presenters/usePushPresenter";
 
 export default function MessagesPage() {
   const { shell, list } = useChatListPresenter();
+  const push = usePushPresenter();
   const nav = getAppShellNav();
 
   return (
@@ -34,6 +37,7 @@ export default function MessagesPage() {
         error={list.error}
         empty={list.empty}
         heading={CHAT_COPY.heading}
+        banner={push.prompt && <PushPrompt {...push.prompt} />}
         loadingText={CHAT_COPY.loading}
         emptyTitle={CHAT_COPY.emptyTitle}
         emptyBody={CHAT_COPY.emptyBody}

@@ -2,6 +2,7 @@ import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nest
 import { and, count, desc, eq, isNull, lt } from "drizzle-orm";
 import { z } from "zod";
 import { Db, DRIZZLE } from "../db/db.module";
+import { PushService } from "../push/push.service";
 import {
   post,
   postComment,
@@ -64,6 +65,7 @@ export class PostInteractionsService {
     @Inject(DRIZZLE) private readonly db: Db,
     private readonly posts: PostsService,
     private readonly storage: StorageService,
+    private readonly push: PushService,
   ) {}
 
   /** Idempotent: the composite primary key is what makes a double tap harmless. */
@@ -154,11 +156,12 @@ export class PostInteractionsService {
 
   async comment(postId: string, userId: string, body: string): Promise<CommentVM> {
     // Resolved for its visibility check: a post you cannot read, you cannot answer.
-    await this.visiblePost(postId, userId);
+    const authorId = await this.visiblePost(postId, userId);
     const [row] = await this.db
       .insert(postComment)
       .values({ postId, authorId: userId, body })
       .returning();
+    this.push.newComment(postId, authorId, userId);
     const [me] = await this.db
       .select({
         username: user.username,

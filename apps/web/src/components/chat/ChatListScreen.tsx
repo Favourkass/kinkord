@@ -7,6 +7,8 @@ export interface ChatListScreenProps {
   error: string | null;
   empty: boolean;
   heading: string;
+  /** Shown under the heading: the "turn on notifications" card, when it applies. */
+  banner?: React.ReactNode;
   loadingText: string;
   emptyTitle: string;
   emptyBody: string;
@@ -19,6 +21,7 @@ export default function ChatListScreen(p: ChatListScreenProps) {
       <h1 className="border-b border-app-line px-[20px] py-[16px] text-[20px] font-bold text-app-text">
         {p.heading}
       </h1>
+      {p.banner}
       {p.loading && (
         <p className="px-[20px] py-[40px] text-center text-[14px] text-app-muted">
           {p.loadingText}
