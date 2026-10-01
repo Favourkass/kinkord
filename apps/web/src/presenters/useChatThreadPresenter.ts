@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CHAT_COPY } from "@/constants/chat";
+import { CHAT_COPY, photosLockedText } from "@/constants/chat";
 import { Routes } from "@/constants/Routes";
 import {
   isNewChatLimit,
@@ -12,9 +12,10 @@ import {
   toThreadPeerVM,
   type ChatAllowancePM,
   type ChatMessagePM,
-  type ConversationSummaryPM,
+  type ConversationThreadPM,
   type PendingMessage,
 } from "@/domain/chat";
+import type { PostMediaVM } from "@/domain/post";
 import type { RealtimeEventPM } from "@/domain/realtime";
 import { ApiError } from "@/services/apiClient";
 import { chatService } from "@/services/chat.service";
@@ -40,6 +41,14 @@ function messageOf(e: unknown, fallback: string): string {
   return e instanceof Error ? e.message : fallback;
 }
 
+/** The photo attached to the next message: uploading, ready (has a key), or failed. */
+interface DraftPhoto {
+  id: string;
+  localUrl: string;
+  key: string | null;
+  error: string | null;
+}
+
 /**
  * One conversation. Saved messages are kept as they came from the API, oldest
  * first; bubbles still on their way live beside them until the server confirms
@@ -48,7 +57,7 @@ function messageOf(e: unknown, fallback: string): string {
 export function useChatThreadPresenter(conversationId: string) {
   const shell = useHomePresenter();
   const [viewerId, setViewerId] = useState<string | null>(null);
-  const [summary, setSummary] = useState<ConversationSummaryPM | null>(null);
+  const [summary, setSummary] = useState<ConversationThreadPM | null>(null);
   const [messages, setMessages] = useState<ChatMessagePM[]>([]);
   const [pending, setPending] = useState<PendingMessage[]>([]);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
@@ -61,6 +70,19 @@ export function useChatThreadPresenter(conversationId: string) {
   const [allowance, setAllowance] = useState<{ for: string; value: ChatAllowancePM } | null>(null);
   const [refusedIn, setRefusedIn] = useState<string | null>(null);
   const lastMarked = useRef<string | null>(null);
+  const [draftPhoto, setDraftPhoto] = useState<DraftPhoto | null>(null);
+  // Someone else's photos this viewer has chosen to see, for as long as the thread is open.
+  const [revealed, setRevealed] = useState<ReadonlySet<string>>(() => new Set());
+  const [viewing, setViewing] = useState<string | null>(null);
+  // The photo button was tapped before photos were open here.
+  const [photoLockedTapped, setPhotoLockedTapped] = useState(false);
+  // Device copies of photos (drafts, and bubbles still sending), freed with the thread.
+  const localUrls = useRef<string[]>([]);
+
+  useEffect(() => {
+    const urls = localUrls.current;
+    return () => urls.forEach((u) => URL.revokeObjectURL(u));
+  }, []);
 
   useEffect(() => {
     let live = true;
@@ -146,9 +168,9 @@ export function useChatThreadPresenter(conversationId: string) {
   }, [conversationId, messages, viewerId]);
 
   const deliver = useCallback(
-    async (clientId: string, body: string) => {
+    async (clientId: string, body: string, photoKey?: string) => {
       try {
-        const saved = await chatService.send(conversationId, body, clientId);
+        const saved = await chatService.send(conversationId, body, clientId, photoKey);
         setPending((p) => p.filter((x) => x.clientId !== clientId));
         setMessages((m) => mergeMessages(m, [saved]));
         setSendError(null);
@@ -170,15 +192,20 @@ export function useChatThreadPresenter(conversationId: string) {
   const send = useCallback(
     (text: string) => {
       const body = text.trim();
-      if (!body) return;
+      // A photo still uploading, or one that failed, holds the message back: the
+      // composer shows which, and can't send until it's ready or removed.
+      if (draftPhoto && !draftPhoto.key) return;
+      const photo = draftPhoto?.key ? { localUrl: draftPhoto.localUrl, key: draftPhoto.key } : null;
+      if (!body && !photo) return;
       const clientId = clientIdOf();
       setPending((p) => [
         ...p,
-        { clientId, body, createdAt: new Date().toISOString(), status: "sending" },
+        { clientId, body, photo, createdAt: new Date().toISOString(), status: "sending" },
       ]);
-      void deliver(clientId, body);
+      setDraftPhoto(null);
+      void deliver(clientId, body, photo?.key);
     },
-    [deliver],
+    [deliver, draftPhoto],
   );
 
   const retry = useCallback(
@@ -186,10 +213,44 @@ export function useChatThreadPresenter(conversationId: string) {
       const item = pending.find((p) => p.clientId === clientId);
       if (!item || item.status !== "failed") return;
       setPending((p) => p.map((x) => (x.clientId === clientId ? { ...x, status: "sending" } : x)));
-      void deliver(clientId, item.body);
+      // The photo is uploaded already: a retry only resends the message.
+      void deliver(clientId, item.body, item.photo?.key);
     },
     [deliver, pending],
   );
+
+  const canSendPhotos = Boolean(summary?.canSendPhotos);
+
+  /** Starts uploading at once, so the photo is usually ready by the time Send is tapped. */
+  const attachPhoto = useCallback(
+    (file: File) => {
+      if (!canSendPhotos) {
+        setPhotoLockedTapped(true);
+        return;
+      }
+      const localUrl = URL.createObjectURL(file);
+      localUrls.current.push(localUrl);
+      const id = clientIdOf();
+      setDraftPhoto({ id, localUrl, key: null, error: null });
+      chatService.uploadPhoto(conversationId, file).then(
+        (key) => setDraftPhoto((d) => (d?.id === id ? { ...d, key } : d)),
+        (e: unknown) => {
+          const error = e instanceof ApiError ? e.message : CHAT_COPY.photoUploadFailed;
+          setDraftPhoto((d) => (d?.id === id ? { ...d, error } : d));
+        },
+      );
+    },
+    [canSendPhotos, conversationId],
+  );
+
+  const removePhoto = useCallback(() => setDraftPhoto(null), []);
+  const photoLocked = useCallback(() => setPhotoLockedTapped(true), []);
+  const revealPhoto = useCallback(
+    (messageId: string) => setRevealed((r) => new Set(r).add(messageId)),
+    [],
+  );
+  const openPhoto = useCallback((src: string) => setViewing(src), []);
+  const closePhoto = useCallback(() => setViewing(null), []);
 
   const loadMore = useCallback(async () => {
     const oldest = messages[0];
@@ -214,11 +275,14 @@ export function useChatThreadPresenter(conversationId: string) {
   });
   const bubbles = useMemo(
     () => [
-      ...messages.map((m) => toThreadMessageVM(m, viewerId)),
+      ...messages.map((m) => toThreadMessageVM(m, viewerId, revealed)),
       ...pending.map((p) => toPendingMessageVM(p, viewerId)),
     ],
-    [messages, pending, viewerId],
+    [messages, pending, viewerId, revealed],
   );
+  const viewingPhoto: PostMediaVM | null = viewing
+    ? { id: viewing, src: viewing, fullSrc: viewing, alt: CHAT_COPY.photoAlt }
+    : null;
 
   return {
     shell,
@@ -241,10 +305,30 @@ export function useChatThreadPresenter(conversationId: string) {
               text: notice === "blocked" ? CHAT_COPY.newChatLimit : CHAT_COPY.newChatHint,
               blocking: notice === "blocked",
             },
+      /** Why photos aren't open yet, once the member has tried to add one. */
+      photoNotice:
+        photoLockedTapped && !canSendPhotos && peer ? photosLockedText(peer.displayName) : null,
+      viewingPhoto,
+    },
+    composerPhoto: {
+      allowed: canSendPhotos,
+      draft: draftPhoto
+        ? {
+            previewUrl: draftPhoto.localUrl,
+            uploading: draftPhoto.key === null && draftPhoto.error === null,
+            error: draftPhoto.error,
+          }
+        : null,
     },
     backHref: Routes.messages,
     send,
     retry,
     loadMore: () => void loadMore(),
+    attachPhoto,
+    removePhoto,
+    photoLocked,
+    revealPhoto,
+    openPhoto,
+    closePhoto,
   };
 }

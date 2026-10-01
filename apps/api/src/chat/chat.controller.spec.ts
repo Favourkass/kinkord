@@ -16,6 +16,7 @@ function make() {
     sendMessage: vi.fn(async () => ({ id: "m1" })),
     markRead: vi.fn(async () => undefined),
     allowance: vi.fn(async () => ({ newChatsPerDay: 1, usedToday: 0, resetsAt: "x" })),
+    presignPhotoUpload: vi.fn(async () => ({ key: "chat/c1/u1/a.jpg" })),
   };
   const realtime = {
     connectionFor: vi.fn(async () => ({ enabled: true, channel: "/chat/u1", token: "v1.a.b" })),
@@ -31,6 +32,21 @@ function make() {
 }
 
 describe("ChatController", () => {
+  it("hands out a photo upload slot for the thread, for the signed-in member", async () => {
+    const { controller, chat } = make();
+    const id = "11111111-1111-4111-8111-111111111111";
+    await expect(
+      controller.photoUpload(req, id, { contentType: "image/jpeg", contentLength: 2048 }),
+    ).resolves.toEqual({ key: "chat/c1/u1/a.jpg" });
+    expect(chat.presignPhotoUpload).toHaveBeenCalledWith("u1", id, "image/jpeg", 2048);
+  });
+
+  it("refuses a photo upload request that doesn't say what the file is", async () => {
+    const { controller, chat } = make();
+    await expect(controller.photoUpload(req, "c1", {})).rejects.toBeInstanceOf(BadRequestException);
+    expect(chat.presignPhotoUpload).not.toHaveBeenCalled();
+  });
+
   it("opens a thread with the member named in the body", async () => {
     const { controller, chat } = make();
     await expect(controller.start(req, { userId: "u2" })).resolves.toEqual({
