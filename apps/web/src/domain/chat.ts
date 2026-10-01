@@ -103,6 +103,8 @@ export interface ThreadPeerVM {
   avatarUrl: string | null;
   isOnline: boolean;
   blockedByMe: boolean;
+  /** Their profile, opened by tapping them in the header. */
+  profileHref: string;
 }
 
 const PREVIEW_MAX = 60;
@@ -134,7 +136,11 @@ export function toConversationRowVM(
   };
 }
 
-export function toThreadPeerVM(peer: ChatPeerPM | null): ThreadPeerVM | null {
+/** `profileHref` takes the username, or the member id for someone without one. */
+export function toThreadPeerVM(
+  peer: ChatPeerPM | null,
+  profileHref: (usernameOrId: string) => string,
+): ThreadPeerVM | null {
   if (!peer) return null;
   return {
     userId: peer.userId,
@@ -142,6 +148,7 @@ export function toThreadPeerVM(peer: ChatPeerPM | null): ThreadPeerVM | null {
     avatarUrl: peer.avatarUrl,
     isOnline: peer.online,
     blockedByMe: peer.blockedByMe,
+    profileHref: profileHref(peer.username ?? peer.userId),
   };
 }
 
