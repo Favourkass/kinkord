@@ -30,7 +30,14 @@ const row: ConversationSummaryPM = {
   id: "c1",
   kind: "dm",
   lastMessageAt: "2026-09-28T10:00:00.000Z",
-  peer: { userId: "u2", username: "ada", displayName: "Ada", avatarUrl: null, online: true },
+  peer: {
+    userId: "u2",
+    username: "ada",
+    displayName: "Ada",
+    avatarUrl: null,
+    online: true,
+    blockedByMe: false,
+  },
   lastMessage: {
     id: "m1",
     conversationId: "c1",

@@ -16,6 +16,7 @@ export const Routes = {
   moderation: "/moderation",
   moderationMember: (id: string) => `/moderation/members/${encodeURIComponent(id)}`,
   moderationBlocklist: "/moderation/blocklist",
+  moderationReports: "/moderation/reports",
   signup: "/signup",
   login: "/login",
   appHome: "/home",

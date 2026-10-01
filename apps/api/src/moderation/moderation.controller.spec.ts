@@ -2,6 +2,7 @@ import { BadRequestException } from "@nestjs/common";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthedRequest } from "../auth/auth.guard";
 import { ModerationController } from "./moderation.controller";
+import type { ReportsService } from "../safety/reports.service";
 import type { ModerationService } from "./moderation.service";
 
 const founder = { user: { id: "u1", email: "maxihandsome@gmail.com", emailVerified: true } };
@@ -14,11 +15,41 @@ function make() {
     deleteMember: vi.fn(async () => ({ deleted: "u9" })),
     addRule: vi.fn(async () => ({ id: "r1" })),
   };
-  const controller = new ModerationController(service as unknown as ModerationService, {} as never);
-  return { controller, service };
+  const reports = {
+    list: vi.fn(async () => []),
+    resolve: vi.fn(async () => ({
+      id: "11111111-1111-4111-8111-111111111111",
+      status: "resolved",
+    })),
+  };
+  const controller = new ModerationController(
+    service as unknown as ModerationService,
+    reports as unknown as ReportsService,
+  );
+  return { controller, service, reports };
 }
 
 describe("ModerationController", () => {
+  it("lists open reports by default, or the status asked for", async () => {
+    const { controller, reports } = make();
+    await controller.reportQueue({});
+    await controller.reportQueue({ status: "dismissed" });
+    expect(reports.list.mock.calls).toEqual([["open"], ["dismissed"]]);
+  });
+
+  it("closes a report as the acting admin, and refuses a malformed id or status", async () => {
+    const { controller, reports } = make();
+    const id = "11111111-1111-4111-8111-111111111111";
+    await controller.resolveReport(req, id, { status: "resolved" });
+    expect(reports.resolve).toHaveBeenCalledWith("u1", id, "resolved");
+    expect(() => controller.resolveReport(req, "r1", { status: "resolved" })).toThrow(
+      BadRequestException,
+    );
+    expect(() => controller.resolveReport(req, id, { status: "open" })).toThrow(
+      BadRequestException,
+    );
+  });
+
   it("tells the app whether the signed-in member is an admin", async () => {
     const { controller } = make();
     await expect(controller.access(req)).resolves.toEqual({ isAdmin: true });

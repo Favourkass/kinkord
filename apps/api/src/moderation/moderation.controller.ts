@@ -12,6 +12,8 @@ import {
 } from "@nestjs/common";
 import { z } from "zod";
 import { AuthGuard, type AuthedRequest } from "../auth/auth.guard";
+import { reportQuerySchema, resolveReportSchema } from "../safety/dto";
+import { ReportsService } from "../safety/reports.service";
 import { AdminGuard } from "./admin.guard";
 import { ModerationService } from "./moderation.service";
 
@@ -40,7 +42,10 @@ function parse<T>(schema: z.ZodType<T>, body: unknown): T {
 @Controller("admin")
 @UseGuards(AuthGuard)
 export class ModerationController {
-  constructor(private readonly moderation: ModerationService) {}
+  constructor(
+    private readonly moderation: ModerationService,
+    private readonly reports: ReportsService,
+  ) {}
 
   /** Lets the app decide whether to show the admin entry point. Any member may ask. */
   @Get("access")
@@ -97,6 +102,21 @@ export class ModerationController {
   @UseGuards(AdminGuard)
   deletePost(@Req() req: AuthedRequest, @Param("id") id: string) {
     return this.moderation.deletePost(req.user.id, id);
+  }
+
+  /** Members' reports, open ones by default: most serious first. */
+  @Get("reports")
+  @UseGuards(AdminGuard)
+  reportQueue(@Query() query: unknown) {
+    // This file's parse() reads a defaulted field as optional; "open" is that default.
+    return this.reports.list(parse(reportQuerySchema, query ?? {}).status ?? "open");
+  }
+
+  @Post("reports/:id/resolve")
+  @UseGuards(AdminGuard)
+  resolveReport(@Req() req: AuthedRequest, @Param("id") id: string, @Body() body: unknown) {
+    if (!z.string().uuid().safeParse(id).success) throw new BadRequestException("Unknown report.");
+    return this.reports.resolve(req.user.id, id, parse(resolveReportSchema, body).status);
   }
 
   @Get("blocklist")

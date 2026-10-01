@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { PgDialect } from "drizzle-orm/pg-core";
-import { user } from "../db/schema";
-import { isAdmin, isBanned, isSuperAdmin, notBanned } from "./admins";
+import { staff, user } from "../db/schema";
+import { adminUserIds, isAdmin, isBanned, isSuperAdmin, notBanned } from "./admins";
 
 /** A client whose single select resolves to `result`. */
 function answering(result: unknown[]) {
@@ -23,6 +23,20 @@ describe("isSuperAdmin", () => {
 
   it("refuses the same address until it is verified", () => {
     expect(isSuperAdmin({ email: "maxihandsome@gmail.com", emailVerified: false })).toBe(false);
+  });
+});
+
+describe("adminUserIds", () => {
+  it("lists the founder's verified accounts and the staff, each once", async () => {
+    const where = vi.fn(async () => [{ id: "f1" }, { id: "f2" }]);
+    const from = vi.fn((table: unknown) =>
+      table === staff ? Promise.resolve([{ id: "s1" }, { id: "f1" }]) : { where },
+    );
+    const db = { select: vi.fn(() => ({ from })) } as never;
+    await expect(adminUserIds(db)).resolves.toEqual(["f1", "f2", "s1"]);
+    const query = new PgDialect().sqlToQuery((where.mock.calls[0] as unknown[])[0] as never);
+    expect(query.sql).toBe('(lower("user"."email") in ($1, $2) and "user"."email_verified" = $3)');
+    expect(query.params).toEqual(["maxihandsome@gmail.com", "nnabuekassidy@gmail.com", true]);
   });
 });
 

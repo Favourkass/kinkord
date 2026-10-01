@@ -28,6 +28,16 @@ vi.mock("./useRealtime", () => ({
   },
 }));
 
+// Blocking goes through the safety service; here it just succeeds.
+const safety = { block: vi.fn(), unblock: vi.fn(), report: vi.fn() };
+vi.mock("@/services/safety.service", () => ({
+  safetyService: {
+    block: (...a: unknown[]) => safety.block(...a),
+    unblock: (...a: unknown[]) => safety.unblock(...a),
+    report: (...a: unknown[]) => safety.report(...a),
+  },
+}));
+
 const svc = {
   me: vi.fn(),
   conversation: vi.fn(),
@@ -63,7 +73,14 @@ const header = (over: Partial<ConversationThreadPM> = {}): ConversationThreadPM 
   id: "c1",
   kind: "dm",
   lastMessageAt: "2026-09-28T10:00:00.000Z",
-  peer: { userId: "u2", username: "ada", displayName: "Ada", avatarUrl: null, online: false },
+  peer: {
+    userId: "u2",
+    username: "ada",
+    displayName: "Ada",
+    avatarUrl: null,
+    online: false,
+    blockedByMe: false,
+  },
   lastMessage: null,
   unreadCount: 0,
   canSendPhotos: false,
@@ -398,5 +415,28 @@ describe("useChatThreadPresenter", () => {
       act(() => result.current.closePhoto());
       expect(result.current.thread.viewingPhoto).toBeNull();
     });
+  });
+
+  it("refetches the header after a block, so the composer gives way to the blocked notice", async () => {
+    safety.block.mockResolvedValue({ blocked: "u2" });
+    const { result } = await ready();
+    expect(result.current.safety.blocked).toBeNull();
+    svc.conversation.mockResolvedValue(
+      header({
+        peer: {
+          userId: "u2",
+          username: "ada",
+          displayName: "Ada",
+          avatarUrl: null,
+          online: false,
+          blockedByMe: true,
+        },
+      }),
+    );
+    act(() => result.current.safety.menu?.onSelect("block"));
+    act(() => result.current.safety.blockDialog?.onConfirm());
+    await waitFor(() => expect(result.current.safety.blocked).not.toBeNull());
+    expect(safety.block).toHaveBeenCalledWith("u2");
+    expect(result.current.thread.peer?.blockedByMe).toBe(true);
   });
 });

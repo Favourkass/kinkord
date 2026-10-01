@@ -192,6 +192,24 @@ describe("PushService notifications", () => {
     expect(sent()).toMatchObject({ body: "Ada commented on your post", url: "/p/p1" });
   });
 
+  it("pings every moderator about a new report, saying nothing about who or why", async () => {
+    const { db } = queuedDb([
+      [{ id: "f1" }], // the founder's verified account
+      [{ id: "f1" }], // also on staff: still one push
+      [sub("s1")],
+      [KEYS],
+    ]);
+    new PushService(db).newReport();
+    await flush();
+    expect(sendNotification).toHaveBeenCalledTimes(1);
+    expect(sent()).toEqual({
+      title: "Kinkord",
+      body: "New report to review",
+      url: "/moderation/reports",
+      tag: "report",
+    });
+  });
+
   it("never throws into the request that caused it", async () => {
     // Once, not a standing implementation: Vitest reports a reset mock's thrown
     // implementation as a failure even when the code catches it.

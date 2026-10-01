@@ -5,6 +5,8 @@
 import type {
   AdminMemberDetailPM,
   AdminMemberPM,
+  AdminReportPM,
+  AdminReportStatus,
   BlockRulePM,
   NewBlockRulePM,
 } from "@/domain/moderation";
@@ -35,6 +37,16 @@ export const moderationService = {
 
   deletePost: (postId: string) =>
     api.del<{ deleted: string }>(`/admin/posts/${encodeURIComponent(postId)}`),
+
+  /** Members' reports, most serious first. */
+  reports: (status: AdminReportStatus = "open") =>
+    api.get<AdminReportPM[]>(`/admin/reports?status=${encodeURIComponent(status)}`),
+
+  resolveReport: (id: string, status: Exclude<AdminReportStatus, "open">) =>
+    api.post<{ id: string; status: AdminReportStatus }>(
+      `/admin/reports/${encodeURIComponent(id)}/resolve`,
+      { status },
+    ),
 
   rules: () => api.get<BlockRulePM[]>("/admin/blocklist"),
 
