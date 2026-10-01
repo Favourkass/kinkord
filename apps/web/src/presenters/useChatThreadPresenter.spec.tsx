@@ -116,6 +116,8 @@ describe("useChatThreadPresenter", () => {
   it("loads the thread and tells the viewer's bubbles apart", async () => {
     const { result } = await ready();
     expect(result.current.thread.peer?.displayName).toBe("Ada");
+    // Tapping them in the header opens their profile.
+    expect(result.current.thread.peer?.profileHref).toBe("/u/ada");
     expect(result.current.thread.messages.map((m) => [m.id, m.isOwn])).toEqual([
       ["m1", false],
       ["m2", true],
