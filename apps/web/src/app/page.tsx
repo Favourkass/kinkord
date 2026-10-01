@@ -1,32 +1,28 @@
-"use client";
+import type { Metadata } from "next";
+import { FORMER_NAMES, SEO_COPY, SITE_NAME, SITE_URL, SOCIAL_PROFILES } from "@/constants/seo";
+import { siteJsonLd, toJsonLdScript } from "@/domain/seo";
+import { getPageMetadata } from "@/presenters/getPageMetadata";
+import HomeScreen from "./HomeScreen";
 
-import BrandSplash from "@/components/ui/BrandSplash";
-import SplashScreen from "@/components/landing/SplashScreen";
-import { useBrandSplashPresenter } from "@/presenters/useBrandSplashPresenter";
-import { useLandingPresenter } from "@/presenters/useLandingPresenter";
+export const metadata: Metadata = getPageMetadata("/", SEO_COPY.site);
 
+/** Server-rendered, so the homepage can say who Kinkord is to search engines. */
 export default function Home() {
-  // The logo animation covers the entry route while the session lookup runs: a
-  // signed-in visitor is bounced to /home behind it, a guest sees the marketing
-  // splash once it fades. Both are rendered, so the page is still in the HTML
-  // for crawlers and assistive tech while the overlay is up.
-  const splash = useBrandSplashPresenter();
-  const vm = useLandingPresenter();
-
+  const facts = siteJsonLd({
+    url: SITE_URL,
+    name: SITE_NAME,
+    description: SEO_COPY.site.description,
+    logo: `${SITE_URL}/icons/icon-512x512.png`,
+    sameAs: SOCIAL_PROFILES,
+    alternateNames: FORMER_NAMES,
+  });
   return (
     <>
-      {splash.visible && (
-        <BrandSplash
-          videoSrc={splash.videoSrc}
-          posterSrc={splash.posterSrc}
-          label={splash.label}
-          animate={splash.animate}
-          leaving={splash.leaving}
-          onPlaying={splash.onPlaying}
-          onFinished={splash.onFinished}
-        />
-      )}
-      <SplashScreen {...vm} />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: toJsonLdScript(facts) }}
+      />
+      <HomeScreen />
     </>
   );
 }
