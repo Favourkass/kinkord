@@ -385,7 +385,7 @@ export function useMemberProfilePresenter(
     tabs,
     toggleFollow,
     followBusy,
-    messageHref: Routes.messages,
+    messageHref: pm ? Routes.messageWith(pm.userId) : Routes.messages,
     editHref: Routes.profileEdit,
     heroLabels: {
       follow: copy.follow,

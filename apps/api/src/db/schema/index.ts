@@ -8,3 +8,4 @@ export * from "./follow";
 export * from "./otp";
 export * from "./post";
 export * from "./moderation";
+export * from "./chat";

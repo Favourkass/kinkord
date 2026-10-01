@@ -85,6 +85,13 @@
       "when": 1790581610069,
       "tag": "0011_admin_moderation",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790588282332,
+      "tag": "0012_chat",
+      "breakpoints": true
     }
   ]
 }
