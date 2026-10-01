@@ -39,7 +39,9 @@ async function bootstrap() {
   const express = app.getHttpAdapter().getInstance();
   const authHandler = toNodeHandler(app.get<Auth>(AUTH));
 
-  express.use(cors({ origin: origins, credentials: true }));
+  // maxAge lets browsers reuse a preflight for 10 minutes instead of asking
+  // again before every chat send and poll.
+  express.use(cors({ origin: origins, credentials: true, maxAge: 600 }));
   express.use((req, res, next) => {
     // Every sign-up goes through POST /auth-ext/sign-up, which requires a phone
     // number. Better Auth's own route would open an account without one, so it

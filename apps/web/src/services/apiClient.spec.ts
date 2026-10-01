@@ -112,3 +112,19 @@ describe("new accounts without a verified phone", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("headers", () => {
+  it("sends no content-type on a GET, so polling needs no CORS preflight", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(okJson([]));
+    await api.get("/chat/conversations");
+    const init = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect(init.headers).toEqual({});
+  });
+
+  it("declares JSON when there is a body", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(okJson({}));
+    await api.post("/chat/conversations", { userId: "u2" });
+    const init = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect(init.headers).toEqual({ "content-type": "application/json" });
+  });
+});

@@ -36,7 +36,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     res = await fetch(`${apiBase}${path}`, {
       credentials: "include",
-      headers: { "content-type": "application/json", ...init?.headers },
+      // Only requests with a body say they carry JSON. A header on a GET makes
+      // the browser send a CORS preflight first, which would double every poll.
+      headers: {
+        ...(init?.body !== undefined ? { "content-type": "application/json" } : {}),
+        ...init?.headers,
+      },
       ...init,
     });
   } catch {

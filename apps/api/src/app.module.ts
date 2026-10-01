@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { AuthModule } from "./auth/auth.module";
+import { ChatModule } from "./chat/chat.module";
 import { CommunityModule } from "./community/community.module";
 import { DbModule } from "./db/db.module";
 import { EmailModule } from "./email/email.module";
@@ -30,6 +31,7 @@ import { StorageModule } from "./storage/storage.module";
     MembersModule,
     OtpModule,
     PostsModule,
+    ChatModule,
   ],
   controllers: [HealthController],
   providers: [HealthService],
