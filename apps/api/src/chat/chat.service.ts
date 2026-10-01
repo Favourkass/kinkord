@@ -12,6 +12,7 @@ import { DRIZZLE, type Db } from "../db/db.module";
 import { conversation, conversationParticipant, message, profile, user } from "../db/schema";
 import { notBanned } from "../moderation/admins";
 import { PresenceService } from "../presence/presence.service";
+import { PushService } from "../push/push.service";
 import { RealtimeService } from "../realtime/realtime.service";
 import { StorageService } from "../storage/storage.service";
 import { chatDay, NEW_CHAT_LIMIT, newChatsPerDay } from "./allowance";
@@ -54,6 +55,7 @@ export class ChatService {
     @Inject(DRIZZLE) private readonly db: Db,
     private readonly storage: StorageService,
     private readonly realtime: RealtimeService,
+    private readonly push: PushService,
   ) {}
 
   /**
@@ -192,6 +194,8 @@ export class ChatService {
         : await this.insertMessage(this.db, senderId, conversationId, input);
     // Both members' open apps hear of it at once, the sender's other tabs too.
     void this.realtime.notify([peer.userId, senderId], { type: "message", conversationId });
+    // And their phone, if the app isn't open on this thread.
+    this.push.newMessage(senderId, peer.userId, conversationId);
     return saved;
   }
 

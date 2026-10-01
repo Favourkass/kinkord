@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/services/authClient";
 import { api, ApiError } from "@/services/apiClient";
+import { pushService } from "@/services/push.service";
 import { Routes } from "@/constants/Routes";
 import type { MeVM, ProfileVM } from "./useProfilePresenter";
 
@@ -45,6 +46,8 @@ export function useHomePresenter() {
           avatarUrl: profile.avatarUrl,
           membersCount: String(stats.members),
         });
+        // Signed in: keep this device's notification subscription current.
+        void pushService.sync().catch(() => undefined);
       } catch (e) {
         if (cancelled) return;
         if (e instanceof ApiError && e.status === 401) {
@@ -65,6 +68,8 @@ export function useHomePresenter() {
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
 
   const logout = useCallback(async () => {
+    // While still signed in, so the API forgets this device for this member.
+    await pushService.forgetDevice();
     await authClient.signOut();
     router.push(Routes.login);
   }, [router]);
