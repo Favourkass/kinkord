@@ -16,6 +16,7 @@ import { notBanned } from "../moderation/admins";
 import { PresenceService } from "../presence/presence.service";
 import { PushService } from "../push/push.service";
 import { RealtimeService } from "../realtime/realtime.service";
+import { blockedBy, notBlocking } from "../safety/blocks";
 import {
   IMAGE_VARIANTS,
   StorageService,
@@ -56,6 +57,8 @@ const photoPrefix = (conversationId: string, userId: string) =>
   `${CHAT_PHOTO_PREFIX}/${conversationId}/${userId}/`;
 /** Photos open up once the other member has written in the thread. */
 export const PHOTOS_LOCKED = "You can send photos once they've written to you.";
+/** Said to a member writing to someone they blocked; the blocked side reads them as gone. */
+export const YOU_BLOCKED = "You've blocked this member. Unblock them to send messages.";
 const photoTooLarge = () => `Photo is too large — max ${CHAT_PHOTO_MAX_MB}MB.`;
 const photoTypes = () => `contentType must be one of: ${Object.keys(PHOTO_TYPES).join(", ")}`;
 
@@ -94,7 +97,7 @@ export class ChatService {
     const [target] = await this.db
       .select({ id: user.id })
       .from(user)
-      .where(and(eq(user.id, otherId), notBanned(user.id)))
+      .where(and(eq(user.id, otherId), notBanned(user.id), notBlocking(user.id, selfId)))
       .limit(1);
     if (!target) throw new NotFoundException("Member not found.");
 
@@ -172,6 +175,32 @@ export class ChatService {
     if (!row) throw new NotFoundException("Conversation not found.");
   }
 
+  /**
+   * The other member, if this one may write to them: still on Kinkord and not
+   * blocking this member, which reads exactly like having left. A member who
+   * did the blocking has to unblock first.
+   */
+  private async writablePeer(conversationId: string, userId: string): Promise<string> {
+    const [peer] = await this.db
+      .select({
+        userId: conversationParticipant.userId,
+        blockedByMe: blockedBy(userId, conversationParticipant.userId),
+      })
+      .from(conversationParticipant)
+      .where(
+        and(
+          eq(conversationParticipant.conversationId, conversationId),
+          ne(conversationParticipant.userId, userId),
+          notBanned(conversationParticipant.userId),
+          notBlocking(conversationParticipant.userId, userId),
+        ),
+      )
+      .limit(1);
+    if (!peer) throw new BadRequestException("This member is no longer on Kinkord.");
+    if (peer.blockedByMe) throw new ForbiddenException(YOU_BLOCKED);
+    return peer.userId;
+  }
+
   async sendMessage(
     sender: Member,
     conversationId: string,
@@ -179,18 +208,7 @@ export class ChatService {
   ): Promise<MessageDto & { clientId: string | null }> {
     const senderId = sender.id;
     await this.assertMember(conversationId, senderId);
-    const [peer] = await this.db
-      .select({ userId: conversationParticipant.userId })
-      .from(conversationParticipant)
-      .where(
-        and(
-          eq(conversationParticipant.conversationId, conversationId),
-          ne(conversationParticipant.userId, senderId),
-          notBanned(conversationParticipant.userId),
-        ),
-      )
-      .limit(1);
-    if (!peer) throw new BadRequestException("This member is no longer on Kinkord.");
+    const peerId = await this.writablePeer(conversationId, senderId);
 
     const [recent] = await this.db
       .select({ n: count() })
@@ -218,9 +236,9 @@ export class ChatService {
         ? await this.startChat(senderId, conversationId, input, limit)
         : await this.insertMessage(this.db, senderId, conversationId, input);
     // Both members' open apps hear of it at once, the sender's other tabs too.
-    void this.realtime.notify([peer.userId, senderId], { type: "message", conversationId });
+    void this.realtime.notify([peerId, senderId], { type: "message", conversationId });
     // And their phone, if the app isn't open on this thread.
-    this.push.newMessage(senderId, peer.userId, conversationId);
+    this.push.newMessage(senderId, peerId, conversationId);
     return saved;
   }
 
@@ -407,6 +425,7 @@ export class ChatService {
     const { peer, lastMessage } = row.summary;
     const canSendPhotos =
       peer !== null &&
+      !peer.blockedByMe &&
       ((lastMessage !== null && lastMessage.senderId !== userId) ||
         (await this.peerHasWritten(conversationId, userId)));
     return { ...row.summary, canSendPhotos };
@@ -446,6 +465,7 @@ export class ChatService {
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
         lastSeenAt: profile.lastSeenAt,
+        blockedByMe: blockedBy(userId, conversationParticipant.userId),
       })
       .from(conversationParticipant)
       .innerJoin(user, eq(user.id, conversationParticipant.userId))
@@ -455,6 +475,8 @@ export class ChatService {
           inArray(conversationParticipant.conversationId, ids),
           ne(conversationParticipant.userId, userId),
           notBanned(conversationParticipant.userId),
+          // Someone who blocked this member is gone from their inbox.
+          notBlocking(conversationParticipant.userId, userId),
         ),
       );
 
@@ -499,6 +521,7 @@ export class ChatService {
                   ? await this.storage.presignDownload(p.avatarKey, "sm")
                   : null,
                 online: PresenceService.isOnline(p.lastSeenAt),
+                blockedByMe: Boolean(p.blockedByMe),
               },
             ] as const,
         ),
@@ -536,6 +559,7 @@ export class ChatService {
     contentLength?: number,
   ) {
     await this.assertMember(conversationId, userId);
+    await this.writablePeer(conversationId, userId);
     await this.assertPhotosAllowed(conversationId, userId);
     const ext = PHOTO_TYPES[contentType];
     if (!ext) throw new BadRequestException(photoTypes());

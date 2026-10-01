@@ -3,7 +3,7 @@ import { and, eq, sql } from "drizzle-orm";
 import webpush from "web-push";
 import { DRIZZLE, type Db } from "../db/db.module";
 import { profile, pushSubscription, pushVapidKey, user } from "../db/schema";
-import { notBanned } from "../moderation/admins";
+import { adminUserIds, notBanned } from "../moderation/admins";
 
 /**
  * What a notification says and where tapping it goes. Discreet on purpose: on
@@ -158,6 +158,28 @@ export class PushService {
         },
       };
     });
+  }
+
+  /**
+   * Someone reported a member: every moderator hears of it at once, so a
+   * report (an under-18 one above all) never sits unread. Says nothing about
+   * who or why: that's for the moderation screen.
+   */
+  newReport(): void {
+    void adminUserIds(this.db)
+      .then((ids) =>
+        Promise.all(
+          ids.map((id) =>
+            this.sendTo(id, {
+              title: "Kinkord",
+              body: "New report to review",
+              url: "/moderation/reports",
+              tag: "report",
+            }),
+          ),
+        ),
+      )
+      .catch((e) => this.log.warn(`push failed: ${String(e)}`));
   }
 
   /** Fire and forget: a notification that can't go out never fails what caused it. */

@@ -15,6 +15,7 @@ import { PresenceModule } from "./presence/presence.module";
 import { ProfilesModule } from "./profiles/profiles.module";
 import { OtpModule } from "./otp/otp.module";
 import { PostsModule } from "./posts/posts.module";
+import { SafetyModule } from "./safety/safety.module";
 import { StorageModule } from "./storage/storage.module";
 
 @Module({
@@ -32,6 +33,7 @@ import { StorageModule } from "./storage/storage.module";
     MembersModule,
     OtpModule,
     PostsModule,
+    SafetyModule,
     ChatModule,
     PushModule,
   ],

@@ -1,6 +1,6 @@
-import { eq, sql, type AnyColumn } from "drizzle-orm";
+import { and, eq, inArray, sql, type AnyColumn } from "drizzle-orm";
 import type { Db } from "../db/db.module";
-import { memberBan, staff } from "../db/schema";
+import { memberBan, staff, user } from "../db/schema";
 
 /**
  * The founder's accounts are admins by their email rather than by a row, so
@@ -28,6 +28,18 @@ export async function isAdmin(db: Db, who: AdminCandidate): Promise<boolean> {
     .where(eq(staff.userId, who.id))
     .limit(1);
   return Boolean(row);
+}
+
+/** Everyone who moderates: the founder's verified accounts, and anyone with a staff row. */
+export async function adminUserIds(db: Db): Promise<string[]> {
+  const founders = await db
+    .select({ id: user.id })
+    .from(user)
+    .where(
+      and(inArray(sql`lower(${user.email})`, SUPER_ADMIN_EMAILS), eq(user.emailVerified, true)),
+    );
+  const team = await db.select({ id: staff.userId }).from(staff);
+  return [...new Set([...founders, ...team].map((r) => r.id))];
 }
 
 export async function isBanned(db: Db, userId: string): Promise<boolean> {

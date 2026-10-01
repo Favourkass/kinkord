@@ -5,6 +5,8 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { type SQL } from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { conversation, conversationParticipant, message } from "../db/schema";
 import type { PushService } from "../push/push.service";
 import type { RealtimeService } from "../realtime/realtime.service";
@@ -16,7 +18,12 @@ import {
   MAX_MESSAGES_PER_MINUTE,
   MAX_NEW_CONVERSATIONS_PER_DAY,
   PHOTOS_LOCKED,
+  YOU_BLOCKED,
 } from "./chat.service";
+
+/** The SQL of the n-th `.where(...)` the service built, to check what it filters on. */
+const whereSql = (calls: Array<{ op: string; args: unknown[] }>, n: number) =>
+  new PgDialect().sqlToQuery(calls.filter((c) => c.op === "where")[n].args[0] as SQL).sql;
 
 /**
  * A stand-in for the Drizzle client: every builder call returns the chain, and
@@ -487,7 +494,7 @@ describe("chat photos", () => {
     });
 
     it("stay shut until the other member has written in the thread", async () => {
-      const { service, storage } = make([[{ userId: "u1" }], []]);
+      const { service, storage } = make([[{ userId: "u1" }], [{ userId: "u2" }], []]);
       const err = await service.presignPhotoUpload("u1", "c1", "image/jpeg").catch((e) => e);
       expect(err).toBeInstanceOf(ForbiddenException);
       expect((err as Error).message).toBe(PHOTOS_LOCKED);
@@ -495,11 +502,11 @@ describe("chat photos", () => {
     });
 
     it("refuse a file that isn't a photo, or is over the size cap", async () => {
-      const gif = make([[{ userId: "u1" }], [{ id: "m1" }]]);
+      const gif = make([[{ userId: "u1" }], [{ userId: "u2" }], [{ id: "m1" }]]);
       await expect(gif.service.presignPhotoUpload("u1", "c1", "image/gif")).rejects.toBeInstanceOf(
         BadRequestException,
       );
-      const huge = make([[{ userId: "u1" }], [{ id: "m1" }]]);
+      const huge = make([[{ userId: "u1" }], [{ userId: "u2" }], [{ id: "m1" }]]);
       await expect(
         huge.service.presignPhotoUpload(
           "u1",
@@ -511,7 +518,7 @@ describe("chat photos", () => {
     });
 
     it("sit under the uploader's own prefix for this thread, one per stored size", async () => {
-      const { service, storage } = make([[{ userId: "u1" }], [{ id: "m1" }]]);
+      const { service, storage } = make([[{ userId: "u1" }], [{ userId: "u2" }], [{ id: "m1" }]]);
       const slot = await service.presignPhotoUpload("u1", "c1", "image/jpeg", 2048);
       expect(slot.key).toMatch(/^chat\/c1\/u1\/[0-9a-f-]{36}\.jpg$/);
       const base = slot.key.slice(0, -".jpg".length);
@@ -673,5 +680,88 @@ describe("chat photos", () => {
         canSendPhotos: false,
       });
     });
+  });
+});
+
+describe("blocks in chat", () => {
+  it("won't open a thread with someone who blocked you: they read as gone", async () => {
+    const { service, calls } = make([[]]);
+    await expect(service.startDm(member("u1"), "u2")).rejects.toBeInstanceOf(NotFoundException);
+    expect(whereSql(calls, 0)).toContain(
+      'not exists (select 1 from "member_block" where "member_block"."blocker_id" = "user"."id" and "member_block"."blocked_id" = $',
+    );
+  });
+
+  it("reads as gone to the member who was blocked when they write", async () => {
+    // The other member blocked u1, so the writable-peer lookup finds nobody.
+    const { service, calls, push } = make([[{ userId: "u1" }], []]);
+    await expect(service.sendMessage(member("u1"), "c1", { body: "hi" })).rejects.toThrow(
+      "This member is no longer on Kinkord.",
+    );
+    expect(whereSql(calls, 1)).toContain('"member_block"."blocked_id" = $');
+    expect(push.newMessage).not.toHaveBeenCalled();
+  });
+
+  it("asks the member who did the blocking to unblock before writing", async () => {
+    const { service, calls, push, realtime } = make([
+      [{ userId: "u1" }],
+      [{ userId: "u2", blockedByMe: true }],
+    ]);
+    const err = await service.sendMessage(member("u1"), "c1", { body: "hi" }).catch((e) => e);
+    expect(err).toBeInstanceOf(ForbiddenException);
+    expect((err as Error).message).toBe(YOU_BLOCKED);
+    expect(calls.some((c) => c.op === "insert")).toBe(false);
+    expect(push.newMessage).not.toHaveBeenCalled();
+    expect(realtime.notify).not.toHaveBeenCalled();
+  });
+
+  it("hands out no photo upload slot either way round", async () => {
+    const blocker = make([[{ userId: "u1" }], [{ userId: "u2", blockedByMe: true }]]);
+    await expect(blocker.service.presignPhotoUpload("u1", "c1", "image/jpeg")).rejects.toThrow(
+      YOU_BLOCKED,
+    );
+    const blocked = make([[{ userId: "u1" }], []]);
+    await expect(blocked.service.presignPhotoUpload("u1", "c1", "image/jpeg")).rejects.toThrow(
+      "This member is no longer on Kinkord.",
+    );
+    expect(blocked.storage.presignUpload).not.toHaveBeenCalled();
+  });
+
+  it("keeps a blocked member's thread for the blocker, flagged, with photos shut", async () => {
+    const { service } = make([
+      [{ userId: "u1" }],
+      [{ id: "c1", kind: "dm", lastMessageAt: at, createdBy: "u2" }],
+      [
+        {
+          conversationId: "c1",
+          userId: "u2",
+          username: "ada",
+          name: "Adaeze Obi",
+          displayName: "Ada",
+          avatarKey: null,
+          lastSeenAt: null,
+          blockedByMe: true,
+        },
+      ],
+      [row("m1", { senderId: "u2" })],
+      [],
+    ]);
+    await expect(service.conversation("u1", "c1")).resolves.toMatchObject({
+      peer: { userId: "u2", blockedByMe: true },
+      canSendPhotos: false,
+    });
+  });
+
+  it("leaves threads with someone who blocked you out of the inbox", async () => {
+    const { service, calls } = make([
+      [{ id: "c1", kind: "dm", lastMessageAt: at, createdBy: "u2" }],
+      [], // the other member blocked u1: no peer row comes back
+      [row("m1", { senderId: "u2" })],
+      [],
+    ]);
+    await expect(service.listConversations("u1")).resolves.toEqual([]);
+    expect(whereSql(calls, 1)).toContain(
+      '"member_block"."blocker_id" = "conversation_participant"."user_id"',
+    );
   });
 });

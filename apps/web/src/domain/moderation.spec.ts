@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  toAdminReportVM,
+  type AdminReportPM,
   toAdminMemberDetailVM,
   toAdminMemberRowVM,
   toAdminPostVM,
@@ -139,5 +141,80 @@ describe("validateNewRule", () => {
     expect(validateNewRule({ ...base, kind: "phone", value: "0803" })).toMatch(/phone/);
     expect(validateNewRule({ ...base, kind: "name", value: "Tol" })).toMatch(/4 letters/);
     expect(validateNewRule({ ...base, value: "ctolulope05@gmail.com" })).toBeNull();
+  });
+});
+
+describe("toAdminReportVM", () => {
+  const report: AdminReportPM = {
+    id: "r1",
+    reason: "underage",
+    details: "  says they're 16  ",
+    status: "open",
+    createdAt: "2026-09-28T08:00:00Z",
+    reviewedAt: null,
+    reportedUserId: "u2",
+    reporter: { userId: "u1", username: "favour", displayName: "Favour" },
+    reported: { userId: "u2", username: "ada", displayName: "Ada" },
+    evidence: [
+      {
+        id: "m1",
+        fromReported: true,
+        body: "",
+        photo: { thumbUrl: "https://m/p_md.jpg", url: "https://m/p.jpg" },
+        createdAt: "2026-09-28T07:58:00Z",
+      },
+      {
+        id: "m2",
+        fromReported: false,
+        body: "how old are you?",
+        photo: null,
+        createdAt: "2026-09-28T07:59:00Z",
+      },
+    ],
+  };
+  const href = (id: string) => `/moderation/members/${id}`;
+
+  it("flags the urgent reasons and links to the reported member", () => {
+    const vm = toAdminReportVM(report, href, { deletedAccount: "a deleted account" }, now);
+    expect(vm).toMatchObject({
+      reason: "May be under 18",
+      urgent: true,
+      when: "an hour ago",
+      reportedName: "Ada",
+      reportedHandle: "@ada",
+      reportedHref: "/moderation/members/u2",
+      reporter: "Favour (@favour)",
+      details: "says they're 16",
+      open: true,
+    });
+    expect(vm.evidence.map((e) => [e.who, e.fromReported, Boolean(e.photo)])).toEqual([
+      ["Ada", true, true],
+      ["Favour", false, false],
+    ]);
+  });
+
+  it("keeps a report whose accounts are gone, and doesn't call spam urgent", () => {
+    const vm = toAdminReportVM(
+      {
+        ...report,
+        reason: "spam",
+        reporter: null,
+        reported: null,
+        status: "dismissed",
+        details: " ",
+      },
+      href,
+      { deletedAccount: "a deleted account" },
+      now,
+    );
+    expect(vm).toMatchObject({
+      urgent: false,
+      reportedName: "a deleted account",
+      reportedHandle: null,
+      reportedHref: "/moderation/members/u2",
+      reporter: "a deleted account",
+      details: null,
+      open: false,
+    });
   });
 });

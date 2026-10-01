@@ -27,7 +27,14 @@ const summary = (over: Partial<ConversationSummaryPM> = {}): ConversationSummary
   id: "c1",
   kind: "dm",
   lastMessageAt: "2026-09-28T10:00:00.000Z",
-  peer: { userId: "u2", username: "ada", displayName: "Ada", avatarUrl: null, online: true },
+  peer: {
+    userId: "u2",
+    username: "ada",
+    displayName: "Ada",
+    avatarUrl: null,
+    online: true,
+    blockedByMe: false,
+  },
   lastMessage: msg("m1"),
   unreadCount: 2,
   ...over,
@@ -88,6 +95,20 @@ describe("chat photos", () => {
 
   it("has no photo on a text message", () => {
     expect(toThreadMessageVM(msg("m1"), "u1").photo).toBeNull();
+  });
+});
+
+describe("a blocked peer", () => {
+  it("carries the viewer's block into the thread header", () => {
+    const peer = {
+      userId: "u2",
+      username: "ada",
+      displayName: "Ada",
+      avatarUrl: null,
+      online: false,
+      blockedByMe: true,
+    };
+    expect(toThreadPeerVM(peer)).toMatchObject({ userId: "u2", blockedByMe: true });
   });
 });
 
