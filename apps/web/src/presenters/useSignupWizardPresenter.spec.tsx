@@ -18,7 +18,7 @@ vi.mock("@/domain/onboarding", async (importOriginal) => ({
 
 const patch = vi.fn();
 const post = vi.fn();
-const get = vi.fn<(...a: unknown[]) => Promise<{ phone: string }>>(async () => ({
+const get = vi.fn<(...a: unknown[]) => Promise<Record<string, unknown>>>(async () => ({
   phone: "+2348031234567",
 }));
 vi.mock("@/services/apiClient", () => ({
@@ -292,6 +292,7 @@ describe("useSignupWizardPresenter", () => {
       );
       expect(result.current.verifyStep.verified).toBe(true);
       expect(result.current.stage).toBe("profile");
+      expect(result.current.welcome.phoneVerified).toBe(true);
     });
 
     it("clears the boxes and says how many tries are left on a wrong code", async () => {
@@ -332,6 +333,9 @@ describe("useSignupWizardPresenter", () => {
 
       expect(result.current.stage).toBe("profile");
       expect(result.current.verifyStep.verified).toBe(false);
+      expect(result.current.welcome.phoneVerified).toBe(false);
+      // Carrying on from the phone step isn't coming back to the photos.
+      expect(result.current.profileStep.resumed).toBe(false);
       expect(verifyCode).not.toHaveBeenCalled();
     });
 
@@ -374,6 +378,50 @@ describe("useSignupWizardPresenter", () => {
       await waitFor(() =>
         expect(result.current.verifyStep.changePhone.error).toBe(PHONE_NIGERIA_ONLY),
       );
+      expect(patch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("coming back to the photo step", () => {
+    it("starts from the photo, roles and verified phone already on file", async () => {
+      get.mockResolvedValueOnce({
+        phone: "+2348031234567",
+        phoneVerified: true,
+        avatarUrl: "https://media.kinkord.com/avatars/u1/a.jpg",
+        coverUrl: null,
+        roles: ["Switch"],
+      });
+      const { result } = renderHook(() => useSignupWizardPresenter("profile"));
+      expect(result.current.stage).toBe("profile");
+      expect(result.current.profileStep.resumed).toBe(true);
+
+      await waitFor(() =>
+        expect(result.current.profileStep.avatarUrl).toBe(
+          "https://media.kinkord.com/avatars/u1/a.jpg",
+        ),
+      );
+      expect(get).toHaveBeenCalledWith("/profile");
+      expect(result.current.profileStep.coverUrl).toBeNull();
+      expect(result.current.profileStep.roles).toEqual(["Switch"]);
+      expect(result.current.welcome.phoneVerified).toBe(true);
+    });
+
+    it("still needs both photos before it finishes", async () => {
+      get.mockResolvedValueOnce({
+        phoneVerified: false,
+        avatarUrl: "https://media.kinkord.com/avatars/u1/a.jpg",
+        coverUrl: null,
+        roles: [],
+      });
+      const { result } = renderHook(() => useSignupWizardPresenter("profile"));
+      await waitFor(() => expect(result.current.profileStep.avatarUrl).not.toBeNull());
+
+      await act(() => result.current.profileStep.submit());
+
+      expect(result.current.profileStep.error).toBe(
+        "Profile photo and cover picture are required.",
+      );
+      expect(result.current.stage).toBe("profile");
       expect(patch).not.toHaveBeenCalled();
     });
   });

@@ -47,11 +47,13 @@ interface ProfileVM {
   phoneVerified: boolean;
   avatarUrl: string | null;
   coverUrl: string | null;
+  roles: string[];
 }
 
 /**
  * `initialStage` lets a member who left mid-way come back to the step they
- * still owe: the API sends anyone with an unverified phone back to "phone".
+ * still owe: the API sends anyone with an unverified phone back to "phone",
+ * and anyone without a profile photo or cover back to "profile".
  */
 export function useSignupWizardPresenter(initialStage: WizardStage = "country") {
   const router = useRouter();
@@ -96,6 +98,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
   const [uploading, setUploading] = useState<"avatar" | "cover" | null>(null);
   const [photoConfirmed, setPhotoConfirmed] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [phoneVerifiedOnFile, setPhoneVerifiedOnFile] = useState(false);
 
   const step = STAGE_STEP[stage];
 
@@ -218,6 +221,28 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
     phone.sentTo ??
     (hasDraftPhone ? toE164(account.phoneCountryCode, account.phoneLocal) : null) ??
     knownPhone;
+
+  // Someone sent back to the photo step may already have one photo, their roles
+  // or a verified phone on file. Start from those, so finishing neither asks for
+  // a photo twice nor saves an empty role list over theirs.
+  const resumedAtPhotos = initialStage === "profile";
+  useEffect(() => {
+    if (!resumedAtPhotos) return;
+    let live = true;
+    api.get<ProfileVM>("/profile").then(
+      (p) => {
+        if (!live) return;
+        setAvatarUrl((current) => current ?? p.avatarUrl);
+        setCoverUrl((current) => current ?? p.coverUrl);
+        setRoles((current) => (current.length > 0 ? current : p.roles));
+        setPhoneVerifiedOnFile(p.phoneVerified);
+      },
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [resumedAtPhotos]);
 
   const uploadImage = useCallback(
     async (kind: "avatar" | "cover", rawFile: File) => {
@@ -351,7 +376,9 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
         },
         error: profileError,
         submit: completeProfile,
+        resumed: resumedAtPhotos,
       },
+      welcome: { phoneVerified: phone.verified || phoneVerifiedOnFile },
       finish,
     }),
     [
@@ -390,6 +417,8 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
       photoConfirmed,
       profileError,
       completeProfile,
+      resumedAtPhotos,
+      phoneVerifiedOnFile,
       finish,
     ],
   );

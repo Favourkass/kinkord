@@ -113,6 +113,22 @@ describe("new accounts without a verified phone", () => {
   });
 });
 
+describe("members without a profile photo or cover", () => {
+  it("are sent back to the photo step, and still see the error", async () => {
+    const assign = vi.fn();
+    vi.stubGlobal("window", { location: { pathname: "/home", assign } });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      errJson(403, {
+        code: "PROFILE_PHOTOS_REQUIRED",
+        message: "Add a profile photo and a cover picture to continue.",
+      }),
+    );
+    await expect(api.get("/posts")).rejects.toBeInstanceOf(ApiError);
+    expect(assign).toHaveBeenCalledWith("/signup?resume=profile");
+    vi.unstubAllGlobals();
+  });
+});
+
 describe("headers", () => {
   it("sends no content-type on a GET, so polling needs no CORS preflight", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(okJson([]));

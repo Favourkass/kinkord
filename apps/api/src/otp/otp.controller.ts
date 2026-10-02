@@ -1,6 +1,6 @@
 import { BadRequestException, Body, Controller, Post, Req, UseGuards } from "@nestjs/common";
 import { z } from "zod";
-import { AllowUnverifiedPhone, AuthGuard, AuthedRequest } from "../auth/auth.guard";
+import { AllowDuringSignUp, AuthGuard, AuthedRequest } from "../auth/auth.guard";
 import { EmailVerificationService } from "./email-verification.service";
 import { PhoneVerificationService } from "./phone-verification.service";
 
@@ -19,7 +19,7 @@ const verifySchema = z.object({
  */
 @Controller("profile/phone")
 @UseGuards(AuthGuard)
-@AllowUnverifiedPhone()
+@AllowDuringSignUp()
 export class OtpController {
   constructor(private readonly phone: PhoneVerificationService) {}
 
@@ -44,7 +44,7 @@ export class OtpController {
  */
 @Controller("profile/email")
 @UseGuards(AuthGuard)
-@AllowUnverifiedPhone()
+@AllowDuringSignUp()
 export class EmailVerificationController {
   constructor(private readonly emails: EmailVerificationService) {}
 
