@@ -34,13 +34,27 @@ export function validateAccount(d: AccountDraft): Partial<Record<keyof AccountDr
     errors.email = "Enter a valid email address.";
   // Required: a number is what stops a removed member coming back with a fresh email.
   if (!d.phoneLocal.trim()) errors.phoneLocal = "Enter your phone number.";
-  else if (!toE164(d.phoneCountryCode, d.phoneLocal))
-    errors.phoneLocal = "Enter a valid phone number.";
+  else if (!isAllowedPhone(toE164(d.phoneCountryCode, d.phoneLocal)))
+    errors.phoneLocal = PHONE_NIGERIA_ONLY;
   if (d.password.length < 10) errors.password = "Use at least 10 characters.";
   else if (!/[a-zA-Z]/.test(d.password) || !/\d/.test(d.password))
     errors.password = "Use letters and numbers.";
   if (d.confirmPassword !== d.password) errors.confirmPassword = "Passwords do not match.";
   return errors;
+}
+
+/**
+ * Which numbers can sign up: Nigerian mobiles only, for now (2026-10-02). The
+ * API holds the same rule (apps/api/src/profiles/phone-rules.ts); open another
+ * country in both, and in PHONE_COUNTRY_CODES. A Nigerian mobile is +234 then
+ * ten digits starting 70, 71, 80, 81, 90 or 91 (0803…, 0703…, 0913…).
+ */
+const ALLOWED_MOBILE_NUMBERS: readonly RegExp[] = [/^\+234[789][01]\d{8}$/];
+
+export const PHONE_NIGERIA_ONLY = "Enter a Nigerian mobile number, like 0803 123 4567.";
+
+export function isAllowedPhone(e164: string | null): boolean {
+  return e164 !== null && ALLOWED_MOBILE_NUMBERS.some((pattern) => pattern.test(e164));
 }
 
 /**

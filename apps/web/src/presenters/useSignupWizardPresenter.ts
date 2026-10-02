@@ -17,6 +17,8 @@ import {
   validateAbout,
   invalidSignupFields,
   toE164,
+  isAllowedPhone,
+  PHONE_NIGERIA_ONLY,
   dobToIso,
   WIZARD_STEPS,
   type AccountDraft,
@@ -183,8 +185,8 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
   const phoneReset = phone.reset;
   const savePhone = useCallback(async () => {
     const e164 = toE164(phoneDraft.countryCode, phoneDraft.local);
-    if (!e164) {
-      setPhoneChangeError("Enter a valid phone number.");
+    if (!e164 || !isAllowedPhone(e164)) {
+      setPhoneChangeError(PHONE_NIGERIA_ONLY);
       return;
     }
     setSavingPhone(true);

@@ -57,6 +57,10 @@ describe("updateProfileSchema", () => {
     expect(updateProfileSchema.safeParse({ roles: Array(11).fill("x") }).success).toBe(false);
     expect(updateProfileSchema.safeParse({ phone: "+2348012345678" }).success).toBe(true);
     expect(updateProfileSchema.safeParse({ phone: "0801 234 5678" }).success).toBe(false);
+    // Nigerian mobiles only, for now.
+    const foreign = updateProfileSchema.safeParse({ phone: "+447700900123" });
+    expect(foreign.success).toBe(false);
+    expect(foreign.error?.issues[0]?.message).toMatch(/Nigerian mobile numbers/);
   });
 
   it("validates the edit-profile persona fields", () => {
