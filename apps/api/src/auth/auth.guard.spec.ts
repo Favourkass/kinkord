@@ -1,9 +1,19 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ForbiddenException, UnauthorizedException } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { type PresenceService } from "../presence/presence.service";
 import { AllowUnverifiedPhone, AuthGuard, PHONE_VERIFICATION_REQUIRED } from "./auth.guard";
 import { type Auth } from "./auth.instance";
+
+// The phone step is optional for now; most tests here turn it back on to check
+// the hold that returns with it.
+const phoneStep = vi.hoisted(() => ({ required: true }));
+vi.mock("../profiles/phone-rules", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../profiles/phone-rules")>()),
+  get PHONE_STEP_REQUIRED() {
+    return phoneStep.required;
+  },
+}));
 
 const ctxFor = (req: object) => ({ switchToHttp: () => ({ getRequest: () => req }) }) as never;
 
@@ -90,5 +100,24 @@ describe("AuthGuard phone requirement", () => {
     await expect(
       guardFor("2026-09-01T10:00:00Z", false).canActivate(ctx({ headers: {} }, "feed")),
     ).resolves.toBe(true);
+  });
+
+  describe("while the phone step is optional", () => {
+    afterEach(() => {
+      phoneStep.required = true;
+    });
+
+    it("lets a new account in without a verified phone, with no lookup per request", async () => {
+      phoneStep.required = false;
+      const db = { select: vi.fn() };
+      const guard = new AuthGuard(
+        authWith({ user: { id: "u1", createdAt: "2026-10-02T10:00:00Z" }, session: { id: "s1" } }),
+        presenceStub().presence,
+        new Reflector(),
+        db as never,
+      );
+      await expect(guard.canActivate(ctx({ headers: {} }, "feed"))).resolves.toBe(true);
+      expect(db.select).not.toHaveBeenCalled();
+    });
   });
 });

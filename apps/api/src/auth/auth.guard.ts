@@ -14,6 +14,7 @@ import { eq } from "drizzle-orm";
 import { DRIZZLE, type Db } from "../db/db.module";
 import { profile } from "../db/schema";
 import { PresenceService } from "../presence/presence.service";
+import { PHONE_STEP_REQUIRED } from "../profiles/phone-rules";
 import { AUTH, Auth } from "./auth.instance";
 
 /**
@@ -65,15 +66,17 @@ export class AuthGuard implements CanActivate {
   }
 
   /**
-   * The code step can't be skipped in the app, but a member could still leave
-   * the sign-up page and open any other one; this is what actually holds them
-   * at the phone step. Only accounts old enough to predate the rule, and the
-   * routes needed to verify, get through without a verified phone.
+   * While the phone step is required (PHONE_STEP_REQUIRED), the code step
+   * can't be skipped in the app, but a member could still leave the sign-up
+   * page and open any other one; this is what actually holds them at the phone
+   * step. Only accounts old enough to predate the rule, and the routes needed
+   * to verify, get through without a verified phone.
    */
   private async mustVerifyPhone(
     ctx: ExecutionContext,
     user: { id: string; createdAt: Date | string },
   ): Promise<boolean> {
+    if (!PHONE_STEP_REQUIRED) return false;
     const created = new Date(user.createdAt);
     if (Number.isNaN(created.getTime()) || created < PHONE_REQUIRED_SINCE) return false;
     const allowed = this.reflector.getAllAndOverride<boolean>(ALLOW_UNVERIFIED_PHONE, [

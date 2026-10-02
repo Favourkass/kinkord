@@ -19,6 +19,7 @@ import {
   toE164,
   isAllowedPhone,
   PHONE_NIGERIA_ONLY,
+  PHONE_STEP_REQUIRED,
   dobToIso,
   WIZARD_STEPS,
   type AccountDraft,
@@ -159,9 +160,12 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
   }, [stage, emailSendCode]);
 
   const nextVerificationStep = useCallback(() => setStage("phone"), []);
+  // Texted codes aren't arriving reliably, so for now the code can wait
+  // (PHONE_STEP_REQUIRED); Settings → Security & 2FA verifies it later.
+  const skipPhone = useCallback(() => setStage("profile"), []);
 
-  // The phone code can't be skipped, so a mistyped number has to be fixable here
-  // or the member is stuck on this step for good.
+  // When the phone code can't be skipped, a mistyped number has to be fixable
+  // here or the member is stuck on this step for good.
   const [knownPhone, setKnownPhone] = useState<string | null>(null);
   const [changingPhone, setChangingPhone] = useState(false);
   const [phoneDraft, setPhoneDraft] = useState({ countryCode: "+234", local: "" });
@@ -310,6 +314,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
         number: phoneNumber,
         email: emailCode,
         nextStep: nextVerificationStep,
+        skip: PHONE_STEP_REQUIRED ? null : skipPhone,
         changePhone: {
           open: changingPhone,
           countryCode: phoneDraft.countryCode,
@@ -367,6 +372,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
       submitCombinedStep,
       backToCountry,
       nextVerificationStep,
+      skipPhone,
       phone,
       phoneNumber,
       changingPhone,

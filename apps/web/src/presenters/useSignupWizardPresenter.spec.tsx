@@ -7,6 +7,15 @@ import { useSignupWizardPresenter } from "./useSignupWizardPresenter";
 const push = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push, replace: vi.fn() }) }));
 
+// The phone code is skippable for now; one test turns the requirement back on.
+const phoneStep = vi.hoisted(() => ({ required: false }));
+vi.mock("@/domain/onboarding", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/domain/onboarding")>()),
+  get PHONE_STEP_REQUIRED() {
+    return phoneStep.required;
+  },
+}));
+
 const patch = vi.fn();
 const post = vi.fn();
 const get = vi.fn<(...a: unknown[]) => Promise<{ phone: string }>>(async () => ({
@@ -317,9 +326,23 @@ describe("useSignupWizardPresenter", () => {
       expect(result.current.verifyStep.sent).toBe(false);
     });
 
-    it("offers no way past the phone code without verifying it", () => {
-      const { result } = renderHook(() => useSignupWizardPresenter());
-      expect("skip" in result.current.verifyStep).toBe(false);
+    it("lets a member skip the code for now and carry on to the profile step", () => {
+      const { result } = renderHook(() => useSignupWizardPresenter("phone"));
+      act(() => result.current.verifyStep.skip?.());
+
+      expect(result.current.stage).toBe("profile");
+      expect(result.current.verifyStep.verified).toBe(false);
+      expect(verifyCode).not.toHaveBeenCalled();
+    });
+
+    it("offers no way past the phone code once it is required again", () => {
+      phoneStep.required = true;
+      try {
+        const { result } = renderHook(() => useSignupWizardPresenter("phone"));
+        expect(result.current.verifyStep.skip).toBeNull();
+      } finally {
+        phoneStep.required = false;
+      }
     });
   });
 
