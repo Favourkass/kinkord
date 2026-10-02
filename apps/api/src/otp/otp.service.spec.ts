@@ -1,5 +1,6 @@
+import { Logger } from "@nestjs/common";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { OtpService } from "./otp.service";
+import { maskDestination, OtpService } from "./otp.service";
 
 process.env.OTP_SECRET = "test-secret";
 
@@ -47,9 +48,80 @@ function makeDb(recent: Array<{ createdAt: Date }> = []) {
 }
 
 const sms = () => ({ send: vi.fn(async () => ({ provider: "robase", providerMessageId: "1" })) });
-const email = () => ({ send: vi.fn(async () => undefined) });
+const email = () => ({ send: vi.fn(async () => ({ provider: "resend", id: "re_1" })) });
 const guard = (action: "allow" | "block" | "flag" = "allow") => ({
   review: vi.fn(async () => ({ action, matches: [] })),
+});
+
+describe("maskDestination", () => {
+  it("keeps the first letter and the mail provider, and the ends of a number", () => {
+    expect(maskDestination("email", "tolu@gmail.com")).toBe("t***@gmail.com");
+    expect(maskDestination("sms", "+2348012345678")).toBe("+234******5678");
+    expect(maskDestination("email", "nonsense")).toBe("***");
+  });
+});
+
+describe("OtpService.send logging", () => {
+  it("logs a sent code with the provider's message id, never the full address", async () => {
+    const log = vi.spyOn(Logger.prototype, "log").mockImplementation(() => undefined);
+    const { db } = makeDb();
+    const service = new OtpService(db as never, email() as never, sms() as never, guard() as never);
+
+    await service.send("u1", "email", "Tolu@Example.com");
+
+    const line = log.mock.calls
+      .map((c) => String(c[0]))
+      .find((m) => m.startsWith("otp email sent"));
+    expect(line).toBe("otp email sent to t***@example.com via resend re_1");
+    log.mockRestore();
+  });
+
+  it("logs an SMS with Robase's id", async () => {
+    const log = vi.spyOn(Logger.prototype, "log").mockImplementation(() => undefined);
+    const { db } = makeDb();
+    const service = new OtpService(db as never, email() as never, sms() as never, guard() as never);
+
+    await service.send("u1", "sms", "+2348012345678");
+
+    expect(log.mock.calls.map((c) => String(c[0]))).toContain(
+      "otp sms sent to +234******5678 via robase 1",
+    );
+    log.mockRestore();
+  });
+
+  it("logs why a code was refused, so 'it never came' can be told from 'we never sent it'", async () => {
+    const warn = vi.spyOn(Logger.prototype, "warn").mockImplementation(() => undefined);
+    const { db } = makeDb([{ createdAt: new Date() }]);
+    const texter = sms();
+    const service = new OtpService(
+      db as never,
+      email() as never,
+      texter as never,
+      guard() as never,
+    );
+
+    await expect(service.send("u1", "sms", "+2348012345678")).rejects.toThrow(/wait a minute/);
+    expect(warn).toHaveBeenCalledWith(
+      "otp sms refused for +234******5678: Please wait a minute before asking for another code.",
+    );
+    expect(texter.send).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("logs a send refused by a sign-up rule", async () => {
+    const warn = vi.spyOn(Logger.prototype, "warn").mockImplementation(() => undefined);
+    const { db } = makeDb();
+    const service = new OtpService(
+      db as never,
+      email() as never,
+      sms() as never,
+      guard("block") as never,
+    );
+
+    await expect(service.send("u1", "email", "x@y.com")).rejects.toThrow();
+    expect(warn).toHaveBeenCalledWith("otp email refused for x***@y.com: sign-up rule");
+    warn.mockRestore();
+  });
 });
 
 describe("OtpService.send", () => {

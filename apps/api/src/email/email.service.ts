@@ -9,6 +9,12 @@ export interface SendEmailInput {
   text: string;
 }
 
+/** The provider's id for the message: what to search for in its dashboard. */
+export interface SentEmail {
+  provider: "resend" | "smtp";
+  id: string | null;
+}
+
 /**
  * Email port. Resend in real environments (RESEND_API_KEY set);
  * falls back to SMTP (Mailpit on localhost:1025) for local dev.
@@ -28,9 +34,9 @@ export class EmailService {
         secure: false,
       });
 
-  async send(input: SendEmailInput): Promise<void> {
+  async send(input: SendEmailInput): Promise<SentEmail> {
     if (this.resend) {
-      const { error } = await this.resend.emails.send({
+      const { data, error } = await this.resend.emails.send({
         from: this.from,
         to: input.to,
         subject: input.subject,
@@ -41,14 +47,15 @@ export class EmailService {
         this.logger.error(`resend send failed: ${error.message}`);
         throw new Error(`Email delivery failed: ${error.message}`);
       }
-      return;
+      return { provider: "resend", id: data?.id ?? null };
     }
-    await this.smtp!.sendMail({
+    const info = await this.smtp!.sendMail({
       from: this.from,
       to: input.to,
       subject: input.subject,
       html: input.html,
       text: input.text,
     });
+    return { provider: "smtp", id: info.messageId ?? null };
   }
 }
