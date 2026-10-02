@@ -10,31 +10,37 @@ function renderDrawer(settingsOpen = false) {
   const nav = getAppShellNav();
   const onClose = vi.fn();
   const onToggleSettings = vi.fn();
-  render(<SidebarDrawer
-    open
-    onClose={onClose}
-    name="Kinkord Official"
-    avatarUrl={null}
-    membersCount="110"
-    kycVerified
-    links={nav.links}
-    labels={nav.labels}
-    navigation={nav.drawer}
-    settingsOpen={settingsOpen}
-    onToggleSettings={onToggleSettings}
-    onLogout={vi.fn()}
-  />);
+  render(
+    <SidebarDrawer
+      open
+      onClose={onClose}
+      name="Kinkord Official"
+      avatarUrl={null}
+      membersCount="110"
+      kycVerified
+      links={nav.links}
+      labels={nav.labels}
+      navigation={nav.drawer}
+      settingsOpen={settingsOpen}
+      onToggleSettings={onToggleSettings}
+      onLogout={vi.fn()}
+    />,
+  );
   return { onClose, onToggleSettings };
 }
 
 describe("SidebarDrawer", () => {
   it("renders the requested primary order while settings children stay collapsed", () => {
     renderDrawer();
-    const labels = screen.getByRole("navigation", { name: "Account menu" })
-      .querySelectorAll("a");
+    const labels = screen.getByRole("navigation", { name: "Account menu" }).querySelectorAll("a");
     expect(Array.from(labels).map((link) => link.textContent?.replace("110", "").trim())).toEqual([
-      "Members", "Saved", "Kinkopedia", "Verification", "KinkCoins & Payment",
-      "Subscription", "Marketplace",
+      "Members",
+      "Saved",
+      "Kinkopedia",
+      "Verification",
+      "KinkCoins & Payment",
+      "Subscription",
+      "Marketplace",
     ]);
     expect(screen.queryByText("Account Settings")).toBeNull();
   });

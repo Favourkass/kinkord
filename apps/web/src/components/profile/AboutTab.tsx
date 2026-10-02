@@ -219,7 +219,11 @@ export default function AboutTab({ vm, labels }: AboutTabProps) {
       <Card icon={ICONS.verification} title={labels.verification}>
         <div className="flex items-center gap-[12px] rounded-[12px] border border-kink-gold-bright/30 bg-kink-gold-bright/10 p-[12px]">
           <span className="grid size-[36px] shrink-0 place-items-center rounded-full bg-kink-gold-bright text-black">
-            {vm.verification.level === "kyc" ? <KycVerifiedMark size={28} /> : <MaskIcon src={ICONS.verified} width={18} />}
+            {vm.verification.level === "kyc" ? (
+              <KycVerifiedMark size={28} />
+            ) : (
+              <MaskIcon src={ICONS.verified} width={18} />
+            )}
           </span>
           <span className="flex min-w-0 flex-col">
             <span className="text-[13px] font-semibold text-pf-text">
@@ -230,7 +234,7 @@ export default function AboutTab({ vm, labels }: AboutTabProps) {
                 ? "Kinkord KYC checks completed"
                 : vm.verification.level === "identity"
                   ? "Government ID, liveness & photo checked"
-                : labels.verifiedDetail(vm.verification.email, vm.verification.phone)}
+                  : labels.verifiedDetail(vm.verification.email, vm.verification.phone)}
             </span>
           </span>
         </div>

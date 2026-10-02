@@ -9,10 +9,14 @@ import { readFileSync } from "node:fs";
 const apiEnv = readFileSync(new URL("../apps/api/.env", import.meta.url), "utf8");
 const setting = (name) => apiEnv.match(new RegExp(`^${name}=(.*)$`, "m"))?.[1]?.trim() ?? "";
 const database = new URL(setting("DATABASE_URL"));
-if (setting("DIDIT_MODE") !== "sandbox" ||
-    !["localhost", "127.0.0.1"].includes(database.hostname) ||
-    setting("BRONZE_POLICY_URL") !== "http://localhost:3000/privacy/verification") {
-  throw new Error("Public preview requires local Postgres, Didit sandbox, and the local Bronze privacy notice.");
+if (
+  setting("DIDIT_MODE") !== "sandbox" ||
+  !["localhost", "127.0.0.1"].includes(database.hostname) ||
+  setting("BRONZE_POLICY_URL") !== "http://localhost:3000/privacy/verification"
+) {
+  throw new Error(
+    "Public preview requires local Postgres, Didit sandbox, and the local Bronze privacy notice.",
+  );
 }
 
 const username = "kinkord-preview";
@@ -40,13 +44,18 @@ function publicOrigin(req) {
 
 const server = createServer((req, res) => {
   const origin = publicOrigin(req);
-  if (!origin) { res.writeHead(400).end(); return; }
+  if (!origin) {
+    res.writeHead(400).end();
+    return;
+  }
 
   if (!publicAccess && !authorized(req.headers.authorization)) {
-    res.writeHead(401, {
-      "WWW-Authenticate": 'Basic realm="Kinkord test preview", charset="UTF-8"',
-      "Cache-Control": "no-store",
-    }).end("Preview access required");
+    res
+      .writeHead(401, {
+        "WWW-Authenticate": 'Basic realm="Kinkord test preview", charset="UTF-8"',
+        "Cache-Control": "no-store",
+      })
+      .end("Preview access required");
     return;
   }
 
@@ -79,44 +88,53 @@ const server = createServer((req, res) => {
     delete headers.origin;
   }
 
-  const upstream = httpRequest({ hostname: "127.0.0.1", port: target.port, method: req.method,
-    path, headers }, (upstreamRes) => {
-    const responseHeaders = { ...upstreamRes.headers };
-    delete responseHeaders.connection;
-    const contentType = String(responseHeaders["content-type"] || "");
-    if (!api || !contentType.includes("application/json")) {
-      res.writeHead(upstreamRes.statusCode || 502, responseHeaders);
-      upstreamRes.pipe(res);
-      return;
-    }
+  const upstream = httpRequest(
+    { hostname: "127.0.0.1", port: target.port, method: req.method, path, headers },
+    (upstreamRes) => {
+      const responseHeaders = { ...upstreamRes.headers };
+      delete responseHeaders.connection;
+      const contentType = String(responseHeaders["content-type"] || "");
+      if (!api || !contentType.includes("application/json")) {
+        res.writeHead(upstreamRes.statusCode || 502, responseHeaders);
+        upstreamRes.pipe(res);
+        return;
+      }
 
-    const chunks = [];
-    let size = 0;
-    upstreamRes.on("data", (chunk) => {
-      size += chunk.length;
-      if (size > 5_000_000) upstreamRes.destroy(new Error("API response too large for preview"));
-      else chunks.push(chunk);
-    });
-    upstreamRes.on("end", () => {
-      const body = Buffer.concat(chunks).toString("utf8")
-        .replaceAll("http://localhost:9000/", `${origin}/__media/`)
-        .replaceAll("http://127.0.0.1:9000/", `${origin}/__media/`)
-        .replaceAll("http://localhost:4000/", `${origin}/__api/`)
-        .replaceAll("http://localhost:3000/", `${origin}/`);
-      delete responseHeaders.etag;
-      delete responseHeaders["transfer-encoding"];
-      responseHeaders["content-length"] = String(Buffer.byteLength(body));
-      responseHeaders["cache-control"] = "no-store";
-      res.writeHead(upstreamRes.statusCode || 502, responseHeaders).end(body);
-    });
-    upstreamRes.on("error", () => { if (!res.headersSent) res.writeHead(502).end(); });
+      const chunks = [];
+      let size = 0;
+      upstreamRes.on("data", (chunk) => {
+        size += chunk.length;
+        if (size > 5_000_000) upstreamRes.destroy(new Error("API response too large for preview"));
+        else chunks.push(chunk);
+      });
+      upstreamRes.on("end", () => {
+        const body = Buffer.concat(chunks)
+          .toString("utf8")
+          .replaceAll("http://localhost:9000/", `${origin}/__media/`)
+          .replaceAll("http://127.0.0.1:9000/", `${origin}/__media/`)
+          .replaceAll("http://localhost:4000/", `${origin}/__api/`)
+          .replaceAll("http://localhost:3000/", `${origin}/`);
+        delete responseHeaders.etag;
+        delete responseHeaders["transfer-encoding"];
+        responseHeaders["content-length"] = String(Buffer.byteLength(body));
+        responseHeaders["cache-control"] = "no-store";
+        res.writeHead(upstreamRes.statusCode || 502, responseHeaders).end(body);
+      });
+      upstreamRes.on("error", () => {
+        if (!res.headersSent) res.writeHead(502).end();
+      });
+    },
+  );
+  upstream.on("error", () => {
+    if (!res.headersSent) res.writeHead(502).end("Preview upstream unavailable");
   });
-  upstream.on("error", () => { if (!res.headersSent) res.writeHead(502).end("Preview upstream unavailable"); });
   req.pipe(upstream);
 });
 
 server.listen(3100, "127.0.0.1", () => {
-  console.log(`Kinkord ${publicAccess ? "public" : "protected"} local preview: http://127.0.0.1:3100`);
+  console.log(
+    `Kinkord ${publicAccess ? "public" : "protected"} local preview: http://127.0.0.1:3100`,
+  );
   if (!publicAccess) {
     console.log(`Preview username: ${username}`);
     console.log(`Preview password: ${password}`);

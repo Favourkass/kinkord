@@ -8,11 +8,14 @@ export interface DiditDerivedStageEvidence {
 }
 
 const record = (value: unknown): Record<string, unknown> | null =>
-  value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 
-const warnings = (value: unknown) => Array.isArray(value)
-  ? value.map(record).filter((item): item is Record<string, unknown> => Boolean(item))
-  : [];
+const warnings = (value: unknown) =>
+  Array.isArray(value)
+    ? value.map(record).filter((item): item is Record<string, unknown> => Boolean(item))
+    : [];
 
 function statusFromDidit(status: unknown): KycStageStatus {
   if (status === "Approved") return "passed";
@@ -41,12 +44,16 @@ function poaIssueDateState(issueDate: string, now: Date): "fresh" | "stale" | "i
  * Maps Didit's PoA report without retaining the address, document URL, issuer
  * or extracted identity data. An approved report with any risk is review-only.
  */
-export function deriveDiditResidenceEvidence(decision: Record<string, unknown>, now = new Date()): DiditDerivedStageEvidence {
+export function deriveDiditResidenceEvidence(
+  decision: Record<string, unknown>,
+  now = new Date(),
+): DiditDerivedStageEvidence {
   const poa = record(decision.poa);
   if (!poa) return { status: "pending", summary: {}, reasonCodes: ["POA_RESULT_PENDING"] };
   const riskCodes = warnings(poa.warnings).map((warning) => String(warning.risk ?? "POA_WARNING"));
   const providerStatus = statusFromDidit(poa.status);
-  const hasAddress = typeof poa.poa_formatted_address === "string" || typeof poa.poa_address === "string";
+  const hasAddress =
+    typeof poa.poa_formatted_address === "string" || typeof poa.poa_address === "string";
   const issueDateState = poaIssueDateState(String(poa.issue_date ?? ""), now);
   const hasCurrentIssueDate = issueDateState === "fresh";
   const identityMismatch = riskCodes.some((code) => /^NAME_MISMATCH/.test(code));
@@ -57,11 +64,18 @@ export function deriveDiditResidenceEvidence(decision: Record<string, unknown>, 
     issueDateWithinPolicy: hasCurrentIssueDate,
     noIdentityMismatch: !identityMismatch,
   };
-  if (providerStatus !== "passed") return { status: providerStatus, summary, reasonCodes: riskCodes };
-  if (issueDateState === "stale" && !riskCodes.includes("POA_DOCUMENT_TOO_OLD")) riskCodes.push("POA_DOCUMENT_TOO_OLD");
-  else if (issueDateState === "invalid" && !riskCodes.includes("POA_ISSUE_DATE_INVALID")) riskCodes.push("POA_ISSUE_DATE_INVALID");
+  if (providerStatus !== "passed")
+    return { status: providerStatus, summary, reasonCodes: riskCodes };
+  if (issueDateState === "stale" && !riskCodes.includes("POA_DOCUMENT_TOO_OLD"))
+    riskCodes.push("POA_DOCUMENT_TOO_OLD");
+  else if (issueDateState === "invalid" && !riskCodes.includes("POA_ISSUE_DATE_INVALID"))
+    riskCodes.push("POA_ISSUE_DATE_INVALID");
   if (!hasAddress || issueDateState !== "fresh" || identityMismatch || riskCodes.length) {
-    return { status: "under_review", summary, reasonCodes: riskCodes.length ? riskCodes : ["POA_REVIEW_REQUIRED"] };
+    return {
+      status: "under_review",
+      summary,
+      reasonCodes: riskCodes.length ? riskCodes : ["POA_REVIEW_REQUIRED"],
+    };
   }
   return { status: "passed", summary, reasonCodes: [] };
 }
@@ -71,19 +85,42 @@ export function deriveDiditResidenceEvidence(decision: Record<string, unknown>, 
  * location is not GPS. It can fail or escalate a KYC case; it cannot pass the
  * Kinkord live-location safeguard without separately consented GPS evidence.
  */
-export function deriveDiditNetworkLocationEvidence(decision: Record<string, unknown>, expectedCountryCode: string): DiditDerivedStageEvidence {
-  const analyses = Array.isArray(decision.ip_analyses) ? decision.ip_analyses.map(record)
-    .filter((item): item is Record<string, unknown> => Boolean(item)) : [];
-  if (!analyses.length) return { status: "pending", summary: {}, reasonCodes: ["IP_ANALYSIS_PENDING"] };
+export function deriveDiditNetworkLocationEvidence(
+  decision: Record<string, unknown>,
+  expectedCountryCode: string,
+): DiditDerivedStageEvidence {
+  const analyses = Array.isArray(decision.ip_analyses)
+    ? decision.ip_analyses
+        .map(record)
+        .filter((item): item is Record<string, unknown> => Boolean(item))
+    : [];
+  if (!analyses.length)
+    return { status: "pending", summary: {}, reasonCodes: ["IP_ANALYSIS_PENDING"] };
   const latest = analyses[analyses.length - 1];
   const providerStatus = statusFromDidit(latest.status);
-  const countryMatches = String(latest.ip_country_code ?? "").toUpperCase() === expectedCountryCode.toUpperCase();
+  const countryMatches =
+    String(latest.ip_country_code ?? "").toUpperCase() === expectedCountryCode.toUpperCase();
   const privateNetwork = latest.is_vpn_or_tor === true || latest.is_data_center === true;
-  const summary = { providerApproved: providerStatus === "passed", countryMatches, privateNetwork: !privateNetwork };
-  const riskCodes = warnings(latest.warnings).map((warning) => String(warning.risk ?? "IP_ANALYSIS_WARNING"));
-  if (providerStatus === "failed") return { status: "failed", summary, reasonCodes: riskCodes.length ? riskCodes : ["IP_ANALYSIS_DECLINED"] };
+  const summary = {
+    providerApproved: providerStatus === "passed",
+    countryMatches,
+    privateNetwork: !privateNetwork,
+  };
+  const riskCodes = warnings(latest.warnings).map((warning) =>
+    String(warning.risk ?? "IP_ANALYSIS_WARNING"),
+  );
+  if (providerStatus === "failed")
+    return {
+      status: "failed",
+      summary,
+      reasonCodes: riskCodes.length ? riskCodes : ["IP_ANALYSIS_DECLINED"],
+    };
   if (providerStatus !== "passed" || privateNetwork || !countryMatches) {
-    return { status: "under_review", summary, reasonCodes: riskCodes.length ? riskCodes : ["NETWORK_LOCATION_REQUIRES_REVIEW"] };
+    return {
+      status: "under_review",
+      summary,
+      reasonCodes: riskCodes.length ? riskCodes : ["NETWORK_LOCATION_REQUIRES_REVIEW"],
+    };
   }
   return { status: "under_review", summary, reasonCodes: ["GPS_LOCATION_REQUIRED"] };
 }
@@ -97,6 +134,12 @@ export function diditProofOfAddressCoordinate(decision: Record<string, unknown>)
   const location = record(geometry?.location);
   const latitude = Number(location?.lat);
   const longitude = Number(location?.lng);
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    Math.abs(latitude) > 90 ||
+    Math.abs(longitude) > 180
+  )
+    return null;
   return { latitude, longitude };
 }

@@ -1,12 +1,22 @@
 import { Injectable } from "@nestjs/common";
 import type { KycConsentCategory, KycStageStatus } from "../db/schema";
 import { BronzeRepository } from "./bronze.repository";
-import { canAwardKinkordKyc, KYC_REQUIRED_STAGES, KYC_RESIDENCE_POLICY_VERSION, kycResultEnvironment, type KycRequiredStage, type KycStageDecision } from "./kyc-policy";
+import {
+  canAwardKinkordKyc,
+  KYC_REQUIRED_STAGES,
+  KYC_RESIDENCE_POLICY_VERSION,
+  kycResultEnvironment,
+  type KycRequiredStage,
+  type KycStageDecision,
+} from "./kyc-policy";
 import { KycRepository } from "./kyc.repository";
 import { KYC_FINANCIAL_POLICY_VERSION, KycFinancialService } from "./kyc-financial.service";
 import { KYC_LOCATION_POLICY_VERSION, KycLocationService } from "./kyc-location.service";
 
-const stageDetails: Record<KycRequiredStage, { title: string; description: string; available: boolean }> = {
+const stageDetails: Record<
+  KycRequiredStage,
+  { title: string; description: string; available: boolean }
+> = {
   identity: {
     title: "Identity & live biometrics",
     description: "Government ID, live liveness, face match and profile-photo match.",
@@ -19,7 +29,8 @@ const stageDetails: Record<KycRequiredStage, { title: string; description: strin
   },
   residence: {
     title: "Residence",
-    description: "Proof-of-address verification. Submit a recent document through the identity session.",
+    description:
+      "Proof-of-address verification. Submit a recent document through the identity session.",
     available: true,
   },
   financial: {
@@ -48,7 +59,9 @@ export class KycService {
 
   private async buildDecisions(userId: string) {
     const [{ caseRow, results }, legacy, financialAttempt] = await Promise.all([
-      this.repository.snapshot(userId), this.legacyIdentity.status(userId), this.repository.latestStageAttempt(userId, "financial"),
+      this.repository.snapshot(userId),
+      this.legacyIdentity.status(userId),
+      this.repository.latestStageAttempt(userId, "financial"),
     ]);
     const newest = new Map<KycRequiredStage, (typeof results)[number]>();
     for (const result of results) {
@@ -62,7 +75,7 @@ export class KycService {
         return {
           stage,
           status: result.status,
-          checks: stage === "identity" ? result.summary as KycStageDecision["checks"] : undefined,
+          checks: stage === "identity" ? (result.summary as KycStageDecision["checks"]) : undefined,
           expiresAt: result.expiresAt,
           environment: kycResultEnvironment(result.summary),
         };
@@ -73,15 +86,23 @@ export class KycService {
           status: legacyStatus[legacy.status] ?? "not_started",
           // A legacy verified result already passed all identity checks, but it
           // is deliberately insufficient to award full Kinkord KYC by itself.
-          checks: legacy.status === "verified"
-            ? { governmentId: true, liveness: true, idFace: true, profileFace: true, identityDetails: true }
-            : undefined,
+          checks:
+            legacy.status === "verified"
+              ? {
+                  governmentId: true,
+                  liveness: true,
+                  idFace: true,
+                  profileFace: true,
+                  identityDetails: true,
+                }
+              : undefined,
           // Legacy Bronze was recorded before environment stamping; it never
           // seals on its own and must not borrow a live/sandbox stamp here.
           environment: null,
         };
       }
-      if (stage === "financial" && financialAttempt?.status === "pending") return { stage, status: "pending" };
+      if (stage === "financial" && financialAttempt?.status === "pending")
+        return { stage, status: "pending" };
       return { stage, status: "not_started" };
     });
     return { caseRow, decisions };
@@ -90,7 +111,9 @@ export class KycService {
   async status(userId: string) {
     const { caseRow, decisions } = await this.buildDecisions(userId);
     // A revoked or expired case never reports verified, regardless of stage rows.
-    const caseActive = !caseRow.revokedAt && caseRow.status !== "revoked" &&
+    const caseActive =
+      !caseRow.revokedAt &&
+      caseRow.status !== "revoked" &&
       !(caseRow.expiresAt && caseRow.expiresAt <= new Date());
     const verified = caseActive && canAwardKinkordKyc(decisions);
     return {
@@ -99,8 +122,12 @@ export class KycService {
       stages: decisions.map((decision) => ({
         key: decision.stage,
         ...stageDetails[decision.stage],
-        available: decision.stage === "location" ? this.location.enabled
-          : decision.stage === "financial" ? this.financial.enabled : stageDetails[decision.stage].available,
+        available:
+          decision.stage === "location"
+            ? this.location.enabled
+            : decision.stage === "financial"
+              ? this.financial.enabled
+              : stageDetails[decision.stage].available,
         status: decision.status,
         expiresAt: decision.expiresAt?.toISOString() ?? null,
       })),

@@ -7,18 +7,30 @@ import { liveCaptureUrl, type ProfileMatchAudit } from "./profile-match-policy";
 @Injectable()
 export class ProfileMatchService {
   private readonly logger = new Logger(ProfileMatchService.name);
-  constructor(private readonly repo: BronzeRepository, private readonly didit: DiditService,
-    private readonly storage: StorageService) {}
+  constructor(
+    private readonly repo: BronzeRepository,
+    private readonly didit: DiditService,
+    private readonly storage: StorageService,
+  ) {}
 
   /** null means another worker is still processing. Never retry a possibly billed request. */
-  async evaluate(attempt: { id: string; userId: string; avatarKey: string },
-    decision: Record<string, unknown>): Promise<ProfileMatchAudit | null> {
-    const review = (reason: string): ProfileMatchAudit => ({ outcome: "review", reason,
-      mode: this.didit.mode, threshold: this.didit.profileMatchThreshold, score: null,
-      requestId: null, providerStatus: null });
+  async evaluate(
+    attempt: { id: string; userId: string; avatarKey: string },
+    decision: Record<string, unknown>,
+  ): Promise<ProfileMatchAudit | null> {
+    const review = (reason: string): ProfileMatchAudit => ({
+      outcome: "review",
+      reason,
+      mode: this.didit.mode,
+      threshold: this.didit.profileMatchThreshold,
+      score: null,
+      requestId: null,
+      providerStatus: null,
+    });
     if (!this.didit.profileMatchEnabled) return review("PROFILE_PHOTO_FACE_MATCH_REQUIRED");
     // Old consents never authorize the newly introduced transfer of a profile photo.
-    if (!await this.repo.hasConsent(attempt.userId)) return review("PROFILE_PHOTO_MATCH_CONSENT_REQUIRED");
+    if (!(await this.repo.hasConsent(attempt.userId)))
+      return review("PROFILE_PHOTO_MATCH_CONSENT_REQUIRED");
     const selfieUrl = liveCaptureUrl(decision);
     if (!selfieUrl) return review("PROFILE_PHOTO_CAPTURE_UNAVAILABLE");
     const claim = await this.repo.claimProfileMatch(attempt.id);

@@ -1,5 +1,10 @@
 import { Module } from "@nestjs/common";
-import { BronzeController, BronzeReviewController, DiditCallbackController, SmileIdCallbackController } from "./bronze.controller";
+import {
+  BronzeController,
+  BronzeReviewController,
+  DiditCallbackController,
+  SmileIdCallbackController,
+} from "./bronze.controller";
 import { BronzeRepository } from "./bronze.repository";
 import { BronzeService } from "./bronze.service";
 import { SmileIdService } from "./smile-id.service";
@@ -15,8 +20,29 @@ import { KycFinancialService } from "./kyc-financial.service";
 import { KycReviewService } from "./kyc-review.service";
 
 @Module({
-  controllers: [BronzeController, BronzeReviewController, DiditCallbackController, SmileIdCallbackController, KycController, MonoCallbackController, KycReviewController],
-  providers: [BronzeRepository, BronzeService, DiditService, SmileIdService, ProfileMatchService, KycRepository, KycService, KycIngestionService, KycLocationService, MonoService, KycFinancialService, KycReviewService],
+  controllers: [
+    BronzeController,
+    BronzeReviewController,
+    DiditCallbackController,
+    SmileIdCallbackController,
+    KycController,
+    MonoCallbackController,
+    KycReviewController,
+  ],
+  providers: [
+    BronzeRepository,
+    BronzeService,
+    DiditService,
+    SmileIdService,
+    ProfileMatchService,
+    KycRepository,
+    KycService,
+    KycIngestionService,
+    KycLocationService,
+    MonoService,
+    KycFinancialService,
+    KycReviewService,
+  ],
   exports: [KycService, KycRepository],
 })
 export class VerificationModule {}

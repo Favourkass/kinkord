@@ -51,10 +51,12 @@ const features: Record<string, ComingSoonFeatureVM> = {
 };
 
 export function getComingSoonFeatureVM(feature: string): ComingSoonFeatureVM {
-  return features[feature] ?? {
-    headline: "COMING SOON",
-    constructionLead: "This feature is",
-    constructionAccent: "on the way",
-    subcopy: "We are still preparing this part of Kinkord.",
-  };
+  return (
+    features[feature] ?? {
+      headline: "COMING SOON",
+      constructionLead: "This feature is",
+      constructionAccent: "on the way",
+      subcopy: "We are still preparing this part of Kinkord.",
+    }
+  );
 }

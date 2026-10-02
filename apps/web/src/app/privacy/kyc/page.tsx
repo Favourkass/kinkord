@@ -4,7 +4,8 @@ import { getVerificationPrivacyVM } from "@/presenters/getVerificationPrivacyVM"
 
 export const metadata: Metadata = {
   title: "Kinkord KYC Privacy Notice | Kinkord",
-  description: "How Kinkord handles identity, biometric, location, residence and financial KYC information.",
+  description:
+    "How Kinkord handles identity, biometric, location, residence and financial KYC information.",
   robots: { index: true, follow: true },
 };
 

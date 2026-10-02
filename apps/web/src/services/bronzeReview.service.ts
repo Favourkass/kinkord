@@ -11,6 +11,8 @@ export interface BronzeReviewDecisionInput {
 export const bronzeReviewApi = {
   list: () => api.get<BronzeReviewPM[]>("/verification/bronze/reviews"),
   decide: (id: string, input: BronzeReviewDecisionInput) =>
-    api.post<BronzeReviewDecisionPM>(`/verification/bronze/reviews/${encodeURIComponent(id)}/decision`, input),
+    api.post<BronzeReviewDecisionPM>(
+      `/verification/bronze/reviews/${encodeURIComponent(id)}/decision`,
+      input,
+    ),
 };
-

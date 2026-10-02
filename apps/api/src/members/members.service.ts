@@ -273,14 +273,16 @@ export class MembersService {
       // Only you see your own birth date; everyone else gets the derived age.
       dateOfBirth: isSelf ? p.dateOfBirth : null,
       verification: {
-        email: u.emailVerified, phone: p.phoneVerified,
+        email: u.emailVerified,
+        phone: p.phoneVerified,
         // Unified seal comes only from the policy service (all four stages,
         // environment stamp, unexpired, not revoked) — never from legacy Bronze.
         ...(fullKyc ? { kyc: true as const } : {}),
         // Legacy identity approval has not completed the new location, residence
         // and financial KYC stages, so it must never be promoted automatically.
         ...(row.bronze?.status === "verified" && row.bronze.verifiedAvatarKey === p.avatarKey
-          ? { legacyIdentity: true as const } : {}),
+          ? { legacyIdentity: true as const }
+          : {}),
       },
     };
   }

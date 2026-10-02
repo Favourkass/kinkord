@@ -92,7 +92,12 @@ export const MEMBERS_COPY = {
       noSocial: "No links added yet.",
       platforms: { facebook: "Facebook", x: "X (Twitter)" },
       verification: "Verification Status",
-      verified: { kyc: "Kinkord KYC Verified", identity: "Identity Verified", basic: "Basic Verified", none: "Not verified yet" },
+      verified: {
+        kyc: "Kinkord KYC Verified",
+        identity: "Identity Verified",
+        basic: "Basic Verified",
+        none: "Not verified yet",
+      },
       verifiedDetail: (email: boolean, phone: boolean) =>
         email && phone
           ? "Email & Phone Verified"

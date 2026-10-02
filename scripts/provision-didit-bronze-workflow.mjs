@@ -8,11 +8,16 @@
 const baseUrl = "https://verification.didit.me/v3/workflows/";
 const mode = process.argv[2] ?? "dry-run";
 const environment = process.argv[3] ?? "sandbox";
-const label = environment === "live" ? "Kinkord Bronze - Nigeria Live" : "Kinkord Bronze - Nigeria Test";
-const apiKey = (environment === "live" ? process.env.DIDIT_API_KEY : process.env.DIDIT_SANDBOX_API_KEY)?.trim();
+const label =
+  environment === "live" ? "Kinkord Bronze - Nigeria Live" : "Kinkord Bronze - Nigeria Test";
+const apiKey = (
+  environment === "live" ? process.env.DIDIT_API_KEY : process.env.DIDIT_SANDBOX_API_KEY
+)?.trim();
 
-if (!['dry-run', 'inspect', 'create'].includes(mode)) throw new Error("Use dry-run, inspect or create.");
-if (!['sandbox', 'live'].includes(environment)) throw new Error("Use sandbox or live as the environment.");
+if (!["dry-run", "inspect", "create"].includes(mode))
+  throw new Error("Use dry-run, inspect or create.");
+if (!["sandbox", "live"].includes(environment))
+  throw new Error("Use sandbox or live as the environment.");
 
 const payload = {
   workflow_label: label,
@@ -64,7 +69,9 @@ async function request(url, options = {}) {
   const body = await response.json().catch(() => null);
   if (!response.ok) {
     // Provider error bodies can include echoed credentials or sensitive data.
-    const detail = JSON.stringify(body ?? {}).replaceAll(apiKey, "[redacted]").slice(0, 2000);
+    const detail = JSON.stringify(body ?? {})
+      .replaceAll(apiKey, "[redacted]")
+      .slice(0, 2000);
     throw new Error(`Didit workflow request failed with HTTP ${response.status}: ${detail}`);
   }
   return body;
@@ -75,7 +82,10 @@ if (mode === "dry-run") {
   process.exit(0);
 }
 
-if (!apiKey) throw new Error(environment === "live" ? "DIDIT_API_KEY is missing." : "DIDIT_SANDBOX_API_KEY is missing.");
+if (!apiKey)
+  throw new Error(
+    environment === "live" ? "DIDIT_API_KEY is missing." : "DIDIT_SANDBOX_API_KEY is missing.",
+  );
 
 function workflowRows(body) {
   if (Array.isArray(body)) return body;
@@ -88,23 +98,32 @@ const current = workflowRows(await request(baseUrl));
 const existing = current.filter((item) => item.workflow_label === label);
 
 if (mode === "inspect") {
-  console.log(JSON.stringify({
-    workflowCount: current.length,
-    environment,
-    workflows: current.map((item) => ({
-      id: item.uuid ?? item.workflow_id,
-      label: item.workflow_label,
-      status: item.status,
-      features: item.features,
-    })),
-    planned: payload,
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        workflowCount: current.length,
+        environment,
+        workflows: current.map((item) => ({
+          id: item.uuid ?? item.workflow_id,
+          label: item.workflow_label,
+          status: item.status,
+          features: item.features,
+        })),
+        planned: payload,
+      },
+      null,
+      2,
+    ),
+  );
 } else {
-  if (existing.length > 1) throw new Error("Multiple matching workflows exist; inspect them before creating another.");
-  const created = existing[0] ?? await request(baseUrl, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  if (existing.length > 1)
+    throw new Error("Multiple matching workflows exist; inspect them before creating another.");
+  const created =
+    existing[0] ??
+    (await request(baseUrl, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }));
   const id = created.uuid ?? created.workflow_id;
   if (typeof id !== "string" || !id) throw new Error("Didit did not return a workflow ID.");
   const detail = await request(`${baseUrl}${encodeURIComponent(id)}/`);
@@ -112,24 +131,36 @@ if (mode === "inspect") {
   const featureNodes = graphNodes.filter((node) => node?.node_type === "feature");
   const orderedFeatures = payload.features.map((item) => item.feature);
   if (orderedFeatures.some((feature) => !featureNodes.some((node) => node.feature === feature))) {
-    throw new Error(`Didit created workflow ${id}, but its returned graph is missing a required feature.`);
+    throw new Error(
+      `Didit created workflow ${id}, but its returned graph is missing a required feature.`,
+    );
   }
   const liveness = featureNodes.find((node) => node.feature === "LIVENESS");
   const validation = featureNodes.find((node) => node.feature === "DATABASE_VALIDATION");
   const nigeriaServices = validation?.config?.database_validation_countries?.NGA?.services ?? [];
-  if (liveness?.config?.face_liveness_method !== "ACTIVE_3D" ||
-      !nigeriaServices.includes("nga_national_id")) {
-    throw new Error(`Didit created workflow ${id}, but active liveness or Nigerian NIN validation did not persist.`);
+  if (
+    liveness?.config?.face_liveness_method !== "ACTIVE_3D" ||
+    !nigeriaServices.includes("nga_national_id")
+  ) {
+    throw new Error(
+      `Didit created workflow ${id}, but active liveness or Nigerian NIN validation did not persist.`,
+    );
   }
-  console.log(JSON.stringify({
-    created: existing.length === 0,
-    environment,
-    id,
-    label: detail.workflow_label,
-    status: detail.status,
-    features: detail.features,
-    isDesktopAllowed: detail.is_desktop_allowed,
-    livenessMethod: liveness.config.face_liveness_method,
-    nigeriaServices,
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        created: existing.length === 0,
+        environment,
+        id,
+        label: detail.workflow_label,
+        status: detail.status,
+        features: detail.features,
+        isDesktopAllowed: detail.is_desktop_allowed,
+        livenessMethod: liveness.config.face_liveness_method,
+        nigeriaServices,
+      },
+      null,
+      2,
+    ),
+  );
 }

@@ -12,10 +12,14 @@ function subject(input: { legacyStatus?: string; results?: unknown[] } = {}) {
     latestStageAttempt: async () => null,
   } as unknown as KycRepository;
   const legacy = {
-    status: async () => input.legacyStatus ? { status: input.legacyStatus } : null,
+    status: async () => (input.legacyStatus ? { status: input.legacyStatus } : null),
   } as unknown as BronzeRepository;
-  return new KycService(repository, legacy, { enabled: false } as unknown as KycLocationService,
-    { enabled: false } as unknown as KycFinancialService);
+  return new KycService(
+    repository,
+    legacy,
+    { enabled: false } as unknown as KycLocationService,
+    { enabled: false } as unknown as KycFinancialService,
+  );
 }
 
 describe("KycService", () => {
@@ -36,20 +40,38 @@ describe("KycService", () => {
   it("never reports verified for a revoked case even when stages passed", async () => {
     const environment = process.env.DIDIT_MODE?.trim() === "sandbox" ? "sandbox" : "live";
     const results = (["identity", "location", "residence", "financial"] as const).map((stage) => ({
-      stage, status: "passed", expiresAt: null,
-      summary: stage === "identity"
-        ? { governmentId: true, liveness: true, idFace: true, profileFace: true, identityDetails: true, environment }
-        : { environment },
+      stage,
+      status: "passed",
+      expiresAt: null,
+      summary:
+        stage === "identity"
+          ? {
+              governmentId: true,
+              liveness: true,
+              idFace: true,
+              profileFace: true,
+              identityDetails: true,
+              environment,
+            }
+          : { environment },
     }));
     const repository = {
-      snapshot: async () => ({ caseRow: { status: "revoked", revokedAt: new Date(), expiresAt: null }, results }),
+      snapshot: async () => ({
+        caseRow: { status: "revoked", revokedAt: new Date(), expiresAt: null },
+        results,
+      }),
       recordConsent: async () => null,
       latestStageAttempt: async () => null,
     } as unknown as import("./kyc.repository").KycRepository;
-    const legacy = { status: async () => null } as unknown as import("./bronze.repository").BronzeRepository;
-    const service = new KycService(repository, legacy,
+    const legacy = {
+      status: async () => null,
+    } as unknown as import("./bronze.repository").BronzeRepository;
+    const service = new KycService(
+      repository,
+      legacy,
       { enabled: false } as unknown as import("./kyc-location.service").KycLocationService,
-      { enabled: false } as unknown as import("./kyc-financial.service").KycFinancialService);
+      { enabled: false } as unknown as import("./kyc-financial.service").KycFinancialService,
+    );
     const view = await service.status("member-1");
     expect(view.fullKycVerified).toBe(false);
     expect(view.status).toBe("revoked");

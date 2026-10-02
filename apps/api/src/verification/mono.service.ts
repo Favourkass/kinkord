@@ -20,61 +20,98 @@ function monoAccountId(value: unknown) {
 
 @Injectable()
 export class MonoService {
-  private get secretKey() { return process.env.MONO_SECRET_KEY?.trim() ?? ""; }
-  private get webhookSecret() { return process.env.MONO_WEBHOOK_SECRET?.trim() ?? ""; }
-  private get redirectUrl() { return process.env.MONO_REDIRECT_URL?.trim() ?? ""; }
+  private get secretKey() {
+    return process.env.MONO_SECRET_KEY?.trim() ?? "";
+  }
+  private get webhookSecret() {
+    return process.env.MONO_WEBHOOK_SECRET?.trim() ?? "";
+  }
+  private get redirectUrl() {
+    return process.env.MONO_REDIRECT_URL?.trim() ?? "";
+  }
 
   get configured() {
-    return process.env.MONO_FINANCIAL_KYC_ENABLED === "true" && Boolean(this.secretKey && this.webhookSecret && this.redirectUrl);
+    return (
+      process.env.MONO_FINANCIAL_KYC_ENABLED === "true" &&
+      Boolean(this.secretKey && this.webhookSecret && this.redirectUrl)
+    );
   }
 
   private headers() {
-    return { accept: "application/json", "content-type": "application/json", "mono-sec-key": this.secretKey };
+    return {
+      accept: "application/json",
+      "content-type": "application/json",
+      "mono-sec-key": this.secretKey,
+    };
   }
 
   async initiateAccountLink(input: { name: string; email: string; reference: string }) {
-    if (!this.configured) throw new ServiceUnavailableException("Financial KYC is not configured yet.");
+    if (!this.configured)
+      throw new ServiceUnavailableException("Financial KYC is not configured yet.");
     try {
       const response = await fetch(`${MONO_API}/accounts/initiate`, {
-        method: "POST", headers: this.headers(),
+        method: "POST",
+        headers: this.headers(),
         body: JSON.stringify({
-          customer: { name: input.name, email: input.email }, meta: { ref: input.reference },
-          scope: "auth", redirect_url: this.redirectUrl,
+          customer: { name: input.name, email: input.email },
+          meta: { ref: input.reference },
+          scope: "auth",
+          redirect_url: this.redirectUrl,
         }),
-        signal: AbortSignal.timeout(10_000), redirect: "error",
+        signal: AbortSignal.timeout(10_000),
+        redirect: "error",
       });
       if (!response.ok) throw new Error("Mono link initiation failed");
-      const body = await response.json() as { data?: { mono_url?: unknown; meta?: { ref?: unknown } } };
+      const body = (await response.json()) as {
+        data?: { mono_url?: unknown; meta?: { ref?: unknown } };
+      };
       const url = text(body.data?.mono_url);
-      if (!url || !/^https:\/\/link\.mono\.co\//.test(url) || body.data?.meta?.ref !== input.reference) {
+      if (
+        !url ||
+        !/^https:\/\/link\.mono\.co\//.test(url) ||
+        body.data?.meta?.ref !== input.reference
+      ) {
         throw new Error("Mono returned an invalid account-link URL");
       }
       return { url };
     } catch {
-      throw new ServiceUnavailableException("Financial KYC is temporarily unavailable. Please try again.");
+      throw new ServiceUnavailableException(
+        "Financial KYC is temporarily unavailable. Please try again.",
+      );
     }
   }
 
   async identity(accountId: unknown): Promise<MonoIdentity> {
-    if (!this.configured) throw new ServiceUnavailableException("Financial KYC is not configured yet.");
+    if (!this.configured)
+      throw new ServiceUnavailableException("Financial KYC is not configured yet.");
     const id = monoAccountId(accountId);
-    if (!id) throw new ServiceUnavailableException("Mono did not provide a usable linked-account reference.");
+    if (!id)
+      throw new ServiceUnavailableException(
+        "Mono did not provide a usable linked-account reference.",
+      );
     try {
       const response = await fetch(`${MONO_API}/accounts/${encodeURIComponent(id)}/identity`, {
-        headers: this.headers(), signal: AbortSignal.timeout(10_000), redirect: "error",
+        headers: this.headers(),
+        signal: AbortSignal.timeout(10_000),
+        redirect: "error",
       });
       if (!response.ok) throw new Error("Mono identity lookup failed");
-      const body = await response.json() as { data?: Record<string, unknown> };
+      const body = (await response.json()) as { data?: Record<string, unknown> };
       return {
-        fullName: text(body.data?.full_name), dateOfBirth: text(body.data?.dob), gender: text(body.data?.gender),
+        fullName: text(body.data?.full_name),
+        dateOfBirth: text(body.data?.dob),
+        gender: text(body.data?.gender),
       };
     } catch {
-      throw new ServiceUnavailableException("Financial identity information is temporarily unavailable. Please try again later.");
+      throw new ServiceUnavailableException(
+        "Financial identity information is temporarily unavailable. Please try again later.",
+      );
     }
   }
 
   verifyWebhook(received: string | undefined) {
-    if (!this.configured || !received) throw new UnauthorizedException("Invalid Mono webhook secret.");
+    if (!this.configured || !received)
+      throw new UnauthorizedException("Invalid Mono webhook secret.");
     const expected = Buffer.from(this.webhookSecret, "utf8");
     const actual = Buffer.from(received, "utf8");
     if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) {

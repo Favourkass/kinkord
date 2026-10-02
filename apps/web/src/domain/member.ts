@@ -366,8 +366,13 @@ export function toPublicProfileVM(
       return url ? [{ platform, url, handle: socialHandle(url) }] : [];
     }),
     verification: {
-      level: pm.verification?.kyc ? "kyc" : pm.verification?.legacyIdentity ? "identity" :
-        pm.verification?.email || pm.verification?.phone ? "basic" : "none",
+      level: pm.verification?.kyc
+        ? "kyc"
+        : pm.verification?.legacyIdentity
+          ? "identity"
+          : pm.verification?.email || pm.verification?.phone
+            ? "basic"
+            : "none",
       email: Boolean(pm.verification?.email),
       phone: Boolean(pm.verification?.phone),
     },

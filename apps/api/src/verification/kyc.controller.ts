@@ -1,4 +1,14 @@
-import { BadRequestException, Body, Controller, Get, Headers, Param, Post, Req, UseGuards } from "@nestjs/common";
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+} from "@nestjs/common";
 import { z } from "zod";
 import { AuthGuard, type AuthedRequest } from "../auth/auth.guard";
 import { KycService } from "./kyc.service";
@@ -12,21 +22,30 @@ const consentSchema = z.object({
 });
 
 const locationSchema = z.object({
-  latitude: z.number().finite().min(-90).max(90), longitude: z.number().finite().min(-180).max(180),
+  latitude: z.number().finite().min(-90).max(90),
+  longitude: z.number().finite().min(-180).max(180),
   accuracyMetres: z.number().finite().positive().max(10_000),
 });
 
 @Controller("verification/kyc")
 @UseGuards(AuthGuard)
 export class KycController {
-  constructor(private readonly kyc: KycService, private readonly location: KycLocationService,
-    private readonly financial: KycFinancialService) {}
+  constructor(
+    private readonly kyc: KycService,
+    private readonly location: KycLocationService,
+    private readonly financial: KycFinancialService,
+  ) {}
 
-  @Get("status") status(@Req() req: AuthedRequest) { return this.kyc.status(req.user.id); }
+  @Get("status") status(@Req() req: AuthedRequest) {
+    return this.kyc.status(req.user.id);
+  }
 
   @Post("consents") consent(@Req() req: AuthedRequest, @Body() body: unknown) {
     const parsed = consentSchema.safeParse(body);
-    if (!parsed.success) throw new BadRequestException("A valid KYC consent category and policy version are required.");
+    if (!parsed.success)
+      throw new BadRequestException(
+        "A valid KYC consent category and policy version are required.",
+      );
     return this.kyc.consent(req.user.id, parsed.data.category, parsed.data.policyVersion);
   }
 
@@ -61,12 +80,20 @@ const reviewDecisionSchema = z.object({
 export class KycReviewController {
   constructor(private readonly reviews: KycReviewService) {}
 
-  @Get() list(@Req() req: AuthedRequest) { return this.reviews.list(req.user); }
+  @Get() list(@Req() req: AuthedRequest) {
+    return this.reviews.list(req.user);
+  }
 
-  @Post(":id/decision") decide(@Req() req: AuthedRequest, @Param("id") id: string, @Body() body: unknown) {
+  @Post(":id/decision") decide(
+    @Req() req: AuthedRequest,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
     const parsed = reviewDecisionSchema.safeParse(body);
     if (!z.string().uuid().safeParse(id).success || !parsed.success) {
-      throw new BadRequestException("A valid KYC review decision and evidence reference are required.");
+      throw new BadRequestException(
+        "A valid KYC review decision and evidence reference are required.",
+      );
     }
     return this.reviews.decide(req.user, { id, ...parsed.data });
   }

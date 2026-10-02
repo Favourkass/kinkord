@@ -102,7 +102,14 @@ export function useHomePresenter() {
   }, [router]);
 
   return {
-    loading, error, drawerOpen, settingsMenuOpen, openDrawer, closeDrawer,
-    toggleSettingsMenu, logout, ...vm,
+    loading,
+    error,
+    drawerOpen,
+    settingsMenuOpen,
+    openDrawer,
+    closeDrawer,
+    toggleSettingsMenu,
+    logout,
+    ...vm,
   };
 }

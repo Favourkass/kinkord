@@ -14,4 +14,3 @@ export interface BronzeReviewPM {
 export interface BronzeReviewDecisionPM {
   status: "verified" | "manual_review";
 }
-

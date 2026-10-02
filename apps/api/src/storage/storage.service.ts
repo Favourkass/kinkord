@@ -60,8 +60,9 @@ export class StorageService {
 
   /** Reads only a server-selected profile key; never fetches an arbitrary profile URL. */
   async readVerificationImage(key: string) {
-    const response = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }),
-      { abortSignal: AbortSignal.timeout(10000) });
+    const response = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }), {
+      abortSignal: AbortSignal.timeout(10000),
+    });
     const body = response.Body;
     if (!body) throw new Error("Profile image unavailable");
     // SDK's Node body is a readable stream. Breaking iteration destroys the stream.

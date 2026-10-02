@@ -12,7 +12,9 @@ export default function FeatureComingSoonPage() {
   const shell = useHomePresenter();
   const copy = getComingSoonFeatureVM(feature);
 
-  return <AppShell {...appShellProps(shell, getAppShellNav())} activeNav="none">
-    <ComingSoonPanel {...copy} />
-  </AppShell>;
+  return (
+    <AppShell {...appShellProps(shell, getAppShellNav())} activeNav="none">
+      <ComingSoonPanel {...copy} />
+    </AppShell>
+  );
 }

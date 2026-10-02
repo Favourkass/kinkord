@@ -1,10 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { canAwardKinkordKyc, kycProviderEnvironment, nextRequiredKycStage, type KycStageDecision } from "./kyc-policy";
+import {
+  canAwardKinkordKyc,
+  kycProviderEnvironment,
+  nextRequiredKycStage,
+  type KycStageDecision,
+} from "./kyc-policy";
 
 const environment = kycProviderEnvironment();
 
 const allPassed = (): KycStageDecision[] => [
-  { stage: "identity", status: "passed", environment, checks: { governmentId: true, liveness: true, idFace: true, profileFace: true, identityDetails: true } },
+  {
+    stage: "identity",
+    status: "passed",
+    environment,
+    checks: {
+      governmentId: true,
+      liveness: true,
+      idFace: true,
+      profileFace: true,
+      identityDetails: true,
+    },
+  },
   { stage: "location", status: "passed", environment },
   { stage: "residence", status: "passed", environment },
   { stage: "financial", status: "passed", environment },

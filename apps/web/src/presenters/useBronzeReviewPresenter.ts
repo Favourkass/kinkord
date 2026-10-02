@@ -27,7 +27,9 @@ export function useBronzeReviewPresenter() {
     try {
       const rows = await bronzeReviewApi.list();
       setReviews(rows);
-      setDrafts((current) => Object.fromEntries(rows.map((row) => [row.id, current[row.id] ?? emptyDraft()])));
+      setDrafts((current) =>
+        Object.fromEntries(rows.map((row) => [row.id, current[row.id] ?? emptyDraft()])),
+      );
       setError(null);
     } catch (failure) {
       if (failure instanceof ApiError && failure.status === 401) router.replace(Routes.login);
@@ -40,7 +42,9 @@ export function useBronzeReviewPresenter() {
   }, [router]);
 
   useEffect(() => {
-    const timer = setTimeout(() => { void load(); }, 0);
+    const timer = setTimeout(() => {
+      void load();
+    }, 0);
     return () => clearTimeout(timer);
   }, [load]);
 
@@ -51,11 +55,15 @@ export function useBronzeReviewPresenter() {
   const decide = async (id: string, decision: "approve" | "reject") => {
     const draft = drafts[id] ?? emptyDraft();
     if (draft.evidenceReference.trim().length < 3 || draft.reason.trim().length < 10) {
-      setError("Add the Didit/internal evidence reference and review notes of at least 10 characters.");
+      setError(
+        "Add the Didit/internal evidence reference and review notes of at least 10 characters.",
+      );
       return;
     }
     if (decision === "approve" && !draft.profileFaceMatches) {
-      setError("Approval requires an affirmative match between the Didit live capture and the profile photo.");
+      setError(
+        "Approval requires an affirmative match between the Didit live capture and the profile photo.",
+      );
       return;
     }
     setBusyId(id);
@@ -64,7 +72,9 @@ export function useBronzeReviewPresenter() {
       await bronzeReviewApi.decide(id, { decision, ...draft });
       await load();
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : "The review decision could not be saved.");
+      setError(
+        failure instanceof Error ? failure.message : "The review decision could not be saved.",
+      );
     } finally {
       setBusyId(null);
     }
@@ -75,7 +85,8 @@ export function useBronzeReviewPresenter() {
     error,
     view: {
       title: "KYC review queue",
-      guidance: "Use the provider reference to inspect the live capture in Didit. Compare it only with the profile photo shown for this attempt. Never copy ID numbers or biometric media into the notes.",
+      guidance:
+        "Use the provider reference to inspect the live capture in Didit. Compare it only with the profile photo shown for this attempt. Never copy ID numbers or biometric media into the notes.",
       providerConsoleHref: "https://business.didit.me/",
       empty: reviews.length === 0,
       items: reviews.map((review) => {
@@ -87,14 +98,21 @@ export function useBronzeReviewPresenter() {
           evidenceReference: draft.evidenceReference,
           reason: draft.reason,
           busy: busyId === review.id,
-          onProfileFaceMatches: (value: boolean) => update(review.id, { profileFaceMatches: value }),
+          onProfileFaceMatches: (value: boolean) =>
+            update(review.id, { profileFaceMatches: value }),
           onEvidenceReference: (value: string) => update(review.id, { evidenceReference: value }),
           onReason: (value: string) => update(review.id, { reason: value }),
-          onApprove: () => { void decide(review.id, "approve"); },
-          onReject: () => { void decide(review.id, "reject"); },
+          onApprove: () => {
+            void decide(review.id, "approve");
+          },
+          onReject: () => {
+            void decide(review.id, "reject");
+          },
         };
       }),
-      onRefresh: () => { void load(); },
+      onRefresh: () => {
+        void load();
+      },
     },
   };
 }

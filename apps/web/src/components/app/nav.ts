@@ -3,8 +3,15 @@
 export type AppTab = "home" | "chat" | "notifications" | "profile";
 
 export type AppNav =
-  | "home" | "members" | "chat" | "notifications" | "profile"
-  | "settings" | "saved" | "edit-profile" | "none";
+  | "home"
+  | "members"
+  | "chat"
+  | "notifications"
+  | "profile"
+  | "settings"
+  | "saved"
+  | "edit-profile"
+  | "none";
 
 export interface AppNavLinks {
   home: string;
@@ -28,9 +35,21 @@ export interface AppNavLabels {
 }
 
 export type DrawerIcon =
-  | "members" | "saved" | "kinkopedia" | "verification" | "coins" | "subscription"
-  | "marketplace" | "account" | "data" | "privacy" | "security" | "content"
-  | "safety" | "support" | "about";
+  | "members"
+  | "saved"
+  | "kinkopedia"
+  | "verification"
+  | "coins"
+  | "subscription"
+  | "marketplace"
+  | "account"
+  | "data"
+  | "privacy"
+  | "security"
+  | "content"
+  | "safety"
+  | "support"
+  | "about";
 
 export interface DrawerNavItem {
   key: string;
