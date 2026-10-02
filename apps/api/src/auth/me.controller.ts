@@ -1,11 +1,11 @@
 import { Controller, Get, Req, UseGuards } from "@nestjs/common";
-import { AllowUnverifiedPhone, AuthGuard, AuthedRequest } from "./auth.guard";
+import { AllowDuringSignUp, AuthGuard, AuthedRequest } from "./auth.guard";
 
 @Controller()
 export class MeController {
   @Get("me")
   @UseGuards(AuthGuard)
-  @AllowUnverifiedPhone()
+  @AllowDuringSignUp()
   me(@Req() req: AuthedRequest) {
     const { id, email, name, emailVerified, image, createdAt } = req.user;
     const u = req.user as typeof req.user & {

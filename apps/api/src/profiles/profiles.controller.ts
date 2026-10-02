@@ -12,7 +12,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { z } from "zod";
-import { AllowUnverifiedPhone, AuthGuard, AuthedRequest } from "../auth/auth.guard";
+import { AllowDuringSignUp, AuthGuard, AuthedRequest } from "../auth/auth.guard";
 import { PROFILE_OPTIONS } from "./profile-options";
 import { ProfilesService, updateProfileSchema } from "./profiles.service";
 
@@ -32,7 +32,7 @@ export class ProfilesController {
   constructor(private readonly profiles: ProfilesService) {}
 
   @Get()
-  @AllowUnverifiedPhone()
+  @AllowDuringSignUp()
   getOwn(@Req() req: AuthedRequest) {
     return this.profiles.getOwn(req.user.id, req.user.name);
   }
@@ -53,7 +53,7 @@ export class ProfilesController {
   }
 
   @Patch()
-  @AllowUnverifiedPhone()
+  @AllowDuringSignUp()
   update(@Req() req: AuthedRequest, @Body() body: unknown) {
     const parsed = updateProfileSchema.safeParse(body);
     if (!parsed.success) {
@@ -71,6 +71,7 @@ export class ProfilesController {
   }
 
   @Post("upload-url")
+  @AllowDuringSignUp()
   presignUpload(@Req() req: AuthedRequest, @Body() body: unknown) {
     const parsed = uploadUrlSchema.safeParse(body);
     if (!parsed.success) {
