@@ -36,6 +36,16 @@ describe("EmailService", () => {
     expect(smtpSend).not.toHaveBeenCalled();
   });
 
+  it("returns Resend's message id, so a send can be found in its dashboard", async () => {
+    process.env.RESEND_API_KEY = "re_test";
+    resendSend.mockResolvedValue({ data: { id: "4ef9a417" }, error: null });
+    const { EmailService } = await import("./email.service");
+    await expect(new EmailService().send(message)).resolves.toEqual({
+      provider: "resend",
+      id: "4ef9a417",
+    });
+  });
+
   it("throws when Resend reports a delivery error", async () => {
     process.env.RESEND_API_KEY = "re_test";
     resendSend.mockResolvedValue({ error: { message: "bounced" } });
