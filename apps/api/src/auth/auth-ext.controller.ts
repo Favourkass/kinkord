@@ -3,6 +3,7 @@ import type { Request, Response as ExpressResponse } from "express";
 import { fromNodeHeaders } from "better-auth/node";
 import { z } from "zod";
 import { PhoneSignInService } from "./phone-sign-in.service";
+import { isAllowedPhone, PHONE_NOT_ALLOWED } from "../profiles/phone-rules";
 import { SignUpService } from "./sign-up.service";
 
 const signInPhoneSchema = z.object({
@@ -51,7 +52,8 @@ const signUpSchema = z.object({
   phone: z
     .string({ required_error: "Enter your phone number." })
     .trim()
-    .regex(/^\+\d{8,15}$/, "phone must be E.164, e.g. +2348012345678"),
+    .regex(/^\+\d{8,15}$/, "phone must be E.164, e.g. +2348012345678")
+    .refine(isAllowedPhone, PHONE_NOT_ALLOWED),
 });
 
 @Controller("auth-ext")
