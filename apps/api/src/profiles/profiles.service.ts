@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import { isAllowedPhone, PHONE_NOT_ALLOWED } from "./phone-rules";
 import { and, eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -87,6 +88,7 @@ export const updateProfileSchema = z.object({
     .string()
     .trim()
     .regex(/^\+\d{8,15}$/, "phone must be E.164, e.g. +2348012345678")
+    .refine(isAllowedPhone, PHONE_NOT_ALLOWED)
     .nullable()
     .optional(),
   avatarKey: z.string().trim().max(256).nullable().optional(),

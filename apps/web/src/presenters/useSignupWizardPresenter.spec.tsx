@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { PHONE_NIGERIA_ONLY } from "@/domain/onboarding";
 import { useSignupWizardPresenter } from "./useSignupWizardPresenter";
 
 const push = vi.fn();
@@ -348,7 +349,7 @@ describe("useSignupWizardPresenter", () => {
       act(() => result.current.verifyStep.changePhone.save());
 
       await waitFor(() =>
-        expect(result.current.verifyStep.changePhone.error).toBe("Enter a valid phone number."),
+        expect(result.current.verifyStep.changePhone.error).toBe(PHONE_NIGERIA_ONLY),
       );
       expect(patch).not.toHaveBeenCalled();
     });

@@ -144,6 +144,23 @@ describe("OtpService.send", () => {
     expect(texter.send).not.toHaveBeenCalled();
   });
 
+  it("won't text a number outside Nigeria, even one saved before the rule", async () => {
+    const { db, stored } = makeDb();
+    const texter = sms();
+    const service = new OtpService(
+      db as never,
+      email() as never,
+      texter as never,
+      guard() as never,
+    );
+
+    await expect(service.send("u1", "sms", "+254703105232")).rejects.toThrow(
+      /Nigerian mobile numbers/,
+    );
+    expect(stored).toHaveLength(0);
+    expect(texter.send).not.toHaveBeenCalled();
+  });
+
   it("checks an email destination as an email", async () => {
     const { db } = makeDb();
     const checking = guard();

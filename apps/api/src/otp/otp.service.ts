@@ -15,6 +15,7 @@ import { EmailService } from "../email/email.service";
 import { verificationCodeEmail } from "../email/templates";
 import { SmsService } from "../messaging/sms.service";
 import { SignupGuardService } from "../moderation/signup-guard.service";
+import { isAllowedPhone, PHONE_NOT_ALLOWED } from "../profiles/phone-rules";
 
 export type OtpChannel = "email" | "sms";
 
@@ -45,7 +46,12 @@ export interface OtpVerifyResult {
 function normalizeDestination(channel: OtpChannel, destination: string) {
   const normalized = destination.trim().toLowerCase();
   if (channel === "email" && EMAIL_RE.test(normalized)) return normalized;
-  if (channel === "sms" && E164_RE.test(normalized)) return normalized;
+  if (channel === "sms" && E164_RE.test(normalized)) {
+    // A number saved before the Nigeria-only rule can't be texted either: the
+    // member changes it to a Nigerian one, which the profile then accepts.
+    if (!isAllowedPhone(normalized)) throw new BadRequestException(PHONE_NOT_ALLOWED);
+    return normalized;
+  }
   throw new BadRequestException(
     channel === "email"
       ? "A valid email address is required"

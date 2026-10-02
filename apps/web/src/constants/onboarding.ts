@@ -4,14 +4,13 @@ export const LAUNCH_COUNTRIES = [
   { code: "NG", name: "Nigeria", flag: "🇳🇬", dialCode: "+234" },
 ] as const;
 
-export const PHONE_COUNTRY_CODES = [
-  { code: "NG", dialCode: "+234", flag: "🇳🇬" },
-  { code: "US", dialCode: "+1", flag: "🇺🇸" },
-  { code: "GB", dialCode: "+44", flag: "🇬🇧" },
-  { code: "ZA", dialCode: "+27", flag: "🇿🇦" },
-  { code: "KE", dialCode: "+254", flag: "🇰🇪" },
-  { code: "GH", dialCode: "+233", flag: "🇬🇭" },
-] as const;
+/**
+ * Nigerian numbers only, for now (2026-10-02): texts abroad cost more and
+ * arrived less reliably. To reopen a country, add its dial code here, e.g.
+ * { code: "GH", dialCode: "+233", flag: "🇬🇭" }, and its mobile pattern in
+ * domain/onboarding.ts and apps/api/src/profiles/phone-rules.ts.
+ */
+export const PHONE_COUNTRY_CODES = [{ code: "NG", dialCode: "+234", flag: "🇳🇬" }] as const;
 
 export const NG_STATES = [
   "Abia",
