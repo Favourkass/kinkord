@@ -68,6 +68,7 @@ describe("SignupGuardService.review", () => {
     expect(send.mock.calls.map((c) => c[0].to)).toEqual([
       "maxihandsome@gmail.com",
       "nnabuekassidy@gmail.com",
+      "tegamaxwell2026@gmail.com",
     ]);
   });
 
