@@ -60,8 +60,11 @@ export default function SignupPage() {
 }
 
 function SignupWizard() {
+  // The app sends a member who left sign-up half-done back to the step they owe.
   const resume = useSearchParams().get("resume");
-  const p = useSignupWizardPresenter(resume === "phone" ? "phone" : undefined);
+  const p = useSignupWizardPresenter(
+    resume === "phone" || resume === "profile" ? resume : undefined,
+  );
   const [rolesOpen, setRolesOpen] = useState(false);
 
   // A failed Send OTP says what's wrong by the button; bring the first bad
@@ -413,7 +416,9 @@ function SignupWizard() {
                   <p className="text-[12px] text-kink-cream lg:text-[16px]">
                     {p.verifyStep.sent
                       ? "Enter the code we texted you. It expires in 10 minutes."
-                      : "We'll text a code to this number to confirm it's yours. You need it to use Kinkord."}
+                      : p.verifyStep.skip
+                        ? "We'll text a code to this number to confirm it's yours."
+                        : "We'll text a code to this number to confirm it's yours. You need it to use Kinkord."}
                   </p>
                 </div>
                 <div className="flex items-center gap-3 rounded-[12px] border-2 border-kink-gold-bright bg-[#111111] px-5 py-3 lg:px-8 lg:py-4">
@@ -530,6 +535,20 @@ function SignupWizard() {
                     className="max-w-[564px]"
                   />
                 )}
+                {p.verifyStep.skip && (
+                  <div className="flex flex-col items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={p.verifyStep.skip}
+                      className="text-[13px] text-kink-help underline lg:text-[16px]"
+                    >
+                      Not getting the text? Skip for now
+                    </button>
+                    <p className="text-[12px] text-white/60 lg:text-[15px]">
+                      You can verify your number later in Settings → Security &amp; 2FA.
+                    </p>
+                  </div>
+                )}
               </>
             )}
           </section>
@@ -540,6 +559,11 @@ function SignupWizard() {
         <SignupShell step={p.step} badge="STEP 5 OF 5">
           <section className="flex w-full max-w-[706px] flex-col items-center gap-6 lg:max-w-[1130px] lg:gap-8">
             <StageHeading plain="BUILD YOUR" highlight="PROFILE" />
+            {p.profileStep.resumed && (
+              <p className="text-center text-[13px] text-kink-cream lg:text-[16px]">
+                Add a profile photo and a cover picture to start using Kinkord.
+              </p>
+            )}
             <PhotoConfirmation {...p.profileStep.confirmation} />
             <UploadTile
               shape="circle"
@@ -637,8 +661,17 @@ function SignupWizard() {
                     </span>
                   </div>
                   <p className="mt-1.5 flex items-center gap-2 text-[13px] text-[#bfbfbf] lg:text-[17px]">
-                    <CheckCircle2 size={16} className="text-[#59b240]" aria-hidden />
-                    Phone verification pending — unlocks when SMS goes live
+                    {p.welcome.phoneVerified ? (
+                      <>
+                        <CheckCircle2 size={16} className="shrink-0 text-[#59b240]" aria-hidden />
+                        Phone number verified
+                      </>
+                    ) : (
+                      <>
+                        <Clock size={16} className="shrink-0 text-kink-gold-bright" aria-hidden />
+                        Phone not verified yet. Verify it any time in Settings → Security &amp; 2FA.
+                      </>
+                    )}
                   </p>
                 </div>
               </div>

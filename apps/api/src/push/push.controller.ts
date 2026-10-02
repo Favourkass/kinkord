@@ -1,6 +1,6 @@
 import { BadRequestException, Body, Controller, Get, Post, Req, UseGuards } from "@nestjs/common";
 import type { z } from "zod";
-import { AllowUnverifiedPhone, AuthGuard, type AuthedRequest } from "../auth/auth.guard";
+import { AllowDuringSignUp, AuthGuard, type AuthedRequest } from "../auth/auth.guard";
 import { endpointSchema, subscriptionSchema } from "./dto";
 import { PushService } from "./push.service";
 
@@ -33,7 +33,7 @@ export class PushController {
 
   /** Allowed before phone verification too: logging out always cleans up the device. */
   @Post("subscriptions/remove")
-  @AllowUnverifiedPhone()
+  @AllowDuringSignUp()
   async unsubscribe(@Req() req: AuthedRequest, @Body() body: unknown) {
     await this.push.unsubscribe(req.user.id, parse(endpointSchema, body).endpoint);
     return { ok: true };

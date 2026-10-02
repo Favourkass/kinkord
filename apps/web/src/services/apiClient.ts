@@ -2,17 +2,23 @@ import { Routes } from "@/constants/Routes";
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
-/** Sent by the API for a new account whose phone isn't verified yet. */
-const PHONE_VERIFICATION_REQUIRED = "PHONE_VERIFICATION_REQUIRED";
+/**
+ * The `code`s the API sends while a member still owes a sign-up step, and the
+ * step each one sends them back to.
+ */
+const SIGN_UP_STEP_FOR_CODE = new Map([
+  ["PHONE_VERIFICATION_REQUIRED", "phone"],
+  ["PROFILE_PHOTOS_REQUIRED", "profile"],
+]);
 
 /**
- * A member who left sign-up before verifying their phone can't use anything
- * else, so wherever they land, they are taken back to that step.
+ * A member who left sign-up half-done can't use anything else, so wherever
+ * they land, they are taken back to the step they still owe.
  */
-function sendToPhoneStep(): void {
+function sendToSignUpStep(step: string): void {
   if (typeof window === "undefined") return;
   if (window.location.pathname.startsWith(Routes.signup)) return;
-  window.location.assign(`${Routes.signup}?resume=phone`);
+  window.location.assign(`${Routes.signup}?resume=${step}`);
 }
 
 export class ApiError extends Error {
@@ -50,12 +56,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
   const body = await res.json().catch(() => null);
   if (!res.ok) {
-    if (
-      res.status === 403 &&
-      (body as { code?: string } | null)?.code === PHONE_VERIFICATION_REQUIRED
-    ) {
-      sendToPhoneStep();
-    }
+    const code = (body as { code?: string } | null)?.code;
+    const step = res.status === 403 && code ? SIGN_UP_STEP_FOR_CODE.get(code) : undefined;
+    if (step) sendToSignUpStep(step);
     throw new ApiError(res.status, body);
   }
   return body as T;

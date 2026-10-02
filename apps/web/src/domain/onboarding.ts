@@ -58,6 +58,15 @@ export function isAllowedPhone(e164: string | null): boolean {
 }
 
 /**
+ * Whether the phone code has to be entered before Kinkord opens up. Off for now
+ * (2026-10-02): texted codes aren't reaching Nigerian phones reliably, so the
+ * phone step offers "Skip for now" and the code can be done later in Settings →
+ * Security & 2FA. The API holds the same switch
+ * (apps/api/src/profiles/phone-rules.ts); turn both back on together.
+ */
+export const PHONE_STEP_REQUIRED = false;
+
+/**
  * "+234" + "0803 123 4567" -> "+2348031234567"; returns null when invalid.
  *
  * Autofill and copy-paste often put the whole international number in the
