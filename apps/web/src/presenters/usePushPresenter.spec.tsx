@@ -10,6 +10,7 @@ const svc = vi.hoisted(() => ({
   enable: vi.fn<() => Promise<PushState>>(),
   disable: vi.fn<() => Promise<PushState>>(),
   test: vi.fn<() => Promise<number>>(),
+  isAndroid: vi.fn<() => boolean>(),
 }));
 vi.mock("@/services/push.service", () => ({ pushService: svc }));
 
@@ -31,6 +32,22 @@ describe("usePushPresenter", () => {
     localStorage.clear();
   });
   afterEach(cleanup);
+
+  it("shows Android members how to make notifications pop up, once they're on", async () => {
+    svc.isAndroid.mockReturnValue(true);
+    const { result } = await ready("on");
+    expect(result.current.settings.tip).toBe(PUSH_COPY.androidPopTip);
+  });
+
+  it("keeps the pop-up tip to Android, and until notifications are on", async () => {
+    svc.isAndroid.mockReturnValue(false);
+    const iphone = await ready("on");
+    expect(iphone.result.current.settings.tip).toBeNull();
+    cleanup();
+    svc.isAndroid.mockReturnValue(true);
+    const off = await ready("off");
+    expect(off.result.current.settings.tip).toBeNull();
+  });
 
   it("offers to turn notifications on, in settings and as a card", async () => {
     const { result } = await ready("off");
