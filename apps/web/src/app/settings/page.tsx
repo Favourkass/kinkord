@@ -53,13 +53,17 @@ export default function SettingsPage() {
       handle={vm.handle}
       avatarUrl={vm.avatarUrl}
       membersCount={vm.membersCount}
+      kycVerified={vm.kycVerified}
       activeNav="settings"
       drawerOpen={vm.drawerOpen}
       onMenu={vm.openDrawer}
       onCloseDrawer={vm.closeDrawer}
+      settingsMenuOpen={vm.settingsMenuOpen}
+      onToggleSettingsMenu={vm.toggleSettingsMenu}
       onLogout={vm.logout}
       links={nav.links}
       labels={nav.labels}
+      drawerNavigation={nav.drawer}
     >
       <div className="mx-auto w-full max-w-[440px] px-[29px]">
         <h1 className="text-[24px] font-medium text-app-value">Settings</h1>

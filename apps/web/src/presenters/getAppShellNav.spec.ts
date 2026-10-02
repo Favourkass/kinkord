@@ -24,6 +24,18 @@ describe("getAppShellNav", () => {
       logout: "Log Out",
     });
   });
+
+  it("uses the client-approved mobile drawer order and groups settings behind one accordion", () => {
+    const drawer = getAppShellNav().drawer;
+    expect(drawer.primary.map((item) => item.label)).toEqual([
+      "Members", "Saved", "Kinkopedia", "Verification", "KinkCoins & Payment",
+      "Subscription", "Marketplace",
+    ]);
+    expect(drawer.settingsGroups.flatMap((group) => group.items.map((item) => item.label))).toEqual([
+      "Account Settings", "Your Data", "Privacy", "Security", "Content & Experience",
+      "Community & Safety", "Help & Support", "About Kinkord",
+    ]);
+  });
 });
 
 describe("appShellProps", () => {
@@ -37,9 +49,12 @@ describe("appShellProps", () => {
         handle: "@tega",
         avatarUrl: null,
         membersCount: "128",
+        kycVerified: false,
         drawerOpen: false,
+        settingsMenuOpen: false,
         openDrawer,
         closeDrawer: () => {},
+        toggleSettingsMenu: () => {},
         logout: () => {},
       },
       nav,

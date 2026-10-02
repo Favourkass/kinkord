@@ -18,13 +18,17 @@ export default function ModerationLayout({ children }: { children: ReactNode }) 
       handle={vm.handle}
       avatarUrl={vm.avatarUrl}
       membersCount={vm.membersCount}
+      kycVerified={vm.kycVerified}
       activeNav="settings"
       drawerOpen={vm.drawerOpen}
       onMenu={vm.openDrawer}
       onCloseDrawer={vm.closeDrawer}
+      settingsMenuOpen={vm.settingsMenuOpen}
+      onToggleSettingsMenu={vm.toggleSettingsMenu}
       onLogout={vm.logout}
       links={nav.links}
       labels={nav.labels}
+      drawerNavigation={nav.drawer}
     >
       {children}
     </AppShell>

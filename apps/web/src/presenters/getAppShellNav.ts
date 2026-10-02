@@ -1,5 +1,6 @@
 import { MEMBERS_COPY } from "@/constants/members";
 import { Routes } from "@/constants/Routes";
+import type { DrawerNavigation } from "@/components/app/nav";
 
 /** Structurally matches the shell components' AppNavLinks / AppNavLabels contracts. */
 export interface AppShellNavVM {
@@ -22,6 +23,7 @@ export interface AppShellNavVM {
     saved: string;
     logout: string;
   };
+  drawer: DrawerNavigation;
 }
 
 /** Display-ready nav (hrefs + copy) for every AppShell screen. */
@@ -37,6 +39,38 @@ export function getAppShellNav(): AppShellNavVM {
       saved: Routes.saved,
     },
     labels: { ...MEMBERS_COPY.nav },
+    drawer: {
+      primary: [
+        { key: "members", label: "Members", href: Routes.members, icon: "members", count: "members" },
+        { key: "saved", label: "Saved", href: Routes.saved, icon: "saved" },
+        { key: "kinkopedia", label: "Kinkopedia", href: Routes.kinkopedia, icon: "kinkopedia" },
+        { key: "verification", label: "Verification", href: Routes.settingsKyc, icon: "verification" },
+        { key: "kinkcoins", label: "KinkCoins & Payment", href: Routes.kinkCoins, icon: "coins" },
+        { key: "subscription", label: "Subscription", href: Routes.subscription, icon: "subscription" },
+        { key: "marketplace", label: "Marketplace", href: Routes.marketplace, icon: "marketplace" },
+      ],
+      settingsLabel: "Settings & Privacy",
+      settingsGroups: [
+        { label: "Account", items: [
+          { key: "account-settings", label: "Account Settings", href: Routes.settings, icon: "account" },
+          { key: "your-data", label: "Your Data", href: Routes.settingsData, icon: "data" },
+        ] },
+        { label: "Privacy & Security", items: [
+          { key: "privacy", label: "Privacy", href: Routes.profileEditPrivacy, icon: "privacy" },
+          { key: "security", label: "Security", href: Routes.settingsSecurity, icon: "security" },
+        ] },
+        { label: "Preference", items: [
+          { key: "content-experience", label: "Content & Experience", href: Routes.settingsContent, icon: "content" },
+        ] },
+        { label: "Safety", items: [
+          { key: "community-safety", label: "Community & Safety", href: Routes.settingsCommunitySafety, icon: "safety" },
+        ] },
+        { label: "Support", items: [
+          { key: "help-support", label: "Help & Support", href: Routes.contact, icon: "support" },
+          { key: "about", label: "About Kinkord", href: Routes.about, icon: "about" },
+        ] },
+      ],
+    },
   };
 }
 
@@ -47,9 +81,12 @@ export interface ShellSource {
   handle: string;
   avatarUrl: string | null;
   membersCount: string;
+  kycVerified: boolean;
   drawerOpen: boolean;
+  settingsMenuOpen: boolean;
   openDrawer: () => void;
   closeDrawer: () => void;
+  toggleSettingsMenu: () => void;
   logout: () => void;
 }
 
@@ -62,11 +99,15 @@ export function appShellProps(home: ShellSource, nav: ReturnType<typeof getAppSh
     handle: home.handle,
     avatarUrl: home.avatarUrl,
     membersCount: home.membersCount,
+    kycVerified: home.kycVerified,
     drawerOpen: home.drawerOpen,
+    settingsMenuOpen: home.settingsMenuOpen,
     onMenu: home.openDrawer,
     onCloseDrawer: home.closeDrawer,
+    onToggleSettingsMenu: home.toggleSettingsMenu,
     onLogout: home.logout,
     links: nav.links,
     labels: nav.labels,
+    drawerNavigation: nav.drawer,
   };
 }

@@ -3,7 +3,7 @@ import AppMobileHeader from "./AppMobileHeader";
 import AvatarCircle from "./AvatarCircle";
 import DesktopSidebar from "./DesktopSidebar";
 import MobileTabBar from "./MobileTabBar";
-import type { AppNav, AppNavLabels, AppNavLinks, AppTab } from "./nav";
+import type { AppNav, AppNavLabels, AppNavLinks, AppTab, DrawerNavigation } from "./nav";
 import SidebarDrawer from "./SidebarDrawer";
 
 export type { AppNav, AppNavLabels, AppNavLinks, AppTab } from "./nav";
@@ -16,15 +16,19 @@ export interface AppShellProps {
   handle: string;
   avatarUrl: string | null;
   membersCount: string;
+  kycVerified: boolean;
   /** Highlighted bottom tab; omit on screens outside the tab bar (e.g. Settings). */
   activeTab?: AppTab;
   activeNav: AppNav;
   drawerOpen: boolean;
   onMenu: () => void;
   onCloseDrawer: () => void;
+  settingsMenuOpen: boolean;
+  onToggleSettingsMenu: () => void;
   onLogout: () => void;
   links: AppNavLinks;
   labels: AppNavLabels;
+  drawerNavigation: DrawerNavigation;
   /** Page background; the members directory screens use the Figma `mem-page` tone. */
   mobileTone?: "surface" | "members";
   /** Desktop greeting strip (avatar + "Hi …"); the directory screens don't have one in the PC frames. */
@@ -41,14 +45,18 @@ export default function AppShell({
   name,
   avatarUrl,
   membersCount,
+  kycVerified,
   activeTab,
   activeNav,
   drawerOpen,
   onMenu,
   onCloseDrawer,
+  settingsMenuOpen,
+  onToggleSettingsMenu,
   onLogout,
   links,
   labels,
+  drawerNavigation,
   mobileTone = "surface",
   desktopGreeting = true,
   mobileHeader,
@@ -70,8 +78,12 @@ export default function AppShell({
           name={name}
           avatarUrl={avatarUrl}
           membersCount={membersCount}
+          kycVerified={kycVerified}
           links={links}
           labels={labels}
+          navigation={drawerNavigation}
+          settingsOpen={settingsMenuOpen}
+          onToggleSettings={onToggleSettingsMenu}
           onLogout={onLogout}
         />
       </div>

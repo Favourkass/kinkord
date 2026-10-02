@@ -20,14 +20,18 @@ export default function NotificationsPage() {
       handle={vm.handle}
       avatarUrl={vm.avatarUrl}
       membersCount={vm.membersCount}
+      kycVerified={vm.kycVerified}
       activeTab="notifications"
       activeNav="notifications"
       drawerOpen={vm.drawerOpen}
       onMenu={vm.openDrawer}
       onCloseDrawer={vm.closeDrawer}
+      settingsMenuOpen={vm.settingsMenuOpen}
+      onToggleSettingsMenu={vm.toggleSettingsMenu}
       onLogout={vm.logout}
       links={nav.links}
       labels={nav.labels}
+      drawerNavigation={nav.drawer}
     >
       <ComingSoonPanel
         headline={copy.headline}
