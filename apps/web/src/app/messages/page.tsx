@@ -22,17 +22,21 @@ export default function MessagesPage() {
       handle={shell.handle}
       avatarUrl={shell.avatarUrl}
       membersCount={shell.membersCount}
+      kycVerified={shell.kycVerified}
       notificationsUnread={shell.notificationsUnread}
       notificationsCount={shell.notificationsCount}
       messagesCount={shell.messagesCount}
       activeTab="chat"
       activeNav="chat"
       drawerOpen={shell.drawerOpen}
+      settingsMenuOpen={shell.settingsMenuOpen}
       onMenu={shell.openDrawer}
       onCloseDrawer={shell.closeDrawer}
+      onToggleSettingsMenu={shell.toggleSettingsMenu}
       onLogout={shell.logout}
       links={nav.links}
       labels={nav.labels}
+      drawerNavigation={nav.drawer}
     >
       <ChatListScreen
         rows={list.rows}

@@ -26,13 +26,18 @@ export default function MembersCountryPage() {
       notificationsUnread={shell.notificationsUnread}
       notificationsCount={shell.notificationsCount}
       messagesCount={shell.messagesCount}
+      kycVerified={shell.kycVerified}
+      activeTab="home"
       activeNav="members"
       drawerOpen={shell.drawerOpen}
       onMenu={shell.openDrawer}
       onCloseDrawer={shell.closeDrawer}
+      settingsMenuOpen={shell.settingsMenuOpen}
+      onToggleSettingsMenu={shell.toggleSettingsMenu}
       onLogout={shell.logout}
       links={nav.links}
       labels={nav.labels}
+      drawerNavigation={nav.drawer}
       mobileTone="members"
       desktopGreeting={false}
     >

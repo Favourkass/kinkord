@@ -53,16 +53,20 @@ export default function SettingsPage() {
       handle={vm.handle}
       avatarUrl={vm.avatarUrl}
       membersCount={vm.membersCount}
+      kycVerified={vm.kycVerified}
       notificationsUnread={vm.notificationsUnread}
       notificationsCount={vm.notificationsCount}
       messagesCount={vm.messagesCount}
       activeNav="settings"
       drawerOpen={vm.drawerOpen}
+      settingsMenuOpen={vm.settingsMenuOpen}
       onMenu={vm.openDrawer}
       onCloseDrawer={vm.closeDrawer}
+      onToggleSettingsMenu={vm.toggleSettingsMenu}
       onLogout={vm.logout}
       links={nav.links}
       labels={nav.labels}
+      drawerNavigation={nav.drawer}
     >
       <div className="mx-auto w-full max-w-[440px] px-[29px]">
         <h1 className="text-[24px] font-medium text-app-value">Settings</h1>
@@ -112,13 +116,6 @@ export default function SettingsPage() {
             <ChevronRightIcon className="text-[#b8850f]" />
           </Link>
         ) : null}
-        <Link
-          href={Routes.settingsKyc}
-          className="mt-[12px] flex h-[52px] items-center justify-between rounded-[16px] bg-app-members px-[18px] text-[18px] font-medium text-app-name"
-        >
-          Kinkord KYC
-          <ChevronRightIcon className="text-[#b8850f]" />
-        </Link>
       </div>
     </AppShell>
   );

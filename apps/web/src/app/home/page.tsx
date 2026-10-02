@@ -23,15 +23,19 @@ export default function HomePage() {
         name: home.name,
         avatarUrl: home.avatarUrl,
         membersCount: home.membersCount,
+        kycVerified: home.kycVerified,
         notificationsUnread: home.notificationsUnread,
         notificationsCount: home.notificationsCount,
         messagesCount: home.messagesCount,
         drawerOpen: home.drawerOpen,
+        settingsMenuOpen: home.settingsMenuOpen,
         onMenu: home.openDrawer,
         onCloseDrawer: home.closeDrawer,
+        onToggleSettingsMenu: home.toggleSettingsMenu,
         onLogout: home.logout,
         links: nav.links,
         labels: nav.labels,
+        drawerNavigation: nav.drawer,
       }}
       loading={feed.loading}
       error={home.error ?? feed.error}

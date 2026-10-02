@@ -6,7 +6,7 @@ import { useHomePresenter } from "./useHomePresenter";
 const push = vi.fn();
 const replace = vi.fn();
 const router = { push, replace };
-vi.mock("next/navigation", () => ({ useRouter: () => router }));
+vi.mock("next/navigation", () => ({ useRouter: () => router, usePathname: () => "/home" }));
 
 const signOut = vi.fn();
 vi.mock("@/services/authClient", () => ({
@@ -43,6 +43,8 @@ const routeGet = (path: unknown) => {
   if (path === "/me") return Promise.resolve(me);
   if (path === "/profile") return Promise.resolve(profile);
   if (path === "/community/stats") return Promise.resolve(stats);
+  if (path === "/verification/kyc/status")
+    return Promise.resolve({ fullKycVerified: false });
   return Promise.reject(new Error(`unexpected ${String(path)}`));
 };
 
@@ -65,6 +67,7 @@ describe("useHomePresenter", () => {
     expect(result.current.handle).toBe("@tegamaxwell");
     expect(result.current.avatarUrl).toBe("https://s3/avatar.jpg");
     expect(result.current.membersCount).toBe("128");
+    expect(result.current.kycVerified).toBe(false);
     expect(result.current.silver).toBe(false);
   });
 

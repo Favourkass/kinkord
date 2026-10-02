@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { authClient } from "@/services/authClient";
 import { api, ApiError } from "@/services/apiClient";
 import { pushService } from "@/services/push.service";
 import { Routes } from "@/constants/Routes";
 import type { MeVM, ProfileVM } from "./useProfilePresenter";
+import type { KycProgressPM } from "@/domain/kyc";
 import { useMessageBadgePresenter } from "./useMessageBadgePresenter";
 import { useNotificationCountPresenter } from "./useNotificationBadgePresenter";
 
@@ -14,9 +15,26 @@ interface CommunityStatsVM {
   members: number;
 }
 
+const settingsDrawerRoutes = new Set<string>([
+  Routes.settings,
+  Routes.settingsSecurity,
+  Routes.settingsKyc,
+  Routes.settingsData,
+  Routes.settingsContent,
+  Routes.settingsCommunitySafety,
+  Routes.profileEditPrivacy,
+  Routes.contact,
+  Routes.about,
+]);
+
+export function isSettingsDrawerPath(pathname: string) {
+  return settingsDrawerRoutes.has(pathname) || pathname.startsWith(`${Routes.settings}/`);
+}
+
 /** Post-login home: greeting, drawer identity, live member count. */
 export function useHomePresenter() {
   const router = useRouter();
+  const pathname = usePathname();
   const [loading, setLoading] = useState(true);
   const [signedIn, setSignedIn] = useState(false);
   const messagesCount = useMessageBadgePresenter(signedIn);
@@ -24,23 +42,29 @@ export function useHomePresenter() {
   const notificationsUnread = notificationsCount > 0;
   const [error, setError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [settingsMenuState, setSettingsMenuState] = useState(() => ({
+    pathname,
+    open: isSettingsDrawerPath(pathname),
+  }));
   const [vm, setVm] = useState({
     greeting: "Hi there, Welcome",
     name: "",
     handle: "",
     avatarUrl: null as string | null,
-    membersCount: "—",
+    kycVerified: false,
     silver: false,
+    membersCount: "—",
   });
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        const [me, profile, stats] = await Promise.all([
+        const [me, profile, stats, kyc] = await Promise.all([
           api.get<MeVM & { name?: string | null }>("/me"),
           api.get<ProfileVM>("/profile"),
           api.get<CommunityStatsVM>("/community/stats"),
+          api.get<KycProgressPM>("/verification/kyc/status").catch(() => null),
         ]);
         if (cancelled) return;
         setSignedIn(true);
@@ -52,8 +76,9 @@ export function useHomePresenter() {
           name: profile.displayName || me.username || "",
           handle: me.username ? `@${me.username}` : "",
           avatarUrl: profile.avatarUrl,
-          membersCount: String(stats.members),
+          kycVerified: Boolean(kyc?.fullKycVerified),
           silver: me.plan === "silver",
+          membersCount: String(stats.members),
         });
         // Signed in: keep this device's notification subscription current.
         void pushService.sync().catch(() => undefined);
@@ -75,6 +100,18 @@ export function useHomePresenter() {
 
   const openDrawer = useCallback(() => setDrawerOpen(true), []);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
+  const settingsMenuOpen =
+    settingsMenuState.pathname === pathname
+      ? settingsMenuState.open
+      : isSettingsDrawerPath(pathname);
+  const toggleSettingsMenu = useCallback(
+    () =>
+      setSettingsMenuState((current) => ({
+        pathname,
+        open: !(current.pathname === pathname ? current.open : isSettingsDrawerPath(pathname)),
+      })),
+    [pathname],
+  );
 
   const logout = useCallback(async () => {
     setSignedIn(false);
@@ -88,8 +125,10 @@ export function useHomePresenter() {
     loading,
     error,
     drawerOpen,
+    settingsMenuOpen,
     openDrawer,
     closeDrawer,
+    toggleSettingsMenu,
     logout,
     notificationsUnread,
     notificationsCount,
