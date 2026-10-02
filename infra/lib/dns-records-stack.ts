@@ -30,5 +30,16 @@ export class DnsRecordsStack extends cdk.Stack {
       zone,
       values: ["google-site-verification=2UIOUMvhuYPsRbVCoc5hPHTi_6foL_h_Q-vxQKf_VKs"],
     });
+
+    // DMARC: tells Gmail, Yahoo and Outlook what to do with mail claiming to be
+    // from kinkord.com that fails its checks. Without one they trust our mail
+    // (sign-up codes above all) less and file more of it as spam. `p=none` only
+    // monitors: nothing is rejected. Add `rua=mailto:…` once a mailbox exists to
+    // receive the reports, then tighten to quarantine.
+    new route53.TxtRecord(this, "Dmarc", {
+      zone,
+      recordName: "_dmarc",
+      values: ["v=DMARC1; p=none"],
+    });
   }
 }
