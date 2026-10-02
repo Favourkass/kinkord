@@ -65,6 +65,19 @@ describe("pushService", () => {
     await expect(pushService.state()).resolves.toBe("unsupported");
   });
 
+  it("knows an Android phone, where a member turns on pop-up notifications themselves", () => {
+    Object.defineProperty(navigator, "userAgent", {
+      value: "Mozilla/5.0 (Linux; Android 14; TECNO KJ7) AppleWebKit/537.36 Chrome/128.0 Mobile",
+      configurable: true,
+    });
+    expect(pushService.isAndroid()).toBe(true);
+    Object.defineProperty(navigator, "userAgent", {
+      value: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15",
+      configurable: true,
+    });
+    expect(pushService.isAndroid()).toBe(false);
+  });
+
   it("asks iPhone Safari to install the app first", async () => {
     Object.defineProperty(navigator, "userAgent", {
       value: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15",

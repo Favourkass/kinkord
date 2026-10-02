@@ -29,6 +29,10 @@ function isIos(): boolean {
   );
 }
 
+function isAndroid(): boolean {
+  return typeof navigator !== "undefined" && /Android/.test(navigator.userAgent);
+}
+
 function standalone(): boolean {
   if (typeof window === "undefined") return false;
   return (
@@ -51,6 +55,13 @@ async function current(): Promise<PushSubscription | null> {
 }
 
 export const pushService = {
+  /**
+   * Android decides per app whether a notification pops up over the screen
+   * ("Pop on screen", "Floating notifications" on some phones). A website can't
+   * turn that on, so on Android the app shows members where to.
+   */
+  isAndroid,
+
   async state(): Promise<PushState> {
     const ok = supported();
     const sub = ok ? await current() : null;

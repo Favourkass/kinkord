@@ -8,6 +8,8 @@ export interface PushSettingRowProps {
   actionDisabled: boolean;
   onAction: () => void;
   error: string | null;
+  /** How to make notifications pop up on screen, where the member has to do it. */
+  tip: string | null;
 }
 
 /** Settings → Notifications: push for this device, on or off. */
@@ -30,6 +32,7 @@ export default function PushSettingRow(p: PushSettingRowProps) {
         </button>
       </div>
       {p.error && <p className="pt-[6px] text-[13px] text-app-danger">{p.error}</p>}
+      {p.tip && <p className="pt-[8px] text-[13px] leading-[19px] text-app-muted">{p.tip}</p>}
     </>
   );
 }
