@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { PUSH_COPY } from "@/constants/push";
 import { shouldPromptForPush, type PushState } from "@/domain/push";
 import { pushService } from "@/services/push.service";
@@ -24,12 +24,17 @@ function writeDismissed(): void {
   }
 }
 
+/** For useSyncExternalStore: the device a page runs on doesn't change under it. */
+const neverChanges = () => () => undefined;
+
 /** Push notifications for the settings row and the "turn them on" card. */
 export function usePushPresenter() {
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState(readDismissed);
+  // The device never changes while the page is open; the server renders false.
+  const android = useSyncExternalStore(neverChanges, pushService.isAndroid, () => false);
 
   useEffect(() => {
     let live = true;
@@ -80,6 +85,7 @@ export function usePushPresenter() {
       actionDisabled: busy || !canToggle,
       onAction: state === "on" ? disable : () => void enable(),
       error,
+      tip: state === "on" && android ? PUSH_COPY.androidPopTip : null,
     },
     prompt: shouldPromptForPush(state, dismissed)
       ? {

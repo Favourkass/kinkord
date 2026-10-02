@@ -3,12 +3,19 @@ import type { Db } from "../db/db.module";
 import { memberBan, staff, user } from "../db/schema";
 
 /**
- * The founder's accounts are admins by their email rather than by a row, so
+ * The founders' accounts are admins by their email rather than by a row, so
  * admin access doesn't depend on a migration running after the account exists.
- * The email must be verified: without that, anyone could sign up with this
- * address before the founder does and inherit the admin tools.
+ * Being on this list means the moderation tools, no daily new-chat limit, a
+ * push for every report, the moderation alert emails, and an account the admin
+ * screens can't block or delete. The email must be verified: without that,
+ * anyone could sign up with one of these addresses first and inherit all that.
  */
-export const SUPER_ADMIN_EMAILS = ["maxihandsome@gmail.com", "nnabuekassidy@gmail.com"];
+export const SUPER_ADMIN_EMAILS = [
+  "maxihandsome@gmail.com",
+  "nnabuekassidy@gmail.com",
+  // Tega Maxwell, added 2026-10-02.
+  "tegamaxwell2026@gmail.com",
+];
 
 export interface AdminCandidate {
   id: string;

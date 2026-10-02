@@ -13,6 +13,9 @@ export const PUSH_COPY = {
       "On iPhone, add Kinkord to your Home Screen first (Share → Add to Home Screen), then open it from there.",
     unsupported: "This browser can't show notifications.",
   } satisfies Record<PushState, string>,
+  /** Shown on Android once notifications are on: the one switch only the member can flip. */
+  androidPopTip:
+    "To make Kinkord pop up on your screen like other apps: long-press a Kinkord notification, tap the ⚙ settings icon, and turn on “Pop on screen” (on some phones it's called “Floating notifications”).",
   turnOn: "Turn on",
   turnOff: "Turn off",
   working: "…",

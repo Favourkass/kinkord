@@ -21,6 +21,11 @@ describe("isSuperAdmin", () => {
     expect(isSuperAdmin({ email: "nnabuekassidy@gmail.com", emailVerified: true })).toBe(true);
   });
 
+  it("recognises Tega's account, but only once its email is verified", () => {
+    expect(isSuperAdmin({ email: "TegaMaxwell2026@gmail.com", emailVerified: true })).toBe(true);
+    expect(isSuperAdmin({ email: "tegamaxwell2026@gmail.com", emailVerified: false })).toBe(false);
+  });
+
   it("refuses the same address until it is verified", () => {
     expect(isSuperAdmin({ email: "maxihandsome@gmail.com", emailVerified: false })).toBe(false);
   });
@@ -35,8 +40,15 @@ describe("adminUserIds", () => {
     const db = { select: vi.fn(() => ({ from })) } as never;
     await expect(adminUserIds(db)).resolves.toEqual(["f1", "f2", "s1"]);
     const query = new PgDialect().sqlToQuery((where.mock.calls[0] as unknown[])[0] as never);
-    expect(query.sql).toBe('(lower("user"."email") in ($1, $2) and "user"."email_verified" = $3)');
-    expect(query.params).toEqual(["maxihandsome@gmail.com", "nnabuekassidy@gmail.com", true]);
+    expect(query.sql).toBe(
+      '(lower("user"."email") in ($1, $2, $3) and "user"."email_verified" = $4)',
+    );
+    expect(query.params).toEqual([
+      "maxihandsome@gmail.com",
+      "nnabuekassidy@gmail.com",
+      "tegamaxwell2026@gmail.com",
+      true,
+    ]);
   });
 });
 

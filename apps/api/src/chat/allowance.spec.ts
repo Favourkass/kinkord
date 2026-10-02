@@ -31,6 +31,7 @@ describe("newChatsPerDay", () => {
 
   it("doesn't limit the super admins", () => {
     expect(newChatsPerDay({ email: "maxihandsome@gmail.com", emailVerified: true })).toBeNull();
+    expect(newChatsPerDay({ email: "tegamaxwell2026@gmail.com", emailVerified: true })).toBeNull();
     expect(newChatsPerDay({ email: " NnabueKassidy@gmail.com", emailVerified: true })).toBeNull();
   });
 
