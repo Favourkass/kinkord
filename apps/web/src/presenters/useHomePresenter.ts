@@ -36,7 +36,10 @@ export function useHomePresenter() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [settingsMenuOpen, setSettingsMenuOpen] = useState(() => isSettingsDrawerPath(pathname));
+  const [settingsMenuState, setSettingsMenuState] = useState(() => ({
+    pathname,
+    open: isSettingsDrawerPath(pathname),
+  }));
   const [vm, setVm] = useState({
     greeting: "Hi there, Welcome",
     name: "",
@@ -86,13 +89,20 @@ export function useHomePresenter() {
     };
   }, [router]);
 
-  useEffect(() => {
-    if (isSettingsDrawerPath(pathname)) setSettingsMenuOpen(true);
-  }, [pathname]);
-
   const openDrawer = useCallback(() => setDrawerOpen(true), []);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
-  const toggleSettingsMenu = useCallback(() => setSettingsMenuOpen((open) => !open), []);
+  const settingsMenuOpen =
+    settingsMenuState.pathname === pathname
+      ? settingsMenuState.open
+      : isSettingsDrawerPath(pathname);
+  const toggleSettingsMenu = useCallback(
+    () =>
+      setSettingsMenuState((current) => ({
+        pathname,
+        open: !(current.pathname === pathname ? current.open : isSettingsDrawerPath(pathname)),
+      })),
+    [pathname],
+  );
 
   const logout = useCallback(async () => {
     // While still signed in, so the API forgets this device for this member.

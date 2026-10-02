@@ -1,6 +1,39 @@
 import { MEMBERS_COPY } from "@/constants/members";
 import { Routes } from "@/constants/Routes";
-import type { DrawerNavigation } from "@/components/app/nav";
+
+type AppShellDrawerIcon =
+  | "members"
+  | "saved"
+  | "kinkopedia"
+  | "verification"
+  | "coins"
+  | "subscription"
+  | "marketplace"
+  | "account"
+  | "data"
+  | "privacy"
+  | "security"
+  | "content"
+  | "safety"
+  | "support"
+  | "about";
+
+interface AppShellDrawerItemVM {
+  key: string;
+  label: string;
+  href: string;
+  icon: AppShellDrawerIcon;
+  count?: "members";
+}
+
+interface AppShellDrawerVM {
+  primary: AppShellDrawerItemVM[];
+  settingsLabel: string;
+  settingsGroups: Array<{
+    label: string;
+    items: AppShellDrawerItemVM[];
+  }>;
+}
 
 /** Structurally matches the shell components' AppNavLinks / AppNavLabels contracts. */
 export interface AppShellNavVM {
@@ -23,7 +56,7 @@ export interface AppShellNavVM {
     saved: string;
     logout: string;
   };
-  drawer: DrawerNavigation;
+  drawer: AppShellDrawerVM;
 }
 
 /** Display-ready nav (hrefs + copy) for every AppShell screen. */
