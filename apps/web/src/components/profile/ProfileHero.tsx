@@ -2,6 +2,7 @@ import Link from "next/link";
 import MaskIcon from "@/components/app/MaskIcon";
 import KycVerifiedMark from "@/components/brand/KycVerifiedMark";
 import type { PublicProfileVM } from "@/domain/member";
+import ExpandableAvatar from "./ExpandableAvatar";
 
 export interface ProfileHeroLabels {
   follow: string;
@@ -11,8 +12,6 @@ export interface ProfileHeroLabels {
   editProfile: string;
   /** Own profile (Figma 1167:552); inert until stories ship. */
   addToStory: string;
-  /** "Gift is not working for now" (CEO) — shown, never active. */
-  gift: string;
   comingSoon: string;
   stats: { friends: string; followers: string; following: string };
 }
@@ -32,7 +31,7 @@ export interface ProfileHeroProps {
  * Figma profile header (1167:552 own / 1202:242 member): 169px cover, 110px avatar
  * overlay, italic "Last seen", centred name · @handle, bold stats row, pin + location,
  * "25F · Dominant | Sadist", then the action row — own: gold "Add to story" + black
- * "Edit profile"; member: gold Follow + black Message + inert Gift.
+ * "Edit profile"; member: gold Follow + black Message.
  */
 export default function ProfileHero({
   vm,
@@ -62,13 +61,13 @@ export default function ProfileHero({
         <div className="absolute left-[20px] top-[114px] size-[110px]">
           <span aria-hidden className="absolute inset-0 rounded-full bg-pf-surface" />
           {vm.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <ExpandableAvatar
               src={vm.avatarUrl}
               alt={vm.displayName}
               fetchPriority="high"
-              decoding="async"
-              className="absolute left-[5px] top-[8px] size-[100px] rounded-full object-cover"
+              closeLabel="Close"
+              wrapperClassName="absolute left-[5px] top-[8px] size-[100px]"
+              className="size-[100px]"
             />
           ) : (
             <span className="absolute left-[5px] top-[8px] grid size-[100px] place-items-center rounded-full bg-pf-surface-2 text-pf-muted">
@@ -107,10 +106,27 @@ export default function ProfileHero({
             {vm.stats.following} {labels.stats.following}
           </span>
         </p>
-        {vm.locationLine && (
+        {vm.locationParts.length > 0 && (
           <p className="flex items-center gap-[4px] text-[13px] font-bold leading-[16px] text-pf-muted">
             <MaskIcon name="map-pin" width={14} className="text-kink-gold-bright" />
-            {vm.locationLine}
+            {/* One span, so the comma hugs the word before it rather than the gap. */}
+            <span className="min-w-0 truncate">
+              {vm.locationParts.map((part, i) => (
+                <span key={part.label}>
+                  {part.href ? (
+                    <Link
+                      href={part.href}
+                      className="underline-offset-2 hover:text-kink-gold-bright hover:underline"
+                    >
+                      {part.label}
+                    </Link>
+                  ) : (
+                    part.label
+                  )}
+                  {i < vm.locationParts.length - 1 ? ", " : ""}
+                </span>
+              ))}
+            </span>
           </p>
         )}
         {vm.tagLine && (
@@ -157,14 +173,6 @@ export default function ProfileHero({
               <MaskIcon name="message" width={16} />
               {labels.message}
             </Link>
-            <button
-              type="button"
-              disabled
-              title={labels.comingSoon}
-              className="flex h-[36px] w-[64px] items-center justify-center rounded-[12px] border border-pf-border bg-pf-surface-2 text-[11px] font-bold text-pf-muted"
-            >
-              {labels.gift}
-            </button>
           </>
         )}
       </div>

@@ -51,10 +51,26 @@ export interface MemberCardVM {
   isFollowing: boolean;
 }
 
+/**
+ * "25F" — age plus the gender initial, or just the initial when the age is
+ * unknown. Null when there is no age at all.
+ *
+ * Directory cards, the profile header and every People row read from this, so
+ * the same member is never labelled two different ways on two screens.
+ */
+export function ageTagOf(age: number | null, gender: string | null): string | null {
+  return age === null ? null : `${age}${genderInitial(gender)}`;
+}
+
+/** "Abraka, Delta State" — null when neither city nor state is set. */
+export function locationOf(city: string | null, state: string | null): string | null {
+  return [city, displayState(state)].filter(Boolean).join(", ") || null;
+}
+
 export function toMemberCardVM(pm: MemberCardPM): MemberCardVM {
-  const ageTag = pm.age === null ? null : `${pm.age}${genderInitial(pm.gender)}`;
+  const ageTag = ageTagOf(pm.age, pm.gender);
   const roles = pm.roles.length > 0 ? pm.roles.join(" | ") : null;
-  const location = [pm.city, displayState(pm.state)].filter(Boolean).join(", ") || null;
+  const location = locationOf(pm.city, pm.state);
   return {
     userId: pm.userId,
     username: pm.username,
@@ -127,6 +143,8 @@ export interface MediaItemPM {
   fullUrl: string;
   createdAt: string;
   isCurrent: boolean;
+  /** Uploaded avatars and covers only; a post's photo is removed with its post. */
+  deletable: boolean;
 }
 
 export interface MediaPagePM {
@@ -145,6 +163,7 @@ export interface MediaTileVM {
   /** The current profile photo gets the 2-column "Featured" tile (Figma 1524:1786). */
   featured: boolean;
   isCurrent: boolean;
+  deletable: boolean;
 }
 
 export interface PublicProfileVM {
@@ -161,6 +180,8 @@ export interface PublicProfileVM {
   stats: { friends: string; followers: string; following: string; mutualFriends: string };
   /** "Abraka, Delta State, Nigeria" */
   locationLine: string | null;
+  /** The same line split up, each piece linking to the directory filtered to it. */
+  locationParts: PlacePartVM[];
   /** "25F · Dominant | Sadist" */
   tagLine: string | null;
   bio: string | null;
@@ -233,11 +254,64 @@ export function toMediaTiles(items: MediaItemPM[]): MediaTileVM[] {
     fullUrl: m.fullUrl,
     featured: m.kind === "avatar" && m.isCurrent,
     isCurrent: m.isCurrent,
+    deletable: m.deletable,
   }));
 }
 
-export function toPublicProfileVM(pm: PublicProfilePM, now = new Date()): PublicProfileVM {
-  const ageTag = pm.age === null ? "" : `${pm.age}${genderInitial(pm.gender)}`;
+/** One clickable piece of a location line. `href` is null for a place we don't serve yet. */
+export interface PlacePartVM {
+  label: string;
+  href: string | null;
+}
+
+/**
+ * Builds the link for a place. Routing lives in the presenter layer, so the
+ * caller supplies this — the domain only decides what the pieces are.
+ */
+export type PlaceHref = (place: {
+  country: string | null;
+  state: string | null;
+  city: string | null;
+}) => string | null;
+
+/**
+ * "Sangotedo, Lagos State, Nigeria" as three links: the city filters to itself,
+ * the state to the whole state, the country to the whole country. Tapping a
+ * place on someone's profile is the fastest way to find people near them.
+ */
+export function locationPartsOf(
+  pm: Pick<PublicProfilePM, "country" | "state" | "city">,
+  placeHref: PlaceHref,
+): PlacePartVM[] {
+  const parts: PlacePartVM[] = [];
+  if (pm.city) {
+    parts.push({
+      label: pm.city,
+      href: placeHref({ country: pm.country, state: pm.state, city: pm.city }),
+    });
+  }
+  if (pm.state) {
+    parts.push({
+      label: displayState(pm.state),
+      href: placeHref({ country: pm.country, state: pm.state, city: null }),
+    });
+  }
+  const country = countryName(pm.country);
+  if (country) {
+    parts.push({
+      label: country,
+      href: placeHref({ country: pm.country, state: null, city: null }),
+    });
+  }
+  return parts;
+}
+
+export function toPublicProfileVM(
+  pm: PublicProfilePM,
+  placeHref: PlaceHref = () => null,
+  now = new Date(),
+): PublicProfileVM {
+  const ageTag = ageTagOf(pm.age, pm.gender) ?? "";
   const rolesTag = pm.roles.join(" | ");
   const tagLine = [ageTag, rolesTag].filter(Boolean).join(" · ") || null;
   const locationLine =
@@ -258,6 +332,7 @@ export function toPublicProfileVM(pm: PublicProfilePM, now = new Date()): Public
       mutualFriends: compactNumber(pm.counts.mutualFriends),
     },
     locationLine,
+    locationParts: locationPartsOf(pm, placeHref),
     tagLine,
     bio: pm.bio,
     basic: {
@@ -335,8 +410,13 @@ export interface FriendRowVM {
   userId: string;
   username: string | null;
   displayName: string;
+  /** Still used by the Suggested Friends column; no longer rendered in the People tab. */
   handle: string | null;
   avatarUrl: string | null;
+  /** "25F" — age + gender initial, same format as the directory cards. */
+  ageTag: string | null;
+  /** "Abraka, Delta State" — null when neither city nor state is set. */
+  location: string | null;
   isFollowing: boolean;
   busy: boolean;
 }

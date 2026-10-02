@@ -9,8 +9,8 @@ export interface SidebarDrawerProps {
   name: string;
   avatarUrl: string | null;
   membersCount: string;
-  links: Pick<AppNavLinks, "members" | "settings" | "profile">;
-  labels: Pick<AppNavLabels, "members" | "settings" | "logout" | "profile">;
+  links: Pick<AppNavLinks, "members" | "settings" | "profile" | "saved">;
+  labels: Pick<AppNavLabels, "members" | "settings" | "logout" | "profile" | "saved">;
   onLogout: () => void;
 }
 
@@ -65,6 +65,19 @@ export default function SidebarDrawer({
             width={14}
             className="ml-[14px] text-app-members-count"
           />
+        </Link>
+        <Link
+          href={links.saved}
+          onClick={onClose}
+          className="ml-[18px] mt-[11px] flex h-[36px] w-[245px] items-center rounded-[12px] pl-[13px] pr-[9px]"
+        >
+          <MaskIcon
+            src="/app/feed/icon-bookmark.svg"
+            width={16}
+            className="text-app-members-count"
+          />
+          <span className="pl-[10px] text-[12px] font-medium text-drawer-text">{labels.saved}</span>
+          <MaskIcon name="chevron-right-14" width={14} className="ml-auto text-app-members-count" />
         </Link>
         <div className="mt-auto pb-[37px]">
           <Link

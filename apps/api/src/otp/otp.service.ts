@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   HttpException,
   Inject,
   Injectable,
@@ -13,6 +14,8 @@ import { otpChallenge } from "../db/schema";
 import { EmailService } from "../email/email.service";
 import { verificationCodeEmail } from "../email/templates";
 import { SmsService } from "../messaging/sms.service";
+import { SignupGuardService } from "../moderation/signup-guard.service";
+import { isAllowedPhone, PHONE_NOT_ALLOWED } from "../profiles/phone-rules";
 
 export type OtpChannel = "email" | "sms";
 
@@ -43,7 +46,12 @@ export interface OtpVerifyResult {
 function normalizeDestination(channel: OtpChannel, destination: string) {
   const normalized = destination.trim().toLowerCase();
   if (channel === "email" && EMAIL_RE.test(normalized)) return normalized;
-  if (channel === "sms" && E164_RE.test(normalized)) return normalized;
+  if (channel === "sms" && E164_RE.test(normalized)) {
+    // A number saved before the Nigeria-only rule can't be texted either: the
+    // member changes it to a Nigerian one, which the profile then accepts.
+    if (!isAllowedPhone(normalized)) throw new BadRequestException(PHONE_NOT_ALLOWED);
+    return normalized;
+  }
   throw new BadRequestException(
     channel === "email"
       ? "A valid email address is required"
@@ -62,6 +70,19 @@ function hashCode(code: string) {
   return createHash("sha256").update(`${secret}:${code}`).digest("hex");
 }
 
+/**
+ * Enough of a destination to tell which member, and which mail provider, a log
+ * line is about, without writing the address itself into the logs:
+ * t***@gmail.com, +234******3266.
+ */
+export function maskDestination(channel: OtpChannel, to: string): string {
+  if (channel === "email") {
+    const at = to.indexOf("@");
+    return at > 0 ? `${to[0]}***${to.slice(at)}` : "***";
+  }
+  return to.length > 8 ? `${to.slice(0, 4)}${"*".repeat(to.length - 8)}${to.slice(-4)}` : "***";
+}
+
 function sixDigits() {
   return String(randomInt(100000, 1000000));
 }
@@ -74,6 +95,7 @@ export class OtpService {
     @Inject(DRIZZLE) private readonly db: Db,
     private readonly email: EmailService,
     private readonly sms: SmsService,
+    private readonly signupGuard: SignupGuardService,
   ) {}
 
   /**
@@ -83,8 +105,28 @@ export class OtpService {
    */
   async send(userId: string, channel: OtpChannel, destination: string) {
     const to = normalizeDestination(channel, destination);
+    // A removed member's phone or email must not verify a new account.
+    const verdict = await this.signupGuard.review(
+      channel === "sms" ? { phone: to } : { email: to },
+      `${channel} code`,
+    );
+    if (verdict.action === "block") {
+      this.logger.warn(`otp ${channel} refused for ${maskDestination(channel, to)}: sign-up rule`);
+      throw new ForbiddenException(
+        channel === "sms"
+          ? "We couldn't send a code to that number."
+          : "We couldn't send a code to that address.",
+      );
+    }
     const now = new Date();
-    await this.enforceRate(userId, to, now);
+    try {
+      await this.enforceRate(userId, to, now);
+    } catch (error) {
+      this.logger.warn(
+        `otp ${channel} refused for ${maskDestination(channel, to)}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
+    }
 
     const code = sixDigits();
     const id = randomUUID();
@@ -102,7 +144,12 @@ export class OtpService {
     });
 
     try {
-      await this.deliver(channel, to, code);
+      const sent = await this.deliver(channel, to, code);
+      // Successful sends are logged too, with the provider's id: when a member
+      // says a code never came, this is what to look up in Resend or Robase.
+      this.logger.log(
+        `otp ${channel} sent to ${maskDestination(channel, to)} via ${sent.provider} ${sent.id ?? "(no id)"}`,
+      );
     } catch (error) {
       await this.db.delete(otpChallenge).where(eq(otpChallenge.id, id));
       // Whatever the provider said — an unapproved sender ID, a dead key, an
@@ -190,16 +237,20 @@ export class OtpService {
     }
   }
 
-  private async deliver(channel: OtpChannel, to: string, code: string) {
+  private async deliver(
+    channel: OtpChannel,
+    to: string,
+    code: string,
+  ): Promise<{ provider: string; id: string | null }> {
     const minutes = Math.round(OTP_TTL_MS / 60_000);
     if (channel === "sms") {
-      await this.sms.send({
+      const sent = await this.sms.send({
         to,
         message: `Your Kinkord verification code is ${code}. It expires in ${minutes} minutes.`,
       });
-      return;
+      return { provider: sent.provider, id: sent.providerMessageId ?? null };
     }
-    await this.email.send({ to, ...verificationCodeEmail(code, minutes) });
+    return this.email.send({ to, ...verificationCodeEmail(code, minutes) });
   }
 
   /** Best-effort tidy-up; a failure here must never fail the request. */

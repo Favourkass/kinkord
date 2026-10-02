@@ -73,3 +73,13 @@ describe("compressImage", () => {
     expect(out).toBe(jpg);
   });
 });
+
+describe("IMAGE_UPLOAD_PRESETS.post", () => {
+  it("keeps a feed photo sharp enough for the lightbox without a cover's weight", () => {
+    // A post photo runs the full card width and opens full screen, but four go
+    // up at once over a phone connection.
+    expect(IMAGE_UPLOAD_PRESETS.post.maxDim).toBe(1440);
+    expect(IMAGE_UPLOAD_PRESETS.post.maxDim).toBeLessThan(IMAGE_UPLOAD_PRESETS.cover.maxDim);
+    expect(IMAGE_UPLOAD_PRESETS.post.maxBytes).toBeLessThan(IMAGE_UPLOAD_PRESETS.cover.maxBytes);
+  });
+});

@@ -6,6 +6,9 @@ import { Db } from "../db/db.module";
 import * as schema from "../db/schema";
 import { EmailService } from "../email/email.service";
 import { resetPasswordEmail, verificationEmail } from "../email/templates";
+import { SIGNUP_REFUSED, SignupGuardService } from "../moderation/signup-guard.service";
+import { clientIpFrom } from "../moderation/signup-rules";
+import { ACCOUNT_SUSPENDED, isBanned } from "../moderation/admins";
 
 export const AUTH = Symbol("AUTH");
 export type Auth = ReturnType<typeof buildAuth>;
@@ -22,7 +25,7 @@ export function rejectUsernameChanges<T extends object>(data: T): { data: T } {
   return { data };
 }
 
-export function buildAuth(db: Db, email: EmailService) {
+export function buildAuth(db: Db, email: EmailService, signupGuard: SignupGuardService) {
   const webOrigins = (process.env.WEB_ORIGINS ?? "http://localhost:3000")
     .split(",")
     .map((o) => o.trim())
@@ -57,12 +60,25 @@ export function buildAuth(db: Db, email: EmailService) {
     databaseHooks: {
       user: {
         create: {
-          before: async (u) => {
+          before: async (u, ctx) => {
             // Age gate v0 (18+ platform): refuse accounts without attestation.
             if (!(u as { ageAttested?: boolean }).ageAttested) {
               throw new APIError("BAD_REQUEST", {
                 message: "You must confirm you are 18 or older to create an account.",
               });
+            }
+            // Removed members stay removed. Every sign-up route creates the user
+            // here, so this is the one place email, name and IP are all checked.
+            const verdict = await signupGuard.review(
+              {
+                email: u.email,
+                name: u.name,
+                ip: clientIpFrom(ctx?.headers ?? ctx?.request?.headers),
+              },
+              "sign-up",
+            );
+            if (verdict.action === "block") {
+              throw new APIError("FORBIDDEN", { message: SIGNUP_REFUSED });
             }
             return { data: u };
           },
@@ -76,6 +92,19 @@ export function buildAuth(db: Db, email: EmailService) {
         },
         update: {
           before: async (u) => rejectUsernameChanges(u),
+        },
+      },
+      session: {
+        create: {
+          // A suspended member can't start a session by any route: email,
+          // phone or a password reset. Their existing sessions were deleted
+          // when the ban was made.
+          before: async (s) => {
+            if (await isBanned(db, s.userId)) {
+              throw new APIError("FORBIDDEN", { message: ACCOUNT_SUSPENDED });
+            }
+            return { data: s };
+          },
         },
       },
     },

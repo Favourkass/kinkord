@@ -11,6 +11,10 @@ const countryCode = z
 
 const statesQuerySchema = z.object({ country: countryCode });
 
+const suggestedQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(20).default(10),
+});
+
 const listQuerySchema = z
   .object({
     country: countryCode,
@@ -38,6 +42,14 @@ export class MembersController {
     const parsed = statesQuerySchema.safeParse(query);
     if (!parsed.success) throw new BadRequestException(parsed.error.flatten().fieldErrors);
     return this.members.states(parsed.data.country);
+  }
+
+  /** Home feed "People you may know" strip. */
+  @Get("suggested")
+  suggested(@Req() req: AuthedRequest, @Query() query: unknown) {
+    const parsed = suggestedQuerySchema.safeParse(query);
+    if (!parsed.success) throw new BadRequestException(parsed.error.flatten().fieldErrors);
+    return this.members.suggestedForFeed(req.user.id, parsed.data.limit);
   }
 
   @Get()

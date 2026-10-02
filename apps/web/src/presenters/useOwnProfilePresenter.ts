@@ -46,5 +46,7 @@ export function useOwnProfilePresenter(initialTab?: string | null) {
     loading: error ? false : profile.loading,
     status: error ?? profile.status,
     activeTab: "profile" as const,
+    /** Null until the API says who you are; the Posts tab waits on it. */
+    username,
   };
 }

@@ -1,5 +1,6 @@
+import { Logger } from "@nestjs/common";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { OtpService } from "./otp.service";
+import { maskDestination, OtpService } from "./otp.service";
 
 process.env.OTP_SECRET = "test-secret";
 
@@ -47,13 +48,143 @@ function makeDb(recent: Array<{ createdAt: Date }> = []) {
 }
 
 const sms = () => ({ send: vi.fn(async () => ({ provider: "robase", providerMessageId: "1" })) });
-const email = () => ({ send: vi.fn(async () => undefined) });
+const email = () => ({ send: vi.fn(async () => ({ provider: "resend", id: "re_1" })) });
+const guard = (action: "allow" | "block" | "flag" = "allow") => ({
+  review: vi.fn(async () => ({ action, matches: [] })),
+});
+
+describe("maskDestination", () => {
+  it("keeps the first letter and the mail provider, and the ends of a number", () => {
+    expect(maskDestination("email", "tolu@gmail.com")).toBe("t***@gmail.com");
+    expect(maskDestination("sms", "+2348012345678")).toBe("+234******5678");
+    expect(maskDestination("email", "nonsense")).toBe("***");
+  });
+});
+
+describe("OtpService.send logging", () => {
+  it("logs a sent code with the provider's message id, never the full address", async () => {
+    const log = vi.spyOn(Logger.prototype, "log").mockImplementation(() => undefined);
+    const { db } = makeDb();
+    const service = new OtpService(db as never, email() as never, sms() as never, guard() as never);
+
+    await service.send("u1", "email", "Tolu@Example.com");
+
+    const line = log.mock.calls
+      .map((c) => String(c[0]))
+      .find((m) => m.startsWith("otp email sent"));
+    expect(line).toBe("otp email sent to t***@example.com via resend re_1");
+    log.mockRestore();
+  });
+
+  it("logs an SMS with Robase's id", async () => {
+    const log = vi.spyOn(Logger.prototype, "log").mockImplementation(() => undefined);
+    const { db } = makeDb();
+    const service = new OtpService(db as never, email() as never, sms() as never, guard() as never);
+
+    await service.send("u1", "sms", "+2348012345678");
+
+    expect(log.mock.calls.map((c) => String(c[0]))).toContain(
+      "otp sms sent to +234******5678 via robase 1",
+    );
+    log.mockRestore();
+  });
+
+  it("logs why a code was refused, so 'it never came' can be told from 'we never sent it'", async () => {
+    const warn = vi.spyOn(Logger.prototype, "warn").mockImplementation(() => undefined);
+    const { db } = makeDb([{ createdAt: new Date() }]);
+    const texter = sms();
+    const service = new OtpService(
+      db as never,
+      email() as never,
+      texter as never,
+      guard() as never,
+    );
+
+    await expect(service.send("u1", "sms", "+2348012345678")).rejects.toThrow(/wait a minute/);
+    expect(warn).toHaveBeenCalledWith(
+      "otp sms refused for +234******5678: Please wait a minute before asking for another code.",
+    );
+    expect(texter.send).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("logs a send refused by a sign-up rule", async () => {
+    const warn = vi.spyOn(Logger.prototype, "warn").mockImplementation(() => undefined);
+    const { db } = makeDb();
+    const service = new OtpService(
+      db as never,
+      email() as never,
+      sms() as never,
+      guard("block") as never,
+    );
+
+    await expect(service.send("u1", "email", "x@y.com")).rejects.toThrow();
+    expect(warn).toHaveBeenCalledWith("otp email refused for x***@y.com: sign-up rule");
+    warn.mockRestore();
+  });
+});
 
 describe("OtpService.send", () => {
+  it("refuses to text a blocked number, before storing or sending anything", async () => {
+    const { db, stored } = makeDb();
+    const texter = sms();
+    const blocking = guard("block");
+    const service = new OtpService(
+      db as never,
+      email() as never,
+      texter as never,
+      blocking as never,
+    );
+
+    await expect(service.send("u1", "sms", "+2349054291043")).rejects.toThrow(
+      "We couldn't send a code to that number.",
+    );
+    expect(blocking.review).toHaveBeenCalledWith({ phone: "+2349054291043" }, "sms code");
+    expect(stored).toHaveLength(0);
+    expect(texter.send).not.toHaveBeenCalled();
+  });
+
+  it("won't text a number outside Nigeria, even one saved before the rule", async () => {
+    const { db, stored } = makeDb();
+    const texter = sms();
+    const service = new OtpService(
+      db as never,
+      email() as never,
+      texter as never,
+      guard() as never,
+    );
+
+    await expect(service.send("u1", "sms", "+254703105232")).rejects.toThrow(
+      /Nigerian mobile numbers/,
+    );
+    expect(stored).toHaveLength(0);
+    expect(texter.send).not.toHaveBeenCalled();
+  });
+
+  it("checks an email destination as an email", async () => {
+    const { db } = makeDb();
+    const checking = guard();
+    const service = new OtpService(
+      db as never,
+      email() as never,
+      sms() as never,
+      checking as never,
+    );
+
+    await service.send("u1", "email", "Tolu@Example.com");
+
+    expect(checking.review).toHaveBeenCalledWith({ email: "tolu@example.com" }, "email code");
+  });
+
   it("stores the challenge before the code goes out", async () => {
     const { db, stored } = makeDb();
     const texter = sms();
-    const service = new OtpService(db as never, email() as never, texter as never);
+    const service = new OtpService(
+      db as never,
+      email() as never,
+      texter as never,
+      guard() as never,
+    );
 
     const result = await service.send("u1", "sms", "+2348012345678");
 
@@ -69,7 +200,12 @@ describe("OtpService.send", () => {
   it("drops the challenge when delivery fails, so no dead code is left behind", async () => {
     const { db, del } = makeDb();
     const texter = { send: vi.fn(async () => Promise.reject(new Error("provider down"))) };
-    const service = new OtpService(db as never, email() as never, texter as never);
+    const service = new OtpService(
+      db as never,
+      email() as never,
+      texter as never,
+      guard() as never,
+    );
 
     await expect(service.send("u1", "sms", "+2348012345678")).rejects.toThrow(
       /could not text you/i,
@@ -86,7 +222,12 @@ describe("OtpService.send", () => {
         Promise.reject(new Error("SMS delivery failed via Termii (422) SENDER_ID_NOT_APPROVED")),
       ),
     };
-    const service = new OtpService(db as never, email() as never, texter as never);
+    const service = new OtpService(
+      db as never,
+      email() as never,
+      texter as never,
+      guard() as never,
+    );
 
     await expect(service.send("u1", "sms", "+2348012345678")).rejects.toMatchObject({
       status: 503,
@@ -96,7 +237,7 @@ describe("OtpService.send", () => {
 
   it("refuses a destination that is not a real number or address", async () => {
     const { db } = makeDb();
-    const service = new OtpService(db as never, email() as never, sms() as never);
+    const service = new OtpService(db as never, email() as never, sms() as never, guard() as never);
 
     await expect(service.send("u1", "sms", "08012345678")).rejects.toThrow(/phone number/);
     await expect(service.send("u1", "email", "nope")).rejects.toThrow(/email address/);
@@ -105,7 +246,7 @@ describe("OtpService.send", () => {
 
   it("holds a second request inside the cooldown", async () => {
     const { db } = makeDb([{ createdAt: new Date() }]);
-    const service = new OtpService(db as never, email() as never, sms() as never);
+    const service = new OtpService(db as never, email() as never, sms() as never, guard() as never);
 
     await expect(service.send("u1", "sms", "+2348012345678")).rejects.toThrow(/wait a minute/);
   });
@@ -113,7 +254,7 @@ describe("OtpService.send", () => {
   it("stops after five codes in an hour", async () => {
     const old = new Date(Date.now() - 10 * 60 * 1000);
     const { db } = makeDb([old, old, old, old, old].map((createdAt) => ({ createdAt })));
-    const service = new OtpService(db as never, email() as never, sms() as never);
+    const service = new OtpService(db as never, email() as never, sms() as never, guard() as never);
 
     await expect(service.send("u1", "sms", "+2348012345678")).rejects.toThrow(/Too many codes/);
   });
@@ -125,7 +266,12 @@ describe("OtpService.verify", () => {
 
   beforeEach(() => {
     fixture = makeDb();
-    service = new OtpService(fixture.db as never, email() as never, sms() as never);
+    service = new OtpService(
+      fixture.db as never,
+      email() as never,
+      sms() as never,
+      guard() as never,
+    );
   });
 
   it("counts down the attempts, then locks for 24 hours", async () => {
@@ -148,7 +294,12 @@ describe("OtpService.verify", () => {
 
   it("accepts the code that was actually sent, and spends it", async () => {
     const texter = sms();
-    const issuing = new OtpService(fixture.db as never, email() as never, texter as never);
+    const issuing = new OtpService(
+      fixture.db as never,
+      email() as never,
+      texter as never,
+      guard() as never,
+    );
     const issued = await issuing.send("u1", "sms", "+2348012345678");
 
     // Read the real code out of the message the member would have received.
@@ -173,7 +324,12 @@ describe("OtpService.verify", () => {
           }),
       ),
     };
-    const scoped = new OtpService(empty as never, email() as never, sms() as never);
+    const scoped = new OtpService(
+      empty as never,
+      email() as never,
+      sms() as never,
+      guard() as never,
+    );
     await expect(scoped.verify("someone-else", "challenge-1", "123456")).resolves.toEqual({
       valid: false,
     });

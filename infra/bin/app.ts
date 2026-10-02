@@ -4,6 +4,8 @@ import { BillingStack } from "../lib/billing-stack";
 import { NetworkStack } from "../lib/network-stack";
 import { DataStack } from "../lib/data-stack";
 import { ApiBaseStack, ApiStack } from "../lib/api-stack";
+import { DnsRecordsStack } from "../lib/dns-records-stack";
+import { RealtimeStack } from "../lib/realtime-stack";
 import { WebStack } from "../lib/web-stack";
 
 const app = new cdk.App();
@@ -37,4 +39,18 @@ const apiBase = new ApiBaseStack(app, "KinkordApiBase", {
 
 new ApiStack(app, "KinkordApi", { env: primary, base: apiBase });
 
+// Live chat. Attaches its permissions to the API's existing instance role by
+// name, so it deploys without touching the API stacks.
+new RealtimeStack(app, "KinkordRealtime", {
+  env: primary,
+  apiInstanceRoleName: "KinkordApiBase-InstanceRole3CCE2F1D-oljaS88t9vMg",
+});
+
 new WebStack(app, "KinkordWeb", { env: primary });
+
+// Records in the kinkord.com zone, attached by id so they deploy without
+// KinkordFoundation (which has drifted from the code).
+new DnsRecordsStack(app, "KinkordDnsRecords", {
+  env: primary,
+  hostedZoneId: "Z1029069WMDN1XV54QJU",
+});

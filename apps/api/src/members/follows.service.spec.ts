@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { type Db } from "../db/db.module";
 import { FollowsService } from "./follows.service";
@@ -22,17 +22,22 @@ const chain = (result: unknown) => {
 
 const makeDb = () => {
   const select = vi.fn();
-  const insert = vi.fn(() => chain(undefined));
+  // An insert answers with the rows it added: none when the follow already existed.
+  const insert = vi.fn(() => chain([] as unknown[]));
   const del = vi.fn(() => chain(undefined));
   const db = { select, insert, delete: del } as unknown as Db;
   return { db, select, insert, del };
 };
 
+const push = { newFollower: vi.fn() };
+
 describe("FollowsService", () => {
+  beforeEach(() => push.newFollower.mockClear());
+
   it("refuses to follow yourself", async () => {
     const { db, select, insert } = makeDb();
     select.mockReturnValueOnce(chain([{ id: "me" }]));
-    const svc = new FollowsService(db);
+    const svc = new FollowsService(db, push as never);
     await expect(svc.follow("me", "@Me")).rejects.toBeInstanceOf(BadRequestException);
     expect(insert).not.toHaveBeenCalled();
   });
@@ -40,7 +45,7 @@ describe("FollowsService", () => {
   it("404s for an unknown handle before touching the graph", async () => {
     const { db, select, insert } = makeDb();
     select.mockReturnValueOnce(chain([]));
-    const svc = new FollowsService(db);
+    const svc = new FollowsService(db, push as never);
     await expect(svc.follow("me", "ghost")).rejects.toBeInstanceOf(NotFoundException);
     expect(insert).not.toHaveBeenCalled();
   });
@@ -49,19 +54,29 @@ describe("FollowsService", () => {
     const { db, select, insert } = makeDb();
     select.mockReturnValueOnce(chain([{ id: "u2" }])); // resolveUserId
     select.mockReturnValueOnce(chain([{ c: 3 }])); // followersCount
-    const svc = new FollowsService(db);
+    insert.mockReturnValueOnce(chain([{ followerId: "me" }])); // a new follow
+    const svc = new FollowsService(db, push as never);
     await expect(svc.follow("me", "@Raven")).resolves.toEqual({
       following: true,
       followersCount: 3,
     });
     expect(insert).toHaveBeenCalledTimes(1);
+    expect(push.newFollower).toHaveBeenCalledWith("me", "u2");
+  });
+
+  it("doesn't notify again when the follow already existed", async () => {
+    const { db, select } = makeDb();
+    select.mockReturnValueOnce(chain([{ id: "u2" }]));
+    select.mockReturnValueOnce(chain([{ c: 3 }]));
+    await new FollowsService(db, push as never).follow("me", "raven");
+    expect(push.newFollower).not.toHaveBeenCalled();
   });
 
   it("unfollows and reports the decremented count", async () => {
     const { db, select, del } = makeDb();
     select.mockReturnValueOnce(chain([{ id: "u2" }]));
     select.mockReturnValueOnce(chain([{ c: 2 }]));
-    const svc = new FollowsService(db);
+    const svc = new FollowsService(db, push as never);
     await expect(svc.unfollow("me", "raven")).resolves.toEqual({
       following: false,
       followersCount: 2,
@@ -75,14 +90,14 @@ describe("FollowsService", () => {
       .mockReturnValueOnce(chain([{ c: 5 }])) // friends
       .mockReturnValueOnce(chain([{ c: 12 }])) // followers
       .mockReturnValueOnce(chain([{ c: 7 }])); // following
-    const svc = new FollowsService(db);
+    const svc = new FollowsService(db, push as never);
     await expect(svc.counts("u1")).resolves.toEqual({ friends: 5, followers: 12, following: 7 });
   });
 
   it("treats a missing follow row as not-following", async () => {
     const { db, select } = makeDb();
     select.mockReturnValueOnce(chain([]));
-    const svc = new FollowsService(db);
+    const svc = new FollowsService(db, push as never);
     await expect(svc.isFollowing("me", "u2")).resolves.toBe(false);
   });
 });
@@ -96,7 +111,7 @@ describe("FollowsService friends lists", () => {
       ]),
     );
     select.mockReturnValueOnce(chain([{ c: 1 }]));
-    const svc = new FollowsService(db);
+    const svc = new FollowsService(db, push as never);
     await expect(svc.friends("u2", "me", 20, 0)).resolves.toEqual({
       items: [
         { userId: "u3", username: "kay", displayName: "Kay", avatarKey: null, isFollowing: true },
@@ -112,7 +127,7 @@ describe("FollowsService friends lists", () => {
       chain([{ userId: "u4", username: "vee", displayName: "Vee", avatarKey: "a.jpg" }]),
     );
     select.mockReturnValueOnce(chain([{ c: 1 }]));
-    const svc = new FollowsService(db);
+    const svc = new FollowsService(db, push as never);
     await expect(svc.mutualFriends("u2", "me", 20, 0)).resolves.toEqual({
       items: [
         {
@@ -129,7 +144,7 @@ describe("FollowsService friends lists", () => {
 
   it("has no mutual friends with yourself and skips the query", async () => {
     const { db, select } = makeDb();
-    const svc = new FollowsService(db);
+    const svc = new FollowsService(db, push as never);
     await expect(svc.mutualFriendsCount("me", "me")).resolves.toBe(0);
     expect(select).not.toHaveBeenCalled();
   });
@@ -138,7 +153,7 @@ describe("FollowsService friends lists", () => {
 describe("FollowsService.areFriends", () => {
   it("is true only when both follow rows exist, and never with yourself", async () => {
     const { db, select } = makeDb();
-    const svc = new FollowsService(db);
+    const svc = new FollowsService(db, push as never);
     select.mockReturnValueOnce(chain([{ c: 1 }]));
     await expect(svc.areFriends("me", "u2")).resolves.toBe(true);
     select.mockReturnValueOnce(chain([{ c: 0 }]));
@@ -158,7 +173,7 @@ describe("FollowsService.followers / following", () => {
         ]),
       )
       .mockReturnValueOnce(chain([{ c: 7 }]));
-    const page = await new FollowsService(db).followers("u2", "me", 20, 0);
+    const page = await new FollowsService(db, push as never).followers("u2", "me", 20, 0);
     expect(page).toEqual({
       items: [
         { userId: "u3", username: "kay", displayName: "Kay", avatarKey: null, isFollowing: false },
@@ -182,7 +197,7 @@ describe("FollowsService.followers / following", () => {
         ]),
       )
       .mockReturnValueOnce(chain([{ c: 1 }]));
-    const page = await new FollowsService(db).following("u2", "me", 20, 0);
+    const page = await new FollowsService(db, push as never).following("u2", "me", 20, 0);
     expect(page.items[0]).toMatchObject({ username: "vee", isFollowing: true });
     expect(page.total).toBe(1);
   });

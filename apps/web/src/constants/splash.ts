@@ -2,12 +2,14 @@
  * Brand splash shown on the app's entry route while the session lookup runs.
  *
  * Asset names carry a version suffix so they can be cached immutably (see the
- * `headers()` rule in next.config.ts); ship a new animation as `-v2` rather
- * than overwriting these files, or stale caches will keep the old one.
+ * `headers()` rule in next.config.ts). Ship the next animation as `-v3`
+ * alongside these rather than overwriting them: the cache rule is `immutable`,
+ * so a browser that already has `-v2` will not even revalidate it, and an
+ * overwrite would never reach anyone who has opened the app before.
  */
 export const BRAND_SPLASH = {
-  videoSrc: "/brand/splash/kinkord-splash-v1.mp4",
-  posterSrc: "/brand/splash/kinkord-splash-v1.jpg",
+  videoSrc: "/brand/splash/kinkord-splash-v2.mp4",
+  posterSrc: "/brand/splash/kinkord-splash-v2.jpg",
   /** Announced to screen readers, which never see the animation. */
   label: "Kinkord is loading",
 } as const;
@@ -27,7 +29,7 @@ export const SPLASH_START_MS = 2500;
 
 /**
  * Hard stop, so a stalled download or a video that never reports its end can
- * never trap someone on the splash. Must clear the clip's own length (5.03s)
+ * never trap someone on the splash. Must clear the clip's own length (5.53s)
  * plus a little buffering, or it would cut the animation short.
  */
 export const SPLASH_MAX_MS = 10000;

@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  ageTagOf,
+  locationOf,
+  locationPartsOf,
   socialHandle,
   toMediaTiles,
   toMemberCardVM,
   toPublicProfileVM,
   type MemberCardPM,
+  type PlaceHref,
   type PublicProfilePM,
 } from "./member";
 
@@ -98,7 +102,7 @@ const profile: PublicProfilePM = {
 
 describe("toPublicProfileVM", () => {
   it("builds the header lines from the design: handle, stats, location, tag line, presence", () => {
-    const vm = toPublicProfileVM(profile, now);
+    const vm = toPublicProfileVM(profile, () => null, now);
     expect(vm.handle).toBe("@nene");
     expect(vm.stats).toEqual({
       friends: "1.2K",
@@ -129,6 +133,7 @@ describe("toPublicProfileVM", () => {
         country: null,
         lastSeenAt: null,
       },
+      () => null,
       now,
     );
     expect(vm.handle).toBeNull();
@@ -218,14 +223,129 @@ describe("About cards + media (profile rebuild, 2026-09-12)", () => {
     expect(socialHandle("https://facebook.com/")).toBe("facebook.com");
     expect(socialHandle("not a url")).toBe("not a url");
     const tiles = toMediaTiles([
-      { id: "a", kind: "avatar", url: "u", fullUrl: "f", createdAt: "x", isCurrent: true },
-      { id: "b", kind: "cover", url: "u", fullUrl: "f", createdAt: "x", isCurrent: true },
-      { id: "c", kind: "avatar", url: "u", fullUrl: "f", createdAt: "x", isCurrent: false },
+      {
+        id: "a",
+        kind: "avatar",
+        url: "u",
+        fullUrl: "f",
+        createdAt: "x",
+        isCurrent: true,
+        deletable: true,
+      },
+      {
+        id: "b",
+        kind: "cover",
+        url: "u",
+        fullUrl: "f",
+        createdAt: "x",
+        isCurrent: true,
+        deletable: true,
+      },
+      {
+        id: "c",
+        kind: "avatar",
+        url: "u",
+        fullUrl: "f",
+        createdAt: "x",
+        isCurrent: false,
+        deletable: true,
+      },
     ]);
     expect(tiles.map((t) => [t.id, t.featured])).toEqual([
       ["a", true],
       ["b", false],
       ["c", false],
+    ]);
+  });
+
+  it("carries through that a post's photo cannot be deleted from the profile grid", () => {
+    // It belongs to a post — removing it there would leave the post with a hole.
+    const tiles = toMediaTiles([
+      {
+        id: "p1",
+        kind: "photo",
+        url: "u",
+        fullUrl: "f",
+        createdAt: "x",
+        isCurrent: false,
+        deletable: false,
+      },
+      {
+        id: "a",
+        kind: "avatar",
+        url: "u",
+        fullUrl: "f",
+        createdAt: "x",
+        isCurrent: true,
+        deletable: true,
+      },
+    ]);
+    expect(tiles.map((t) => [t.id, t.deletable])).toEqual([
+      ["p1", false],
+      ["a", true],
+    ]);
+  });
+});
+
+describe("ageTagOf / locationOf", () => {
+  // Directory cards, the profile header and every People row read these, so a
+  // member must never be labelled two different ways on two screens.
+  it("builds the age tag the way every surface shows it", () => {
+    expect(ageTagOf(25, "Female")).toBe("25F");
+    expect(ageTagOf(25, "Male")).toBe("25M");
+    expect(ageTagOf(25, null)).toBe("25");
+    expect(ageTagOf(25, "Non-binary")).toBe("25");
+  });
+
+  it("has no tag at all when the age is unknown", () => {
+    // A bare gender initial with no number reads like a typo on a card.
+    expect(ageTagOf(null, "Female")).toBeNull();
+    expect(ageTagOf(null, null)).toBeNull();
+  });
+
+  it("joins city and state, and suffixes the state once", () => {
+    expect(locationOf("Abraka", "Delta")).toBe("Abraka, Delta State");
+    expect(locationOf(null, "Delta")).toBe("Delta State");
+    expect(locationOf("Abraka", null)).toBe("Abraka");
+    expect(locationOf(null, "Delta State")).toBe("Delta State");
+    expect(locationOf(null, "FCT Abuja")).toBe("FCT Abuja");
+  });
+
+  it("is null when there is no location at all, so no empty line renders", () => {
+    expect(locationOf(null, null)).toBeNull();
+  });
+});
+
+describe("locationPartsOf", () => {
+  // Tapping a place on someone's profile is the fastest route to people near them.
+  const href: PlaceHref = ({ country, state, city }) => {
+    if (country !== "NG") return null;
+    if (!state) return "/members/ng";
+    if (!city) return `/members/ng/${state}`;
+    return `/members/ng/${state}?region=${city}`;
+  };
+
+  it("splits the line into city, state and country, each linking one level wider", () => {
+    expect(locationPartsOf({ country: "NG", state: "Lagos", city: "Sangotedo" }, href)).toEqual([
+      { label: "Sangotedo", href: "/members/ng/Lagos?region=Sangotedo" },
+      { label: "Lagos State", href: "/members/ng/Lagos" },
+      { label: "Nigeria", href: "/members/ng" },
+    ]);
+  });
+
+  it("leaves out the pieces a member has not set", () => {
+    expect(locationPartsOf({ country: "NG", state: "Lagos", city: null }, href)).toEqual([
+      { label: "Lagos State", href: "/members/ng/Lagos" },
+      { label: "Nigeria", href: "/members/ng" },
+    ]);
+    expect(locationPartsOf({ country: null, state: null, city: null }, href)).toEqual([]);
+  });
+
+  it("renders a country we do not serve as plain text rather than a dead link", () => {
+    // A link into an empty directory is worse than no link.
+    expect(locationPartsOf({ country: "GH", state: "Accra", city: null }, href)).toEqual([
+      { label: "Accra State", href: null },
+      { label: "Ghana", href: null },
     ]);
   });
 });

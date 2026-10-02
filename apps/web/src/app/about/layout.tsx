@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
+import { SEO_COPY } from "@/constants/seo";
+import { getPageMetadata } from "@/presenters/getPageMetadata";
 
-export const metadata: Metadata = {
-  title: "About Kinkord — The World's Kink Community",
-  description: "What Kinkord is, our mission, and the people behind our vision.",
-};
+export const metadata: Metadata = getPageMetadata("/about", SEO_COPY.about);
 
 export default function AboutLayout({ children }: { children: React.ReactNode }) {
   return <>{children}</>;

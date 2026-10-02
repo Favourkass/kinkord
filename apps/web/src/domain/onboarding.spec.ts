@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  isAllowedPhone,
+  PHONE_NIGERIA_ONLY,
   dobToIso,
+  invalidSignupFields,
   isAdult,
   toE164,
   validateAccount,
@@ -46,13 +49,76 @@ describe("validateAccount", () => {
   });
 });
 
+describe("validateAccount: phone", () => {
+  it("requires a phone number", () => {
+    expect(validateAccount(account({ phoneLocal: "  " })).phoneLocal).toBe(
+      "Enter your phone number.",
+    );
+  });
+  it("still rejects a number that isn't one", () => {
+    expect(validateAccount(account({ phoneLocal: "12" })).phoneLocal).toBe(PHONE_NIGERIA_ONLY);
+  });
+
+  it("takes Nigerian mobiles however they're typed", () => {
+    for (const phoneLocal of [
+      "0803 123 4567",
+      "803 123 4567",
+      "+234 803 123 4567",
+      "07031234567",
+    ]) {
+      expect(validateAccount(account({ phoneLocal })).phoneLocal, phoneLocal).toBeUndefined();
+    }
+  });
+
+  it("refuses numbers from other countries, and Nigerian landlines, for now", () => {
+    for (const phoneLocal of ["+44 7700 900123", "+254 703 105232", "01 234 5678"]) {
+      expect(validateAccount(account({ phoneLocal })).phoneLocal, phoneLocal).toBe(
+        PHONE_NIGERIA_ONLY,
+      );
+    }
+  });
+  it("accepts the full international number Chrome autofill puts in the box", () => {
+    expect(validateAccount(account({ phoneLocal: "+2348031234567" })).phoneLocal).toBeUndefined();
+  });
+});
+
 describe("toE164", () => {
   it("builds E.164 from NG local format, stripping the leading zero", () => {
     expect(toE164("+234", "0803 123 4567")).toBe("+2348031234567");
   });
+  it("recognises a country code typed or autofilled into the local box", () => {
+    for (const typed of [
+      "+2348031234567",
+      "+234 803 123 4567",
+      "+234 0803 123 4567",
+      "002348031234567",
+      "2348031234567",
+      "(+234) 803-123-4567",
+    ]) {
+      expect(toE164("+234", typed)).toBe("+2348031234567");
+    }
+    expect(toE164("+44", "+44 7911 123456")).toBe("+447911123456");
+    expect(toE164("+1", "1 555 123 4567")).toBe("+15551234567");
+  });
+  it("keeps a full number for another country as typed", () => {
+    expect(toE164("+234", "+44 7911 123456")).toBe("+447911123456");
+  });
+  it("doesn't mistake a short national number for one with the code", () => {
+    // 10 digits that merely start with 234: too short to also hold the code.
+    expect(toE164("+234", "2341234567")).toBe("+2342341234567");
+  });
   it("rejects junk", () => {
     expect(toE164("+234", "12")).toBeNull();
     expect(toE164("", "08031234567")).toBeNull();
+  });
+});
+
+describe("invalidSignupFields", () => {
+  it("lists failing fields in on-screen order across both steps", () => {
+    expect(
+      invalidSignupFields({ confirmPassword: "x", phoneLocal: "x" }, { gender: "x", dob: "x" }),
+    ).toEqual(["phoneLocal", "confirmPassword", "dob", "gender"]);
+    expect(invalidSignupFields({}, {})).toEqual([]);
   });
 });
 
@@ -86,5 +152,15 @@ describe("dob", () => {
 
   it("defines WIZARD_STEPS as 5", () => {
     expect(WIZARD_STEPS).toBe(5);
+  });
+});
+
+describe("isAllowedPhone", () => {
+  it("is Nigerian mobiles only, for now", () => {
+    expect(isAllowedPhone("+2348031234567")).toBe(true);
+    expect(isAllowedPhone("+2349131234567")).toBe(true);
+    expect(isAllowedPhone("+447700900123")).toBe(false);
+    expect(isAllowedPhone("+23412345678")).toBe(false);
+    expect(isAllowedPhone(null)).toBe(false);
   });
 });

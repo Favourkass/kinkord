@@ -2,7 +2,17 @@ import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, asc, count, desc, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { Db, DRIZZLE } from "../db/db.module";
-import { bronzeVerification, follow, profile, profileMedia, user, type ProfileMediaKind } from "../db/schema";
+import { notBanned } from "../moderation/admins";
+import {
+  bronzeVerification,
+  follow,
+  profile,
+  profileMedia,
+  user,
+  type PostMediaKind,
+  type ProfileMediaKind,
+} from "../db/schema";
+import { PostsService } from "../posts/posts.service";
 import { ONLINE_WINDOW_SECONDS, PresenceService } from "../presence/presence.service";
 import { StorageService } from "../storage/storage.service";
 import { KycService } from "../verification/kyc.service";
@@ -17,8 +27,18 @@ const MEDIA_KINDS: Record<MediaFilter, ProfileMediaKind[]> = {
   all: ["avatar", "cover"],
   profile: ["avatar"],
   photos: ["cover"],
-  // Videos arrive with posts; nothing to list yet.
   videos: [],
+};
+/** What a Media tab tile can be: an uploaded avatar or cover, or a post attachment. */
+export type MediaItemKind = ProfileMediaKind | "photo" | "video";
+
+/** The same pills over post attachments: a photo you posted belongs under "Photos". */
+const POST_MEDIA_KINDS: Record<MediaFilter, PostMediaKind[]> = {
+  all: ["image", "video"],
+  // "Profile Photo" means the avatar itself, which no post can be.
+  profile: [],
+  photos: ["image"],
+  videos: ["video"],
 };
 
 export interface ListMembersParams {
@@ -62,6 +82,7 @@ export class MembersService {
     @Inject(DRIZZLE) private readonly db: Db,
     private readonly storage: StorageService,
     private readonly follows: FollowsService,
+    private readonly posts: PostsService,
     private readonly kyc: KycService,
   ) {}
 
@@ -103,6 +124,7 @@ export class MembersService {
     const conditions = [
       eq(profile.country, params.country.toUpperCase()),
       ne(profile.userId, viewerId),
+      notBanned(profile.userId),
     ];
     if (params.state) conditions.push(eq(profile.state, params.state));
     if (params.state && params.lga) conditions.push(eq(profile.city, params.lga));
@@ -157,6 +179,11 @@ export class MembersService {
 
     const [totalRow] = await this.db.select({ total: count() }).from(profile).where(where);
 
+    // One grouped query for the page rather than a count per card.
+    const postCounts = await this.posts.postCountsFor(
+      rows.map((r) => r.userId),
+      viewerId,
+    );
     const items = await Promise.all(
       rows.map(async (r) => ({
         userId: r.userId,
@@ -172,8 +199,7 @@ export class MembersService {
         state: r.state,
         isOnline: Boolean(r.isOnline),
         lastSeenAt: r.lastSeenAt ? r.lastSeenAt.toISOString() : null,
-        // Posts ship in a later slice; the card slot stays so the layout is final.
-        postsCount: 0,
+        postsCount: postCounts.get(r.userId) ?? 0,
         followersCount: Number(r.followers ?? 0),
         isFollowing: Boolean(r.isFollowing),
       })),
@@ -190,7 +216,7 @@ export class MembersService {
       .from(user)
       .innerJoin(profile, eq(profile.userId, user.id))
       .leftJoin(bronzeVerification, eq(bronzeVerification.userId, user.id))
-      .where(eq(user.username, handle))
+      .where(and(eq(user.username, handle), notBanned(user.id)))
       .limit(1);
     if (!row) throw new NotFoundException("Member not found.");
 
@@ -273,12 +299,16 @@ export class MembersService {
       eq(profile.state, target.state),
       ne(profile.userId, targetId),
       ne(profile.userId, viewerId),
+      notBanned(profile.userId),
     ];
     if (target.country) conditions.push(eq(profile.country, target.country));
     const where = and(...conditions);
-    const sameArea = target.city
-      ? sql<number>`case when ${profile.city} = ${target.city} then 1 else 0 end`
-      : sql<number>`0`;
+    // Same city first when the member has one. Without a city there is nothing
+    // to rank by: a constant would render as `order by 0`, which Postgres reads
+    // as "output column 0" and rejects.
+    const sameAreaFirst = target.city
+      ? [desc(sql<number>`case when ${profile.city} = ${target.city} then 1 else 0 end`)]
+      : [];
     const viewerFollow = alias(follow, "viewer_follow");
     const rows = await this.db
       .select({
@@ -286,6 +316,10 @@ export class MembersService {
         username: user.username,
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
+        dateOfBirth: profile.dateOfBirth,
+        gender: profile.gender,
+        city: profile.city,
+        state: profile.state,
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
       })
       .from(profile)
@@ -295,13 +329,35 @@ export class MembersService {
         and(eq(viewerFollow.followerId, viewerId), eq(viewerFollow.followingId, profile.userId)),
       )
       .where(where)
-      .orderBy(desc(sameArea), desc(profile.createdAt))
+      .orderBy(...sameAreaFirst, desc(profile.createdAt))
       .limit(limit)
       .offset(offset);
     const [totalRow] = await this.db.select({ total: count() }).from(profile).where(where);
     return {
       items: rows.map((r) => ({ ...r, isFollowing: Boolean(r.isFollowing) })),
       total: Number(totalRow?.total ?? 0),
+    };
+  }
+
+  /**
+   * "People you may know" on the home feed. Same rule as the profile Suggested
+   * tab — `suggested` already excludes the viewer — but the feed card shows a
+   * 221x191 photo rather than a 48px row, so it asks for the medium size.
+   */
+  async suggestedForFeed(viewerId: string, limitArg?: number) {
+    const { limit } = normalizePaging(1, limitArg ?? 10);
+    const { items, total } = await this.suggested(viewerId, viewerId, limit, 0);
+    return {
+      items: await Promise.all(
+        items.map(async (r) => ({
+          userId: r.userId,
+          username: r.username,
+          displayName: r.displayName,
+          avatarUrl: r.avatarKey ? await this.storage.presignDownload(r.avatarKey, "md") : null,
+          isFollowing: r.isFollowing,
+        })),
+      ),
+      total,
     };
   }
 
@@ -331,28 +387,68 @@ export class MembersService {
     const restricted =
       p.visibility === "friends" && !isSelf && !(await this.follows.areFriends(viewerId, targetId));
     const kinds = MEDIA_KINDS[filter];
-    if (restricted || kinds.length === 0) return { items: [], total: 0, page, limit, restricted };
+    const postKinds = POST_MEDIA_KINDS[filter];
+    if (restricted || (kinds.length === 0 && postKinds.length === 0)) {
+      return { items: [], total: 0, page, limit, restricted };
+    }
+
+    // Two sources, both newest-first: uploaded avatars and covers, and the
+    // photos attached to posts. Each is read up to `offset + limit` and the two
+    // are merged, which is exactly right for merging sorted lists and is bounded
+    // because the page size is capped.
+    const reach = offset + limit;
     const where = and(eq(profileMedia.userId, targetId), inArray(profileMedia.kind, kinds));
-    const rows = await this.db
-      .select()
-      .from(profileMedia)
-      .where(where)
-      .orderBy(desc(profileMedia.createdAt))
-      .limit(limit)
-      .offset(offset);
-    const [totalRow] = await this.db.select({ total: count() }).from(profileMedia).where(where);
+    const [uploaded, uploadedTotal, fromPosts] = await Promise.all([
+      kinds.length
+        ? this.db
+            .select()
+            .from(profileMedia)
+            .where(where)
+            .orderBy(desc(profileMedia.createdAt))
+            .limit(reach)
+        : Promise.resolve([]),
+      kinds.length
+        ? this.db.select({ total: count() }).from(profileMedia).where(where)
+        : Promise.resolve([{ total: 0 }]),
+      this.posts.postMediaFor(targetId, viewerId, postKinds, reach, 0),
+    ]);
+
+    const merged = [
+      ...uploaded.map((r) => ({
+        id: r.id,
+        kind: r.kind as MediaItemKind,
+        key: r.key,
+        createdAt: r.createdAt,
+        isCurrent: r.key === (r.kind === "avatar" ? p.avatarKey : p.coverKey),
+      })),
+      ...fromPosts.rows.map((r) => ({
+        id: r.id,
+        // A post attachment is a plain photo or video on the profile grid; only
+        // an uploaded avatar can be the "current" one.
+        kind: (r.kind === "video" ? "video" : "photo") as MediaItemKind,
+        key: r.key,
+        createdAt: r.createdAt,
+        isCurrent: false,
+      })),
+    ]
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(offset, offset + limit);
+
     const items = await Promise.all(
-      rows.map(async (r) => ({
+      merged.map(async (r) => ({
         id: r.id,
         kind: r.kind,
         // Grid tiles use the medium size; the lightbox opens the original.
         url: await this.storage.presignDownload(r.key, "md"),
         fullUrl: await this.storage.presignDownload(r.key),
         createdAt: r.createdAt.toISOString(),
-        isCurrent: r.key === (r.kind === "avatar" ? p.avatarKey : p.coverKey),
+        isCurrent: r.isCurrent,
+        /** Post attachments are not deletable from here — they belong to a post. */
+        deletable: r.kind === "avatar" || r.kind === "cover",
       })),
     );
-    return { items, total: Number(totalRow?.total ?? 0), page, limit, restricted: false };
+    const total = Number(uploadedTotal[0]?.total ?? 0) + fromPosts.total;
+    return { items, total, page, limit, restricted: false };
   }
 
   /** A member's friends ("all" = their mutual follows; "mutual" = friends in common with the viewer). */
@@ -380,8 +476,12 @@ export class MembersService {
         userId: r.userId,
         username: r.username,
         displayName: r.displayName,
-        // Friend rows are 48px circles — the small size is ~8KB.
         avatarUrl: r.avatarKey ? await this.storage.presignDownload(r.avatarKey, "sm") : null,
+        // Same rule as the directory cards: age is derived, the birth date never leaves the API.
+        age: ageFromDob(r.dateOfBirth),
+        gender: r.gender,
+        city: r.city,
+        state: r.state,
         isFollowing: r.isFollowing,
       })),
     );

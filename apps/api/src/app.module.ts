@@ -1,6 +1,8 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { AuthModule } from "./auth/auth.module";
+import { ChatModule } from "./chat/chat.module";
+import { PushModule } from "./push/push.module";
 import { CommunityModule } from "./community/community.module";
 import { DbModule } from "./db/db.module";
 import { EmailModule } from "./email/email.module";
@@ -8,9 +10,12 @@ import { HealthController } from "./health/health.controller";
 import { HealthService } from "./health/health.service";
 import { MembersModule } from "./members/members.module";
 import { MessagingModule } from "./messaging/messaging.module";
+import { ModerationModule } from "./moderation/moderation.module";
 import { PresenceModule } from "./presence/presence.module";
 import { ProfilesModule } from "./profiles/profiles.module";
 import { OtpModule } from "./otp/otp.module";
+import { PostsModule } from "./posts/posts.module";
+import { SafetyModule } from "./safety/safety.module";
 import { StorageModule } from "./storage/storage.module";
 import { VerificationModule } from "./verification/verification.module";
 
@@ -19,6 +24,7 @@ import { VerificationModule } from "./verification/verification.module";
     ConfigModule.forRoot({ isGlobal: true }),
     DbModule,
     EmailModule,
+    ModerationModule,
     PresenceModule,
     AuthModule,
     MessagingModule,
@@ -28,7 +34,10 @@ import { VerificationModule } from "./verification/verification.module";
     MembersModule,
     VerificationModule,
     OtpModule,
-    VerificationModule,
+    PostsModule,
+    SafetyModule,
+    ChatModule,
+    PushModule,
   ],
   controllers: [HealthController],
   providers: [HealthService],

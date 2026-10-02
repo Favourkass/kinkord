@@ -77,3 +77,70 @@ describe("uploadToPresignedUrl", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 });
+
+describe("new accounts without a verified phone", () => {
+  const blocked = () =>
+    errJson(403, {
+      code: "PHONE_VERIFICATION_REQUIRED",
+      message: "Verify your phone number to continue.",
+    });
+
+  it("are sent back to the phone step, and still see the error", async () => {
+    const assign = vi.fn();
+    vi.stubGlobal("window", { location: { pathname: "/home", assign } });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(blocked());
+    await expect(api.get("/posts")).rejects.toBeInstanceOf(ApiError);
+    expect(assign).toHaveBeenCalledWith("/signup?resume=phone");
+    vi.unstubAllGlobals();
+  });
+
+  it("are left alone while already on the sign-up page", async () => {
+    const assign = vi.fn();
+    vi.stubGlobal("window", { location: { pathname: "/signup", assign } });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(blocked());
+    await expect(api.get("/community/stats")).rejects.toBeInstanceOf(ApiError);
+    expect(assign).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it("isn't triggered by an ordinary 403", async () => {
+    const assign = vi.fn();
+    vi.stubGlobal("window", { location: { pathname: "/home", assign } });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(errJson(403, { message: "Admins only." }));
+    await expect(api.get("/admin/members")).rejects.toBeInstanceOf(ApiError);
+    expect(assign).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("members without a profile photo or cover", () => {
+  it("are sent back to the photo step, and still see the error", async () => {
+    const assign = vi.fn();
+    vi.stubGlobal("window", { location: { pathname: "/home", assign } });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      errJson(403, {
+        code: "PROFILE_PHOTOS_REQUIRED",
+        message: "Add a profile photo and a cover picture to continue.",
+      }),
+    );
+    await expect(api.get("/posts")).rejects.toBeInstanceOf(ApiError);
+    expect(assign).toHaveBeenCalledWith("/signup?resume=profile");
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("headers", () => {
+  it("sends no content-type on a GET, so polling needs no CORS preflight", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(okJson([]));
+    await api.get("/chat/conversations");
+    const init = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect(init.headers).toEqual({});
+  });
+
+  it("declares JSON when there is a body", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(okJson({}));
+    await api.post("/chat/conversations", { userId: "u2" });
+    const init = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect(init.headers).toEqual({ "content-type": "application/json" });
+  });
+});

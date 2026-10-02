@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { NotFoundException } from "@nestjs/common";
-import { type SQL } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { type Db } from "../db/db.module";
 import { type StorageService } from "../storage/storage.service";
+import { type PostsService } from "../posts/posts.service";
 import { type FollowsService } from "./follows.service";
 import { MembersService, ageFromDob, normalizePaging } from "./members.service";
 
@@ -40,6 +41,27 @@ const recordingChain = (result: unknown, wheres: SQL[]) => {
 
 const renderWhere = (w: SQL) => new PgDialect().sqlToQuery(w);
 
+/** Like `chain`, but remembers the arguments of every `.orderBy(...)` so the ordering can be asserted. */
+const orderRecordingChain = (result: unknown, orders: SQL[][]) => {
+  const p: unknown = new Proxy(() => p, {
+    get: (_t, prop) => {
+      if (prop === "then")
+        return (res: (v: unknown) => unknown, rej: (e: unknown) => unknown) =>
+          Promise.resolve(result).then(res, rej);
+      if (prop === "orderBy")
+        return (...args: SQL[]) => {
+          orders.push(args);
+          return p;
+        };
+      return () => p;
+    },
+    apply: () => p,
+  });
+  return p;
+};
+
+const renderOrder = (args: SQL[]) => new PgDialect().sqlToQuery(sql.join(args, sql`, `));
+
 const makeService = () => {
   const select = vi.fn();
   const db = { select } as unknown as Db;
@@ -56,6 +78,10 @@ const makeService = () => {
         username: "kay",
         displayName: "Kay",
         avatarKey: "avatars/kay.jpg",
+        dateOfBirth: null,
+        gender: null,
+        city: null,
+        state: null,
         isFollowing: false,
       },
     ],
@@ -77,9 +103,20 @@ const makeService = () => {
     areFriends,
   } as unknown as FollowsService;
   const kyc = { isFullyVerified: vi.fn(async () => false) };
+  const postCountsFor = vi.fn(async () => new Map<string, number>());
+  const postMediaFor = vi.fn(async () => ({ rows: [], total: 0 }));
+  const posts = { postCountsFor, postMediaFor } as unknown as PostsService;
   return {
-    service: new MembersService(db, storage, follows, kyc as unknown as import("../verification/kyc.service").KycService),
+    service: new MembersService(
+      db,
+      storage,
+      follows,
+      posts,
+      kyc as unknown as import("../verification/kyc.service").KycService,
+    ),
     kyc,
+    postCountsFor,
+    postMediaFor,
     select,
     presignDownload,
     isFollowing,
@@ -320,6 +357,10 @@ describe("MembersService.friends", () => {
           username: "kay",
           displayName: "Kay",
           avatarUrl: "https://s3/avatars/kay.jpg",
+          age: null,
+          gender: null,
+          city: null,
+          state: null,
           isFollowing: false,
         },
       ],
@@ -452,6 +493,10 @@ describe("MembersService people tabs + media (profile rebuild, 2026-09-12)", () 
               username: "ada",
               displayName: "Ada",
               avatarKey: "avatars/u5/a.jpg",
+              dateOfBirth: null,
+              gender: null,
+              city: null,
+              state: null,
               isFollowing: null,
             },
           ],
@@ -466,11 +511,61 @@ describe("MembersService people tabs + media (profile rebuild, 2026-09-12)", () 
       username: "ada",
       displayName: "Ada",
       avatarUrl: "https://s3/avatars/u5/a.jpg",
+      age: null,
+      gender: null,
+      city: null,
+      state: null,
       isFollowing: false,
     });
     const { params } = renderWhere(wheres[0]);
     expect(params).toEqual(["Delta", "u2", "me", "NG"]);
     expect(renderWhere(wheres[1])).toEqual(renderWhere(wheres[0]));
+  });
+
+  it("ranks suggestions by their own city first when the member has one", async () => {
+    const { service, select } = makeService();
+    const orders: SQL[][] = [];
+    select
+      .mockReturnValueOnce(chain([{ country: "NG", state: "Delta", city: "Abraka" }]))
+      .mockReturnValueOnce(orderRecordingChain([], orders))
+      .mockReturnValueOnce(chain([{ total: 0 }]));
+    await service.friends("nene", "me", "suggested");
+    expect(renderOrder(orders[0])).toMatchObject({
+      sql: `case when "profile"."city" = $1 then 1 else 0 end desc, "profile"."created_at" desc`,
+      params: ["Abraka"],
+    });
+  });
+
+  it("ranks by newest alone when the member has a state but no city — never `order by 0`", async () => {
+    // Production bug (2026-10-01): a constant fallback rendered `order by 0 desc`,
+    // which Postgres rejects as "ORDER BY position 0 is not in select list".
+    const { service, select } = makeService();
+    const orders: SQL[][] = [];
+    select
+      .mockReturnValueOnce(chain([{ country: "NG", state: "Delta", city: null }]))
+      .mockReturnValueOnce(
+        orderRecordingChain(
+          [
+            {
+              userId: "u5",
+              username: "ada",
+              displayName: "Ada",
+              avatarKey: null,
+              dateOfBirth: null,
+              gender: null,
+              city: null,
+              state: "Delta",
+              isFollowing: null,
+            },
+          ],
+          orders,
+        ),
+      )
+      .mockReturnValueOnce(chain([{ total: 1 }]));
+    const page = await service.friends("nene", "me", "suggested");
+    expect(page.total).toBe(1);
+    expect(page.items.map((m) => m.username)).toEqual(["ada"]);
+    expect(renderOrder(orders[0])).toEqual({ sql: `"profile"."created_at" desc`, params: [] });
   });
 
   it("suggests nobody when the member has no state on file", async () => {
@@ -517,18 +612,7 @@ describe("MembersService people tabs + media (profile rebuild, 2026-09-12)", () 
     expect(presignDownload).toHaveBeenCalledWith("avatars/u2/new.jpg");
   });
 
-  it("returns nothing for the Videos pill yet, and nothing at all to non-friends of a friends-only profile", async () => {
-    const videos = makeService();
-    videos.select.mockReturnValueOnce(
-      chain([{ avatarKey: null, coverKey: null, visibility: "public" }]),
-    );
-    await expect(videos.service.media("nene", "me", "videos")).resolves.toMatchObject({
-      items: [],
-      total: 0,
-      restricted: false,
-    });
-    expect(videos.select).toHaveBeenCalledTimes(1);
-
+  it("shows nothing at all to a non-friend of a friends-only profile", async () => {
     const locked = makeService();
     locked.select.mockReturnValueOnce(
       chain([{ avatarKey: "avatars/u2/a.jpg", coverKey: null, visibility: "friends" }]),
@@ -538,5 +622,133 @@ describe("MembersService people tabs + media (profile rebuild, 2026-09-12)", () 
       restricted: true,
     });
     expect(locked.areFriends).toHaveBeenCalledWith("me", "u2");
+    // Nothing is even asked of the posts side for a profile the viewer cannot see.
+    expect(locked.postMediaFor).not.toHaveBeenCalled();
+  });
+
+  it("puts post photos in the grid beside the uploads, newest first", async () => {
+    const { service, select, postMediaFor } = makeService();
+    select
+      .mockReturnValueOnce(
+        chain([{ avatarKey: "avatars/u2/new.jpg", coverKey: null, visibility: "public" }]),
+      )
+      .mockReturnValueOnce(
+        chain([
+          {
+            id: "m1",
+            userId: "u2",
+            kind: "cover",
+            key: "covers/u2/a.jpg",
+            createdAt: new Date("2026-09-10T00:00:00Z"),
+          },
+        ]),
+      )
+      .mockReturnValueOnce(chain([{ total: 1 }]));
+    postMediaFor.mockResolvedValueOnce({
+      rows: [
+        {
+          id: "pm1",
+          kind: "image",
+          key: "posts/u2/a.jpg",
+          createdAt: new Date("2026-09-12T00:00:00Z"),
+        },
+      ],
+      total: 1,
+    } as never);
+
+    const page = await service.media("nene", "me", "photos");
+
+    expect(postMediaFor).toHaveBeenCalledWith("u2", "me", ["image"], 20, 0);
+    // The post photo is newer, so it sorts first across both sources.
+    expect(page.items.map((i) => i.id)).toEqual(["pm1", "m1"]);
+    expect(page.items[0]).toMatchObject({ kind: "photo", deletable: false, isCurrent: false });
+    expect(page.items[1]).toMatchObject({ kind: "cover", deletable: true });
+    expect(page.total).toBe(2);
+  });
+
+  it("never asks the posts side for the Profile Photo pill — no post can be an avatar", async () => {
+    const { service, select, postMediaFor } = makeService();
+    select
+      .mockReturnValueOnce(chain([{ avatarKey: null, coverKey: null, visibility: "public" }]))
+      .mockReturnValueOnce(chain([]))
+      .mockReturnValueOnce(chain([{ total: 0 }]));
+
+    await service.media("nene", "me", "profile");
+
+    expect(postMediaFor).toHaveBeenCalledWith("u2", "me", [], 20, 0);
+  });
+});
+
+describe("post counts on the directory cards", () => {
+  it("counts each member's visible posts in one query for the page", async () => {
+    const { service, select, postCountsFor } = makeService();
+    postCountsFor.mockResolvedValueOnce(new Map([["u2", 7]]) as never);
+    select
+      .mockReturnValueOnce(chain(undefined)) // follower_counts subquery (built, not awaited)
+      .mockReturnValueOnce(
+        chain([
+          {
+            userId: "u2",
+            username: "nene",
+            displayName: "Nene",
+            avatarKey: null,
+            dateOfBirth: null,
+            gender: null,
+            roles: [],
+            city: null,
+            state: null,
+            isOnline: false,
+            lastSeenAt: null,
+            followers: 0,
+            isFollowing: false,
+          },
+        ]),
+      )
+      .mockReturnValueOnce(chain([{ total: 1 }]));
+
+    const page = await service.list({ country: "NG", sort: "recent" }, "me");
+
+    expect(postCountsFor).toHaveBeenCalledWith(["u2"], "me");
+    expect(page.items[0].postsCount).toBe(7);
+  });
+});
+
+describe("MembersService.suggestedForFeed", () => {
+  it("asks for the medium avatar — the feed card is a photo, not a 48px row", async () => {
+    const { service, select, presignDownload } = makeService();
+    // `suggested` reads the viewer's own profile, then the candidate rows, then a count.
+    select
+      .mockReturnValueOnce(chain([{ country: "NG", state: "Delta", city: "Abraka" }]))
+      .mockReturnValueOnce(
+        chain([
+          {
+            userId: "u3",
+            username: "kay",
+            displayName: "Kay",
+            avatarKey: "avatars/kay.jpg",
+            isFollowing: false,
+          },
+        ]),
+      )
+      .mockReturnValueOnce(chain([{ total: 1 }]));
+
+    const result = await service.suggestedForFeed("u1", 5);
+
+    expect(presignDownload).toHaveBeenCalledWith("avatars/kay.jpg", "md");
+    expect(result.items[0]).toEqual({
+      userId: "u3",
+      username: "kay",
+      displayName: "Kay",
+      avatarUrl: "https://s3/avatars/kay.jpg",
+      isFollowing: false,
+    });
+    expect(result.total).toBe(1);
+  });
+
+  it("is empty rather than an error for a member who has set no state yet", async () => {
+    const { service, select } = makeService();
+    select.mockReturnValueOnce(chain([{ country: "NG", state: null, city: null }]));
+
+    await expect(service.suggestedForFeed("u1")).resolves.toEqual({ items: [], total: 0 });
   });
 });

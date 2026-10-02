@@ -66,8 +66,6 @@ export const MEMBERS_COPY = {
     /** Own profile (Figma 1167:552): gold "Add to story" (inert until stories) + black "Edit profile". */
     addToStory: "Add to story",
     editProfile: "Edit profile",
-    /** "Gift is not working for now" (CEO, 2026-09-12) — shown, never active. */
-    gift: "Gift",
     comingSoon: "Coming soon",
     online: "Online",
     lastSeen: (ago: string) => `Last seen ${ago}`,
@@ -135,6 +133,9 @@ export const MEMBERS_COPY = {
     },
     posts: {
       empty: "No posts yet.",
+      /** What a visitor sees where a friends-only post would be — the API simply omits it. */
+      loading: "Loading posts…",
+      loadMore: "Load more posts",
       like: "Like",
       comment: "Comment",
       share: "Share",
@@ -176,6 +177,7 @@ export const MEMBERS_COPY = {
     notifications: "Notifications",
     profile: "Profile",
     settings: "Settings and Privacy",
+    saved: "Saved",
     logout: "Log Out",
   },
   notifications: {

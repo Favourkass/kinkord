@@ -2,6 +2,7 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from "@nes
 import { and, count, desc, eq, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { Db, DRIZZLE } from "../db/db.module";
+import { PushService } from "../push/push.service";
 import { follow, profile, user } from "../db/schema";
 
 export interface FollowCounts {
@@ -17,6 +18,11 @@ export interface FriendRow {
   username: string | null;
   displayName: string;
   avatarKey: string | null;
+  /** Kept server-side; the members service derives `age` and never leaks the DOB. */
+  dateOfBirth: string | null;
+  gender: string | null;
+  city: string | null;
+  state: string | null;
   isFollowing: boolean;
 }
 
@@ -31,15 +37,21 @@ export interface FriendsPage {
  */
 @Injectable()
 export class FollowsService {
-  constructor(@Inject(DRIZZLE) private readonly db: Db) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: Db,
+    private readonly push: PushService,
+  ) {}
 
   async follow(viewerId: string, username: string) {
     const targetId = await this.resolveUserId(username);
     if (targetId === viewerId) throw new BadRequestException("You can’t follow yourself.");
-    await this.db
+    const added = await this.db
       .insert(follow)
       .values({ followerId: viewerId, followingId: targetId })
-      .onConflictDoNothing();
+      .onConflictDoNothing()
+      .returning({ followerId: follow.followerId });
+    // Only a new follow is news: tapping Follow twice notifies once.
+    if (added.length > 0) this.push.newFollower(viewerId, targetId);
     return { following: true, followersCount: await this.followersCount(targetId) };
   }
 
@@ -123,6 +135,12 @@ export class FollowsService {
         username: user.username,
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
+
+        dateOfBirth: profile.dateOfBirth,
+        gender: profile.gender,
+        city: profile.city,
+        state: profile.state,
+
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
       })
       .from(follow)
@@ -158,6 +176,10 @@ export class FollowsService {
         username: user.username,
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
+        dateOfBirth: profile.dateOfBirth,
+        gender: profile.gender,
+        city: profile.city,
+        state: profile.state,
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
       })
       .from(follow)
@@ -184,13 +206,19 @@ export class FollowsService {
   ): Promise<FriendsPage> {
     const viewerFollow = alias(follow, "viewer_follow");
     const rows = await this.db
+
       .select({
         userId: user.id,
         username: user.username,
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
+        dateOfBirth: profile.dateOfBirth,
+        gender: profile.gender,
+        city: profile.city,
+        state: profile.state,
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
       })
+
       .from(follow)
       .innerJoin(user, eq(user.id, follow.followingId))
       .innerJoin(profile, eq(profile.userId, user.id))
@@ -223,6 +251,10 @@ export class FollowsService {
           username: user.username,
           displayName: profile.displayName,
           avatarKey: profile.avatarKey,
+          dateOfBirth: profile.dateOfBirth,
+          gender: profile.gender,
+          city: profile.city,
+          state: profile.state,
         })
         .from(follow)
         .innerJoin(

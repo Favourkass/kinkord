@@ -4,15 +4,21 @@ import { useState } from "react";
 import Link from "next/link";
 import AppShell from "@/components/app/AppShell";
 import { ChevronRightIcon } from "@/components/app/icons";
+import PushSettingRow from "@/components/app/PushSettingRow";
 import { Routes } from "@/constants/Routes";
+import { MODERATION_COPY } from "@/constants/moderation";
 import { getAppShellNav } from "@/presenters/getAppShellNav";
+import { useAdminAccessPresenter } from "@/presenters/useAdminAccessPresenter";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
+import { usePushPresenter } from "@/presenters/usePushPresenter";
 import { usePwaPresenter } from "@/presenters/usePwaPresenter";
 import { getTheme, setTheme, type Theme } from "@/util/theme";
 
 export default function SettingsPage() {
   const vm = useHomePresenter();
   const pwa = usePwaPresenter();
+  const push = usePushPresenter();
+  const admin = useAdminAccessPresenter();
   const nav = getAppShellNav();
   const [theme, setThemeState] = useState<Theme>(() =>
     typeof document === "undefined" ? "light" : getTheme(),
@@ -71,6 +77,7 @@ export default function SettingsPage() {
           <span>{pwa.isInstalled ? "App Installed" : "Download / Install App"}</span>
           <ChevronRightIcon className="text-[#b8850f]" />
         </button>
+        <PushSettingRow {...push.settings} />
         <p className="pt-[28px] pb-[8px] text-[14px] font-bold text-app-text">Account</p>
         <Link
           href={Routes.profileEdit}
@@ -93,6 +100,15 @@ export default function SettingsPage() {
           Kinkord KYC
           <ChevronRightIcon className="text-[#b8850f]" />
         </Link>
+        {admin.isAdmin ? (
+          <Link
+            href={Routes.moderation}
+            className="mt-[12px] flex h-[52px] items-center justify-between rounded-[16px] bg-app-members px-[18px] text-[18px] font-medium text-app-name"
+          >
+            {MODERATION_COPY.settingsEntry}
+            <ChevronRightIcon className="text-[#b8850f]" />
+          </Link>
+        ) : null}
       </div>
     </AppShell>
   );

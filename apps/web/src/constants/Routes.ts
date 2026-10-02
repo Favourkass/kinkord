@@ -14,10 +14,19 @@ export const Routes = {
   adminLogin: "/admin/login",
   adminLecturesNew: "/admin/lectures/new",
   adminLectureEdit: (id: string) => `/admin/lectures/${id}/edit`,
+  // Member moderation. Not under /admin: that prefix is the legacy lectures admin,
+  // gated by its own login in middleware.ts.
+  moderation: "/moderation",
+  moderationMember: (id: string) => `/moderation/members/${encodeURIComponent(id)}`,
+  moderationBlocklist: "/moderation/blocklist",
+  moderationReports: "/moderation/reports",
   signup: "/signup",
   login: "/login",
   appHome: "/home",
   messages: "/messages",
+  messageThread: (conversationId: string) => `/messages/${encodeURIComponent(conversationId)}`,
+  /** Opens (or reuses) the 1:1 thread with a member, then lands in it. */
+  messageWith: (userId: string) => `/messages/with/${encodeURIComponent(userId)}`,
   settings: "/settings",
   /** Password + 2FA moved here from /profile (CEO, 2026-09-12: "we still need to keep the change password and co"). */
   settingsSecurity: "/settings/security",
@@ -42,10 +51,17 @@ export const Routes = {
   membersCountry: (country: string) => `/members/${country.toLowerCase()}`,
   membersState: (country: string, state: string) =>
     `/members/${country.toLowerCase()}/${encodeURIComponent(state)}`,
+  /** A state narrowed to one city / LGA — what a profile's city links to. */
+  membersRegion: (country: string, state: string, region: string) =>
+    `/members/${country.toLowerCase()}/${encodeURIComponent(state)}?region=${encodeURIComponent(region)}`,
   /** Another member's public profile. */
   member: (username: string) => `/u/${encodeURIComponent(username.replace(/^@/, ""))}`,
   /** People tab "See more" page (Figma 1322:25). */
   memberPeople: (username: string, tab: string) =>
     `/u/${encodeURIComponent(username.replace(/^@/, ""))}/people?tab=${encodeURIComponent(tab)}`,
   notifications: "/notifications",
+  /** One post on its own — what Share hands out. */
+  post: (id: string) => `/p/${encodeURIComponent(id)}`,
+  /** The viewer's saved posts. */
+  saved: "/saved",
 } as const;

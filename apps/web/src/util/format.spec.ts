@@ -8,6 +8,7 @@ import {
   genderInitial,
   monthYear,
   shortDate,
+  shortTimeAgo,
   timeAgo,
 } from "./format";
 
@@ -101,6 +102,27 @@ describe("timeAgo", () => {
     expect(timeAgo(null, now)).toBeNull();
     expect(timeAgo("bad", now)).toBeNull();
     expect(timeAgo(new Date(now.getTime() + 60_000).toISOString(), now)).toBe("just now");
+  });
+});
+
+describe("shortTimeAgo", () => {
+  const now = new Date("2026-09-18T12:00:00.000Z");
+  const ago = (ms: number) => new Date(now.getTime() - ms).toISOString();
+
+  it("gives the post header one short token per age", () => {
+    expect(shortTimeAgo(ago(30_000), now)).toBe("now");
+    expect(shortTimeAgo(ago(3 * 60_000), now)).toBe("3m");
+    expect(shortTimeAgo(ago(60 * 60_000), now)).toBe("1h");
+    expect(shortTimeAgo(ago(2 * 24 * 3600_000), now)).toBe("2d");
+    expect(shortTimeAgo(ago(14 * 24 * 3600_000), now)).toBe("2w");
+    expect(shortTimeAgo(ago(60 * 24 * 3600_000), now)).toBe("2mo");
+    expect(shortTimeAgo(ago(800 * 24 * 3600_000), now)).toBe("2y");
+  });
+
+  it("returns null for missing or unparseable input and never goes negative", () => {
+    expect(shortTimeAgo(null, now)).toBeNull();
+    expect(shortTimeAgo("bad", now)).toBeNull();
+    expect(shortTimeAgo(new Date(now.getTime() + 60_000).toISOString(), now)).toBe("now");
   });
 });
 

@@ -176,6 +176,10 @@ describe("optimistic follow toggles", () => {
       username: "kay",
       displayName: "Kay",
       avatarUrl: null,
+      age: null,
+      gender: null,
+      city: null,
+      state: null,
       isFollowing: false,
     };
     expect(toggleFollowOnFriend(row)).toEqual({ ...row, isFollowing: true });

@@ -93,6 +93,32 @@ describe("AuthExtController", () => {
     expect(signUpWithProfile).not.toHaveBeenCalled();
   });
 
+  it("refuses a sign-up with a number outside Nigeria, for now, on the phone field", async () => {
+    const { controller, signUpWithProfile } = makeController();
+    for (const phone of ["+447700900123", "+254703105232", "+23412345678"]) {
+      const err = await controller
+        .signUpCombined(req, makeRes(), { ...validSignUp, phone })
+        .catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(BadRequestException);
+      expect((err as BadRequestException).getResponse()).toMatchObject({
+        phone: [expect.stringMatching(/Nigerian mobile numbers/)],
+      });
+    }
+    expect(signUpWithProfile).not.toHaveBeenCalled();
+  });
+
+  it("still signs in a member whose number was saved before the Nigeria-only rule", async () => {
+    const { controller, signInWithPhone } = makeController();
+    await controller.signInPhone(req, makeRes(), {
+      phone: "+447700900123",
+      password: "supersecret123",
+    });
+    expect(signInWithPhone).toHaveBeenCalledWith(
+      expect.objectContaining({ phone: "+447700900123" }),
+      expect.any(Headers),
+    );
+  });
+
   it("normalizes the username and forwards the combined sign-up session", async () => {
     const { controller, signUpWithProfile } = makeController({
       signUpResult: {
@@ -116,6 +142,22 @@ describe("AuthExtController", () => {
     );
     expect(res.setHeader).toHaveBeenCalledWith("set-cookie", ["kinkord.session_token=xyz; Path=/"]);
     expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it("refuses a sign-up without a phone number", async () => {
+    const { controller, signUpWithProfile } = makeController();
+    const withoutPhone = Object.fromEntries(
+      Object.entries(validSignUp).filter(([field]) => field !== "phone"),
+    );
+    const err = await controller.signUpCombined(req, makeRes(), withoutPhone).catch((e) => e);
+    expect(err).toBeInstanceOf(BadRequestException);
+    expect((err as BadRequestException).getResponse()).toMatchObject({
+      phone: ["Enter your phone number."],
+    });
+    await expect(
+      controller.signUpCombined(req, makeRes(), { ...validSignUp, phone: null }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(signUpWithProfile).not.toHaveBeenCalled();
   });
 
   it("rejects a sign-up whose date of birth is under 18", async () => {

@@ -1,13 +1,8 @@
 import type { Metadata } from "next";
+import { SEO_COPY } from "@/constants/seo";
+import { getPageMetadata } from "@/presenters/getPageMetadata";
 
-export const metadata: Metadata = {
-  title: "Contact Us — Kinkord",
-  description: "Reach out to Kinkord for support, inquiries, or to report any issues.",
-  openGraph: {
-    title: "Contact Us — Kinkord",
-    description: "Reach out to Kinkord for support, inquiries, or to report any issues.",
-  },
-};
+export const metadata: Metadata = getPageMetadata("/contact", SEO_COPY.contact);
 
 export default function ContactLayout({ children }: { children: React.ReactNode }) {
   return children;

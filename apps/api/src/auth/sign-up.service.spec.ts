@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { InternalServerErrorException } from "@nestjs/common";
+import { ForbiddenException, InternalServerErrorException } from "@nestjs/common";
 import { type Db } from "../db/db.module";
+import type { SignupGuardService } from "../moderation/signup-guard.service";
 import { type Auth } from "./auth.instance";
 import { SignUpService } from "./sign-up.service";
 
@@ -19,7 +20,11 @@ const fields = {
   phone: "+2348031234567",
 };
 
-const make = (opts: { signUpResponse: Response; updateThrows?: boolean }) => {
+const make = (opts: {
+  signUpResponse: Response;
+  updateThrows?: boolean;
+  verdict?: "allow" | "block" | "flag";
+}) => {
   const setWhere = opts.updateThrows
     ? vi.fn().mockRejectedValue(new Error("db down"))
     : vi.fn().mockResolvedValue(undefined);
@@ -37,7 +42,17 @@ const make = (opts: { signUpResponse: Response; updateThrows?: boolean }) => {
   const db = { update, delete: del, select } as unknown as Db;
   const signUpEmail = vi.fn().mockResolvedValue(opts.signUpResponse);
   const auth = { api: { signUpEmail } } as unknown as Auth;
-  return { service: new SignUpService(db, auth), update, set, del, deleteWhere, signUpEmail };
+  const review = vi.fn().mockResolvedValue({ action: opts.verdict ?? "allow", matches: [] });
+  const guard = { review } as unknown as SignupGuardService;
+  return {
+    service: new SignUpService(db, auth, guard),
+    update,
+    set,
+    del,
+    deleteWhere,
+    signUpEmail,
+    review,
+  };
 };
 
 describe("SignUpService", () => {
@@ -77,5 +92,34 @@ describe("SignUpService", () => {
     );
     expect(del).toHaveBeenCalledTimes(1);
     expect(deleteWhere).toHaveBeenCalledTimes(1);
+  });
+  it("refuses a blocked phone before Better Auth creates anything", async () => {
+    const res = new Response(JSON.stringify({ user: { id: "u1" } }), { status: 200 });
+    const { service, signUpEmail, review } = make({ signUpResponse: res, verdict: "block" });
+
+    await expect(service.signUpWithProfile(account, fields, new Headers())).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(review).toHaveBeenCalledWith({ phone: "+2348031234567" }, "sign-up");
+    expect(signUpEmail).not.toHaveBeenCalled();
+  });
+
+  it("lets a flagged phone through for review", async () => {
+    const res = new Response(JSON.stringify({ user: { id: "u1" } }), { status: 200 });
+    const { service, signUpEmail } = make({ signUpResponse: res, verdict: "flag" });
+
+    const result = await service.signUpWithProfile(account, fields, new Headers());
+
+    expect(signUpEmail).toHaveBeenCalledTimes(1);
+    expect(result.status).toBe(200);
+  });
+
+  it("skips the phone check when no phone was given", async () => {
+    const res = new Response(JSON.stringify({ user: { id: "u1" } }), { status: 200 });
+    const { service, review } = make({ signUpResponse: res, verdict: "block" });
+
+    await service.signUpWithProfile(account, { ...fields, phone: null }, new Headers());
+
+    expect(review).not.toHaveBeenCalled();
   });
 });

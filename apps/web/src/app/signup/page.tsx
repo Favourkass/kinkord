@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   AtSign,
   CheckCircle2,
@@ -37,6 +38,9 @@ import {
 } from "@/constants/onboarding";
 import { NG_LGAS } from "@/constants/nigeria";
 import { Routes } from "@/constants/Routes";
+import type { SignupField } from "@/domain/onboarding";
+
+const fieldId = (field: SignupField) => `signup-${field}`;
 
 function StageHeading({ plain, highlight }: { plain: string; highlight: string }) {
   return (
@@ -46,9 +50,32 @@ function StageHeading({ plain, highlight }: { plain: string; highlight: string }
   );
 }
 
+// useSearchParams needs a Suspense boundary for the page to prerender.
 export default function SignupPage() {
-  const p = useSignupWizardPresenter();
+  return (
+    <Suspense fallback={null}>
+      <SignupWizard />
+    </Suspense>
+  );
+}
+
+function SignupWizard() {
+  // The app sends a member who left sign-up half-done back to the step they owe.
+  const resume = useSearchParams().get("resume");
+  const p = useSignupWizardPresenter(
+    resume === "phone" || resume === "profile" ? resume : undefined,
+  );
   const [rolesOpen, setRolesOpen] = useState(false);
+
+  // A failed Send OTP says what's wrong by the button; bring the first bad
+  // field into view too, since on a phone it's usually scrolled off the top.
+  const firstInvalid = p.firstInvalid;
+  useEffect(() => {
+    if (!firstInvalid) return;
+    document
+      .getElementById(fieldId(firstInvalid.field))
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [firstInvalid]);
 
   return (
     <>
@@ -132,6 +159,7 @@ export default function SignupPage() {
             </p>
             <div className="flex w-full flex-col gap-4 lg:gap-7">
               <TextField
+                id={fieldId("username")}
                 label="Username"
                 icon={AtSign}
                 placeholder="@yourhandle"
@@ -143,6 +171,7 @@ export default function SignupPage() {
                 helper="This is your unique username on Kinkord."
               />
               <TextField
+                id={fieldId("displayName")}
                 label="Display name"
                 icon={User}
                 placeholder="How members will see you"
@@ -153,6 +182,7 @@ export default function SignupPage() {
                 helper="This is the name other members will see."
               />
               <TextField
+                id={fieldId("email")}
                 label="Email address"
                 icon={Mail}
                 type="email"
@@ -165,15 +195,17 @@ export default function SignupPage() {
                 helper="We'll never share your email with anyone."
               />
               <TextField
+                id={fieldId("phoneLocal")}
                 label="Phone number"
                 icon={Phone}
                 placeholder="803 123 4567"
-                autoComplete="tel"
+                autoComplete="tel-national"
                 leftAddon={
                   <span className="flex h-full items-center gap-2">
                     <span aria-hidden className="h-[26px] w-px bg-kink-edge" />
                     <select
                       aria-label="Country code"
+                      autoComplete="tel-country-code"
                       value={p.accountStep.draft.phoneCountryCode}
                       onChange={(e) =>
                         p.accountStep.set({
@@ -181,7 +213,7 @@ export default function SignupPage() {
                           phoneCountryCode: e.target.value,
                         })
                       }
-                      className="bg-transparent text-white outline-none [&>option]:bg-kink-field"
+                      className="appearance-none bg-transparent text-white outline-none [color-scheme:dark] [&>option]:bg-kink-field"
                     >
                       {PHONE_COUNTRY_CODES.map((c) => (
                         <option key={c.code} value={c.dialCode}>{`${c.flag} ${c.dialCode}`}</option>
@@ -197,6 +229,7 @@ export default function SignupPage() {
                 helper="This will be used for verification. One number can only be linked to one account."
               />
               <TextField
+                id={fieldId("password")}
                 label="Password"
                 icon={Lock}
                 type="password"
@@ -207,6 +240,7 @@ export default function SignupPage() {
                 helper="Use 10+ characters with letters & numbers."
               />
               <TextField
+                id={fieldId("confirmPassword")}
                 label="Confirm password"
                 icon={Lock}
                 type="password"
@@ -225,6 +259,7 @@ export default function SignupPage() {
             <StageHeading plain="TELL US" highlight="ABOUT YOU" />
             <div className="grid w-full gap-4 sm:grid-cols-2 lg:gap-6">
               <SelectField
+                id={fieldId("state")}
                 label="State"
                 icon={MapPin}
                 options={NG_STATES}
@@ -248,6 +283,7 @@ export default function SignupPage() {
               Your state and area help us show you local communities and events.
             </p>
             <DobPicker
+              id={fieldId("dob")}
               day={p.aboutStep.draft.dobDay}
               month={p.aboutStep.draft.dobMonth}
               year={p.aboutStep.draft.dobYear}
@@ -261,7 +297,7 @@ export default function SignupPage() {
               }
               error={p.aboutStep.errors.dob}
             />
-            <div className="w-full">
+            <div id={fieldId("gender")} className="w-full">
               <p className="mb-2 text-[12px] font-medium text-white lg:text-[20px]">Gender</p>
               <div className="grid grid-cols-2 gap-4 lg:gap-6">
                 {(["male", "female"] as const).map((g) => (
@@ -380,18 +416,77 @@ export default function SignupPage() {
                   <p className="text-[12px] text-kink-cream lg:text-[16px]">
                     {p.verifyStep.sent
                       ? "Enter the code we texted you. It expires in 10 minutes."
-                      : "Verifying your number unlocks the Basic verified badge. You can also skip and do it later."}
+                      : p.verifyStep.skip
+                        ? "We'll text a code to this number to confirm it's yours."
+                        : "We'll text a code to this number to confirm it's yours. You need it to use Kinkord."}
                   </p>
                 </div>
                 <div className="flex items-center gap-3 rounded-[12px] border-2 border-kink-gold-bright bg-[#111111] px-5 py-3 lg:px-8 lg:py-4">
                   <Smartphone size={20} className="text-kink-gold-bright lg:size-7" aria-hidden />
                   <span className="text-[15px] font-medium text-white lg:text-[24px]">
-                    {p.verifyStep.sentTo ??
-                      `${p.accountStep.draft.phoneCountryCode} ${
-                        p.accountStep.draft.phoneLocal.replace(/^0/, "") || "your phone number"
-                      }`}
+                    {p.verifyStep.number ?? "your phone number"}
                   </span>
                 </div>
+                {p.verifyStep.changePhone.open ? (
+                  <div className="flex w-full flex-col gap-3">
+                    <TextField
+                      label="New phone number"
+                      icon={Phone}
+                      placeholder="803 123 4567"
+                      autoComplete="tel-national"
+                      leftAddon={
+                        <span className="flex h-full items-center gap-2">
+                          <span aria-hidden className="h-[26px] w-px bg-kink-edge" />
+                          <select
+                            aria-label="Country code"
+                            autoComplete="tel-country-code"
+                            value={p.verifyStep.changePhone.countryCode}
+                            onChange={(e) =>
+                              p.verifyStep.changePhone.setCountryCode(e.target.value)
+                            }
+                            className="appearance-none bg-transparent text-white outline-none [color-scheme:dark] [&>option]:bg-kink-field"
+                          >
+                            {PHONE_COUNTRY_CODES.map((c) => (
+                              <option
+                                key={c.code}
+                                value={c.dialCode}
+                              >{`${c.flag} ${c.dialCode}`}</option>
+                            ))}
+                          </select>
+                          <ChevronDown size={14} aria-hidden className="-ml-1 text-white" />
+                          <span aria-hidden className="h-[26px] w-px bg-kink-edge" />
+                        </span>
+                      }
+                      value={p.verifyStep.changePhone.local}
+                      onChange={p.verifyStep.changePhone.setLocal}
+                      error={p.verifyStep.changePhone.error ?? undefined}
+                    />
+                    <div className="flex items-center gap-4">
+                      <GoldCta
+                        label="Save number"
+                        arrow={false}
+                        onClick={p.verifyStep.changePhone.save}
+                        loading={p.verifyStep.changePhone.saving}
+                        className="max-w-[240px]"
+                      />
+                      <button
+                        type="button"
+                        onClick={p.verifyStep.changePhone.cancel}
+                        className="text-[13px] text-kink-help underline lg:text-[16px]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={p.verifyStep.changePhone.start}
+                    className="text-[13px] text-kink-help underline lg:text-[16px]"
+                  >
+                    Wrong number? Change it
+                  </button>
+                )}
                 <CodeInput
                   value={p.verifyStep.code}
                   onChange={p.verifyStep.setCode}
@@ -440,13 +535,20 @@ export default function SignupPage() {
                     className="max-w-[564px]"
                   />
                 )}
-                <button
-                  type="button"
-                  onClick={p.verifyStep.skip}
-                  className="text-[13px] text-kink-help underline lg:text-[16px]"
-                >
-                  Skip for now
-                </button>
+                {p.verifyStep.skip && (
+                  <div className="flex flex-col items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={p.verifyStep.skip}
+                      className="text-[13px] text-kink-help underline lg:text-[16px]"
+                    >
+                      Not getting the text? Skip for now
+                    </button>
+                    <p className="text-[12px] text-white/60 lg:text-[15px]">
+                      You can verify your number later in Settings → Security &amp; 2FA.
+                    </p>
+                  </div>
+                )}
               </>
             )}
           </section>
@@ -457,6 +559,11 @@ export default function SignupPage() {
         <SignupShell step={p.step} badge="STEP 5 OF 5">
           <section className="flex w-full max-w-[706px] flex-col items-center gap-6 lg:max-w-[1130px] lg:gap-8">
             <StageHeading plain="BUILD YOUR" highlight="PROFILE" />
+            {p.profileStep.resumed && (
+              <p className="text-center text-[13px] text-kink-cream lg:text-[16px]">
+                Add a profile photo and a cover picture to start using Kinkord.
+              </p>
+            )}
             <PhotoConfirmation {...p.profileStep.confirmation} />
             <UploadTile
               shape="circle"
@@ -554,8 +661,17 @@ export default function SignupPage() {
                     </span>
                   </div>
                   <p className="mt-1.5 flex items-center gap-2 text-[13px] text-[#bfbfbf] lg:text-[17px]">
-                    <CheckCircle2 size={16} className="text-[#59b240]" aria-hidden />
-                    Phone verification pending — unlocks when SMS goes live
+                    {p.welcome.phoneVerified ? (
+                      <>
+                        <CheckCircle2 size={16} className="shrink-0 text-[#59b240]" aria-hidden />
+                        Phone number verified
+                      </>
+                    ) : (
+                      <>
+                        <Clock size={16} className="shrink-0 text-kink-gold-bright" aria-hidden />
+                        Phone not verified yet. Verify it any time in Settings → Security &amp; 2FA.
+                      </>
+                    )}
                   </p>
                 </div>
               </div>

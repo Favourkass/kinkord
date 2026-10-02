@@ -72,6 +72,10 @@ const friendsPage = {
       username: "kay",
       displayName: "Kinky Kay",
       avatarUrl: null,
+      age: 25,
+      gender: "Female",
+      city: "Abraka",
+      state: "Delta",
       isFollowing: false,
     },
   ],
@@ -104,6 +108,7 @@ const mediaPage = {
       fullUrl: "https://s3/a.jpg",
       createdAt: "2026-09-10T00:00:00.000Z",
       isCurrent: true,
+      deletable: true,
     },
     {
       id: "m0",
@@ -112,6 +117,7 @@ const mediaPage = {
       fullUrl: "https://s3/c.jpg",
       createdAt: "2026-08-10T00:00:00.000Z",
       isCurrent: false,
+      deletable: true,
     },
   ],
   total: 2,
@@ -152,7 +158,7 @@ describe("useMemberProfilePresenter", () => {
     expect(result.current.presenceText).toBe("Last seen an hour ago");
     expect(result.current.tab).toBe("about");
     expect(result.current.tabs.map((t) => t.label)).toEqual(["Posts", "About", "Media", "People"]);
-    expect(result.current.heroLabels).toMatchObject({ addToStory: "Add to story", gift: "Gift" });
+    expect(result.current.heroLabels).toMatchObject({ addToStory: "Add to story" });
     expect(result.current.activeTab).toBeUndefined();
     expect(result.current.status).toBeNull();
   });
@@ -217,7 +223,10 @@ describe("useMemberProfilePresenter", () => {
       "Following (10)",
       "Suggested",
     ]);
+    // The row's second line is age + place, not the handle (CEO, 2026-09-18).
     expect(result.current.people.rows[0]).toMatchObject({
+      ageTag: "25F",
+      location: "Abraka, Delta State",
       displayName: "Kinky Kay",
       handle: "@kay",
       href: "/u/kay",
