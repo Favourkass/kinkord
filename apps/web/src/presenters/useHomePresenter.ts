@@ -8,6 +8,7 @@ import { pushService } from "@/services/push.service";
 import { Routes } from "@/constants/Routes";
 import type { MeVM, ProfileVM } from "./useProfilePresenter";
 import type { KycProgressPM } from "@/domain/kyc";
+import { useNotificationBadgePresenter } from "./useNotificationBadgePresenter";
 
 interface CommunityStatsVM {
   members: number;
@@ -34,6 +35,8 @@ export function useHomePresenter() {
   const router = useRouter();
   const pathname = usePathname();
   const [loading, setLoading] = useState(true);
+  const [signedIn, setSignedIn] = useState(false);
+  const notificationsUnread = useNotificationBadgePresenter(signedIn);
   const [error, setError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [settingsMenuState, setSettingsMenuState] = useState(() => ({
@@ -60,6 +63,7 @@ export function useHomePresenter() {
           api.get<KycProgressPM>("/verification/kyc/status").catch(() => null),
         ]);
         if (cancelled) return;
+        setSignedIn(true);
         const firstName =
           (me.name ?? profile.displayName ?? me.username ?? "there").trim().split(/\s+/)[0] ||
           "there";
@@ -105,6 +109,7 @@ export function useHomePresenter() {
   );
 
   const logout = useCallback(async () => {
+    setSignedIn(false);
     // While still signed in, so the API forgets this device for this member.
     await pushService.forgetDevice();
     await authClient.signOut();
@@ -120,6 +125,8 @@ export function useHomePresenter() {
     closeDrawer,
     toggleSettingsMenu,
     logout,
+    notificationsUnread,
+    signedIn,
     ...vm,
   };
 }

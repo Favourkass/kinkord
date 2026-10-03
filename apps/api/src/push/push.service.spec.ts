@@ -46,6 +46,15 @@ const sub = (id: string, endpoint = `https://fcm.googleapis.com/fcm/send/${id}`)
   p256dh: "p256",
   auth: "auth",
 });
+// The inbox stores each event and says whether it was new; a null is a repeat
+// or a blocked sender, and nothing goes to their devices.
+const inboxRecord = vi.fn(async (): Promise<string | null> => "notification-1");
+const inboxReadConversation = vi.fn(async () => undefined);
+const inbox = () => ({ record: inboxRecord, readConversation: inboxReadConversation }) as never;
+beforeEach(() => {
+  inboxRecord.mockClear();
+  inboxReadConversation.mockClear();
+});
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 describe("PushService keys", () => {
@@ -53,7 +62,7 @@ describe("PushService keys", () => {
 
   it("uses the stored key pair", async () => {
     const { db } = queuedDb([[KEYS]]);
-    await expect(new PushService(db).publicKey()).resolves.toBe("PUB");
+    await expect(new PushService(db, inbox()).publicKey()).resolves.toBe("PUB");
     expect(generateVAPIDKeys).not.toHaveBeenCalled();
   });
 
@@ -63,7 +72,7 @@ describe("PushService keys", () => {
       undefined, // insert ... on conflict do nothing
       [KEYS], // another instance got there first: read back what's stored
     ]);
-    await expect(new PushService(db).publicKey()).resolves.toBe("PUB");
+    await expect(new PushService(db, inbox()).publicKey()).resolves.toBe("PUB");
     expect(after("insert", pushVapidKey, "values")).toEqual({
       id: 1,
       publicKey: "PUB-new",
@@ -73,7 +82,7 @@ describe("PushService keys", () => {
 
   it("reads the keys once per process", async () => {
     const { db, left } = queuedDb([[KEYS]]);
-    const service = new PushService(db);
+    const service = new PushService(db, inbox());
     await service.publicKey();
     await service.publicKey();
     expect(left()).toBe(0);
@@ -83,7 +92,7 @@ describe("PushService keys", () => {
 describe("PushService subscriptions", () => {
   it("remembers a device, moving it to whoever signs in on it", async () => {
     const { db, after, calls } = queuedDb([undefined]);
-    await new PushService(db).subscribe(
+    await new PushService(db, inbox()).subscribe(
       "u1",
       { endpoint: "https://push.example/abc", keys: { p256dh: "p", auth: "a" } },
       "Chrome",
@@ -110,7 +119,7 @@ describe("PushService sending", () => {
   it("sends to each of the member's devices with our VAPID keys", async () => {
     const { db } = queuedDb([[sub("s1"), sub("s2")], [KEYS]]);
     const message = { title: "Kinkord", body: "hi", url: "/home", tag: "t" };
-    await expect(new PushService(db).sendTo("u2", message)).resolves.toBe(2);
+    await expect(new PushService(db, inbox()).sendTo("u2", message)).resolves.toBe(2);
     expect(sendNotification).toHaveBeenCalledTimes(2);
     const [target, payload, options] = sendNotification.mock.calls[0];
     expect(target).toEqual({
@@ -130,7 +139,7 @@ describe("PushService sending", () => {
       .mockRejectedValueOnce(Object.assign(new Error("Server"), { statusCode: 500 }));
     const { db, calls } = queuedDb([[sub("s1"), sub("s2")], [KEYS], undefined]);
     await expect(
-      new PushService(db).sendTo("u2", { title: "t", body: "b", url: "/", tag: "t" }),
+      new PushService(db, inbox()).sendTo("u2", { title: "t", body: "b", url: "/", tag: "t" }),
     ).resolves.toBe(0);
     expect(calls.filter((c) => c.op === "delete")).toHaveLength(1);
   });
@@ -138,7 +147,7 @@ describe("PushService sending", () => {
   it("asks nothing more when the member has no devices", async () => {
     const { db, left } = queuedDb([[]]);
     await expect(
-      new PushService(db).sendTo("u2", { title: "t", body: "b", url: "/", tag: "t" }),
+      new PushService(db, inbox()).sendTo("u2", { title: "t", body: "b", url: "/", tag: "t" }),
     ).resolves.toBe(0);
     expect(left()).toBe(0);
     expect(sendNotification).not.toHaveBeenCalled();
@@ -155,13 +164,14 @@ describe("PushService notifications", () => {
       [sub("s1")],
       [KEYS],
     ]);
-    new PushService(db).newMessage("u1", "u2", "c1");
+    new PushService(db, inbox()).newMessage("u1", "u2", "c1");
     await flush();
     expect(sent()).toEqual({
       title: "Kinkord",
       body: "New message from Ada",
       url: "/messages/c1",
       tag: "chat-c1",
+      notificationId: "notification-1",
     });
   });
 
@@ -171,14 +181,14 @@ describe("PushService notifications", () => {
       [sub("s1")],
       [KEYS],
     ]);
-    new PushService(db).newFollower("u1", "u2");
+    new PushService(db, inbox()).newFollower("u1", "u2");
     await flush();
     expect(sent()).toMatchObject({ body: "raven followed you", url: "/u/raven" });
   });
 
   it("tells an author about a comment, but not about their own", async () => {
     const own = queuedDb([]);
-    new PushService(own.db).newComment("p1", "u1", "u1");
+    new PushService(own.db, inbox()).newComment("p1", "u1", "u1");
     await flush();
     expect(own.calls).toHaveLength(0);
 
@@ -187,7 +197,7 @@ describe("PushService notifications", () => {
       [sub("s1")],
       [KEYS],
     ]);
-    new PushService(db).newComment("p1", "u2", "u1");
+    new PushService(db, inbox()).newComment("p1", "u2", "u1");
     await flush();
     expect(sent()).toMatchObject({ body: "Ada commented on your post", url: "/p/p1" });
   });
@@ -199,7 +209,7 @@ describe("PushService notifications", () => {
       [sub("s1")],
       [KEYS],
     ]);
-    new PushService(db).newReport();
+    new PushService(db, inbox()).newReport();
     await flush();
     expect(sendNotification).toHaveBeenCalledTimes(1);
     expect(sent()).toEqual({
@@ -207,6 +217,7 @@ describe("PushService notifications", () => {
       body: "New report to review",
       url: "/moderation/reports",
       tag: "report",
+      notificationId: "notification-1",
     });
   });
 
@@ -219,7 +230,76 @@ describe("PushService notifications", () => {
       [sub("s1")],
       [KEYS],
     ]);
-    expect(() => new PushService(db).newMessage("u1", "u2", "c1")).not.toThrow();
+    expect(() => new PushService(db, inbox()).newMessage("u1", "u2", "c1")).not.toThrow();
     await flush();
+  });
+});
+
+describe("inbox and push delivery", () => {
+  beforeEach(() => sendNotification.mockReset().mockResolvedValue({ statusCode: 201 }));
+  const message = { title: "Kinkord", body: "Ada followed you", url: "/u/ada", tag: "follow-u1" };
+  const follow = { type: "follow" as const, actorId: "u1" };
+
+  it("stores the event even when the recipient has no push devices", async () => {
+    const { db } = queuedDb([[]]);
+    await expect(new PushService(db, inbox()).deliver("u2", follow, message)).resolves.toBe(0);
+    expect(inboxRecord).toHaveBeenCalledWith("u2", follow);
+    expect(sendNotification).not.toHaveBeenCalled();
+  });
+
+  it("sends nothing the inbox didn't store: a repeat, or a member they've blocked", async () => {
+    inboxRecord.mockResolvedValueOnce(null);
+    const { db, calls } = queuedDb([]);
+    await expect(new PushService(db, inbox()).deliver("u2", follow, message)).resolves.toBe(0);
+    expect(calls).toHaveLength(0);
+    expect(sendNotification).not.toHaveBeenCalled();
+  });
+
+  it("keeps one inbox record when delivering to several devices fails", async () => {
+    sendNotification
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockRejectedValueOnce(new Error("offline"));
+    const { db } = queuedDb([[sub("s1"), sub("s2")], [KEYS]]);
+    await new PushService(db, inbox()).deliver("u2", follow, message);
+    expect(inboxRecord).toHaveBeenCalledTimes(1);
+    expect(sendNotification).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["newLike", "newRepost"] as const)(
+    "maps %s to the right inbox event and skips a member's own activity",
+    async (method) => {
+      const own = queuedDb([]);
+      new PushService(own.db, inbox())[method]("p1", "u1", "u1");
+      expect(inboxRecord).not.toHaveBeenCalled();
+      const { db } = queuedDb([[{ displayName: "Ada" }], []]);
+      new PushService(db, inbox())[method]("p1", "u2", "u1");
+      await flush();
+      expect(inboxRecord).toHaveBeenCalledWith("u2", {
+        type: method === "newLike" ? "like" : "repost",
+        actorId: "u1",
+        subjectId: "p1",
+      });
+    },
+  );
+
+  it("files a message under its chat, at the message's own time", async () => {
+    const sentAt = new Date("2026-10-03T10:00:00.000Z");
+    const { db } = queuedDb([[{ displayName: "Ada" }], []]);
+    new PushService(db, inbox()).newMessage("u1", "u2", "c1", sentAt);
+    await flush();
+    expect(inboxRecord).toHaveBeenCalledWith("u2", {
+      type: "message",
+      actorId: "u1",
+      subjectId: "c1",
+      at: sentAt,
+    });
+  });
+
+  it("clears a chat's inbox row when the member reads it, without failing the read", async () => {
+    inboxReadConversation.mockRejectedValueOnce(new Error("db down"));
+    const at = new Date("2026-10-03T10:00:00.000Z");
+    expect(() => new PushService(queuedDb([]).db, inbox()).chatRead("u2", "c1", at)).not.toThrow();
+    await flush();
+    expect(inboxReadConversation).toHaveBeenCalledWith("u2", "c1", at);
   });
 });

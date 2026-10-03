@@ -21,6 +21,12 @@ describe("eventsFromFrame", () => {
     expect(eventsFromFrame({ type: "data", id: "chat", event: [event, event] })).toHaveLength(2);
   });
 
+  it("reads an inbox change, which carries nothing but its kind", () => {
+    expect(
+      eventsFromFrame({ type: "data", event: JSON.stringify({ type: "notification", id: "x" }) }),
+    ).toEqual([{ type: "notification" }]);
+  });
+
   it("ignores other frames, malformed events and unknown kinds", () => {
     expect(eventsFromFrame({ type: "ka" })).toEqual([]);
     expect(eventsFromFrame(null)).toEqual([]);

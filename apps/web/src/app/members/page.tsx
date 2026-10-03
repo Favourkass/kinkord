@@ -21,6 +21,7 @@ export default function MembersCountryPage() {
       avatarUrl={shell.avatarUrl}
       membersCount={shell.membersCount}
       kycVerified={shell.kycVerified}
+      notificationsUnread={shell.notificationsUnread}
       activeTab="home"
       activeNav="members"
       drawerOpen={shell.drawerOpen}

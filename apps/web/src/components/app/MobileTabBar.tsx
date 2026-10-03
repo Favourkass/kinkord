@@ -8,6 +8,7 @@ export type { AppTab } from "./nav";
 export interface MobileTabBarProps {
   /** Undefined when the current screen isn't one of the tabs (e.g. Settings). */
   active?: AppTab;
+  notificationsUnread?: boolean;
   avatarUrl: string | null;
   links: Pick<AppNavLinks, "home" | "chat" | "notifications" | "profile">;
   labels: Pick<AppNavLabels, "home" | "chat" | "notifications" | "profile">;
@@ -27,7 +28,13 @@ const ICON_TABS: Array<{
 const PROFILE_CENTER_PCT = 81.93;
 
 /** Bottom tab bar: Home, Chat, Notifications, Profile (live avatar) with a 60px gold indicator over the active tab. */
-export default function MobileTabBar({ active, avatarUrl, links, labels }: MobileTabBarProps) {
+export default function MobileTabBar({
+  active,
+  avatarUrl,
+  links,
+  labels,
+  notificationsUnread,
+}: MobileTabBarProps) {
   const indicatorCenter =
     active === "profile" ? PROFILE_CENTER_PCT : ICON_TABS.find((t) => t.key === active)?.centerPct;
   return (
@@ -47,7 +54,11 @@ export default function MobileTabBar({ active, avatarUrl, links, labels }: Mobil
           <Link
             key={tab.key}
             href={links[tab.key]}
-            aria-label={labels[tab.key]}
+            aria-label={
+              tab.key === "notifications" && notificationsUnread
+                ? `${labels[tab.key]}, unread notifications`
+                : labels[tab.key]
+            }
             aria-current={active === tab.key ? "page" : undefined}
             className={`absolute top-[12.5px] grid size-[24px] -translate-x-1/2 place-items-center ${
               active === tab.key ? "text-kink-amber" : "text-mem-tab-icon"
@@ -55,6 +66,12 @@ export default function MobileTabBar({ active, avatarUrl, links, labels }: Mobil
             style={{ left: `${tab.centerPct}%` }}
           >
             <MaskIcon name={tab.icon} width={tab.size} />
+            {tab.key === "notifications" && notificationsUnread && (
+              <span
+                aria-hidden
+                className="absolute -right-1 -top-1 size-2 rounded-full bg-app-members-count ring-2 ring-mem-header"
+              />
+            )}
           </Link>
         ))}
         <Link

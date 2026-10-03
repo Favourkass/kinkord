@@ -39,6 +39,19 @@ describe("useRealtime", () => {
     expect(second).toHaveBeenCalledWith({ type: "message", conversationId: "c1" });
   });
 
+  it("holds off connecting until enabled", () => {
+    hear = null;
+    const fn = vi.fn();
+    const { result, rerender } = renderHook(({ on }) => useRealtime(fn, on), {
+      initialProps: { on: false },
+    });
+    expect(hear).toBeNull();
+    expect(result.current.live).toBe(false);
+    rerender({ on: true });
+    act(() => hear?.({ type: "notification" }));
+    expect(fn).toHaveBeenCalledWith({ type: "notification" });
+  });
+
   it("stops listening when the screen goes away", () => {
     const { unmount } = renderHook(() => useRealtime(() => undefined));
     unmount();

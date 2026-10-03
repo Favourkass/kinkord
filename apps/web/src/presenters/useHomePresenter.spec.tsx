@@ -40,6 +40,7 @@ const profile = { displayName: "SIR T", avatarUrl: "https://s3/avatar.jpg" };
 const stats = { members: 128 };
 
 const routeGet = (path: unknown) => {
+  if (path === "/notifications/unread-count") return Promise.resolve({ count: 0 });
   if (path === "/me") return Promise.resolve(me);
   if (path === "/profile") return Promise.resolve(profile);
   if (path === "/community/stats") return Promise.resolve(stats);

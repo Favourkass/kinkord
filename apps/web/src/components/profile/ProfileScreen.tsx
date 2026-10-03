@@ -48,6 +48,7 @@ export interface ProfileScreenProps {
   suggested: SuggestedFriendsProps;
   activeTab?: AppTab;
   viewerAvatarUrl: string | null;
+  notificationsUnread?: boolean;
   links: AppNavLinks;
   labels: AppNavLabels;
 }
@@ -78,6 +79,7 @@ export default function ProfileScreen(p: ProfileScreenProps) {
           links: p.links,
           labels: p.labels,
           viewerAvatarUrl: p.viewerAvatarUrl,
+          notificationsUnread: p.notificationsUnread,
         }}
         hero={ready && p.vm ? <ProfileHero vm={p.vm} labels={p.heroLabels} {...actions} /> : null}
         sideCard={
@@ -85,6 +87,7 @@ export default function ProfileScreen(p: ProfileScreenProps) {
         }
         aside={ready ? <SuggestedFriends {...p.suggested} /> : null}
         viewerAvatarUrl={p.viewerAvatarUrl}
+        notificationsUnread={p.notificationsUnread}
         activeTab={p.activeTab}
         links={p.links}
         labels={p.labels}

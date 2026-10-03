@@ -1,44 +1,62 @@
 "use client";
 
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import AppShell from "@/components/app/AppShell";
-import ComingSoonPanel from "@/components/app/ComingSoonPanel";
-import { MEMBERS_COPY } from "@/constants/members";
-import { getAppShellNav } from "@/presenters/getAppShellNav";
+import NotificationHeader from "@/components/notifications/NotificationHeader";
+import NotificationTabBar from "@/components/notifications/NotificationTabBar";
+import NotificationInbox from "@/components/notifications/NotificationInbox";
+import { NOTIFICATIONS_COPY } from "@/constants/notifications";
+import { appShellProps, getAppShellNav } from "@/presenters/getAppShellNav";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
+import { useNotificationsPresenter } from "@/presenters/useNotificationsPresenter";
 
-export default function NotificationsPage() {
-  const vm = useHomePresenter();
+function NotificationsScreen() {
+  const shell = useHomePresenter();
+  const search = useSearchParams();
+  const inbox = useNotificationsPresenter(shell.signedIn, search.get("open"));
   const nav = getAppShellNav();
-  const copy = MEMBERS_COPY.notifications;
-
   return (
     <AppShell
-      brand="KINKORD"
-      tagline="THE WORLD'S KINK COMMUNITY"
-      greeting={vm.greeting}
-      name={vm.name}
-      handle={vm.handle}
-      avatarUrl={vm.avatarUrl}
-      membersCount={vm.membersCount}
-      kycVerified={vm.kycVerified}
+      {...appShellProps(shell, nav)}
       activeTab="notifications"
       activeNav="notifications"
-      drawerOpen={vm.drawerOpen}
-      onMenu={vm.openDrawer}
-      onCloseDrawer={vm.closeDrawer}
-      settingsMenuOpen={vm.settingsMenuOpen}
-      onToggleSettingsMenu={vm.toggleSettingsMenu}
-      onLogout={vm.logout}
-      links={nav.links}
-      labels={nav.labels}
-      drawerNavigation={nav.drawer}
+      desktopGreeting={false}
+      mobileHeader={
+        <NotificationHeader
+          title={NOTIFICATIONS_COPY.title}
+          searchLabel={NOTIFICATIONS_COPY.search}
+          searchOpen={inbox.searchOpen}
+          onMenu={shell.openDrawer}
+          onSearch={inbox.toggleSearch}
+        />
+      }
+      mobileFooter={
+        <NotificationTabBar
+          links={nav.links}
+          labels={nav.labels}
+          unread={shell.notificationsUnread}
+        />
+      }
     >
-      <ComingSoonPanel
-        headline={copy.headline}
-        constructionLead={copy.constructionLead}
-        constructionAccent={copy.constructionAccent}
-        subcopy={copy.subcopy}
+      <NotificationInbox
+        {...inbox}
+        error={inbox.error ?? shell.error}
+        onFilter={inbox.setUnreadOnly}
+        onOpen={inbox.openNotification}
+        onMarkAll={inbox.markAll}
+        onLoadMore={inbox.loadMore}
+        onRefresh={inbox.refresh}
+        copy={NOTIFICATIONS_COPY}
       />
     </AppShell>
+  );
+}
+
+export default function NotificationsPage() {
+  return (
+    <Suspense fallback={<p className="p-6 text-app-subtle">{NOTIFICATIONS_COPY.loading}</p>}>
+      <NotificationsScreen />
+    </Suspense>
   );
 }

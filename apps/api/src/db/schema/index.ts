@@ -13,3 +13,4 @@ export * from "./moderation";
 export * from "./chat";
 export * from "./push";
 export * from "./safety";
+export * from "./notification";

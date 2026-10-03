@@ -91,6 +91,13 @@ describe("useChatListPresenter", () => {
     expect(list).toHaveBeenCalledTimes(1);
   });
 
+  it("ignores inbox events, which never change the chat list", async () => {
+    renderHook(() => useChatListPresenter());
+    list.mockClear();
+    await act(async () => live.hear?.({ type: "notification" }));
+    expect(list).not.toHaveBeenCalled();
+  });
+
   it("polls only as a slow safety net while the live connection is up", () => {
     live.up = true;
     renderHook(() => useChatListPresenter());

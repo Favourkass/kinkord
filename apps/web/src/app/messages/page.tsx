@@ -23,6 +23,7 @@ export default function MessagesPage() {
       avatarUrl={shell.avatarUrl}
       membersCount={shell.membersCount}
       kycVerified={shell.kycVerified}
+      notificationsUnread={shell.notificationsUnread}
       activeTab="chat"
       activeNav="chat"
       drawerOpen={shell.drawerOpen}

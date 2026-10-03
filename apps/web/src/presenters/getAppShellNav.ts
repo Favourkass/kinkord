@@ -161,6 +161,7 @@ export interface ShellSource {
   avatarUrl: string | null;
   membersCount: string;
   kycVerified: boolean;
+  notificationsUnread?: boolean;
   drawerOpen: boolean;
   settingsMenuOpen: boolean;
   openDrawer: () => void;
@@ -179,6 +180,7 @@ export function appShellProps(home: ShellSource, nav: ReturnType<typeof getAppSh
     avatarUrl: home.avatarUrl,
     membersCount: home.membersCount,
     kycVerified: home.kycVerified,
+    notificationsUnread: home.notificationsUnread,
     drawerOpen: home.drawerOpen,
     settingsMenuOpen: home.settingsMenuOpen,
     onMenu: home.openDrawer,

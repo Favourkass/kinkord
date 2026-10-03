@@ -22,6 +22,7 @@ export default function SavedPage() {
         avatarUrl: home.avatarUrl,
         membersCount: home.membersCount,
         kycVerified: home.kycVerified,
+        notificationsUnread: home.notificationsUnread,
         drawerOpen: home.drawerOpen,
         settingsMenuOpen: home.settingsMenuOpen,
         onMenu: home.openDrawer,

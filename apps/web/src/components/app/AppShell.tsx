@@ -17,6 +17,7 @@ export interface AppShellProps {
   avatarUrl: string | null;
   membersCount: string;
   kycVerified: boolean;
+  notificationsUnread?: boolean;
   /** Highlighted bottom tab; omit on screens outside the tab bar (e.g. Settings). */
   activeTab?: AppTab;
   activeNav: AppNav;
@@ -35,6 +36,7 @@ export interface AppShellProps {
   desktopGreeting?: boolean;
   /** Replaces the hamburger header on mobile (e.g. the Edit Profile back-arrow NavBar). */
   mobileHeader?: ReactNode;
+  mobileFooter?: ReactNode;
   children: ReactNode;
 }
 
@@ -46,6 +48,7 @@ export default function AppShell({
   avatarUrl,
   membersCount,
   kycVerified,
+  notificationsUnread,
   activeTab,
   activeNav,
   drawerOpen,
@@ -60,6 +63,7 @@ export default function AppShell({
   mobileTone = "surface",
   desktopGreeting = true,
   mobileHeader,
+  mobileFooter,
   children,
 }: AppShellProps) {
   const tone = mobileTone === "members" ? "bg-mem-page" : "bg-app-surface";
@@ -71,7 +75,15 @@ export default function AppShell({
         <main className="flex flex-1 flex-col pb-[calc(57px+env(safe-area-inset-bottom))]">
           {children}
         </main>
-        <MobileTabBar active={activeTab} avatarUrl={avatarUrl} links={links} labels={labels} />
+        {mobileFooter ?? (
+          <MobileTabBar
+            active={activeTab}
+            avatarUrl={avatarUrl}
+            links={links}
+            labels={labels}
+            notificationsUnread={notificationsUnread}
+          />
+        )}
         <SidebarDrawer
           open={drawerOpen}
           onClose={onCloseDrawer}
@@ -93,6 +105,7 @@ export default function AppShell({
         <DesktopSidebar
           brand={brand}
           active={activeNav}
+          notificationsUnread={notificationsUnread}
           avatarUrl={avatarUrl}
           membersCount={membersCount}
           links={links}
