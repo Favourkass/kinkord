@@ -16,6 +16,8 @@ const querySchema = z.object({
   cursor: z.string().min(1).max(512).optional(),
   type: z.enum(["comment", "mention"]).optional(),
   unread: z.enum(["true", "false"]).optional(),
+  /** Searches the whole inbox, not just what the app has loaded. */
+  q: z.string().trim().max(64).optional(),
 });
 
 @Controller("notifications")
@@ -27,12 +29,12 @@ export class NotificationsController {
   list(@Req() req: AuthedRequest, @Query() query: unknown) {
     const parsed = querySchema.safeParse(query);
     if (!parsed.success) throw new BadRequestException("Invalid notification query.");
-    return this.inbox.list(
-      req.user.id,
-      parsed.data.cursor,
-      parsed.data.unread === "true",
-      parsed.data.type,
-    );
+    return this.inbox.list(req.user.id, {
+      cursor: parsed.data.cursor,
+      unreadOnly: parsed.data.unread === "true",
+      type: parsed.data.type,
+      q: parsed.data.q || undefined,
+    });
   }
 
   @Get("unread-count")

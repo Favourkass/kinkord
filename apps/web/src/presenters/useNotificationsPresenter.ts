@@ -6,22 +6,31 @@ import { NOTIFICATIONS_COPY } from "@/constants/notifications";
 import { Routes } from "@/constants/Routes";
 import {
   notificationDestination,
-  searchNotifications,
   type NotificationTab,
   type NotificationPagePM,
   toNotificationVM,
   type NotificationPM,
 } from "@/domain/notification";
+import type { RealtimeEventPM } from "@/domain/realtime";
 import {
   listenForInboxChanges,
   mergeNotifications,
   notificationsApi,
 } from "@/services/notifications.service";
+import { useRealtime } from "./useRealtime";
+
+/** Backstop refreshes: rare while live events arrive, more often while they can't. */
+export const INBOX_POLL_MS = 60_000;
+export const INBOX_FALLBACK_POLL_MS = 5 * 60_000;
+/** How long typing pauses before the search goes to the server. */
+export const SEARCH_DEBOUNCE_MS = 300;
 
 export function useNotificationsPresenter(ready: boolean, openId: string | null = null) {
   const router = useRouter();
   const [tab, setTab] = useState<NotificationTab>("all");
   const [query, setQuery] = useState("");
+  // What the server is asked for: the box's text, once typing pauses.
+  const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [unreadOnly, setUnreadOnly] = useState(false);
@@ -39,7 +48,18 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
   const pageCount = useRef(1);
   const refreshRef = useRef<() => void>(() => undefined);
 
-  const filterKey = `${unreadOnly}-${tab}`;
+  const filterKey = `${unreadOnly}-${tab}-${search}`;
+
+  useEffect(() => {
+    const term = query.trim();
+    const timer = setTimeout(() => setSearch(term), term ? SEARCH_DEBOUNCE_MS : 0);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const onRealtime = useCallback((e: RealtimeEventPM) => {
+    if (e.type === "notification") refreshRef.current();
+  }, []);
+  const { live } = useRealtime(onRealtime, ready);
 
   useEffect(() => {
     if (!ready) return;
@@ -57,9 +77,12 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
         let nextCursor: string | null = null;
         let refreshed: NotificationPM[] = [];
         for (let page = 0; page < depth; page++) {
-          const result: NotificationPagePM = await (tab === "all"
-            ? notificationsApi.list(unreadOnly, nextCursor)
-            : notificationsApi.list(unreadOnly, nextCursor, tab));
+          const result: NotificationPagePM = await notificationsApi.list({
+            unread: unreadOnly,
+            cursor: nextCursor,
+            type: tab === "all" ? undefined : tab,
+            q: search || undefined,
+          });
           refreshed = mergeNotifications(refreshed, result.items);
           nextCursor = result.nextCursor;
           if (!nextCursor) break;
@@ -93,19 +116,27 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
     refreshRef.current = wake;
     wake();
     const stop = listenForInboxChanges(wake);
-    const timer = setInterval(wake, 30_000);
     window.addEventListener("focus", wake);
     window.addEventListener("online", wake);
     document.addEventListener("visibilitychange", wake);
     return () => {
       generation.current = mine + 1;
-      clearInterval(timer);
+      refreshRef.current = () => undefined;
       stop();
       window.removeEventListener("focus", wake);
       window.removeEventListener("online", wake);
       document.removeEventListener("visibilitychange", wake);
     };
-  }, [ready, unreadOnly, retry, tab, filterKey]);
+  }, [ready, unreadOnly, retry, tab, search, filterKey]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const timer = setInterval(
+      () => refreshRef.current(),
+      live ? INBOX_FALLBACK_POLL_MS : INBOX_POLL_MS,
+    );
+    return () => clearInterval(timer);
+  }, [ready, live]);
 
   // OS push clicks land here first, including notifications older than the loaded page.
   useEffect(() => {
@@ -174,9 +205,12 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
     const mine = generation.current;
     const version = revision.current;
     try {
-      const result: NotificationPagePM = await (tab === "all"
-        ? notificationsApi.list(unreadOnly, cursor)
-        : notificationsApi.list(unreadOnly, cursor, tab));
+      const result: NotificationPagePM = await notificationsApi.list({
+        unread: unreadOnly,
+        cursor,
+        type: tab === "all" ? undefined : tab,
+        q: search || undefined,
+      });
       if (generation.current !== mine || version !== revision.current) return;
       pageCount.current++;
       setItems((previous) => mergeNotifications(previous, result.items));
@@ -188,16 +222,17 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
       busy.current = false;
       setLoadingMore(false);
     }
-  }, [cursor, unreadOnly, tab]);
+  }, [cursor, unreadOnly, tab, search]);
 
+  // The search itself ran on the server; only an item read here since stays filtered out.
   const visibleItems = useMemo(
     () =>
       loadedFor === filterKey
-        ? searchNotifications(items, query)
+        ? items
             .filter((item) => !unreadOnly || item.readAt === null)
             .map((item) => toNotificationVM(item))
         : [],
-    [items, loadedFor, unreadOnly, filterKey, query],
+    [items, loadedFor, unreadOnly, filterKey],
   );
 
   return {

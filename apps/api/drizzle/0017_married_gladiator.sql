@@ -1,1 +1,0 @@
-ALTER TABLE "notification" ADD COLUMN "actor" jsonb;

@@ -31,11 +31,20 @@ export function listenForInboxChanges(onChange: () => void): () => void {
   };
 }
 
+export interface NotificationListOptions {
+  unread?: boolean;
+  cursor?: string | null;
+  type?: "comment" | "mention";
+  /** Searched by the API across the whole inbox, not just the loaded page. */
+  q?: string;
+}
+
 export const notificationsApi = {
-  list: (unread = false, cursor?: string | null, type?: "comment" | "mention") => {
+  list: ({ unread = false, cursor, type, q }: NotificationListOptions = {}) => {
     const query = new URLSearchParams();
     if (unread) query.set("unread", "true");
     if (type) query.set("type", type);
+    if (q?.trim()) query.set("q", q.trim());
     if (cursor) query.set("cursor", cursor);
     return api.get<NotificationPagePM>(`/notifications${query.size ? `?${query}` : ""}`);
   },

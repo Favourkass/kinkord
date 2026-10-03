@@ -57,7 +57,7 @@ describe("PushController", () => {
     await expect(controller.test(req)).resolves.toEqual({ sent: 2 });
     expect(push.deliver).toHaveBeenCalledWith(
       "u1",
-      "test",
+      { type: "test" },
       expect.objectContaining({ tag: "test" }),
     );
   });

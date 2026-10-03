@@ -1,20 +1,21 @@
 import { describe, expect, it } from "vitest";
 import {
   notificationDestination,
-  searchNotifications,
   toNotificationVM,
   type NotificationKind,
   type NotificationPM,
 } from "./notification";
+
 const item: NotificationPM = {
   id: "n1",
   type: "message",
-  title: "Kinkord",
-  body: "New message from Ada",
+  actor: { name: "Ada", username: "ada", avatarUrl: "/avatar.jpg" },
   url: "/messages/c1",
+  count: 1,
   createdAt: "2026-10-03T10:00:00Z",
   readAt: null,
 };
+
 describe("notification presentation", () => {
   it.each<NotificationKind>([
     "message",
@@ -29,8 +30,36 @@ describe("notification presentation", () => {
     const vm = toNotificationVM({ ...item, type }, new Date(item.createdAt));
     expect(vm.category).toBeTruthy();
     expect(vm.icon).toBeTruthy();
-    expect(vm.body).toBe(item.body);
+    expect(vm.action).toMatch(/\.$/);
   });
+
+  it("writes the sentence from who did it as they are now, bolding the name apart", () => {
+    expect(
+      toNotificationVM({
+        ...item,
+        type: "like",
+        actor: { name: "Ada Lovelace", username: "ada", avatarUrl: "/avatar.jpg" },
+      }),
+    ).toMatchObject({
+      actorName: "Ada Lovelace",
+      action: "liked your post.",
+      body: "Ada Lovelace liked your post.",
+      avatarUrl: "/avatar.jpg",
+      official: false,
+    });
+  });
+
+  it("counts a chat's messages since it was last read", () => {
+    expect(toNotificationVM(item).action).toBe("sent you a message.");
+    expect(toNotificationVM({ ...item, count: 3 }).body).toBe("Ada sent you 3 messages.");
+  });
+
+  it("shows Kinkord's own notices with the brand mark, not a member", () => {
+    const vm = toNotificationVM({ ...item, type: "report", actor: null });
+    expect(vm).toMatchObject({ official: true, actorName: null, avatarUrl: null });
+    expect(vm.body).toBe("New report to review.");
+  });
+
   it("distinguishes read state and formats recent times", () => {
     expect(toNotificationVM(item, new Date("2026-10-03T10:05:00Z"))).toMatchObject({
       unread: true,
@@ -41,6 +70,7 @@ describe("notification presentation", () => {
     ).toMatchObject({ unread: false, time: "Just now" });
     expect(toNotificationVM(item, new Date("2026-10-03T12:00:00Z")).time).toBe("2h");
   });
+
   it.each([
     "javascript:alert(1)",
     "https://other.test",
@@ -50,27 +80,7 @@ describe("notification presentation", () => {
   ])("refuses unsafe navigation: %s", (url) => {
     expect(notificationDestination(url)).toBeNull();
   });
-  it("separates the bold actor from the action without losing names containing spaces", () => {
-    expect(
-      toNotificationVM({
-        ...item,
-        type: "like",
-        body: "Ada Lovelace liked your post",
-        actor: { name: "Ada Lovelace", avatarUrl: "/avatar.jpg" },
-      }),
-    ).toMatchObject({
-      actorName: "Ada Lovelace",
-      action: "liked your post.",
-      avatarUrl: "/avatar.jpg",
-    });
-    expect(toNotificationVM({ ...item, actor: { name: "Ada", avatarUrl: null } }).action).toBe(
-      "sent you a message.",
-    );
-  });
-  it("searches actor and activity case-insensitively", () => {
-    expect(searchNotifications([item], " ADA ")).toEqual([item]);
-    expect(searchNotifications([item], "liked")).toEqual([]);
-  });
+
   it("accepts internal destinations", () =>
     expect(notificationDestination("/p/post-1")).toBe("/p/post-1"));
 });

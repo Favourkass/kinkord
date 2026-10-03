@@ -4,8 +4,7 @@ import webpush from "web-push";
 import { DRIZZLE, type Db } from "../db/db.module";
 import { profile, pushSubscription, pushVapidKey, user } from "../db/schema";
 import { adminUserIds, notBanned } from "../moderation/admins";
-import { NotificationsService } from "./notifications.service";
-import type { NotificationType } from "../db/schema";
+import { NotificationsService, notificationUrl, type InboxEvent } from "./notifications.service";
 
 /**
  * What a notification says and where tapping it goes. Discreet on purpose: on
@@ -17,8 +16,8 @@ export interface PushMessage {
   url: string;
   /** Same tag replaces the last one, so a busy chat is one notification, not twenty. */
   tag: string;
+  /** The inbox row it stands for: tapping it marks that row read. */
   notificationId?: string;
-  actor?: { name: string; avatarKey: string | null };
 }
 
 export interface SubscriptionInput {
@@ -48,16 +47,21 @@ export class PushService {
     private readonly inbox: NotificationsService,
   ) {}
 
-  /** Store once per recipient, before attempting optional device delivery. */
-  async deliver(userId: string, type: NotificationType, message: PushMessage): Promise<number> {
-    const notificationId = await this.inbox.create(userId, {
-      type,
-      title: message.title,
-      body: message.body,
-      url: message.url,
-      ...(message.actor ? { actor: message.actor } : {}),
-    });
+  /**
+   * Stores the event in the recipient's inbox, then tells their devices. What
+   * the inbox doesn't store (a repeat, or a member they've blocked) isn't sent.
+   */
+  async deliver(userId: string, event: InboxEvent, message: PushMessage): Promise<number> {
+    const notificationId = await this.inbox.record(userId, event);
+    if (!notificationId) return 0;
     return this.sendTo(userId, { ...message, notificationId });
+  }
+
+  /** The member read a chat up to `upTo`: its inbox row clears too. Never fails the read. */
+  chatRead(userId: string, conversationId: string, upTo: Date): void {
+    void this.inbox
+      .readConversation(userId, conversationId, upTo)
+      .catch((e: unknown) => this.log.warn(`inbox read failed: ${String(e)}`));
   }
 
   /** The key a browser subscribes with. */
@@ -106,8 +110,7 @@ export class PushService {
       .where(and(eq(pushSubscription.userId, userId), notBanned(pushSubscription.userId)));
     if (subs.length === 0) return 0;
     const { publicKey, privateKey } = await this.vapid();
-    const { actor: _actor, ...deviceMessage } = message;
-    const payload = JSON.stringify(deviceMessage);
+    const payload = JSON.stringify(message);
     const results = await Promise.all(
       subs.map(async (s) => {
         try {
@@ -137,17 +140,23 @@ export class PushService {
     return results.filter(Boolean).length;
   }
 
-  newMessage(senderId: string, recipientId: string, conversationId: string): void {
+  /** `sentAt` is the message's own time, so reading up to it clears the chat's inbox row. */
+  newMessage(
+    senderId: string,
+    recipientId: string,
+    conversationId: string,
+    sentAt: Date = new Date(),
+  ): void {
     if (senderId === recipientId) return;
-    this.notify("message", async () => {
+    this.notify(async () => {
       const who = await this.member(senderId);
       return {
         to: recipientId,
+        event: { type: "message", actorId: senderId, subjectId: conversationId, at: sentAt },
         message: {
           title: "Kinkord",
           body: `New message from ${who.name}`,
-          actor: who,
-          url: `/messages/${conversationId}`,
+          url: notificationUrl("message", conversationId, null),
           tag: `chat-${conversationId}`,
         },
       };
@@ -156,15 +165,15 @@ export class PushService {
 
   newFollower(followerId: string, followedId: string): void {
     if (followerId === followedId) return;
-    this.notify("follow", async () => {
+    this.notify(async () => {
       const who = await this.member(followerId);
       return {
         to: followedId,
+        event: { type: "follow", actorId: followerId },
         message: {
           title: "Kinkord",
           body: `${who.name} followed you`,
-          actor: who,
-          url: who.username ? `/u/${encodeURIComponent(who.username)}` : "/home",
+          url: notificationUrl("follow", null, who.username),
           tag: `follow-${followerId}`,
         },
       };
@@ -174,15 +183,15 @@ export class PushService {
   newComment(postId: string, authorId: string, commenterId: string): void {
     // Nobody needs telling they commented on their own post.
     if (authorId === commenterId) return;
-    this.notify("comment", async () => {
+    this.notify(async () => {
       const who = await this.member(commenterId);
       return {
         to: authorId,
+        event: { type: "comment", actorId: commenterId, subjectId: postId },
         message: {
           title: "Kinkord",
           body: `${who.name} commented on your post`,
-          actor: who,
-          url: `/p/${postId}`,
+          url: notificationUrl("comment", postId, null),
           tag: `post-${postId}`,
         },
       };
@@ -205,15 +214,15 @@ export class PushService {
     actorId: string,
   ): void {
     if (authorId === actorId) return;
-    this.notify(type, async () => {
+    this.notify(async () => {
       const who = await this.member(actorId);
       return {
         to: authorId,
+        event: { type, actorId, subjectId: postId },
         message: {
           title: "Kinkord",
           body: `${who.name} ${verb} your post`,
-          actor: who,
-          url: `/p/${postId}`,
+          url: notificationUrl(type, postId, null),
           tag: `${type}-${postId}`,
         },
       };
@@ -230,12 +239,16 @@ export class PushService {
       .then((ids) =>
         Promise.all(
           ids.map((id) =>
-            this.deliver(id, "report", {
-              title: "Kinkord",
-              body: "New report to review",
-              url: "/moderation/reports",
-              tag: "report",
-            }),
+            this.deliver(
+              id,
+              { type: "report" },
+              {
+                title: "Kinkord",
+                body: "New report to review",
+                url: notificationUrl("report", null, null),
+                tag: "report",
+              },
+            ),
           ),
         ),
       )
@@ -244,24 +257,17 @@ export class PushService {
 
   /** Fire and forget: a notification that can't go out never fails what caused it. */
   private notify(
-    type: NotificationType,
-    build: () => Promise<{ to: string; message: PushMessage } | null>,
+    build: () => Promise<{ to: string; event: InboxEvent; message: PushMessage } | null>,
   ): void {
     void build()
-      .then((n) => (n ? this.deliver(n.to, type, n.message) : 0))
+      .then((n) => (n ? this.deliver(n.to, n.event, n.message) : 0))
       .catch((e) => this.log.warn(`push failed: ${String(e)}`));
   }
 
-  private async member(
-    userId: string,
-  ): Promise<{ name: string; username: string | null; avatarKey: string | null }> {
+  /** The name a push says, as the member is now; the inbox looks it up again when shown. */
+  private async member(userId: string): Promise<{ name: string; username: string | null }> {
     const [row] = await this.db
-      .select({
-        username: user.username,
-        name: user.name,
-        displayName: profile.displayName,
-        avatarKey: profile.avatarKey,
-      })
+      .select({ username: user.username, name: user.name, displayName: profile.displayName })
       .from(user)
       .leftJoin(profile, eq(profile.userId, user.id))
       .where(eq(user.id, userId))
@@ -269,7 +275,6 @@ export class PushService {
     return {
       name: row?.displayName ?? row?.username ?? row?.name ?? "Someone",
       username: row?.username ?? null,
-      avatarKey: row?.avatarKey ?? null,
     };
   }
 

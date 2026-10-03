@@ -17,15 +17,30 @@ vi.mock("@/services/notifications.service", async (original) => ({
   notificationsApi: { list, read, readAll },
   listenForInboxChanges: () => () => undefined,
 }));
+// Live events, delivered by hand: `hear` is whatever the screen subscribed.
+const live = vi.hoisted(() => ({ hear: null as ((e: unknown) => void) | null }));
+vi.mock("./useRealtime", () => ({
+  useRealtime: (fn: (e: unknown) => void, enabled = true) => {
+    if (enabled) live.hear = fn;
+    return { live: false };
+  },
+}));
 const item: NotificationPM = {
   id: "n1",
   type: "message",
-  title: "Kinkord",
-  body: "New message from Ada",
+  actor: { name: "Ada", username: "ada", avatarUrl: null },
   url: "/messages/c1",
+  count: 1,
   createdAt: "2026-10-03T10:00:00Z",
   readAt: null,
 };
+const page = (over: Record<string, unknown> = {}) => ({
+  unread: false,
+  cursor: null,
+  type: undefined,
+  q: undefined,
+  ...over,
+});
 afterEach(cleanup);
 beforeEach(() => {
   list.mockReset().mockResolvedValue({ items: [item], nextCursor: null });
@@ -76,7 +91,7 @@ describe("useNotificationsPresenter", () => {
     const { result } = renderHook(() => useNotificationsPresenter(true));
     await waitFor(() => expect(result.current.loading).toBe(false));
     act(() => result.current.setUnreadOnly(true));
-    await waitFor(() => expect(list).toHaveBeenCalledWith(true, null));
+    await waitFor(() => expect(list).toHaveBeenCalledWith(page({ unread: true })));
     list.mockResolvedValue({ items: [], nextCursor: null });
     await act(async () => result.current.markAll());
     await waitFor(() => expect(result.current.items).toHaveLength(0));
@@ -86,12 +101,19 @@ describe("useNotificationsPresenter", () => {
     const { result } = renderHook(() => useNotificationsPresenter(true));
     await waitFor(() => expect(result.current.loading).toBe(false));
     act(() => result.current.setTab("comment"));
-    await waitFor(() => expect(list).toHaveBeenLastCalledWith(false, null, "comment"));
+    await waitFor(() => expect(list).toHaveBeenLastCalledWith(page({ type: "comment" })));
     await waitFor(() => expect(result.current.loading).toBe(false));
-    act(() => result.current.setQuery("no match"));
+    // The search goes to the server once typing pauses, within the open tab.
+    list.mockResolvedValue({ items: [], nextCursor: null });
+    act(() => result.current.setQuery(" raven "));
+    await waitFor(() =>
+      expect(list).toHaveBeenLastCalledWith(page({ type: "comment", q: "raven" })),
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.items).toHaveLength(0);
+    act(() => result.current.setQuery(""));
     act(() => result.current.setTab("mention"));
-    await waitFor(() => expect(list).toHaveBeenLastCalledWith(false, null, "mention"));
+    await waitFor(() => expect(list).toHaveBeenLastCalledWith(page({ type: "mention" })));
   });
   it("marks read from the row menu without leaving the inbox", async () => {
     const { result } = renderHook(() => useNotificationsPresenter(true));
@@ -110,7 +132,7 @@ describe("useNotificationsPresenter", () => {
     await act(async () => result.current.loadMore());
     expect(result.current.items).toHaveLength(2);
     expect(result.current.hasMore).toBe(false);
-    expect(list).toHaveBeenLastCalledWith(false, "next");
+    expect(list).toHaveBeenLastCalledWith(page({ cursor: "next" }));
   });
   it("refreshes older loaded pages so another device's reads clear their dots", async () => {
     const older = { ...item, id: "older" };
@@ -154,5 +176,15 @@ describe("useNotificationsPresenter", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     await act(async () => resolve({ items: [item], nextCursor: null }));
     expect(result.current.items).toHaveLength(0);
+  });
+
+  it("refreshes when the inbox changes elsewhere, and ignores chat events", async () => {
+    const { result } = renderHook(() => useNotificationsPresenter(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const calls = list.mock.calls.length;
+    act(() => live.hear?.({ type: "message", conversationId: "c1" }));
+    expect(list).toHaveBeenCalledTimes(calls);
+    act(() => live.hear?.({ type: "notification" }));
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(calls + 1));
   });
 });

@@ -11,9 +11,9 @@ vi.mock("./apiClient", () => ({ api: { get, post } }));
 const item: NotificationPM = {
   id: "n1",
   type: "follow",
-  title: "Kinkord",
-  body: "Ada followed you",
+  actor: { name: "Ada", username: "ada", avatarUrl: null },
   url: "/u/ada",
+  count: 1,
   createdAt: "2026-10-03T10:00:00Z",
   readAt: null,
 };
@@ -26,12 +26,18 @@ describe("notificationsApi", () => {
   it("encodes pagination and unread filters", async () => {
     await notificationsApi.list();
     expect(get).toHaveBeenLastCalledWith("/notifications");
-    await notificationsApi.list(true, "a+b=");
+    await notificationsApi.list({ unread: true, cursor: "a+b=" });
     expect(get).toHaveBeenLastCalledWith("/notifications?unread=true&cursor=a%2Bb%3D");
   });
   it("requests category-filtered pages", async () => {
-    await notificationsApi.list(false, "next", "comment");
+    await notificationsApi.list({ cursor: "next", type: "comment" });
     expect(get).toHaveBeenLastCalledWith("/notifications?type=comment&cursor=next");
+  });
+  it("asks the server to search, sending no blank search", async () => {
+    await notificationsApi.list({ q: "  ada & co " });
+    expect(get).toHaveBeenLastCalledWith("/notifications?q=ada+%26+co");
+    await notificationsApi.list({ q: "   " });
+    expect(get).toHaveBeenLastCalledWith("/notifications");
   });
   it("broadcasts a read only after the server accepts it", async () => {
     const changed = vi.fn();

@@ -1,15 +1,19 @@
 export type NotificationKind =
   "message" | "follow" | "comment" | "mention" | "like" | "repost" | "report" | "test";
 
+/**
+ * GET /notifications item. Who did it is looked up when the inbox loads, so a
+ * renamed or re-photographed member always shows as they are now.
+ */
 export interface NotificationPM {
   id: string;
   type: NotificationKind;
-  title: string;
-  body: string;
+  actor: { name: string; username: string | null; avatarUrl: string | null } | null;
   url: string;
+  /** Messages in a chat since its row was last read; 1 otherwise. */
+  count: number;
   createdAt: string;
   readAt: string | null;
-  actor?: { name: string; avatarUrl: string | null } | null;
 }
 
 export interface NotificationPagePM {
@@ -19,6 +23,7 @@ export interface NotificationPagePM {
 
 export interface NotificationVM {
   id: string;
+  /** The whole sentence, for screen readers. */
   body: string;
   category: string;
   actorName: string | null;
@@ -32,16 +37,31 @@ export interface NotificationVM {
   fullTime: string;
 }
 
-const KINDS: Record<NotificationKind, Pick<NotificationVM, "category" | "icon">> = {
-  message: { category: "Message", icon: "message" },
-  follow: { category: "New follower", icon: "person-add" },
-  mention: { category: "Mention", icon: "mention" },
-  comment: { category: "Comment", icon: "comment" },
-  like: { category: "Like", icon: "heart" },
-  repost: { category: "Repost", icon: "repost" },
-  report: { category: "Moderation", icon: "shield" },
-  test: { category: "Notifications enabled", icon: "bell" },
+const KINDS: Record<
+  NotificationKind,
+  Pick<NotificationVM, "category" | "icon"> & { action: (count: number) => string }
+> = {
+  message: {
+    category: "Message",
+    icon: "message",
+    action: (n) => (n > 1 ? `sent you ${n} messages.` : "sent you a message."),
+  },
+  follow: { category: "New follower", icon: "person-add", action: () => "followed you." },
+  mention: { category: "Mention", icon: "mention", action: () => "mentioned you." },
+  comment: { category: "Comment", icon: "comment", action: () => "commented on your post." },
+  like: { category: "Like", icon: "heart", action: () => "liked your post." },
+  repost: { category: "Repost", icon: "repost", action: () => "reposted your post." },
+  report: { category: "Moderation", icon: "shield", action: () => "New report to review." },
+  test: {
+    category: "Notifications enabled",
+    icon: "bell",
+    action: () =>
+      "Notifications are on. You'll hear about messages, followers and activity on your posts.",
+  },
 };
+
+/** Kinkord's own notices, shown with the brand mark rather than a member. */
+const OFFICIAL: ReadonlySet<NotificationKind> = new Set(["report", "test"]);
 
 export function toNotificationVM(item: NotificationPM, now = new Date()): NotificationVM {
   const date = new Date(item.createdAt);
@@ -58,20 +78,19 @@ export function toNotificationVM(item: NotificationPM, now = new Date()): Notifi
               month: "short",
               ...(date.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}),
             });
+  const kind = KINDS[item.type];
+  const official = OFFICIAL.has(item.type);
+  const actorName = official ? null : (item.actor?.name ?? "A member");
+  const action = kind.action(item.count);
   return {
     id: item.id,
-    body: item.body,
-    actorName: item.actor?.name ?? null,
-    avatarUrl: item.actor?.avatarUrl ?? null,
-    action: item.actor
-      ? item.type === "message"
-        ? "sent you a message."
-        : item.body.startsWith(item.actor.name + " ")
-          ? item.body.slice(item.actor.name.length).trim() + (/[.!?]$/.test(item.body) ? "" : ".")
-          : item.body
-      : item.body,
-    official: item.type === "report" || item.type === "test",
-    ...KINDS[item.type],
+    body: actorName ? `${actorName} ${action}` : action,
+    category: kind.category,
+    actorName,
+    avatarUrl: official ? null : (item.actor?.avatarUrl ?? null),
+    action,
+    official,
+    icon: kind.icon,
     unread: item.readAt === null,
     time,
     dateTime: item.createdAt,
@@ -81,16 +100,7 @@ export function toNotificationVM(item: NotificationPM, now = new Date()): Notifi
 
 /** Only navigate to an internal path, including when opening a push link. */
 export function notificationDestination(url: string): string | null {
-  return /^\/(?!\/)/.test(url) && !/[\\\u0000-\u0020]/.test(url) ? url : null;
+  return /^\/(?!\/)/.test(url) && !/[\\\u0000- ]/.test(url) ? url : null;
 }
 
 export type NotificationTab = "all" | "comment" | "mention";
-
-export function searchNotifications(items: NotificationPM[], query: string): NotificationPM[] {
-  const term = query.trim().toLocaleLowerCase();
-  return term
-    ? items.filter((item) =>
-        `${item.actor?.name ?? ""} ${item.body}`.toLocaleLowerCase().includes(term),
-      )
-    : items;
-}

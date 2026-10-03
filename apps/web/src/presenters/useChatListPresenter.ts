@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Routes } from "@/constants/Routes";
 import { toConversationRowVM, type ConversationSummaryPM } from "@/domain/chat";
+import type { RealtimeEventPM } from "@/domain/realtime";
 import { chatService } from "@/services/chat.service";
 import { useHomePresenter } from "./useHomePresenter";
 import { usePolling } from "./usePolling";
@@ -43,7 +44,13 @@ export function useChatListPresenter() {
       setError(messageOf(e));
     }
   }, []);
-  const onRealtime = useCallback(() => void refresh(), [refresh]);
+  // Only chat events: inbox ones (likes, follows) don't change this list.
+  const onRealtime = useCallback(
+    (e: RealtimeEventPM) => {
+      if (e.type === "message") void refresh();
+    },
+    [refresh],
+  );
   const { live } = useRealtime(onRealtime);
   usePolling(refresh, live ? LIST_FALLBACK_POLL_MS : LIST_POLL_MS, true);
 

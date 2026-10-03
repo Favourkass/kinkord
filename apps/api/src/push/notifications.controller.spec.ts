@@ -11,13 +11,29 @@ describe("NotificationsController", () => {
   it("uses the session's recipient, ignoring supplied identities", () => {
     const { controller, inbox } = make();
     controller.list(req, { unread: "true", cursor: "cursor", userId: "other" });
-    expect(inbox.list).toHaveBeenCalledWith("member", "cursor", true, undefined);
+    expect(inbox.list).toHaveBeenCalledWith("member", {
+      cursor: "cursor",
+      unreadOnly: true,
+      type: undefined,
+      q: undefined,
+    });
     controller.unreadCount(req);
     controller.readAll(req);
     controller.read(req, ID);
     expect(inbox.unreadCount).toHaveBeenCalledWith("member");
     expect(inbox.readAll).toHaveBeenCalledWith("member");
     expect(inbox.read).toHaveBeenCalledWith("member", ID);
+  });
+  it("passes a search on, trimmed, and treats a blank one as none", () => {
+    const { controller, inbox } = make();
+    controller.list(req, { q: "  raven " });
+    expect(inbox.list).toHaveBeenLastCalledWith("member", expect.objectContaining({ q: "raven" }));
+    controller.list(req, { q: "   " });
+    expect(inbox.list).toHaveBeenLastCalledWith(
+      "member",
+      expect.objectContaining({ q: undefined }),
+    );
+    expect(() => controller.list(req, { q: "x".repeat(65) })).toThrow("Invalid notification query");
   });
   it("rejects malformed ids and query parameters", () => {
     const { controller, inbox } = make();
