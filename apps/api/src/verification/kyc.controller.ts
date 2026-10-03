@@ -17,7 +17,7 @@ import { KycReviewService } from "./kyc-review.service";
 import { KycLocationService } from "./kyc-location.service";
 
 const consentSchema = z.object({
-  category: z.enum(["identity_biometric", "location", "residence", "financial"]),
+  category: z.enum(["location", "residence", "financial"]),
   policyVersion: z.string().trim().min(1).max(128),
 });
 
@@ -53,6 +53,10 @@ export class KycController {
     const parsed = locationSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException("A valid live-location result is required.");
     return this.location.capture(req.user.id, parsed.data);
+  }
+
+  @Post("residence/refresh") residenceRefresh(@Req() req: AuthedRequest) {
+    return this.kyc.refreshResidence(req.user.id);
   }
 
   @Post("financial/attempts") financialAttempt(@Req() req: AuthedRequest) {

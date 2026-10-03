@@ -14,6 +14,7 @@ describe("KYC controllers", () => {
     const kyc = {
       status: vi.fn(async () => ({})),
       consent: vi.fn(async () => ({})),
+      refreshResidence: vi.fn(async () => ({ status: "passed" })),
     };
     const location = { capture: vi.fn(async () => ({ status: "passed" })) };
     const financial = { start: vi.fn(async () => ({ url: "https://mono.example" })) };
@@ -24,6 +25,7 @@ describe("KYC controllers", () => {
     );
     await controller.consent(req, { category: "location", policyVersion: "location-v1" });
     await controller.locationEvidence(req, { latitude: 6.3, longitude: 5.6, accuracyMetres: 10 });
+    await controller.residenceRefresh(req);
     await controller.financialAttempt(req);
     expect(kyc.consent).toHaveBeenCalledWith("user-1", "location", "location-v1");
     expect(location.capture).toHaveBeenCalledWith("user-1", {
@@ -32,6 +34,7 @@ describe("KYC controllers", () => {
       accuracyMetres: 10,
     });
     expect(financial.start).toHaveBeenCalledWith(req.user);
+    expect(kyc.refreshResidence).toHaveBeenCalledWith("user-1");
     expect(() => controller.locationEvidence(req, { latitude: 1000 })).toThrow(BadRequestException);
   });
 

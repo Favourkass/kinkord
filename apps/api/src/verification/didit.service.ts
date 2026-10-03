@@ -93,6 +93,10 @@ export class DiditService {
     );
   }
 
+  get residenceEnabled() {
+    return this.configured && process.env.KYC_RESIDENCE_ENABLED === "true";
+  }
+
   get policyUrl() {
     return process.env.BRONZE_POLICY_URL ?? "";
   }

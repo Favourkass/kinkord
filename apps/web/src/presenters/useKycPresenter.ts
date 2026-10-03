@@ -28,7 +28,11 @@ export function useKycPresenter() {
 
   const load = useCallback(async () => {
     try {
-      setProgress(await kycApi.status());
+      const next = await kycApi.status();
+      setProgress(next);
+      setLocationConsentAccepted(next.consents.location);
+      setResidenceConsentAccepted(next.consents.residence);
+      setFinancialConsentAccepted(next.consents.financial);
       setError(null);
     } catch (failure) {
       if (failure instanceof ApiError && failure.status === 401)
@@ -62,7 +66,9 @@ export function useKycPresenter() {
     setError(null);
     try {
       // Consent is recorded before browser GPS is requested, not after it has been shared.
-      await kycApi.consent("location", progress.locationPolicyVersion);
+      if (!progress.consents.location) {
+        await kycApi.consent("location", progress.locationPolicyVersion);
+      }
       const position = await new Promise<GeolocationPosition>((resolve, reject) =>
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true,
@@ -100,8 +106,14 @@ export function useKycPresenter() {
     setResidenceBusy(true);
     setError(null);
     try {
-      // Consent is recorded before the identity session collects any document.
-      await kycApi.consent("residence", progress.residencePolicyVersion);
+      if (!progress.consents.residence) {
+        // Consent is recorded before the identity session collects any document.
+        await kycApi.consent("residence", progress.residencePolicyVersion);
+      }
+      const identity = progress.stages.find((stage) => stage.key === "identity");
+      if (progress.consents.residence || identity?.status === "passed") {
+        await kycApi.refreshResidence();
+      }
       await load();
     } catch (failure) {
       setError(
@@ -120,7 +132,9 @@ export function useKycPresenter() {
     setFinancialBusy(true);
     setError(null);
     try {
-      await kycApi.consent("financial", progress.financialPolicyVersion);
+      if (!progress.consents.financial) {
+        await kycApi.consent("financial", progress.financialPolicyVersion);
+      }
       const launch = await kycApi.startFinancial();
       // Mono owns this hosted page; no banking credential is requested by Kinkord.
       window.location.assign(launch.url);
@@ -143,6 +157,9 @@ export function useKycPresenter() {
           residenceBusy,
           financialConsentAccepted,
           financialBusy,
+          consents: progress.consents,
+          residenceEvidenceReady:
+            progress.stages.find((stage) => stage.key === "identity")?.status === "passed",
         }
       : null,
     refresh: () => {

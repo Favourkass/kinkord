@@ -1,28 +1,9 @@
 import Link from "next/link";
-import {
-  BookOpenText,
-  Bookmark,
-  ChevronDown,
-  ChevronRight,
-  CircleHelp,
-  Coins,
-  Database,
-  Gem,
-  Info,
-  Lock,
-  LogOut,
-  Settings,
-  Shield,
-  ShieldCheck,
-  SlidersHorizontal,
-  Store,
-  UserRound,
-  UsersRound,
-  type LucideIcon,
-} from "lucide-react";
+import { ChevronDown, ChevronRight, LogOut, Settings } from "lucide-react";
 import KycVerifiedMark from "@/components/brand/KycVerifiedMark";
 import AvatarCircle from "./AvatarCircle";
-import type { AppNavLabels, AppNavLinks, DrawerIcon, DrawerNavItem, DrawerNavigation } from "./nav";
+import DrawerNavIcon from "./DrawerNavIcon";
+import type { AppNavLabels, AppNavLinks, DrawerNavItem, DrawerNavigation } from "./nav";
 
 export interface SidebarDrawerProps {
   open: boolean;
@@ -39,24 +20,6 @@ export interface SidebarDrawerProps {
   onLogout: () => void;
 }
 
-const icons: Record<DrawerIcon, LucideIcon> = {
-  members: UsersRound,
-  saved: Bookmark,
-  kinkopedia: BookOpenText,
-  verification: ShieldCheck,
-  coins: Coins,
-  subscription: Gem,
-  marketplace: Store,
-  account: UserRound,
-  data: Database,
-  privacy: Shield,
-  security: Lock,
-  content: SlidersHorizontal,
-  safety: ShieldCheck,
-  support: CircleHelp,
-  about: Info,
-};
-
 function DrawerLink({
   item,
   membersCount,
@@ -66,14 +29,13 @@ function DrawerLink({
   membersCount: string;
   onNavigate: () => void;
 }) {
-  const Icon = icons[item.icon];
   return (
     <Link
       href={item.href}
       onClick={onNavigate}
       className="flex min-h-11 items-center gap-3 border-b border-white/[0.08] px-3 py-2.5 text-sm font-semibold text-drawer-text last:border-b-0"
     >
-      <Icon aria-hidden="true" size={17} className="shrink-0 text-kink-gold-bright" />
+      <DrawerNavIcon icon={item.icon} size={17} className="shrink-0 text-kink-gold-bright" />
       <span>{item.label}</span>
       {item.count === "members" ? (
         <span className="ml-auto rounded-full bg-kink-gold-bright px-2 py-0.5 text-[11px] font-black text-black">

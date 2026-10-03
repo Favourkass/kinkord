@@ -18,6 +18,12 @@ export interface KycProgressViewProps {
   residenceBusy: boolean;
   financialConsentAccepted: boolean;
   financialBusy: boolean;
+  consents: {
+    location: boolean;
+    residence: boolean;
+    financial: boolean;
+  };
+  residenceEvidenceReady: boolean;
   onLocationConsentChange: (accepted: boolean) => void;
   onCaptureLocation: () => void;
   onResidenceConsentChange: (accepted: boolean) => void;
@@ -47,6 +53,8 @@ export default function KycProgressView({
   residenceBusy,
   financialConsentAccepted,
   financialBusy,
+  consents,
+  residenceEvidenceReady,
   onLocationConsentChange,
   onCaptureLocation,
   onResidenceConsentChange,
@@ -97,6 +105,7 @@ export default function KycProgressView({
                   <input
                     type="checkbox"
                     checked={residenceConsentAccepted}
+                    disabled={consents.residence}
                     onChange={(event) => onResidenceConsentChange(event.target.checked)}
                     className="mt-1 accent-kink-amber"
                   />
@@ -104,15 +113,26 @@ export default function KycProgressView({
                     I consent to Kinkord checking a recent proof-of-address document I submit during
                     the identity session, including its issue date, to verify my residence. Kinkord
                     stores only the verification result, not my document or address.
+                    {consents.residence ? " Consent recorded." : ""}
                   </span>
                 </label>
                 <button
                   type="button"
-                  disabled={!residenceConsentAccepted || residenceBusy}
+                  disabled={
+                    !residenceConsentAccepted ||
+                    residenceBusy ||
+                    (consents.residence && !residenceEvidenceReady)
+                  }
                   onClick={onRecordResidenceConsent}
                   className="mt-3 rounded-lg bg-kink-amber px-3 py-2 text-xs font-black text-black disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {residenceBusy ? "Recording consent…" : "Confirm residence consent"}
+                  {residenceBusy
+                    ? "Checking residence…"
+                    : consents.residence
+                      ? residenceEvidenceReady
+                        ? "Check proof-of-address result"
+                        : "Consent recorded — complete identity first"
+                      : "Confirm residence consent"}
                 </button>
               </div>
             ) : null}
@@ -122,6 +142,7 @@ export default function KycProgressView({
                   <input
                     type="checkbox"
                     checked={locationConsentAccepted}
+                    disabled={consents.location}
                     onChange={(event) => onLocationConsentChange(event.target.checked)}
                     className="mt-1 accent-kink-amber"
                   />
@@ -129,6 +150,7 @@ export default function KycProgressView({
                     I consent to Kinkord using this device&apos;s one-time live location only to
                     compare it with my approved proof of address. Kinkord stores the result, not my
                     coordinates.
+                    {consents.location ? " Consent recorded." : ""}
                   </span>
                 </label>
                 <button
@@ -150,6 +172,7 @@ export default function KycProgressView({
                   <input
                     type="checkbox"
                     checked={financialConsentAccepted}
+                    disabled={consents.financial}
                     onChange={(event) => onFinancialConsentChange(event.target.checked)}
                     className="mt-1 accent-kink-amber"
                   />
@@ -158,6 +181,7 @@ export default function KycProgressView({
                     and comparing the bank identity information with my KYC details. Kinkord does
                     not request or store my bank password, BVN, account number, balance, or
                     transactions.
+                    {consents.financial ? " Consent recorded." : ""}
                   </span>
                 </label>
                 <button

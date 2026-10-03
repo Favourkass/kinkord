@@ -1,5 +1,5 @@
 import Link from "next/link";
-import KycVerifiedMark from "@/components/brand/KycVerifiedMark";
+import { ShieldCheck } from "lucide-react";
 
 export interface BronzeVerificationViewProps {
   status: string;
@@ -23,7 +23,7 @@ export default function BronzeVerificationView(p: BronzeVerificationViewProps) {
     <div className="flex flex-col gap-5 text-app-text">
       <div>
         <div className="flex items-center gap-3">
-          <KycVerifiedMark size={36} />
+          <ShieldCheck aria-hidden="true" size={36} className="text-kink-gold-bright" />
           <h1 className="text-[24px] font-black text-kink-gold-bright">Kinkord KYC</h1>
         </div>
         <p className="mt-2 text-sm text-app-subtle">

@@ -1,5 +1,11 @@
-import { Injectable } from "@nestjs/common";
-import type { KycConsentCategory, KycStageStatus } from "../db/schema";
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  ServiceUnavailableException,
+} from "@nestjs/common";
+import type { KycStageStatus } from "../db/schema";
 import { BronzeRepository } from "./bronze.repository";
 import {
   canAwardKinkordKyc,
@@ -12,6 +18,16 @@ import {
 import { KycRepository } from "./kyc.repository";
 import { KYC_FINANCIAL_POLICY_VERSION, KycFinancialService } from "./kyc-financial.service";
 import { KYC_LOCATION_POLICY_VERSION, KycLocationService } from "./kyc-location.service";
+import { DiditService } from "./didit.service";
+import { KycIngestionService } from "./kyc-ingestion.service";
+
+type KycStageConsentCategory = "location" | "residence" | "financial";
+
+const consentPolicyVersions: Record<KycStageConsentCategory, string> = {
+  location: KYC_LOCATION_POLICY_VERSION,
+  residence: KYC_RESIDENCE_POLICY_VERSION,
+  financial: KYC_FINANCIAL_POLICY_VERSION,
+};
 
 const stageDetails: Record<
   KycRequiredStage,
@@ -55,6 +71,8 @@ export class KycService {
     private readonly legacyIdentity: BronzeRepository,
     private readonly location: KycLocationService,
     private readonly financial: KycFinancialService,
+    private readonly didit: DiditService,
+    private readonly ingestion: KycIngestionService,
   ) {}
 
   private async buildDecisions(userId: string) {
@@ -109,7 +127,13 @@ export class KycService {
   }
 
   async status(userId: string) {
-    const { caseRow, decisions } = await this.buildDecisions(userId);
+    const [{ caseRow, decisions }, locationConsented, residenceConsented, financialConsented] =
+      await Promise.all([
+        this.buildDecisions(userId),
+        this.repository.hasActiveConsent(userId, "location", KYC_LOCATION_POLICY_VERSION),
+        this.repository.hasActiveConsent(userId, "residence", KYC_RESIDENCE_POLICY_VERSION),
+        this.repository.hasActiveConsent(userId, "financial", KYC_FINANCIAL_POLICY_VERSION),
+      ]);
     // A revoked or expired case never reports verified, regardless of stage rows.
     const caseActive =
       !caseRow.revokedAt &&
@@ -125,15 +149,22 @@ export class KycService {
         available:
           decision.stage === "location"
             ? this.location.enabled
-            : decision.stage === "financial"
-              ? this.financial.enabled
-              : stageDetails[decision.stage].available,
+            : decision.stage === "residence"
+              ? this.didit.residenceEnabled
+              : decision.stage === "financial"
+                ? this.financial.enabled
+                : stageDetails[decision.stage].available,
         status: decision.status,
         expiresAt: decision.expiresAt?.toISOString() ?? null,
       })),
       locationPolicyVersion: this.location.enabled ? KYC_LOCATION_POLICY_VERSION : null,
-      residencePolicyVersion: KYC_RESIDENCE_POLICY_VERSION,
+      residencePolicyVersion: this.didit.residenceEnabled ? KYC_RESIDENCE_POLICY_VERSION : null,
       financialPolicyVersion: this.financial.enabled ? KYC_FINANCIAL_POLICY_VERSION : null,
+      consents: {
+        location: locationConsented,
+        residence: residenceConsented,
+        financial: financialConsented,
+      },
     };
   }
 
@@ -145,7 +176,49 @@ export class KycService {
     return canAwardKinkordKyc(decisions);
   }
 
-  async consent(userId: string, category: KycConsentCategory, policyVersion: string) {
+  async consent(userId: string, category: KycStageConsentCategory, policyVersion: string) {
+    if (policyVersion !== consentPolicyVersions[category]) {
+      throw new BadRequestException("The current KYC consent version is required.");
+    }
     return this.repository.recordConsent({ userId, category, policyVersion });
+  }
+
+  /** Re-fetches an authenticated Didit decision after residence consent. Raw
+   * proof-of-address data remains in memory and only the derived result is saved. */
+  async refreshResidence(userId: string) {
+    if (!this.didit.residenceEnabled)
+      throw new ServiceUnavailableException("Didit residence verification is not configured.");
+    if (
+      !(await this.repository.hasActiveConsent(userId, "residence", KYC_RESIDENCE_POLICY_VERSION))
+    ) {
+      throw new ForbiddenException("Residence consent is required before checking evidence.");
+    }
+    const attempt = await this.repository.latestStageAttempt(userId, "identity");
+    if (!attempt || attempt.provider !== "didit") {
+      throw new ConflictException(
+        "Complete a Didit identity session with proof of address before checking residence.",
+      );
+    }
+    const decision = await this.didit.decision(attempt.providerSessionReference);
+    if (
+      decision.session_id !== attempt.providerSessionReference ||
+      decision.session_kind !== "user" ||
+      decision.vendor_data !== userId ||
+      decision.workflow_id !== this.didit.workflowId
+    ) {
+      throw new BadRequestException("Mismatched Didit residence decision.");
+    }
+    const result = await this.ingestion.recordDiditResidenceDecision({
+      userId,
+      attemptId: attempt.id,
+      providerReference: attempt.providerSessionReference,
+      decision,
+    });
+    if (!result) {
+      throw new ConflictException(
+        "The completed Didit workflow has no proof-of-address evidence. Use a workflow with Proof of Address enabled.",
+      );
+    }
+    return { status: result.status };
   }
 }

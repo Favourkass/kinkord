@@ -39,6 +39,7 @@ Profile-photo comparison is an anti-impersonation signal. It is not a substitute
 - **Gate:** do not collect coordinates or address documents until the location/residence provider, retention period, reviewer access model and just-in-time privacy copy are approved.
 - Didit evidence mapping is implemented for Proof of Address and Device/IP Analysis. The IP result is anti-fraud evidence only; it can never pass the live-location safeguard because an IP-derived coordinate is not consented GPS.
 - Completed Didit decisions are now ingested idempotently into derived KYC stage records. Provider addresses, document links, IP addresses and coordinates are explicitly excluded from the stored evidence and audit metadata.
+- Residence consent is persisted and shown after reload. If consent is recorded after a completed identity session, the API can re-fetch the authenticated Didit decision and recover only the redacted proof-of-address outcome; raw address data is never persisted. The stage stays unavailable until `KYC_RESIDENCE_ENABLED=true` explicitly confirms that the approved Didit workflow and privacy controls include Proof of Address.
 - A browser-GPS-to-proof-of-address comparison is implemented behind `KYC_LOCATION_ENABLED=false`. It records separate location consent first, uses the submitted GPS and Didit PoA coordinates only in memory, then stores only the distance-threshold/accuracy outcome. It must remain disabled until the KYC privacy notice is formally approved for this data category and the workflow has Proof of Address plus Device/IP Analysis enabled.
 
 ### Phase 4 — financial KYC
@@ -60,6 +61,7 @@ Profile-photo comparison is an anti-impersonation signal. It is not a substitute
 - Do not label an account KYC verified because a sandbox or a partial provider result approved.
 - Any missing required evidence, uncertain result, provider review result, changed profile photo, location mismatch, address mismatch or financial mismatch must fail closed or route to authorised manual review according to the KYC policy.
 - Any material change to consented data categories requires a new consent version and legal/privacy approval.
+
 # Mono financial KYC provision (2026-09-22)
 
 - Mono Connect is now the provisioned financial-stage provider. It is deliberately disabled by default and needs `MONO_FINANCIAL_KYC_ENABLED=true`, a server-only `MONO_SECRET_KEY`, `MONO_WEBHOOK_SECRET`, and `MONO_REDIRECT_URL` before it appears to members.

@@ -9,6 +9,7 @@ describe("KYC progress contract", () => {
       locationPolicyVersion: "location-v1",
       residencePolicyVersion: null,
       financialPolicyVersion: null,
+      consents: { location: true, residence: false, financial: false },
       stages: [
         {
           key: "identity",
@@ -22,5 +23,6 @@ describe("KYC progress contract", () => {
     };
     expect(progress.stages[0]).toMatchObject({ key: "identity", status: "passed" });
     expect(progress.fullKycVerified).toBe(false);
+    expect(progress.consents.location).toBe(true);
   });
 });

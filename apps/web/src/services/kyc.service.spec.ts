@@ -15,11 +15,13 @@ describe("kycApi", () => {
     await kycApi.status();
     await kycApi.consent("location", "location-v1");
     await kycApi.submitLocation({ latitude: 6.3, longitude: 5.6, accuracyMetres: 12 });
+    await kycApi.refreshResidence();
     await kycApi.startFinancial();
     expect(get).toHaveBeenCalledWith("/verification/kyc/status");
     expect(post.mock.calls).toEqual([
       ["/verification/kyc/consents", { category: "location", policyVersion: "location-v1" }],
       ["/verification/kyc/location", { latitude: 6.3, longitude: 5.6, accuracyMetres: 12 }],
+      ["/verification/kyc/residence/refresh", {}],
       ["/verification/kyc/financial/attempts", {}],
     ]);
   });

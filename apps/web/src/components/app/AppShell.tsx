@@ -94,8 +94,12 @@ export default function AppShell({
           brand={brand}
           active={activeNav}
           avatarUrl={avatarUrl}
+          membersCount={membersCount}
           links={links}
           labels={labels}
+          navigation={drawerNavigation}
+          settingsOpen={settingsMenuOpen}
+          onToggleSettings={onToggleSettingsMenu}
           onLogout={onLogout}
         />
         <main className={`flex min-h-dvh min-w-0 flex-1 flex-col ${tone}`}>

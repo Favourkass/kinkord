@@ -12,6 +12,34 @@ import { KycRepository } from "./kyc.repository";
 export class KycIngestionService {
   constructor(private readonly repository: KycRepository) {}
 
+  /** Replays only the redacted PoA decision after separately versioned
+   * residence consent has been recorded. This lets a member recover when the
+   * provider session finished before they completed the residence consent UI. */
+  async recordDiditResidenceDecision(input: {
+    userId: string;
+    attemptId: string;
+    providerReference: string;
+    decision: Record<string, unknown>;
+  }) {
+    if (!input.decision.poa) return null;
+    const consented = await this.repository.hasActiveConsent(
+      input.userId,
+      "residence",
+      KYC_RESIDENCE_POLICY_VERSION,
+    );
+    if (!consented) return null;
+    const residence = deriveDiditResidenceEvidence(input.decision);
+    await this.repository.upsertDerivedStageResult({
+      userId: input.userId,
+      attemptId: input.attemptId,
+      stage: "residence",
+      provider: "didit",
+      providerReference: input.providerReference,
+      ...residence,
+    });
+    return residence;
+  }
+
   /**
    * Converts a verified provider decision to KYC stage records. Raw Didit
    * report data never enters Kinkord storage through this method.
@@ -71,25 +99,7 @@ export class KycIngestionService {
           : ["IDENTITY_REVIEW_REQUIRED"],
     });
 
-    if (input.decision.poa) {
-      // Fail closed: no stored residence evidence without recorded member consent.
-      const consented = await this.repository.hasActiveConsent(
-        input.userId,
-        "residence",
-        KYC_RESIDENCE_POLICY_VERSION,
-      );
-      if (consented) {
-        const residence = deriveDiditResidenceEvidence(input.decision);
-        await this.repository.upsertDerivedStageResult({
-          userId: input.userId,
-          attemptId: input.attemptId,
-          stage: "residence",
-          provider: "didit",
-          providerReference: input.providerReference,
-          ...residence,
-        });
-      }
-    }
+    await this.recordDiditResidenceDecision(input);
     if (Array.isArray(input.decision.ip_analyses)) {
       const location = deriveDiditNetworkLocationEvidence(input.decision, input.profileCountry);
       await this.repository.upsertDerivedStageResult({

@@ -7,5 +7,6 @@ export const kycApi = {
     api.post("/verification/kyc/consents", { category, policyVersion }),
   submitLocation: (input: { latitude: number; longitude: number; accuracyMetres: number }) =>
     api.post<{ status: string }>("/verification/kyc/location", input),
+  refreshResidence: () => api.post<{ status: string }>("/verification/kyc/residence/refresh", {}),
   startFinancial: () => api.post<{ url: string }>("/verification/kyc/financial/attempts", {}),
 };

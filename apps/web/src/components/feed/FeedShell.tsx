@@ -69,8 +69,12 @@ export default function FeedShell({
             brand={brand}
             active="home"
             avatarUrl={avatarUrl}
+            membersCount={membersCount}
             links={links}
             labels={labels}
+            navigation={drawerNavigation}
+            settingsOpen={settingsMenuOpen}
+            onToggleSettings={onToggleSettingsMenu}
             onLogout={onLogout}
           />
         </div>

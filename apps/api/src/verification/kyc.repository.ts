@@ -160,7 +160,10 @@ export class KycRepository {
           status: input.status,
           completedAt: input.status === "pending" ? null : new Date(),
         })
-        .where(eq(kycAttempt.id, input.attemptId));
+        // A single identity-provider response can also yield residence and
+        // network evidence. Those derived stages must not overwrite the
+        // lifecycle status of the underlying identity attempt.
+        .where(and(eq(kycAttempt.id, input.attemptId), eq(kycAttempt.stage, input.stage)));
       // Identity review remains in the specialised legacy flow while its
       // profile-face migration is in progress. Other KYC stages use this
       // generic, role-protected queue.
