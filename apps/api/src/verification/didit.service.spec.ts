@@ -17,6 +17,9 @@ describe("Didit adapter", () => {
     expect(service.configured).toBe(false);
     vi.stubEnv("DIDIT_API_KEY", "test-key");
     expect(service.configured).toBe(true);
+    expect(service.residenceEnabled).toBe(false);
+    vi.stubEnv("KYC_RESIDENCE_ENABLED", "true");
+    expect(service.residenceEnabled).toBe(true);
   });
 
   it("creates a hosted session without exposing the API key in the result", async () => {

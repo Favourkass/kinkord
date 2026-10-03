@@ -49,6 +49,30 @@ describe("KycIngestionService", () => {
     expect(stages).toEqual(["identity"]);
   });
 
+  it("can recover only the derived residence result after consent arrives late", async () => {
+    const upsertDerivedStageResult = vi.fn().mockResolvedValue(undefined);
+    const service = new KycIngestionService({
+      hasActiveConsent: vi.fn().mockResolvedValue(true),
+      upsertDerivedStageResult,
+    } as unknown as KycRepository);
+    await expect(
+      service.recordDiditResidenceDecision({
+        userId: "member-1",
+        attemptId: "00000000-0000-4000-8000-000000000001",
+        providerReference: "session-1",
+        decision: {
+          poa: {
+            status: "Approved",
+            poa_address: "private address",
+            issue_date: "2026-09-01",
+            warnings: [],
+          },
+        },
+      }),
+    ).resolves.toMatchObject({ status: "passed" });
+    expect(JSON.stringify(upsertDerivedStageResult.mock.calls)).not.toContain("private address");
+  });
+
   it("writes a Smile outcome through as identity evidence only", async () => {
     vi.stubEnv("AUTH_SECRET", "test-only-ingestion-binding-secret-long-enough");
     const upsertDerivedStageResult = vi.fn().mockResolvedValue(undefined);

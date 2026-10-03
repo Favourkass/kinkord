@@ -1,27 +1,31 @@
-import Image from "next/image";
 import Link from "next/link";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import AvatarCircle from "./AvatarCircle";
+import DrawerNavIcon from "./DrawerNavIcon";
 import MaskIcon, { type MaskIconName } from "./MaskIcon";
-import type { AppNav, AppNavLabels, AppNavLinks } from "./nav";
+import type { AppNav, AppNavLabels, AppNavLinks, DrawerNavigation } from "./nav";
 import UnreadBadge from "./UnreadBadge";
 
 export interface DesktopSidebarProps {
   brand: string;
   active: AppNav;
   notificationsUnread?: boolean;
-  /** Unread counts; without them the bell falls back to a dot. */
   notificationsCount?: number;
   messagesCount?: number;
   avatarUrl: string | null;
+  membersCount: string;
   links: AppNavLinks;
   labels: AppNavLabels;
+  navigation: DrawerNavigation;
+  settingsOpen: boolean;
+  onToggleSettings: () => void;
   onLogout: () => void;
 }
 
 /**
  * Desktop sidebar per the Figma "PC" frames (881:799 dark / 881:849 light): 333px
- * panel, 48px gold wordmark, Home / Chat / Notifications / Profile, then a divider
- * with "Settings and Privacy" and "Log Out" pinned to the bottom.
+ * panel with the core navigation followed by the client-approved account menu.
+ * Settings children remain behind the same explicit accordion used on mobile.
  */
 export default function DesktopSidebar({
   brand,
@@ -30,8 +34,12 @@ export default function DesktopSidebar({
   notificationsCount,
   messagesCount = 0,
   avatarUrl,
+  membersCount,
   links,
   labels,
+  navigation,
+  settingsOpen,
+  onToggleSettings,
   onLogout,
 }: DesktopSidebarProps) {
   const unread = { home: 0, chat: messagesCount, notifications: notificationsCount ?? 0 };
@@ -57,7 +65,7 @@ export default function DesktopSidebar({
       isActive ? "text-kink-gold-bright" : "text-side-text"
     }`;
   return (
-    <aside className="sticky top-0 flex h-dvh w-[333px] shrink-0 flex-col bg-side-bg pb-[49px] pt-[37px]">
+    <aside className="sticky top-0 flex h-dvh w-[333px] shrink-0 flex-col overflow-y-auto bg-side-bg pb-[32px] pt-[37px]">
       <p className="pl-[38px] text-[48px] font-extrabold leading-[47px] tracking-[4.8px] text-kink-gold-bright">
         {brand}
       </p>
@@ -100,39 +108,91 @@ export default function DesktopSidebar({
           {labels.profile}
         </Link>
       </nav>
-      <div className="mt-auto">
-        <div className="ml-[7px] w-[307px] border-t-[1.5px] border-side-divider" />
-        <Link
-          href={links.saved}
-          aria-current={active === "saved" ? "page" : undefined}
-          className={`mt-[28px] ${row(active === "saved")}`}
+      <div className="mt-[34px] px-[20px]">
+        <div className="border-t-[1.5px] border-side-divider" />
+        <nav aria-label="Desktop account menu" className="mt-4 rounded-xl bg-black/10 px-2">
+          {navigation.primary.map((item) => (
+            <Link
+              key={item.key}
+              href={item.href}
+              className="flex min-h-10 items-center gap-3 border-b border-white/[0.07] px-2 py-2 text-[15px] font-semibold text-side-text last:border-b-0"
+            >
+              <DrawerNavIcon
+                icon={item.icon}
+                size={17}
+                className="shrink-0 text-kink-gold-bright"
+              />
+              <span>{item.label}</span>
+              {item.count === "members" ? (
+                <span className="ml-auto rounded-full bg-kink-gold-bright px-2 py-0.5 text-[10px] font-black text-black">
+                  {membersCount}
+                </span>
+              ) : null}
+              <ChevronRight
+                aria-hidden="true"
+                size={15}
+                className={
+                  item.count === "members" ? "text-neutral-500" : "ml-auto text-neutral-500"
+                }
+              />
+            </Link>
+          ))}
+        </nav>
+        <button
+          type="button"
+          aria-expanded={settingsOpen}
+          aria-controls="desktop-settings-menu"
+          onClick={onToggleSettings}
+          className={`mt-3 flex min-h-11 w-full items-center gap-3 rounded-xl border px-3 text-left text-[15px] font-bold ${settingsOpen ? "border-kink-gold-bright/60 bg-kink-amber/15 text-kink-gold-bright" : "border-kink-amber/25 bg-black/10 text-side-text"}`}
+        >
+          <MaskIcon name="settings" width={18} />
+          <span>{navigation.settingsLabel}</span>
+          {settingsOpen ? (
+            <ChevronDown aria-hidden="true" size={16} className="ml-auto" />
+          ) : (
+            <ChevronRight aria-hidden="true" size={16} className="ml-auto" />
+          )}
+        </button>
+        {settingsOpen ? (
+          <nav
+            id="desktop-settings-menu"
+            aria-label="Desktop settings and privacy"
+            className="mt-2 rounded-xl bg-black/10 px-3 py-2"
+          >
+            {navigation.settingsGroups.map((group) => (
+              <section key={group.label} className="pt-2 first:pt-0">
+                <h2 className="pb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
+                  {group.label}
+                </h2>
+                {group.items.map((item) => (
+                  <Link
+                    key={item.key}
+                    href={item.href}
+                    className="flex min-h-9 items-center gap-2 border-b border-white/[0.06] py-1.5 text-[13px] font-semibold text-side-text last:border-b-0"
+                  >
+                    <DrawerNavIcon icon={item.icon} size={15} className="text-kink-gold-bright" />
+                    <span>{item.label}</span>
+                    <ChevronRight
+                      aria-hidden="true"
+                      size={14}
+                      className="ml-auto text-neutral-500"
+                    />
+                  </Link>
+                ))}
+              </section>
+            ))}
+          </nav>
+        ) : null}
+        <button
+          type="button"
+          onClick={onLogout}
+          className="mt-3 flex min-h-11 w-full items-center gap-3 rounded-xl border border-kink-amber/25 bg-kink-amber/10 px-3 text-[15px] font-bold text-side-text"
         >
           <span className="grid size-[29px] place-items-center text-side-text">
-            <MaskIcon src="/app/feed/icon-bookmark.svg" width={29} />
-          </span>
-          {labels.saved}
-        </Link>
-        <Link href={links.subscription} className={`mt-[24px] ${row(false)}`}>
-          <span className="grid size-[29px] place-items-center">
-            <Image src="/app/subscription/silver-crest.png" alt="" width={29} height={26} />
-          </span>
-          {labels.subscription}
-        </Link>
-        <Link
-          href={links.settings}
-          aria-current={active === "settings" ? "page" : undefined}
-          className={`mt-[24px] ${row(active === "settings")}`}
-        >
-          <span className="grid size-[29px] place-items-center text-side-text">
-            <MaskIcon name="settings" width={29} />
-          </span>
-          {labels.settings}
-        </Link>
-        <button type="button" onClick={onLogout} className={`mt-[24px] ${row(false)}`}>
-          <span className="grid size-[29px] place-items-center text-side-text">
-            <MaskIcon name="logout" width={29} />
+            <MaskIcon name="logout" width={18} />
           </span>
           {labels.logout}
+          <ChevronRight aria-hidden="true" size={15} className="ml-auto text-neutral-500" />
         </button>
       </div>
     </aside>

@@ -45,13 +45,15 @@ export function useMembersCountryPresenter() {
         flag: o.flag,
         emoji: flagEmoji(o.code),
         membersLabel:
-          o.available && o.membersCount !== null
-            ? `${compactNumber(o.membersCount)} ${copy.membersSuffix}`
-            : null,
+          error && o.available
+            ? "Unavailable"
+            : o.available && o.membersCount !== null
+              ? `${compactNumber(o.membersCount)} ${copy.membersSuffix}`
+              : null,
         comingSoon: !o.available,
         href: o.available ? Routes.membersCountry(o.code) : null,
       })),
-    [query, counts, copy.membersSuffix],
+    [query, counts, copy.membersSuffix, error],
   );
 
   const searching = query.trim().length > 0;

@@ -27,7 +27,10 @@ const nextConfig: NextConfig = {
   async rewrites() {
     // Local public previews need browser API calls on the preview origin.
     // This route is absent from normal builds and deployments.
-    return process.env.LOCAL_PREVIEW_PROXY === "1"
+    const localApiProxyEnabled =
+      process.env.LOCAL_PREVIEW_PROXY === "1" ||
+      (process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_API_URL === "/__api");
+    return localApiProxyEnabled
       ? [{ source: "/__api/:path*", destination: "http://127.0.0.1:4000/:path*" }]
       : [];
   },

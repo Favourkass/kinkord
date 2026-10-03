@@ -2,14 +2,15 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { status, consent, submitLocation, startFinancial } = vi.hoisted(() => ({
+const { status, consent, submitLocation, refreshResidence, startFinancial } = vi.hoisted(() => ({
   status: vi.fn(),
   consent: vi.fn(),
   submitLocation: vi.fn(),
+  refreshResidence: vi.fn(),
   startFinancial: vi.fn(),
 }));
 vi.mock("@/services/kyc.service", () => ({
-  kycApi: { status, consent, submitLocation, startFinancial },
+  kycApi: { status, consent, submitLocation, refreshResidence, startFinancial },
 }));
 
 import { useKycPresenter } from "./useKycPresenter";
@@ -20,6 +21,7 @@ const progress = {
   locationPolicyVersion: "location-v1",
   residencePolicyVersion: "residence-v1",
   financialPolicyVersion: "financial-v1",
+  consents: { location: false, residence: false, financial: false },
   stages: [
     {
       key: "identity" as const,
@@ -37,6 +39,7 @@ describe("useKycPresenter", () => {
     status.mockReset().mockResolvedValue(progress);
     consent.mockReset().mockResolvedValue({});
     submitLocation.mockReset().mockResolvedValue({ status: "passed" });
+    refreshResidence.mockReset().mockResolvedValue({ status: "passed" });
     startFinancial.mockReset().mockResolvedValue({ url: "https://mono.example/connect" });
   });
 
@@ -48,5 +51,14 @@ describe("useKycPresenter", () => {
     act(() => result.current.captureLocation());
     await waitFor(() => expect(result.current.error).toContain("Confirm the location consent"));
     expect(consent).not.toHaveBeenCalled();
+  });
+
+  it("records residence consent and reuses completed Didit evidence", async () => {
+    const { result } = renderHook(() => useKycPresenter());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => result.current.setResidenceConsentAccepted(true));
+    act(() => result.current.recordResidenceConsent());
+    await waitFor(() => expect(refreshResidence).toHaveBeenCalledOnce());
+    expect(consent).toHaveBeenCalledWith("residence", "residence-v1");
   });
 });

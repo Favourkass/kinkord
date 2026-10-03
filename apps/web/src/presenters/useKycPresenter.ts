@@ -28,18 +28,28 @@ export function useKycPresenter() {
 
   const load = useCallback(async () => {
     try {
-      setProgress(await kycApi.status());
+      const next = await kycApi.status();
+      setProgress(next);
+      setLocationConsentAccepted(next.consents.location);
+      setResidenceConsentAccepted(next.consents.residence);
+      setFinancialConsentAccepted(next.consents.financial);
       setError(null);
     } catch (failure) {
-      if (failure instanceof ApiError && failure.status === 401) setError("Sign in to view your Kinkord KYC progress.");
-      else setError("KYC progress is temporarily unavailable. You can still complete the available identity stage below.");
+      if (failure instanceof ApiError && failure.status === 401)
+        setError("Sign in to view your Kinkord KYC progress.");
+      else
+        setError(
+          "KYC progress is temporarily unavailable. You can still complete the available identity stage below.",
+        );
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => { void load(); }, 0);
+    const timer = setTimeout(() => {
+      void load();
+    }, 0);
     return () => clearTimeout(timer);
   }, [load]);
 
@@ -56,19 +66,33 @@ export function useKycPresenter() {
     setError(null);
     try {
       // Consent is recorded before browser GPS is requested, not after it has been shared.
-      await kycApi.consent("location", progress.locationPolicyVersion);
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, {
-        enableHighAccuracy: true, maximumAge: 0, timeout: 30_000,
-      }));
+      if (!progress.consents.location) {
+        await kycApi.consent("location", progress.locationPolicyVersion);
+      }
+      const position = await new Promise<GeolocationPosition>((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          maximumAge: 0,
+          timeout: 30_000,
+        }),
+      );
       await kycApi.submitLocation({
-        latitude: position.coords.latitude, longitude: position.coords.longitude,
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
         accuracyMetres: position.coords.accuracy,
       });
       await load();
     } catch (failure) {
       if (failure && typeof failure === "object" && "code" in failure) {
-        setError("We could not obtain your live location. Check browser permissions and try again.");
-      } else setError(failure instanceof Error ? failure.message : "Live-location verification could not be completed.");
+        setError(
+          "We could not obtain your live location. Check browser permissions and try again.",
+        );
+      } else
+        setError(
+          failure instanceof Error
+            ? failure.message
+            : "Live-location verification could not be completed.",
+        );
     } finally {
       setLocationBusy(false);
     }
@@ -82,11 +106,19 @@ export function useKycPresenter() {
     setResidenceBusy(true);
     setError(null);
     try {
-      // Consent is recorded before the identity session collects any document.
-      await kycApi.consent("residence", progress.residencePolicyVersion);
+      if (!progress.consents.residence) {
+        // Consent is recorded before the identity session collects any document.
+        await kycApi.consent("residence", progress.residencePolicyVersion);
+      }
+      const identity = progress.stages.find((stage) => stage.key === "identity");
+      if (progress.consents.residence || identity?.status === "passed") {
+        await kycApi.refreshResidence();
+      }
       await load();
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : "Residence consent could not be recorded.");
+      setError(
+        failure instanceof Error ? failure.message : "Residence consent could not be recorded.",
+      );
     } finally {
       setResidenceBusy(false);
     }
@@ -100,7 +132,9 @@ export function useKycPresenter() {
     setFinancialBusy(true);
     setError(null);
     try {
-      await kycApi.consent("financial", progress.financialPolicyVersion);
+      if (!progress.consents.financial) {
+        await kycApi.consent("financial", progress.financialPolicyVersion);
+      }
       const launch = await kycApi.startFinancial();
       // Mono owns this hosted page; no banking credential is requested by Kinkord.
       window.location.assign(launch.url);
@@ -113,22 +147,35 @@ export function useKycPresenter() {
   return {
     loading,
     error,
-    view: progress ? {
-      fullKycVerified: progress.fullKycVerified,
-      stages: progress.stages.map((stage) => ({ ...stage, statusLabel: labels[stage.status] })),
-      locationConsentAccepted,
-      locationBusy,
-      residenceConsentAccepted,
-      residenceBusy,
-      financialConsentAccepted,
-      financialBusy,
-    } : null,
-    refresh: () => { void load(); },
+    view: progress
+      ? {
+          fullKycVerified: progress.fullKycVerified,
+          stages: progress.stages.map((stage) => ({ ...stage, statusLabel: labels[stage.status] })),
+          locationConsentAccepted,
+          locationBusy,
+          residenceConsentAccepted,
+          residenceBusy,
+          financialConsentAccepted,
+          financialBusy,
+          consents: progress.consents,
+          residenceEvidenceReady:
+            progress.stages.find((stage) => stage.key === "identity")?.status === "passed",
+        }
+      : null,
+    refresh: () => {
+      void load();
+    },
     setLocationConsentAccepted,
-    captureLocation: () => { void captureLocation(); },
+    captureLocation: () => {
+      void captureLocation();
+    },
     setResidenceConsentAccepted,
-    recordResidenceConsent: () => { void recordResidenceConsent(); },
+    recordResidenceConsent: () => {
+      void recordResidenceConsent();
+    },
     setFinancialConsentAccepted,
-    startFinancial: () => { void startFinancial(); },
+    startFinancial: () => {
+      void startFinancial();
+    },
   };
 }
