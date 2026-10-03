@@ -14,7 +14,9 @@ export type RealtimeConnectionPM =
       expiresAt: string;
     };
 
-export type RealtimeEventPM = { type: "message"; conversationId: string };
+/** A chat changed, or the member's notifications did (something new, or read elsewhere). */
+export type RealtimeEventPM =
+  { type: "message"; conversationId: string } | { type: "notification" };
 
 /** Base64url without padding, as AppSync's handshake header wants it. */
 function base64Url(text: string): string {
@@ -42,6 +44,8 @@ export function eventsFromFrame(frame: unknown): RealtimeEventPM[] {
     }
     if (e?.type === "message" && typeof e.conversationId === "string") {
       out.push({ type: "message", conversationId: e.conversationId });
+    } else if (e?.type === "notification") {
+      out.push({ type: "notification" });
     }
   }
   return out;

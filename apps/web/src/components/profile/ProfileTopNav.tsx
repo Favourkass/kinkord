@@ -9,6 +9,7 @@ export interface ProfileTopNavProps {
   searchPlaceholder: string;
   accountLabel: string;
   viewerAvatarUrl: string | null;
+  notificationsUnread?: boolean;
   links: Pick<AppNavLinks, "home" | "chat" | "notifications" | "settings" | "profile">;
   labels: Pick<AppNavLabels, "home" | "chat" | "notifications" | "settings" | "profile">;
 }
@@ -30,8 +31,22 @@ export default function ProfileTopNav(p: ProfileTopNavProps) {
         <span className="text-[14px] leading-[17px]">{p.searchPlaceholder}</span>
       </Link>
       <div className="flex items-center gap-[16px]">
-        <Link href={p.links.notifications} aria-label={p.labels.notifications} className={circle}>
+        <Link
+          href={p.links.notifications}
+          aria-label={
+            p.notificationsUnread
+              ? `${p.labels.notifications}, unread notifications`
+              : p.labels.notifications
+          }
+          className={`relative ${circle}`}
+        >
           <MaskIcon name="bell-outline-24" width={20} />
+          {p.notificationsUnread && (
+            <span
+              aria-hidden
+              className="absolute right-0 top-0 size-2 rounded-full bg-app-members-count ring-2 ring-pf-nav"
+            />
+          )}
         </Link>
         <Link href={p.links.chat} aria-label={p.labels.chat} className={circle}>
           <MaskIcon name="message" width={20} />

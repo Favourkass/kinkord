@@ -1,5 +1,5 @@
 // Kinkord Service Worker
-const CACHE_NAME = "kinkord-pwa-v3";
+const CACHE_NAME = "kinkord-pwa-v4";
 const OFFLINE_URL = "/offline";
 
 const PRECACHE_ASSETS = [
@@ -119,11 +119,12 @@ self.addEventListener("push", (event) => {
     badge: "/icons/badge-96x96.png",
     tag: data.tag,
     renotify: Boolean(data.tag),
-    data: { url },
+    data: { url, notificationId: data.notificationId },
   };
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+      windows.forEach((client) => client.postMessage({ type: "kinkord:notification" }));
       // Already looking at that very screen: nothing to tell them.
       const watching = windows.some(
         (w) => w.visibilityState === "visible" && new URL(w.url).pathname === new URL(url).pathname,
@@ -137,7 +138,10 @@ self.addEventListener("push", (event) => {
 // Tap: bring an open Kinkord window to that screen, or open one there.
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || new URL("/", self.location.origin).href;
+  const id = event.notification.data?.notificationId;
+  const url = id
+    ? new URL(`/notifications?open=${encodeURIComponent(id)}`, self.location.origin).href
+    : event.notification.data?.url || new URL("/", self.location.origin).href;
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (windows) => {

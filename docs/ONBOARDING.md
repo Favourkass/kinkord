@@ -82,6 +82,49 @@ Codes expire in 10 minutes, a resend is refused for 60 seconds, and three wrong
 codes lock that challenge for 24 hours — all of which you will hit while
 testing. `docs/OTP.md` has the full rules.
 
+## Notifications inbox
+
+The member inbox at `/notifications` stores activity independently of browser
+push permission. Opening an item marks it read before navigating; the bell dot
+stays visible while any unread items remain. Read state is stored per member,
+shared across devices. The reference layout has All, Comments and Mentions tabs.
+The search button opens search (run by the API across the whole inbox, by name
+or by a word like "liked"), the Unread filter, refresh and "Mark all as read".
+Row menus also let members mark individual items read without navigating.
+
+Rows store who did what to what (`actor_id`, `subject_id`), never names or
+photos: the inbox looks those up when it loads, so a renamed or re-photographed
+member shows as they are now, and a deleted member's activity disappears with
+them. Device pushes keep their discreet text-only payload.
+
+| Event | Recipient | Opens |
+|---|---|---|
+| New message (text or photo) | Other conversation member: one row per chat, counting messages, cleared when the chat is read | Conversation |
+| New follow | Followed member | Follower's profile |
+| Comment | Post author, except their own comments | Post |
+| Like | Post author, except their own likes | Post |
+| Repost | Original post author, except their own reposts | Original post |
+| Member report | Moderators | Report queue |
+| Push test | Member enabling push | Settings |
+
+- **Repeats:** a like, repost or follow is notified once. Undoing and redoing it
+  stores and sends nothing new (the `dedupe_key` unique index), until the old row
+  has been read and cleaned up.
+- **Blocks and suspensions:** nothing is stored or pushed from a member the
+  recipient has blocked, and rows from blocked or suspended members are hidden.
+- **Clean-up:** read rows older than 90 days are deleted (swept per member as new
+  activity arrives).
+- **Live updates:** a new or read notification sends a `notification` event over
+  the live chat connection (AppSync Events), so the bell and inbox update at
+  once. Without it (locally, say) they check every minute, and every five
+  minutes while it's live.
+
+Mentions has an empty state until a mention producer is implemented; the tab and
+API support filtering that event type, but current posting does not emit it.
+Saved posts remain private and generate no alert. Verification codes and
+password-reset emails remain separate from this inbox. Earlier pushes were not
+stored, so history begins after the inbox migration.
+
 ## Changing the database schema
 
 Drizzle owns the schema; never hand-write SQL in `apps/api/drizzle/`.

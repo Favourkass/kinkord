@@ -53,6 +53,7 @@ export default function SettingsPage() {
       handle={vm.handle}
       avatarUrl={vm.avatarUrl}
       membersCount={vm.membersCount}
+      notificationsUnread={vm.notificationsUnread}
       activeNav="settings"
       drawerOpen={vm.drawerOpen}
       onMenu={vm.openDrawer}

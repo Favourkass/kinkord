@@ -24,6 +24,7 @@ function MembersRegion() {
       handle={shell.handle}
       avatarUrl={shell.avatarUrl}
       membersCount={shell.membersCount}
+      notificationsUnread={shell.notificationsUnread}
       activeTab="home"
       activeNav="members"
       drawerOpen={shell.drawerOpen}

@@ -23,6 +23,7 @@ export default function PostPage() {
         name: home.name,
         avatarUrl: home.avatarUrl,
         membersCount: home.membersCount,
+        notificationsUnread: home.notificationsUnread,
         drawerOpen: home.drawerOpen,
         onMenu: home.openDrawer,
         onCloseDrawer: home.closeDrawer,

@@ -47,6 +47,7 @@ export interface ShellSource {
   handle: string;
   avatarUrl: string | null;
   membersCount: string;
+  notificationsUnread?: boolean;
   drawerOpen: boolean;
   openDrawer: () => void;
   closeDrawer: () => void;
@@ -62,6 +63,7 @@ export function appShellProps(home: ShellSource, nav: ReturnType<typeof getAppSh
     handle: home.handle,
     avatarUrl: home.avatarUrl,
     membersCount: home.membersCount,
+    notificationsUnread: home.notificationsUnread,
     drawerOpen: home.drawerOpen,
     onMenu: home.openDrawer,
     onCloseDrawer: home.closeDrawer,

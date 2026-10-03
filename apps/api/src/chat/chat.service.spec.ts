@@ -73,7 +73,7 @@ function make(answers: unknown[]) {
     remove: vi.fn(async () => undefined),
   };
   const realtime = { notify: vi.fn(async () => undefined) };
-  const push = { newMessage: vi.fn() };
+  const push = { newMessage: vi.fn(), chatRead: vi.fn() };
   return {
     ...q,
     service: new ChatService(
@@ -247,7 +247,8 @@ describe("ChatService.sendMessage", () => {
       undefined,
     ]);
     await service.sendMessage(member("u1"), "c1", { body: "hi" });
-    expect(push.newMessage).toHaveBeenCalledWith("u1", "u2", "c1");
+    // The message's own time travels with it, so reading up to it clears the inbox row.
+    expect(push.newMessage).toHaveBeenCalledWith("u1", "u2", "c1", new Date(saved.createdAt));
   });
 
   it("says nothing live about a message that was refused", async () => {
@@ -374,12 +375,17 @@ describe("ChatService.markRead", () => {
     await expect(service.markRead("u1", "c1", "m9")).rejects.toThrow("Unknown message.");
   });
 
-  it("moves the read pointer to the message", async () => {
-    const { service, after } = make([[{ userId: "u1" }], [{ id: "m2" }], undefined]);
+  it("moves the read pointer to the message, and clears the chat's inbox row up to it", async () => {
+    const { service, after, push } = make([
+      [{ userId: "u1" }],
+      [{ id: "m2", createdAt: at }],
+      undefined,
+    ]);
     await service.markRead("u1", "c1", "m2");
     expect(after("update", conversationParticipant, "set")).toMatchObject({
       lastReadMessageId: "m2",
     });
+    expect(push.chatRead).toHaveBeenCalledWith("u1", "c1", at);
   });
 });
 
