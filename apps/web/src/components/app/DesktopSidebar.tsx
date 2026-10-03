@@ -6,6 +6,7 @@ import type { AppNav, AppNavLabels, AppNavLinks } from "./nav";
 export interface DesktopSidebarProps {
   brand: string;
   active: AppNav;
+  notificationsUnread?: boolean;
   avatarUrl: string | null;
   links: AppNavLinks;
   labels: AppNavLabels;
@@ -20,6 +21,7 @@ export interface DesktopSidebarProps {
 export default function DesktopSidebar({
   brand,
   active,
+  notificationsUnread,
   avatarUrl,
   links,
   labels,
@@ -48,15 +50,26 @@ export default function DesktopSidebar({
           <Link
             key={item.key}
             href={links[item.key]}
+            aria-label={
+              item.key === "notifications" && notificationsUnread
+                ? `${labels[item.key]}, unread notifications`
+                : undefined
+            }
             aria-current={active === item.key ? "page" : undefined}
             className={row(active === item.key)}
           >
-            <span className={`grid size-[29px] place-items-center ${item.iconClass}`}>
+            <span className={`relative grid size-[29px] place-items-center ${item.iconClass}`}>
               <MaskIcon
                 name={item.icon}
                 width={29}
                 height={item.icon === "bell-outline" ? 29 : 29}
               />
+              {item.key === "notifications" && notificationsUnread && (
+                <span
+                  aria-hidden
+                  className="absolute -right-1 -top-1 size-2 rounded-full bg-app-members-count ring-2 ring-side-bg"
+                />
+              )}
             </span>
             {labels[item.key]}
           </Link>

@@ -5,8 +5,8 @@ export const PUSH_COPY = {
   settingsHeading: "Notifications",
   settingsLabel: "Push notifications",
   describe: {
-    on: "On for this device. You'll hear about new messages, followers and comments.",
-    off: "Get told about new messages, followers and comments, even when Kinkord is closed.",
+    on: "On for this device. You'll hear about messages, followers and activity on your posts.",
+    off: "Hear about messages, followers and activity on your posts, even when Kinkord is closed.",
     blocked:
       "Blocked in your browser. Allow notifications for kinkord.com in its settings, then come back.",
     install:

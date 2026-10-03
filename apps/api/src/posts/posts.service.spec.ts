@@ -80,8 +80,10 @@ function makeStorage() {
   };
 }
 
+const push = { newRepost: vi.fn() };
+
 const service = (db = makeDb(), storage = makeStorage()) =>
-  new PostsService(db as never, storage as never);
+  new PostsService(db as never, storage as never, push as never);
 
 describe("createPostSchema", () => {
   it("refuses an empty post", () => {
@@ -369,7 +371,11 @@ describe("the feed's visibility rules", () => {
    */
   const feedSql = async (params = {}) => {
     const wheres: SQL[] = [];
-    const svc = new PostsService(makeRecordingDb(wheres) as never, makeStorage() as never);
+    const svc = new PostsService(
+      makeRecordingDb(wheres) as never,
+      makeStorage() as never,
+      push as never,
+    );
     await svc.feed("viewer-1", params);
     return new PgDialect().sqlToQuery(wheres[0]);
   };
@@ -390,7 +396,11 @@ describe("the feed's visibility rules", () => {
     // never a post of somebody else's that they only liked or commented on.
     // A repost row carries the reposter as its author, so one filter covers both.
     const wheres: SQL[] = [];
-    const svc = new PostsService(makeRecordingDb(wheres) as never, makeStorage() as never);
+    const svc = new PostsService(
+      makeRecordingDb(wheres) as never,
+      makeStorage() as never,
+      push as never,
+    );
     vi.spyOn(svc as never, "resolveAuthor").mockResolvedValue("u2" as never);
 
     await svc.feed("viewer-1", { author: "tega" });
@@ -415,7 +425,11 @@ describe("the feed's visibility rules", () => {
 describe("post counts and post media carry the same rule", () => {
   const renderWheres = async (run: (svc: PostsService) => Promise<unknown>) => {
     const wheres: SQL[] = [];
-    const svc = new PostsService(makeRecordingDb(wheres) as never, makeStorage() as never);
+    const svc = new PostsService(
+      makeRecordingDb(wheres) as never,
+      makeStorage() as never,
+      push as never,
+    );
     await run(svc);
     return wheres.map((w) => new PgDialect().sqlToQuery(w));
   };
@@ -433,7 +447,7 @@ describe("post counts and post media carry the same rule", () => {
   it("does not query at all for an empty set of members", async () => {
     const wheres: SQL[] = [];
     const db = makeRecordingDb(wheres);
-    const svc = new PostsService(db as never, makeStorage() as never);
+    const svc = new PostsService(db as never, makeStorage() as never, push as never);
     await expect(svc.postCountsFor([], "viewer-1")).resolves.toEqual(new Map());
     expect(db.select).not.toHaveBeenCalled();
   });
@@ -450,7 +464,7 @@ describe("post counts and post media carry the same rule", () => {
   it("asks for nothing when the pill covers no post attachment", async () => {
     const wheres: SQL[] = [];
     const db = makeRecordingDb(wheres);
-    const svc = new PostsService(db as never, makeStorage() as never);
+    const svc = new PostsService(db as never, makeStorage() as never, push as never);
     await expect(svc.postMediaFor("u2", "viewer-1", [], 20, 0)).resolves.toEqual({
       rows: [],
       total: 0,
@@ -559,5 +573,22 @@ describe("PostsService.savedFeed", () => {
       [],
     ]);
     await expect(service(db).savedFeed("u1")).resolves.toEqual({ items: [], nextCursor: null });
+  });
+});
+
+describe("repost notifications", () => {
+  it("notifies the original author only when a repost is actually inserted", async () => {
+    push.newRepost.mockClear();
+    const db = makeDb([[{ id: "r2" }], [{ n: 1 }], [{ id: "r2" }], [], [{ n: 1 }], [{ id: "r2" }]]);
+    const svc = service(db);
+    vi.spyOn(svc, "byId").mockResolvedValue({
+      postId: "p1",
+      visibility: "public",
+      author: { userId: "u2" },
+    } as never);
+    await svc.repost("r1", "u1");
+    await svc.repost("r1", "u1");
+    expect(push.newRepost).toHaveBeenCalledTimes(1);
+    expect(push.newRepost).toHaveBeenCalledWith("p1", "u2", "u1");
   });
 });

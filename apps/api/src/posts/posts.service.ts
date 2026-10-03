@@ -11,6 +11,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { Db, DRIZZLE } from "../db/db.module";
 import { notBanned } from "../moderation/admins";
+import { PushService } from "../push/push.service";
 import {
   follow,
   post,
@@ -159,6 +160,7 @@ export class PostsService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Db,
     private readonly storage: StorageService,
+    private readonly push: PushService,
   ) {}
 
   /**
@@ -258,12 +260,15 @@ export class PostsService {
    * Reposting a repost points at the original, so a chain never forms.
    */
   async repost(postId: string, userId: string): Promise<RepostVM> {
-    const target = await this.repostTarget(postId, userId);
-    await this.db
+    const vm = await this.repostTargetVM(postId, userId);
+    const target = vm.postId;
+    const added = await this.db
       .insert(post)
       .values({ authorId: userId, repostOfId: target, visibility: "public" })
       // The partial unique index is the rule; a double tap is simply a no-op.
-      .onConflictDoNothing();
+      .onConflictDoNothing()
+      .returning({ id: post.id });
+    if (added.length) this.push.newRepost(target, vm.author.userId, userId);
     return this.repostState(target, userId);
   }
 
@@ -314,13 +319,17 @@ export class PostsService {
 
   /** Resolves what a repost should point at, and refuses what may not be lifted. */
   private async repostTarget(postId: string, viewerId: string): Promise<string> {
+    return (await this.repostTargetVM(postId, viewerId)).postId;
+  }
+
+  private async repostTargetVM(postId: string, viewerId: string): Promise<PostVM> {
     const vm = await this.byId(postId, viewerId);
     if (!vm) throw new NotFoundException("Post not found");
     if (vm.visibility !== "public") {
       throw new ForbiddenException("Friends-only posts cannot be reposted");
     }
     // Reposting somebody's repost points at the post itself.
-    return vm.postId;
+    return vm;
   }
 
   private async repostState(postId: string, userId: string): Promise<RepostVM> {

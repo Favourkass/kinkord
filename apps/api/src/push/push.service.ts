@@ -4,6 +4,7 @@ import webpush from "web-push";
 import { DRIZZLE, type Db } from "../db/db.module";
 import { profile, pushSubscription, pushVapidKey, user } from "../db/schema";
 import { adminUserIds, notBanned } from "../moderation/admins";
+import { NotificationsService, notificationUrl, type InboxEvent } from "./notifications.service";
 
 /**
  * What a notification says and where tapping it goes. Discreet on purpose: on
@@ -15,6 +16,8 @@ export interface PushMessage {
   url: string;
   /** Same tag replaces the last one, so a busy chat is one notification, not twenty. */
   tag: string;
+  /** The inbox row it stands for: tapping it marks that row read. */
+  notificationId?: string;
 }
 
 export interface SubscriptionInput {
@@ -39,7 +42,27 @@ export class PushService {
   private readonly log = new Logger(PushService.name);
   private keys: Promise<VapidKeys> | null = null;
 
-  constructor(@Inject(DRIZZLE) private readonly db: Db) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: Db,
+    private readonly inbox: NotificationsService,
+  ) {}
+
+  /**
+   * Stores the event in the recipient's inbox, then tells their devices. What
+   * the inbox doesn't store (a repeat, or a member they've blocked) isn't sent.
+   */
+  async deliver(userId: string, event: InboxEvent, message: PushMessage): Promise<number> {
+    const notificationId = await this.inbox.record(userId, event);
+    if (!notificationId) return 0;
+    return this.sendTo(userId, { ...message, notificationId });
+  }
+
+  /** The member read a chat up to `upTo`: its inbox row clears too. Never fails the read. */
+  chatRead(userId: string, conversationId: string, upTo: Date): void {
+    void this.inbox
+      .readConversation(userId, conversationId, upTo)
+      .catch((e: unknown) => this.log.warn(`inbox read failed: ${String(e)}`));
+  }
 
   /** The key a browser subscribes with. */
   async publicKey(): Promise<string> {
@@ -117,27 +140,40 @@ export class PushService {
     return results.filter(Boolean).length;
   }
 
-  newMessage(senderId: string, recipientId: string, conversationId: string): void {
-    this.notify(async () => ({
-      to: recipientId,
-      message: {
-        title: "Kinkord",
-        body: `New message from ${(await this.member(senderId)).name}`,
-        url: `/messages/${conversationId}`,
-        tag: `chat-${conversationId}`,
-      },
-    }));
+  /** `sentAt` is the message's own time, so reading up to it clears the chat's inbox row. */
+  newMessage(
+    senderId: string,
+    recipientId: string,
+    conversationId: string,
+    sentAt: Date = new Date(),
+  ): void {
+    if (senderId === recipientId) return;
+    this.notify(async () => {
+      const who = await this.member(senderId);
+      return {
+        to: recipientId,
+        event: { type: "message", actorId: senderId, subjectId: conversationId, at: sentAt },
+        message: {
+          title: "Kinkord",
+          body: `New message from ${who.name}`,
+          url: notificationUrl("message", conversationId, null),
+          tag: `chat-${conversationId}`,
+        },
+      };
+    });
   }
 
   newFollower(followerId: string, followedId: string): void {
+    if (followerId === followedId) return;
     this.notify(async () => {
       const who = await this.member(followerId);
       return {
         to: followedId,
+        event: { type: "follow", actorId: followerId },
         message: {
           title: "Kinkord",
           body: `${who.name} followed you`,
-          url: who.username ? `/u/${who.username}` : "/home",
+          url: notificationUrl("follow", null, who.username),
           tag: `follow-${followerId}`,
         },
       };
@@ -148,13 +184,46 @@ export class PushService {
     // Nobody needs telling they commented on their own post.
     if (authorId === commenterId) return;
     this.notify(async () => {
+      const who = await this.member(commenterId);
       return {
         to: authorId,
+        event: { type: "comment", actorId: commenterId, subjectId: postId },
         message: {
           title: "Kinkord",
-          body: `${(await this.member(commenterId)).name} commented on your post`,
-          url: `/p/${postId}`,
+          body: `${who.name} commented on your post`,
+          url: notificationUrl("comment", postId, null),
           tag: `post-${postId}`,
+        },
+      };
+    });
+  }
+
+  newLike(postId: string, authorId: string, actorId: string): void {
+    this.postActivity("like", "liked", postId, authorId, actorId);
+  }
+
+  newRepost(postId: string, authorId: string, actorId: string): void {
+    this.postActivity("repost", "reposted", postId, authorId, actorId);
+  }
+
+  private postActivity(
+    type: "like" | "repost",
+    verb: string,
+    postId: string,
+    authorId: string,
+    actorId: string,
+  ): void {
+    if (authorId === actorId) return;
+    this.notify(async () => {
+      const who = await this.member(actorId);
+      return {
+        to: authorId,
+        event: { type, actorId, subjectId: postId },
+        message: {
+          title: "Kinkord",
+          body: `${who.name} ${verb} your post`,
+          url: notificationUrl(type, postId, null),
+          tag: `${type}-${postId}`,
         },
       };
     });
@@ -170,12 +239,16 @@ export class PushService {
       .then((ids) =>
         Promise.all(
           ids.map((id) =>
-            this.sendTo(id, {
-              title: "Kinkord",
-              body: "New report to review",
-              url: "/moderation/reports",
-              tag: "report",
-            }),
+            this.deliver(
+              id,
+              { type: "report" },
+              {
+                title: "Kinkord",
+                body: "New report to review",
+                url: notificationUrl("report", null, null),
+                tag: "report",
+              },
+            ),
           ),
         ),
       )
@@ -183,12 +256,15 @@ export class PushService {
   }
 
   /** Fire and forget: a notification that can't go out never fails what caused it. */
-  private notify(build: () => Promise<{ to: string; message: PushMessage } | null>): void {
+  private notify(
+    build: () => Promise<{ to: string; event: InboxEvent; message: PushMessage } | null>,
+  ): void {
     void build()
-      .then((n) => (n ? this.sendTo(n.to, n.message) : 0))
+      .then((n) => (n ? this.deliver(n.to, n.event, n.message) : 0))
       .catch((e) => this.log.warn(`push failed: ${String(e)}`));
   }
 
+  /** The name a push says, as the member is now; the inbox looks it up again when shown. */
   private async member(userId: string): Promise<{ name: string; username: string | null }> {
     const [row] = await this.db
       .select({ username: user.username, name: user.name, displayName: profile.displayName })

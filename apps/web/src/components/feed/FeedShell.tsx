@@ -12,6 +12,7 @@ export interface FeedShellProps {
   name: string;
   avatarUrl: string | null;
   membersCount: string;
+  notificationsUnread?: boolean;
   drawerOpen: boolean;
   onMenu: () => void;
   onCloseDrawer: () => void;
@@ -40,6 +41,7 @@ export default function FeedShell({
   name,
   avatarUrl,
   membersCount,
+  notificationsUnread,
   drawerOpen,
   onMenu,
   onCloseDrawer,
@@ -60,6 +62,7 @@ export default function FeedShell({
           <DesktopSidebar
             brand={brand}
             active="home"
+            notificationsUnread={notificationsUnread}
             avatarUrl={avatarUrl}
             links={links}
             labels={labels}
@@ -90,7 +93,13 @@ export default function FeedShell({
       </div>
 
       <div className="lg:hidden">
-        <MobileTabBar active="home" avatarUrl={avatarUrl} links={links} labels={labels} />
+        <MobileTabBar
+          active="home"
+          avatarUrl={avatarUrl}
+          links={links}
+          labels={labels}
+          notificationsUnread={notificationsUnread}
+        />
         <SidebarDrawer
           open={drawerOpen}
           onClose={onCloseDrawer}

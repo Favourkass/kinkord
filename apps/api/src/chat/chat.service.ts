@@ -237,8 +237,8 @@ export class ChatService {
         : await this.insertMessage(this.db, senderId, conversationId, input);
     // Both members' open apps hear of it at once, the sender's other tabs too.
     void this.realtime.notify([peerId, senderId], { type: "message", conversationId });
-    // And their phone, if the app isn't open on this thread.
-    this.push.newMessage(senderId, peerId, conversationId);
+    // And their phone, if the app isn't open on this thread, and their inbox.
+    this.push.newMessage(senderId, peerId, conversationId, new Date(saved.createdAt));
     return saved;
   }
 
@@ -375,15 +375,19 @@ export class ChatService {
     return Promise.all((opts.after ? rows : rows.reverse()).map((m) => this.toDto(m)));
   }
 
-  /** Moves this member's read pointer forward to a message; never backwards. */
+  /**
+   * Moves this member's read pointer forward to a message; never backwards.
+   * Their inbox row for this chat clears with it.
+   */
   async markRead(userId: string, conversationId: string, messageId: string): Promise<void> {
     await this.assertMember(conversationId, userId);
     const [known] = await this.db
-      .select({ id: message.id })
+      .select({ id: message.id, createdAt: message.createdAt })
       .from(message)
       .where(and(eq(message.id, messageId), eq(message.conversationId, conversationId)))
       .limit(1);
     if (!known) throw new BadRequestException("Unknown message.");
+    this.push.chatRead(userId, conversationId, known.createdAt);
     const readAt = sql`(select "created_at" from "message" where "id" = ${messageId})`;
     await this.db
       .update(conversationParticipant)
