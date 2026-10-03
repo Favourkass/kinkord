@@ -7,7 +7,6 @@ export * from "./profile-media";
 export * from "./follow";
 export * from "./bronze-verification";
 export * from "./otp";
-export * from "./kyc";
 export * from "./post";
 export * from "./moderation";
 export * from "./chat";

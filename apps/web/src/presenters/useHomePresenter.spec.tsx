@@ -44,7 +44,6 @@ const routeGet = (path: unknown) => {
   if (path === "/me") return Promise.resolve(me);
   if (path === "/profile") return Promise.resolve(profile);
   if (path === "/community/stats") return Promise.resolve(stats);
-  if (path === "/verification/kyc/status") return Promise.resolve({ fullKycVerified: false });
   return Promise.reject(new Error(`unexpected ${String(path)}`));
 };
 
@@ -68,7 +67,7 @@ describe("useHomePresenter", () => {
     expect(result.current.handle).toBe("@tegamaxwell");
     expect(result.current.avatarUrl).toBe("https://s3/avatar.jpg");
     expect(result.current.membersCount).toBe("128");
-    expect(result.current.kycVerified).toBe(false);
+    expect(result.current.verified).toBe(false);
   });
 
   it("redirects to login when the session is gone", async () => {

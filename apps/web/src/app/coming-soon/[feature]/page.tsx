@@ -1,20 +1,20 @@
-"use client";
+import { notFound } from "next/navigation";
+import { COMING_SOON_FEATURES, getComingSoonFeatureVM } from "@/presenters/getComingSoonFeatureVM";
+import ComingSoonFeatureScreen from "./ComingSoonFeatureScreen";
 
-import { useParams } from "next/navigation";
-import AppShell from "@/components/app/AppShell";
-import ComingSoonPanel from "@/components/app/ComingSoonPanel";
-import { appShellProps, getAppShellNav } from "@/presenters/getAppShellNav";
-import { getComingSoonFeatureVM } from "@/presenters/getComingSoonFeatureVM";
-import { useHomePresenter } from "@/presenters/useHomePresenter";
+// Only the features listed exist; any other slug is a 404.
+export const dynamicParams = false;
 
-export default function FeatureComingSoonPage() {
-  const { feature } = useParams<{ feature: string }>();
-  const shell = useHomePresenter();
-  const copy = getComingSoonFeatureVM(feature);
+export function generateStaticParams() {
+  return COMING_SOON_FEATURES.map((feature) => ({ feature }));
+}
 
-  return (
-    <AppShell {...appShellProps(shell, getAppShellNav())} activeNav="none">
-      <ComingSoonPanel {...copy} />
-    </AppShell>
-  );
+export default async function FeatureComingSoonPage({
+  params,
+}: {
+  params: Promise<{ feature: string }>;
+}) {
+  const copy = getComingSoonFeatureVM((await params).feature);
+  if (!copy) notFound();
+  return <ComingSoonFeatureScreen copy={copy} />;
 }

@@ -1,7 +1,8 @@
 import { lookup } from "node:dns/promises";
 import { get } from "node:https";
 
-export const VERIFICATION_IMAGE_MAX_BYTES = 5_000_000;
+// The same cap as an avatar upload (profiles.service), so every valid avatar can be checked.
+export const VERIFICATION_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 export interface VerificationImage {
   bytes: Buffer;
   contentType: string;

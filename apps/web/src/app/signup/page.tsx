@@ -684,10 +684,10 @@ function SignupWizard() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-[18px] font-extrabold uppercase text-kink-gold-bright lg:text-[26px]">
-                    Kinkord KYC
+                    Bronze Verification
                   </p>
                   <p className="text-[12px] text-[#999999] lg:text-[16px]">
-                    Begins with identity and liveness verification.
+                    Verify that you are a real person.
                   </p>
                 </div>
               </div>

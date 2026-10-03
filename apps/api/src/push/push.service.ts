@@ -235,19 +235,23 @@ export class PushService {
    * who or why: that's for the moderation screen.
    */
   newReport(): void {
+    this.toAdmins("report", "New report to review");
+  }
+
+  /** A verification Didit couldn't settle is waiting for an admin; says nothing about whose. */
+  newVerificationReview(): void {
+    this.toAdmins("verification", "New verification to review");
+  }
+
+  private toAdmins(type: "report" | "verification", body: string): void {
     void adminUserIds(this.db)
       .then((ids) =>
         Promise.all(
           ids.map((id) =>
             this.deliver(
               id,
-              { type: "report" },
-              {
-                title: "Kinkord",
-                body: "New report to review",
-                url: notificationUrl("report", null, null),
-                tag: "report",
-              },
+              { type },
+              { title: "Kinkord", body, url: notificationUrl(type, null, null), tag: type },
             ),
           ),
         ),

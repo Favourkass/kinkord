@@ -49,6 +49,21 @@ export default function ConfirmDialog({ dialog }: ConfirmDialogProps) {
           </label>
         ) : null}
 
+        {dialog.input ? (
+          <label className="block pt-[16px] text-[13px] font-bold text-app-text">
+            {dialog.input.label}
+            <input
+              value={dialog.input.value}
+              onChange={(e) => dialog.input?.set(e.target.value)}
+              maxLength={256}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              className="mt-[6px] h-[44px] w-full rounded-[12px] border border-app-input-border bg-app-input px-[10px] text-[15px] font-normal text-app-value focus:border-kink-amber focus:outline-none"
+            />
+          </label>
+        ) : null}
+
         {dialog.reason ? (
           <label className="block pt-[16px] text-[13px] font-bold text-app-text">
             {dialog.reason.label}

@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import AccountMenu from "./AccountMenu";
 import AvatarCircle from "./AvatarCircle";
-import DrawerNavIcon from "./DrawerNavIcon";
 import MaskIcon, { type MaskIconName } from "./MaskIcon";
 import type { AppNav, AppNavLabels, AppNavLinks, DrawerNavigation } from "./nav";
 
@@ -96,91 +95,17 @@ export default function DesktopSidebar({
         </Link>
       </nav>
       <div className="mt-[34px] px-[20px]">
-        <div className="border-t-[1.5px] border-side-divider" />
-        <nav aria-label="Desktop account menu" className="mt-4 rounded-xl bg-black/10 px-2">
-          {navigation.primary.map((item) => (
-            <Link
-              key={item.key}
-              href={item.href}
-              className="flex min-h-10 items-center gap-3 border-b border-white/[0.07] px-2 py-2 text-[15px] font-semibold text-side-text last:border-b-0"
-            >
-              <DrawerNavIcon
-                icon={item.icon}
-                size={17}
-                className="shrink-0 text-kink-gold-bright"
-              />
-              <span>{item.label}</span>
-              {item.count === "members" ? (
-                <span className="ml-auto rounded-full bg-kink-gold-bright px-2 py-0.5 text-[10px] font-black text-black">
-                  {membersCount}
-                </span>
-              ) : null}
-              <ChevronRight
-                aria-hidden="true"
-                size={15}
-                className={
-                  item.count === "members" ? "text-neutral-500" : "ml-auto text-neutral-500"
-                }
-              />
-            </Link>
-          ))}
-        </nav>
-        <button
-          type="button"
-          aria-expanded={settingsOpen}
-          aria-controls="desktop-settings-menu"
-          onClick={onToggleSettings}
-          className={`mt-3 flex min-h-11 w-full items-center gap-3 rounded-xl border px-3 text-left text-[15px] font-bold ${settingsOpen ? "border-kink-gold-bright/60 bg-kink-amber/15 text-kink-gold-bright" : "border-kink-amber/25 bg-black/10 text-side-text"}`}
-        >
-          <MaskIcon name="settings" width={18} />
-          <span>{navigation.settingsLabel}</span>
-          {settingsOpen ? (
-            <ChevronDown aria-hidden="true" size={16} className="ml-auto" />
-          ) : (
-            <ChevronRight aria-hidden="true" size={16} className="ml-auto" />
-          )}
-        </button>
-        {settingsOpen ? (
-          <nav
-            id="desktop-settings-menu"
-            aria-label="Desktop settings and privacy"
-            className="mt-2 rounded-xl bg-black/10 px-3 py-2"
-          >
-            {navigation.settingsGroups.map((group) => (
-              <section key={group.label} className="pt-2 first:pt-0">
-                <h2 className="pb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
-                  {group.label}
-                </h2>
-                {group.items.map((item) => (
-                  <Link
-                    key={item.key}
-                    href={item.href}
-                    className="flex min-h-9 items-center gap-2 border-b border-white/[0.06] py-1.5 text-[13px] font-semibold text-side-text last:border-b-0"
-                  >
-                    <DrawerNavIcon icon={item.icon} size={15} className="text-kink-gold-bright" />
-                    <span>{item.label}</span>
-                    <ChevronRight
-                      aria-hidden="true"
-                      size={14}
-                      className="ml-auto text-neutral-500"
-                    />
-                  </Link>
-                ))}
-              </section>
-            ))}
-          </nav>
-        ) : null}
-        <button
-          type="button"
-          onClick={onLogout}
-          className="mt-3 flex min-h-11 w-full items-center gap-3 rounded-xl border border-kink-amber/25 bg-kink-amber/10 px-3 text-[15px] font-bold text-side-text"
-        >
-          <span className="grid size-[29px] place-items-center text-side-text">
-            <MaskIcon name="logout" width={18} />
-          </span>
-          {labels.logout}
-          <ChevronRight aria-hidden="true" size={15} className="ml-auto text-neutral-500" />
-        </button>
+        <div className="mb-4 border-t-[1.5px] border-side-divider" />
+        <AccountMenu
+          variant="sidebar"
+          navigation={navigation}
+          membersCount={membersCount}
+          active={active}
+          settingsOpen={settingsOpen}
+          onToggleSettings={onToggleSettings}
+          logoutLabel={labels.logout}
+          onLogout={onLogout}
+        />
       </div>
     </aside>
   );

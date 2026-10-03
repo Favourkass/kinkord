@@ -1,9 +1,17 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { Injectable, ServiceUnavailableException, UnauthorizedException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from "@nestjs/common";
 import { downloadVerificationImage, type VerificationImage } from "../storage/verification-image";
 import { profileMatchDecision } from "./profile-match-policy";
+import { VerificationConfig } from "./verification-config";
 
 const DIDIT_API = "https://verification.didit.me/v3/session/";
+/** Didit's decision payloads are small; anything larger isn't a real callback. */
+export const DIDIT_WEBHOOK_MAX_BYTES = 512 * 1024;
 
 function sortJson(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(sortJson);
@@ -24,23 +32,35 @@ function validHexSignature(signature: string | undefined, expected: Buffer) {
 
 @Injectable()
 export class DiditService {
+  constructor(private readonly config: VerificationConfig) {}
+
   get mode() {
-    return process.env.DIDIT_MODE?.trim() || "live";
+    return this.config.current.didit.mode;
   }
 
-  get profileMatchThreshold() {
-    return Number(process.env.DIDIT_PROFILE_FACE_MATCH_THRESHOLD ?? "90");
+  /** Identity verification can be offered right now. */
+  get configured() {
+    return this.config.identityAvailable;
   }
 
   get profileMatchEnabled() {
-    const threshold = this.profileMatchThreshold;
-    return (
-      this.configured &&
-      process.env.DIDIT_PROFILE_FACE_MATCH_ENABLED === "true" &&
-      Number.isFinite(threshold) &&
-      threshold >= 90 &&
-      threshold <= 100
-    );
+    return this.config.profileMatchAvailable;
+  }
+
+  get profileMatchThreshold() {
+    return this.config.current.profileMatch.threshold;
+  }
+
+  get workflowId() {
+    return this.config.current.didit.workflowId;
+  }
+
+  get policyUrl() {
+    return this.config.current.policyUrl;
+  }
+
+  private get apiKey() {
+    return this.config.current.didit.apiKey;
   }
 
   async compareProfilePhoto(selfieUrl: string, profile: VerificationImage, attemptId: string) {
@@ -72,35 +92,6 @@ export class DiditService {
     return profileMatchDecision(await response.json(), this.profileMatchThreshold, this.mode);
   }
 
-  private get apiKey() {
-    if (this.mode === "sandbox") return process.env.DIDIT_SANDBOX_API_KEY?.trim() ?? "";
-    if (this.mode === "live") return process.env.DIDIT_API_KEY?.trim() ?? "";
-    return "";
-  }
-
-  get workflowId() {
-    if (this.mode === "sandbox") return process.env.DIDIT_SANDBOX_WORKFLOW_ID?.trim() ?? "";
-    if (this.mode === "live") return process.env.DIDIT_LIVE_WORKFLOW_ID?.trim() ?? "";
-    return "";
-  }
-
-  get configured() {
-    return Boolean(
-      this.apiKey &&
-      this.workflowId &&
-      process.env.DIDIT_RETURN_URL &&
-      process.env.BRONZE_POLICY_URL,
-    );
-  }
-
-  get residenceEnabled() {
-    return this.configured && process.env.KYC_RESIDENCE_ENABLED === "true";
-  }
-
-  get policyUrl() {
-    return process.env.BRONZE_POLICY_URL ?? "";
-  }
-
   async createSession(userId: string) {
     if (!this.configured) throw new ServiceUnavailableException("Didit is not configured yet.");
     try {
@@ -109,7 +100,7 @@ export class DiditService {
         headers: { "content-type": "application/json", "x-api-key": this.apiKey },
         body: JSON.stringify({
           workflow_id: this.workflowId,
-          callback: process.env.DIDIT_RETURN_URL,
+          callback: this.config.current.returnUrl,
           vendor_data: userId,
         }),
         signal: AbortSignal.timeout(10000),
@@ -144,32 +135,58 @@ export class DiditService {
     }
   }
 
+  /**
+   * Erases a session at Didit with its decision, documents, media and face
+   * templates. Used when a member withdraws consent or their account is deleted.
+   * A session that's already gone counts as deleted.
+   */
+  async deleteSession(sessionId: string): Promise<void> {
+    if (!this.apiKey) throw new ServiceUnavailableException("Didit is not configured.");
+    const response = await fetch(`${DIDIT_API}${encodeURIComponent(sessionId)}/delete/`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json", "x-api-key": this.apiKey },
+      body: JSON.stringify({
+        retain_face_embeddings: false,
+        deletion_instruction: "privacy_erasure",
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok && response.status !== 404) {
+      throw new ServiceUnavailableException(`Didit deletion failed (${response.status}).`);
+    }
+  }
+
+  /** Checks a callback before anything in it is trusted; the body must be the raw bytes. */
   verifyWebhook(
-    body: Buffer,
+    body: unknown,
     signatureV2: string | undefined,
     signatureRaw: string | undefined,
     timestamp: string | undefined,
-  ) {
-    const secret = process.env.DIDIT_WEBHOOK_SECRET;
+  ): Buffer {
+    if (!Buffer.isBuffer(body) || body.length === 0 || body.length > DIDIT_WEBHOOK_MAX_BYTES) {
+      throw new BadRequestException("Invalid Didit callback");
+    }
+    const secret = this.config.current.didit.webhookSecret;
     const seconds = Number(timestamp);
     if (!secret || !Number.isInteger(seconds) || Math.abs(Date.now() / 1000 - seconds) > 300) {
       throw new UnauthorizedException("Invalid Didit webhook signature");
+    }
+    // The raw-body signature needs no parsing, so check it first.
+    if (validHexSignature(signatureRaw, createHmac("sha256", secret).update(body).digest())) {
+      return body;
     }
     let canonical: Buffer | null = null;
     try {
       canonical = Buffer.from(JSON.stringify(sortJson(JSON.parse(body.toString("utf8")))), "utf8");
     } catch {
-      // The callback handler will report malformed JSON after authentication.
+      // Unparseable bodies can't carry a valid canonical signature.
     }
-    const v2Matches =
+    if (
       canonical &&
-      validHexSignature(signatureV2, createHmac("sha256", secret).update(canonical).digest());
-    const rawMatches = validHexSignature(
-      signatureRaw,
-      createHmac("sha256", secret).update(body).digest(),
-    );
-    if (!v2Matches && !rawMatches) {
-      throw new UnauthorizedException("Invalid Didit webhook signature");
+      validHexSignature(signatureV2, createHmac("sha256", secret).update(canonical).digest())
+    ) {
+      return body;
     }
+    throw new UnauthorizedException("Invalid Didit webhook signature");
   }
 }

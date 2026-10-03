@@ -39,7 +39,7 @@ export default function ThreadPage({ params }: { params: Promise<{ id: string }>
       handle={shell.handle}
       avatarUrl={shell.avatarUrl}
       membersCount={shell.membersCount}
-      kycVerified={shell.kycVerified}
+      verified={shell.verified}
       notificationsUnread={shell.notificationsUnread}
       activeTab="chat"
       activeNav="chat"

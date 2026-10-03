@@ -88,6 +88,6 @@ describe("useMembersCountryPresenter", () => {
     const { result } = renderHook(() => useMembersCountryPresenter());
     await waitFor(() => expect(result.current.error).toMatch(/went wrong/));
     // Nigeria still renders (without a count) so the page stays usable.
-    expect(result.current.rows[0]).toMatchObject({ code: "NG", membersLabel: "Unavailable" });
+    expect(result.current.rows[0]).toMatchObject({ code: "NG", membersLabel: null });
   });
 });

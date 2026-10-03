@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import {
   BadRequestException,
   ConflictException,
@@ -7,7 +7,10 @@ import {
   Logger,
   NotFoundException,
   ServiceUnavailableException,
+  type OnModuleDestroy,
+  type OnModuleInit,
 } from "@nestjs/common";
+import { PushService } from "../push/push.service";
 import { StorageService } from "../storage/storage.service";
 import { BronzeRepository } from "./bronze.repository";
 import {
@@ -15,197 +18,183 @@ import {
   BRONZE_POLICY_VERSION,
   canAwardBronze,
   emptyBronzeChecks,
+  idChecksPass,
   interpretDiditResult,
-  interpretSmileResult,
   matchIdentity,
+  stillVerified,
   type BronzeChecks,
 } from "./bronze-policy";
-import { SmileIdService } from "./smile-id.service";
 import { DiditService } from "./didit.service";
+import { identityBinding } from "./identity-binding";
 import { ProfileMatchService } from "./profile-match.service";
-import { KycIngestionService } from "./kyc-ingestion.service";
+import { VerificationConfig } from "./verification-config";
 
+/** A photo must be older than its upload links (10 minutes), so nobody can swap it mid-check. */
+export const PHOTO_SETTLE_MS = 10 * 60_000;
+/** A verified photo can't be older than this; members re-verify with a recent one. */
+export const PHOTO_MAX_AGE_MS = 90 * 24 * 60 * 60_000;
+/** Sessions Didit hasn't finished in this long are expired (unless Didit is reviewing them). */
+export const SESSION_EXPIRY_MS = 24 * 60 * 60_000;
+const RECONCILE_EVERY_MS = 5 * 60_000;
+/** How often a member's own status check may ask Didit about a pending session. */
+const REFRESH_EVERY_MS = 60_000;
+
+export interface Admin {
+  id: string;
+  twoFactorEnabled?: boolean | null;
+}
+
+/** Sanitised for logs: the error's kind, never a message that might carry details. */
+const kind = (e: unknown) => (e instanceof Error ? e.name : "error");
+
+/**
+ * Identity verification ("Bronze"): a government ID, a live selfie, and a match
+ * between that selfie and the member's profile photo, through Didit. What
+ * Didit can't settle on its own, an admin decides from Moderation.
+ */
 @Injectable()
-export class BronzeService {
+export class BronzeService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(BronzeService.name);
+  private readonly refreshed = new Map<string, number>();
+  private timer: ReturnType<typeof setInterval> | null = null;
+
   constructor(
     private readonly repo: BronzeRepository,
-    private readonly smile: SmileIdService,
     private readonly didit: DiditService,
     private readonly storage: StorageService,
     private readonly profileMatch: ProfileMatchService,
-    private readonly kycIngestion: KycIngestionService,
+    private readonly push: PushService,
+    private readonly config: VerificationConfig,
   ) {}
 
-  private reviewer(user: { id: string; email: string; twoFactorEnabled?: boolean | null }) {
-    const allowlist = (process.env.BRONZE_REVIEWER_EMAILS ?? "")
-      .split(",")
-      .map((email) => email.trim().toLowerCase())
-      .filter(Boolean);
-    if (!allowlist.includes(user.email.toLowerCase()) || !user.twoFactorEnabled) {
-      throw new ForbiddenException("Bronze review requires an authorized, 2FA-enabled account.");
-    }
+  onModuleInit() {
+    this.timer = setInterval(() => void this.reconcile(), RECONCILE_EVERY_MS);
+    this.timer.unref?.();
   }
 
-  async reviews(user: { id: string; email: string; twoFactorEnabled?: boolean | null }) {
-    this.reviewer(user);
-    this.logger.log(`Bronze review queue accessed by reviewer ${user.id}`);
-    const rows = await this.repo.openReviews();
-    return Promise.all(
-      rows.map(async (row) => ({
-        id: row.id,
-        userId: row.userId,
-        attemptId: row.attemptId,
-        reasonCodes: row.reasonCodes,
-        createdAt: row.createdAt,
-        providerJobId: row.providerJobId,
-        checks: row.checks,
-        profilePhotoUrl: await this.storage.presignDownload(row.avatarKey),
-      })),
-    );
+  onModuleDestroy() {
+    if (this.timer) clearInterval(this.timer);
   }
 
-  async decideReview(
-    user: { id: string; email: string; twoFactorEnabled?: boolean | null },
-    input: {
-      id: string;
-      decision: "approve" | "reject";
-      profileFaceMatches: boolean;
-      evidenceReference: string;
-      reason: string;
-    },
-  ) {
-    this.reviewer(user);
-    const result = await this.repo.decideReview({ ...input, reviewerId: user.id });
-    if (!result)
-      throw new ConflictException(
-        "The review is no longer open or the required checks did not pass.",
-      );
-    await this.kycIngestion.resolveLegacyIdentityReview({
-      userId: result.userId,
-      attemptId: result.attemptId,
-      approved: input.decision === "approve",
-      profileFaceMatches: input.profileFaceMatches,
-    });
-    this.logger.log(`Bronze review ${input.id} decided ${input.decision} by reviewer ${user.id}`);
-    return result;
-  }
-
-  async status(userId: string) {
-    const [initialState, snapshot, consent] = await Promise.all([
-      this.repo.status(userId),
-      this.repo.snapshot(userId),
-      this.repo.hasConsent(userId),
-    ]);
-    let state = initialState;
+  async status(userId: string, now = Date.now()) {
+    let state = await this.repo.state(userId);
     if (state?.status === "pending" && state.currentAttemptId && this.didit.configured) {
-      const attempt = await this.repo.attempt(state.currentAttemptId);
-      if (attempt?.providerJobId.startsWith("didit:")) {
-        try {
-          await this.recordDiditDecision(attempt.providerJobId.slice(6));
-          state = await this.repo.status(userId);
-        } catch (error) {
-          this.logger.warn(
-            `Didit status refresh deferred: ${error instanceof Error ? error.message : "unknown error"}`,
-          );
+      // A member checking back may beat the webhook; ask Didit, at most once a minute.
+      const last = this.refreshed.get(state.currentAttemptId) ?? 0;
+      if (now - last > REFRESH_EVERY_MS) {
+        this.refreshed.set(state.currentAttemptId, now);
+        if (this.refreshed.size > 10_000) this.refreshed.clear();
+        const attempt = await this.repo.attempt(state.currentAttemptId);
+        if (attempt?.providerJobId.startsWith("didit:")) {
+          try {
+            await this.recordDiditDecision(attempt.providerJobId.slice(6));
+            state = await this.repo.state(userId);
+          } catch (e) {
+            this.logger.warn(`Didit status refresh deferred (${kind(e)})`);
+          }
         }
       }
     }
+    const [snapshot, consented] = await Promise.all([
+      this.repo.snapshot(userId),
+      this.repo.hasConsent(userId),
+    ]);
+    const uploadedAt = snapshot?.avatarUploadedAt?.getTime() ?? 0;
     const missing = [
-      (!snapshot?.avatarKey ||
-        !snapshot.avatarUploadedAt ||
-        snapshot.avatarUploadedAt.getTime() < Date.now() - 90 * 24 * 60 * 60 * 1000) &&
-        "profilePhoto",
+      (!snapshot?.avatarKey || uploadedAt < now - PHOTO_MAX_AGE_MS) && "profilePhoto",
       !snapshot?.dob && "dateOfBirth",
       !snapshot?.gender && "gender",
       !snapshot?.country && "country",
     ].filter((value): value is string => typeof value === "string");
+    // Verified, but the photo, birth date or gender has changed since: verify again.
+    const outdated =
+      state?.status === "verified" &&
+      !stillVerified(state, {
+        avatarKey: snapshot?.avatarKey ?? null,
+        dateOfBirth: snapshot?.dob ?? null,
+        gender: snapshot?.gender ?? null,
+      });
+    const attemptsUsed = state?.attemptsUsed ?? 0;
     return {
-      status:
-        state?.status === "verified" && state.verifiedAvatarKey !== snapshot?.avatarKey
-          ? "manual_review"
-          : (state?.status ?? "not_started"),
-      attemptsUsed: state?.attemptsUsed ?? 0,
-      attemptsRemaining: BRONZE_MAX_ATTEMPTS - (state?.attemptsUsed ?? 0),
-      consented: consent,
+      available: this.didit.configured,
+      status: outdated ? ("outdated" as const) : (state?.status ?? ("not_started" as const)),
+      attemptsUsed,
+      attemptsRemaining: Math.max(0, BRONZE_MAX_ATTEMPTS - attemptsUsed),
+      consented,
       policyVersion: BRONZE_POLICY_VERSION,
+      policyUrl: this.didit.policyUrl || null,
       missing,
-      providerAvailable: this.didit.configured || this.smile.configured,
-      provider: this.didit.configured ? "didit" : this.smile.configured ? "smile" : null,
-      policyUrl: this.didit.policyUrl || this.smile.policyUrl || null,
-      // The private provider result does not leave this endpoint.
+      photoReadyAt:
+        uploadedAt && uploadedAt + PHOTO_SETTLE_MS > now
+          ? new Date(uploadedAt + PHOTO_SETTLE_MS).toISOString()
+          : null,
     };
   }
 
   async consent(userId: string, accepted: boolean, version: string) {
     if (accepted !== true || version !== BRONZE_POLICY_VERSION) {
-      throw new BadRequestException("The current Bronze verification consent is required.");
+      throw new BadRequestException("The current verification consent is required.");
     }
-    if (!this.didit.configured && !this.smile.configured) {
-      throw new ServiceUnavailableException(
-        "Bronze verification is not available until its approved privacy notice and provider are configured.",
-      );
+    if (!this.didit.configured) {
+      throw new ServiceUnavailableException("Verification isn't available yet.");
     }
     await this.repo.consent(userId);
     return this.status(userId);
   }
 
+  /** Withdrawing ends the check and the badge, and erases the member's sessions at Didit. */
+  async withdraw(userId: string) {
+    const sessions = await this.repo.withdrawConsent(userId);
+    await this.eraseAtDidit(sessions);
+    return this.status(userId);
+  }
+
+  /** Before an account is deleted: erase what Didit holds about the member. */
+  async forgetMember(userId: string) {
+    await this.eraseAtDidit(await this.repo.diditSessionsOf(userId));
+  }
+
+  private async eraseAtDidit(sessions: string[]) {
+    const results = await Promise.allSettled(sessions.map((id) => this.didit.deleteSession(id)));
+    const failed = results.filter((r) => r.status === "rejected").length;
+    if (failed) this.logger.warn(`${failed} Didit session(s) couldn't be erased; retry by hand`);
+  }
+
   async start(userId: string) {
     const status = await this.status(userId);
+    if (!status.available)
+      throw new ServiceUnavailableException("Verification isn't available yet.");
     if (status.missing.length)
       throw new BadRequestException({
         message: "Complete your profile and add a recent photo first.",
         missing: status.missing,
       });
+    if (status.photoReadyAt)
+      throw new BadRequestException({
+        message: "Your photo was just uploaded. You can verify it in a few minutes.",
+        photoReadyAt: status.photoReadyAt,
+      });
     if (!status.consented)
       throw new BadRequestException("Consent is required before verification.");
     if (status.status === "pending")
       throw new ConflictException("Verification is already in progress.");
-    if (
-      status.status === "verified" ||
-      status.status === "manual_review" ||
-      !status.attemptsRemaining
-    ) {
-      throw new ConflictException("Automated verification is not available for this account.");
-    }
+    if (status.status === "verified") throw new ConflictException("You're already verified.");
+    if (status.status === "manual_review")
+      throw new ConflictException("Your verification is with our team.");
+    if (status.status === "rejected" || status.status === "revoked" || !status.attemptsRemaining)
+      throw new ForbiddenException("Contact support to verify again.");
     const snapshot = await this.repo.snapshot(userId);
-    if (
-      !snapshot?.avatarKey ||
-      !snapshot.avatarUploadedAt ||
-      snapshot.avatarUploadedAt.getTime() < Date.now() - 90 * 24 * 60 * 60 * 1000 ||
-      !snapshot.dob ||
-      !snapshot.gender ||
-      !snapshot.country
-    ) {
+    if (!snapshot?.avatarKey || !snapshot.dob || !snapshot.gender || !snapshot.country)
       throw new BadRequestException("Complete your profile first.");
+    try {
+      // Every size of the photo comes from the one that gets checked.
+      await this.storage.regenerateVariants(snapshot.avatarKey);
+    } catch (e) {
+      this.logger.warn(`Photo preparation failed (${kind(e)})`);
+      throw new ServiceUnavailableException("Couldn't prepare your photo. Please try again.");
     }
-    let launch:
-      | { provider: "didit"; url: string }
-      | {
-          provider: "smile";
-          token: string;
-          product: "biometric_kyc";
-          environment: "sandbox" | "live";
-          partnerId: string;
-          callbackUrl: string;
-          policyUrl: string;
-        };
-    let jobId: string;
-    if (this.didit.configured) {
-      try {
-        const session = await this.didit.createSession(userId);
-        jobId = `didit:${session.sessionId}`;
-        launch = { provider: "didit", url: session.url };
-      } catch (error) {
-        if (!this.smile.configured) throw error;
-        this.logger.warn("Didit session unavailable; using configured Smile ID fallback.");
-        jobId = randomUUID();
-        launch = await this.smileLaunch(userId, jobId);
-      }
-    } else {
-      jobId = randomUUID();
-      launch = await this.smileLaunch(userId, jobId);
-    }
+    // Opened before the attempt is reserved, so a Didit outage never uses one up.
+    const session = await this.didit.createSession(userId);
     const attemptId = await this.repo.reserve(
       userId,
       {
@@ -213,58 +202,70 @@ export class BronzeService {
         dob: snapshot.dob,
         gender: snapshot.gender,
         country: snapshot.country,
+        nationality: snapshot.nationality,
       },
-      jobId,
+      `didit:${session.sessionId}`,
     );
     if (!attemptId)
       throw new ConflictException("Verification state changed. Refresh and try again.");
-    return { attemptId, ...launch };
-  }
-
-  private async smileLaunch(userId: string, jobId: string) {
-    // Minting the token before reservation avoids charging an attempt for a provider outage.
-    const token = await this.smile.webToken(userId, jobId);
-    return {
-      provider: "smile" as const,
-      token,
-      product: "biometric_kyc" as const,
-      environment: this.smile.environment,
-      partnerId: this.smile.partnerId,
-      callbackUrl: this.smile.callbackUrl,
-      policyUrl: this.smile.policyUrl,
-    };
+    return { attemptId, provider: "didit" as const, url: session.url };
   }
 
   diditCallback(
-    body: Buffer,
+    body: unknown,
     signatureV2: string | undefined,
     signatureRaw: string | undefined,
     timestamp: string | undefined,
   ) {
-    this.didit.verifyWebhook(body, signatureV2, signatureRaw, timestamp);
+    const raw = this.didit.verifyWebhook(body, signatureV2, signatureRaw, timestamp);
     let payload: Record<string, unknown>;
     try {
-      payload = JSON.parse(body.toString("utf8")) as Record<string, unknown>;
+      payload = JSON.parse(raw.toString("utf8")) as Record<string, unknown>;
     } catch {
       throw new BadRequestException("Invalid Didit callback");
     }
     if (typeof payload.session_id !== "string")
       throw new BadRequestException("Missing Didit session");
-    // Didit treats responses taking more than five seconds as failed deliveries.
-    // Acknowledge after authentication, then re-fetch the authoritative decision.
-    // Pending-status polling is the reconciliation path if this process is interrupted.
-    void this.recordDiditDecision(payload.session_id).catch((error) => {
-      this.logger.error(
-        `Didit callback processing failed: ${error instanceof Error ? error.message : "unknown error"}`,
-      );
-    });
+    // Didit counts replies slower than five seconds as failed, so answer now and
+    // process after. Anything that fails here is picked up by reconcile().
+    void this.recordDiditDecision(payload.session_id).catch((e) =>
+      this.logger.warn(`Didit callback processing deferred (${kind(e)})`),
+    );
     return { received: true };
   }
 
-  private async recordDiditDecision(sessionId: string) {
+  /** Background safety net: settles attempts whose webhook was missed or failed. */
+  async reconcile(now = Date.now()) {
+    if (!this.didit.configured) return;
+    let due: Awaited<ReturnType<BronzeRepository["claimForReconcile"]>>;
+    try {
+      due = await this.repo.claimForReconcile(20);
+    } catch (e) {
+      this.logger.warn(`Verification reconcile skipped (${kind(e)})`);
+      return;
+    }
+    for (const attempt of due) {
+      try {
+        const outcome = await this.recordDiditDecision(attempt.providerJobId.slice(6));
+        if (
+          !outcome.terminal &&
+          !outcome.inProviderReview &&
+          attempt.createdAt.getTime() < now - SESSION_EXPIRY_MS
+        )
+          await this.repo.expireAttempt(attempt.id);
+      } catch (e) {
+        this.logger.warn(`Verification reconcile failed for one attempt (${kind(e)})`);
+      }
+    }
+  }
+
+  private async recordDiditDecision(
+    sessionId: string,
+  ): Promise<{ terminal: boolean; inProviderReview: boolean }> {
     const attempt = await this.repo.findAttempt(`didit:${sessionId}`);
     if (!attempt) throw new NotFoundException("Unknown Didit session");
-    if (attempt.status !== "started" && attempt.status !== "processing") return;
+    if (attempt.status !== "started" && attempt.status !== "processing")
+      return { terminal: true, inProviderReview: false };
     const decision = await this.didit.decision(sessionId);
     if (
       decision.session_id !== sessionId ||
@@ -275,38 +276,41 @@ export class BronzeService {
       throw new BadRequestException("Mismatched Didit decision");
     }
     const result = interpretDiditResult(decision, attempt.profileCountry);
-    if (!result.terminal) return;
+    if (!result.terminal) return { terminal: false, inProviderReview: result.inProviderReview };
     const identity = matchIdentity(result.identity, {
       dob: attempt.profileDob,
       gender: attempt.profileGender,
       country: attempt.profileCountry,
+      nationality: attempt.profileNationality,
     });
     const checks: BronzeChecks = {
       ...emptyBronzeChecks(),
       governmentId: result.governmentId,
       liveness: result.liveness,
       idFace: result.idFace,
-      dateOfBirth: identity.dateOfBirth,
-      gender: identity.gender,
-      country: identity.country,
+      ...identity,
     };
-    const primaryPassed =
-      checks.governmentId &&
-      checks.liveness &&
-      checks.idFace &&
-      checks.dateOfBirth &&
-      checks.gender &&
-      checks.country;
-    let failureCodes = result.failed
+    const idPassed = idChecksPass(checks);
+    const failureCodes: string[] = result.failed
       ? ["DIDIT_DECLINED"]
-      : !primaryPassed
-        ? ["DIDIT_REQUIRED_CHECK_MISSING"]
-        : ["PROFILE_PHOTO_FACE_MATCH_REQUIRED"];
-    if (!result.failed && primaryPassed) {
+      : idPassed
+        ? []
+        : ["DIDIT_REQUIRED_CHECK_MISSING"];
+    let status: "failed" | "manual_review" | "verified" = "failed";
+    let binding: string | null = null;
+    if (!result.failed && idPassed) {
       const match = await this.profileMatch.evaluate(attempt, decision);
-      if (!match) return;
+      if (!match) return { terminal: false, inProviderReview: false };
       checks.profileFace = match.outcome === "matched";
-      failureCodes = checks.profileFace ? [] : [match.reason ?? "PROFILE_PHOTO_MATCH_INCONCLUSIVE"];
+      if (!checks.profileFace)
+        failureCodes.push(match.reason ?? "PROFILE_PHOTO_MATCH_INCONCLUSIVE");
+      if (!checks.country) failureCodes.push("ID_COUNTRY_UNCONFIRMED");
+      status = canAwardBronze(checks) ? "verified" : "manual_review";
+      binding = this.bindingFor(result.identity);
+      if (binding && (await this.repo.bindingUsedElsewhere(binding, attempt.userId))) {
+        status = "manual_review";
+        failureCodes.push("IDENTITY_ON_ANOTHER_ACCOUNT");
+      }
     }
     const fingerprint = createHash("sha256")
       .update(JSON.stringify({ sessionId, status: decision.status, checks }))
@@ -317,144 +321,98 @@ export class BronzeService {
       fingerprint,
       resultCode: String(decision.status),
       checks,
-      status:
-        result.failed || !primaryPassed
-          ? "failed"
-          : canAwardBronze(checks)
-            ? "verified"
-            : "manual_review",
-      failureCodes,
-    });
-    if (!recorded) return;
-    await this.kycIngestion.recordDiditDecision({
-      userId: attempt.userId,
-      attemptId: attempt.id,
-      providerReference: sessionId,
-      profileCountry: attempt.profileCountry,
-      decision,
-      identityChecks: recorded.checks,
-      providerDeclined: recorded.status === "failed",
-      verifiedIdentity: {
-        fullName: result.identity.FullName,
-        dateOfBirth: result.identity.DOB,
-        gender: result.identity.Gender,
-      },
-    });
-  }
-
-  async smileCallback(body: unknown) {
-    if (!body || typeof body !== "object" || Array.isArray(body))
-      throw new BadRequestException("Invalid callback");
-    const payload = body as Record<string, unknown>;
-    this.smile.verifyCallback(payload);
-    const params = payload.PartnerParams;
-    if (!params || typeof params !== "object" || Array.isArray(params))
-      throw new BadRequestException("Missing job reference");
-    const jobId = (params as Record<string, unknown>).job_id;
-    if (typeof jobId !== "string") throw new BadRequestException("Invalid job reference");
-    const attempt = await this.repo.findAttempt(jobId);
-    if (!attempt) throw new NotFoundException("Unknown verification job");
-    if ((params as Record<string, unknown>).user_id !== attempt.userId) {
-      throw new BadRequestException("Mismatched verification user");
-    }
-    const providerResults = await this.smile.jobResults(attempt.userId, jobId);
-    const official = providerResults.find((entry) => entry.ResultCode === payload.ResultCode);
-    if (!official) {
-      // Smile retries non-2xx callbacks; an unverifiable or not-yet-available
-      // status must never progress an account's identity decision.
-      throw new ServiceUnavailableException("Provider job status is not ready yet.");
-    }
-    const trusted = official;
-    const result = interpretSmileResult(trusted);
-    const identity = matchIdentity(trusted, {
-      dob: attempt.profileDob,
-      gender: attempt.profileGender,
-      country: attempt.profileCountry,
-    });
-    const previous = attempt.checks as Partial<BronzeChecks>;
-    const checks: BronzeChecks = {
-      ...emptyBronzeChecks(),
-      ...previous,
-      governmentId: Boolean(previous.governmentId || result.verified),
-      liveness: Boolean(previous.liveness || result.live),
-      idFace: Boolean(previous.idFace || result.face),
-      dateOfBirth: Boolean(previous.dateOfBirth || identity.dateOfBirth),
-      gender: Boolean(previous.gender || identity.gender),
-      country: Boolean(previous.country || identity.country),
-      // Never infer a profile-photo match from a government ID face match.
-      profileFace: Boolean(previous.profileFace),
-    };
-    const mismatch =
-      (typeof trusted.DOB === "string" && !identity.dateOfBirth) ||
-      (typeof trusted.Gender === "string" && !identity.gender) ||
-      (typeof trusted.Country === "string" && !identity.country);
-    const primaryPassed =
-      checks.governmentId &&
-      checks.liveness &&
-      checks.idFace &&
-      checks.dateOfBirth &&
-      checks.gender &&
-      checks.country;
-    const failureCodes = result.failed || mismatch ? [result.code || "IDENTITY_MISMATCH"] : [];
-    const needsReview = primaryPassed && !checks.profileFace;
-    const status =
-      result.failed || mismatch
-        ? attempt.number >= BRONZE_MAX_ATTEMPTS
-          ? ("manual_review" as const)
-          : ("failed" as const)
-        : canAwardBronze(checks)
-          ? ("verified" as const)
-          : needsReview
-            ? ("manual_review" as const)
-            : ("processing" as const);
-    if (needsReview) failureCodes.push("PROFILE_PHOTO_FACE_MATCH_REQUIRED");
-    const fingerprint = createHash("sha256")
-      .update(
-        JSON.stringify({
-          jobId,
-          code: result.code,
-          timestamp: payload.timestamp,
-          actions: trusted.Actions,
-          dob: trusted.DOB,
-          gender: trusted.Gender,
-          country: trusted.Country,
-        }),
-      )
-      .digest("hex");
-    const recorded = await this.repo.recordCallback({
-      attemptId: attempt.id,
-      userId: attempt.userId,
-      fingerprint,
-      resultCode: result.code,
-      checks,
       status,
       failureCodes,
+      identityBinding: binding,
     });
-    if (recorded && recorded.status !== "processing") {
-      // Smile never carries PoA/IP evidence; only the identity stage writes through.
-      const fullName = typeof trusted.FullName === "string" ? trusted.FullName : "";
-      await this.kycIngestion.recordSmileIdentityDecision({
-        userId: attempt.userId,
-        attemptId: attempt.id,
-        providerReference: jobId,
-        identityChecks: recorded.checks,
-        bronzeStatus:
-          recorded.status === "verified"
-            ? "verified"
-            : recorded.status === "failed"
-              ? "failed"
-              : "manual_review",
-        ...(fullName && identity.dateOfBirth && identity.gender
-          ? {
-              verifiedIdentity: {
-                fullName,
-                dateOfBirth: String(trusted.DOB),
-                gender: String(trusted.Gender),
-              },
-            }
-          : {}),
-      });
+    if (recorded?.reviewOpened) this.push.newVerificationReview();
+    return { terminal: true, inProviderReview: false };
+  }
+
+  private bindingFor(identity: { FullName: string; DOB: string; Gender: string }) {
+    try {
+      return identityBinding(
+        { fullName: identity.FullName, dateOfBirth: identity.DOB, gender: identity.Gender },
+        this.config.current.bindingSecret,
+      );
+    } catch {
+      return null;
     }
-    return { received: true };
+  }
+
+  // ---- Admins (routes are behind AdminGuard; decisions also need 2FA) ----
+
+  private requireTwoFactor(admin: Admin) {
+    if (!admin.twoFactorEnabled)
+      throw new ForbiddenException(
+        "Turn on two-factor authentication (Settings, Security & 2FA) to review verifications.",
+      );
+  }
+
+  async reviews(admin: Admin) {
+    this.requireTwoFactor(admin);
+    const rows = await this.repo.openReviews();
+    return Promise.all(
+      rows.map(async (row) => ({
+        id: row.id,
+        userId: row.userId,
+        username: row.username,
+        displayName: row.displayName,
+        reasonCodes: row.reasonCodes,
+        createdAt: row.createdAt,
+        providerSessionId: row.providerJobId.replace(/^didit:/, ""),
+        checks: row.checks,
+        // The photo as members see it, and the original it was made from.
+        photoUrl: await this.storage.presignReviewDownload(row.avatarKey, "md"),
+        originalPhotoUrl: await this.storage.presignReviewDownload(row.avatarKey),
+      })),
+    );
+  }
+
+  async decideReview(
+    admin: Admin,
+    input: {
+      id: string;
+      decision: "approve" | "reject";
+      evidenceReference: string;
+      reason: string;
+    },
+  ) {
+    this.requireTwoFactor(admin);
+    const result = await this.repo.decideReview({ ...input, reviewerId: admin.id });
+    if (!result.ok) {
+      if (result.reason === "own")
+        throw new ForbiddenException("You can't decide your own verification.");
+      if (result.reason === "checks")
+        throw new ConflictException(
+          "This attempt didn't pass the ID checks, so it can't be approved.",
+        );
+      if (result.reason === "changed")
+        throw new ConflictException(
+          "The member changed their photo, birth date or gender since, so they need to verify again.",
+        );
+      throw new ConflictException("This review is already closed.");
+    }
+    this.logger.log(`Verification review decided (${input.decision}) by an admin`);
+    return { status: result.status };
+  }
+
+  async revoke(admin: Admin, userId: string) {
+    this.requireTwoFactor(admin);
+    if (!(await this.repo.revoke(userId))) throw new NotFoundException("Nothing to revoke.");
+    return { status: "revoked" as const };
+  }
+
+  async reopen(admin: Admin, userId: string) {
+    this.requireTwoFactor(admin);
+    if (!(await this.repo.reopen(userId)))
+      throw new ConflictException("Only a rejected or revoked verification can be reopened.");
+    return { status: "not_started" as const };
+  }
+
+  /** What Moderation shows on a member's page. */
+  async adminStatus(userId: string) {
+    const state = await this.repo.state(userId);
+    return { status: state?.status ?? "not_started", attemptsUsed: state?.attemptsUsed ?? 0 };
   }
 }

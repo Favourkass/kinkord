@@ -29,11 +29,11 @@ function renderSidebar(settingsOpen = false) {
 describe("DesktopSidebar", () => {
   it("mirrors the client-approved account order while settings stay collapsed", () => {
     renderSidebar();
-    const menu = screen.getByRole("navigation", { name: "Desktop account menu" });
+    const menu = screen.getByRole("navigation", { name: "Account menu" });
     expect(
       within(menu)
         .getAllByRole("link")
-        .map((link) => link.textContent?.replace("110", "")),
+        .map((link) => link.textContent?.replace(/110|Soon/g, "")),
     ).toEqual([
       "Members",
       "Saved",
@@ -44,6 +44,11 @@ describe("DesktopSidebar", () => {
       "Marketplace",
     ]);
     expect(screen.queryByText("Account Settings")).toBeNull();
+    expect(
+      within(menu)
+        .getByRole("link", { name: /Members/ })
+        .getAttribute("aria-current"),
+    ).toBe("page");
   });
 
   it("reveals grouped settings only after the user opens Settings & Privacy", () => {

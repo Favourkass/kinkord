@@ -1,4 +1,4 @@
-export const BRONZE_POLICY_VERSION = "bronze-2026-09-19-profile-match-v2";
+export const BRONZE_POLICY_VERSION = "bronze-2026-10-03-identity-v3";
 export const BRONZE_MAX_ATTEMPTS = 3;
 
 export interface BronzeChecks {
@@ -27,6 +27,17 @@ export function canAwardBronze(checks: BronzeChecks): boolean {
   );
 }
 
+/**
+ * What only the ID itself can prove. If any fails, the attempt fails; nobody
+ * can approve it by hand. The profile-photo match and the country are the two
+ * checks an admin may confirm instead.
+ */
+export function idChecksPass(checks: BronzeChecks): boolean {
+  return (
+    checks.governmentId && checks.liveness && checks.idFace && checks.dateOfBirth && checks.gender
+  );
+}
+
 export function bronzeCallbackOutcome(input: {
   checks: BronzeChecks;
   status: "processing" | "failed" | "manual_review" | "verified";
@@ -42,9 +53,7 @@ export function bronzeCallbackOutcome(input: {
     return {
       checks,
       status:
-        input.attemptNumber >= BRONZE_MAX_ATTEMPTS
-          ? ("manual_review" as const)
-          : ("failed" as const),
+        input.attemptNumber >= BRONZE_MAX_ATTEMPTS ? ("rejected" as const) : ("failed" as const),
       failureCodes: input.failureCodes,
     };
   if (!input.profileUnchanged)
@@ -62,43 +71,16 @@ export function bronzeCallbackOutcome(input: {
         : ["PROFILE_PHOTO_FACE_MATCH_REQUIRED"],
     };
   if (canAwardBronze(checks)) return { checks, status: "verified" as const, failureCodes: [] };
-  const primary =
-    checks.governmentId &&
-    checks.liveness &&
-    checks.idFace &&
-    checks.dateOfBirth &&
-    checks.gender &&
-    checks.country;
-  return {
-    checks,
-    status: primary ? ("manual_review" as const) : ("processing" as const),
-    failureCodes: primary ? ["PROFILE_PHOTO_FACE_MATCH_REQUIRED"] : input.failureCodes,
-  };
-}
-
-/** Only a final, unambiguously positive callback can pass provider-owned checks. */
-export function interpretSmileResult(payload: Record<string, unknown>) {
-  const actions = (payload.Actions ?? {}) as Record<string, unknown>;
-  const code = String(payload.ResultCode ?? "");
-  // Smile can send separate action and ID-info callbacks in either order. The
-  // callback adapter merges positive checks; neither callback alone grants Bronze.
-  const verified = actions.Verify_ID_Number === "Verified" || code === "1012";
-  const finalFaceApproval = code === "0810" || code === "1210";
-  const live =
-    finalFaceApproval &&
-    (actions.Liveness_Check === "Passed" || actions.Human_Review_Liveness_Check === "Passed");
-  const face =
-    finalFaceApproval &&
-    (actions.Selfie_To_ID_Authority_Compare === "Completed" ||
-      actions.Selfie_To_ID_Card_Compare === "Completed");
-  const underReview =
-    Object.values(actions).some((v) => v === "Under Review" || v === "Unable to Determine") ||
-    /provisional|pending|review|inconclusive/i.test(String(payload.ResultText ?? ""));
-  const failed =
-    Object.values(actions).some((v) => v === "Failed" || v === "Not Verified") ||
-    ["0811", "0812", "1013", "1014", "1211", "1212"].includes(code) ||
-    /fail|reject|invalid|spoof|no match/i.test(String(payload.ResultText ?? ""));
-  return { verified, live, face, underReview, failed, code };
+  return idChecksPass(checks)
+    ? {
+        checks,
+        status: "manual_review" as const,
+        failureCodes: [
+          ...(!checks.profileFace ? ["PROFILE_PHOTO_FACE_MATCH_REQUIRED"] : []),
+          ...(!checks.country ? ["ID_COUNTRY_UNCONFIRMED"] : []),
+        ],
+      }
+    : { checks, status: "processing" as const, failureCodes: input.failureCodes };
 }
 
 /** A provider-level approval is insufficient without every required feature. */
@@ -140,58 +122,109 @@ export function interpretDiditResult(payload: Record<string, unknown>, profileCo
   const failed = ["Declined", "Expired", "Abandoned", "Kyc Expired"].includes(
     String(payload.status),
   );
+  const field = (key: string) => (id && typeof id[key] === "string" ? (id[key] as string) : "");
   return {
     terminal,
     failed,
+    /** Still with Didit's own reviewers; never expire it from our side. */
+    inProviderReview: String(payload.status) === "In Review",
+    // A Nigerian member's ID must also check out against NIMC or NIBSS.
     governmentId:
       Boolean(id) && (profileCountry.toUpperCase() !== "NG" || registry || nigeriaLookup),
     liveness: approved("liveness_checks"),
     idFace: approved("face_matches"),
-    identity: id
-      ? {
-          DOB: typeof id.date_of_birth === "string" ? id.date_of_birth : "",
-          Gender: typeof id.gender === "string" ? id.gender : "",
-          Country:
-            id.issuing_state === "NGA"
-              ? "NG"
-              : typeof id.issuing_state === "string"
-                ? id.issuing_state
-                : "",
-          FullName:
-            typeof id.full_name === "string"
-              ? id.full_name
-              : [id.first_name, id.last_name]
-                  .filter((value): value is string => typeof value === "string")
-                  .join(" "),
-        }
-      : { DOB: "", Gender: "", Country: "", FullName: "" },
+    identity: {
+      DOB: field("date_of_birth"),
+      Gender: field("gender"),
+      IssuingState: field("issuing_state"),
+      IssuingStateName: field("issuing_state_name"),
+      FullName:
+        field("full_name") || [field("first_name"), field("last_name")].filter(Boolean).join(" "),
+    },
   };
 }
 
-/** Public profile data is member-chosen; compare the ID authority values only when present. */
+const regionName = (() => {
+  const names = new Intl.DisplayNames(["en"], { type: "region" });
+  return (alpha2: string) => {
+    try {
+      return names.of(alpha2.toUpperCase()) ?? "";
+    } catch {
+      return "";
+    }
+  };
+})();
+const comparable = (value: string) =>
+  value
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z]/g, "");
+
+/**
+ * Whether the ID was issued by the member's nationality, or failing that their
+ * country. Matched by the country's name, since Didit gives three-letter codes
+ * and profiles two-letter ones. False means "not confirmed", never "wrong":
+ * an admin decides those.
+ */
+export function idCountryMatches(
+  id: { IssuingState: string; IssuingStateName: string },
+  member: { country: string; nationality: string | null },
+): boolean {
+  const candidates = [member.nationality, member.country].filter((code): code is string =>
+    Boolean(code && /^[A-Za-z]{2}$/.test(code)),
+  );
+  return candidates.some(
+    (code) =>
+      (code.toUpperCase() === "NG" && id.IssuingState.toUpperCase() === "NGA") ||
+      (Boolean(id.IssuingStateName) &&
+        comparable(regionName(code)) === comparable(id.IssuingStateName)),
+  );
+}
+
+/** The ID's details against the profile; an adult, and the same birth date and gender. */
 export function matchIdentity(
-  payload: Record<string, unknown>,
-  profile: { dob: string; gender: string; country: string },
+  identity: { DOB: string; Gender: string; IssuingState: string; IssuingStateName: string },
+  profile: { dob: string; gender: string; country: string; nationality: string | null },
   now = new Date(),
 ) {
-  const dob = typeof payload.DOB === "string" ? payload.DOB.slice(0, 10) : "";
+  const dob = identity.DOB.slice(0, 10);
   const cutoff = new Date(Date.UTC(now.getUTCFullYear() - 18, now.getUTCMonth(), now.getUTCDate()))
     .toISOString()
     .slice(0, 10);
-  const gender = String(payload.Gender ?? "")
-    .trim()
-    .toLowerCase();
-  const country = String(payload.Country ?? "")
-    .trim()
-    .toUpperCase();
   const normalizedGender = (value: string) =>
-    value.toLowerCase().startsWith("m") ? "m" : value.toLowerCase().startsWith("f") ? "f" : "";
+    value.trim().toLowerCase().startsWith("m")
+      ? "m"
+      : value.trim().toLowerCase().startsWith("f")
+        ? "f"
+        : "";
   return {
     dateOfBirth: /^\d{4}-\d{2}-\d{2}$/.test(dob) && dob <= cutoff && dob === profile.dob,
     gender:
-      Boolean(gender) &&
-      normalizedGender(gender) !== "" &&
-      normalizedGender(gender) === normalizedGender(profile.gender),
-    country: Boolean(country) && country === profile.country.toUpperCase(),
+      normalizedGender(identity.Gender) !== "" &&
+      normalizedGender(identity.Gender) === normalizedGender(profile.gender),
+    country: idCountryMatches(identity, profile),
   };
+}
+
+/** Whether a verification still stands for the profile as it is now. */
+export function stillVerified(
+  state:
+    | {
+        status: string;
+        verifiedAvatarKey: string | null;
+        verifiedDob: string | null;
+        verifiedGender: string | null;
+      }
+    | null
+    | undefined,
+  profile: { avatarKey: string | null; dateOfBirth: string | null; gender: string | null },
+): boolean {
+  return (
+    state?.status === "verified" &&
+    Boolean(state.verifiedAvatarKey) &&
+    state.verifiedAvatarKey === profile.avatarKey &&
+    state.verifiedDob === profile.dateOfBirth &&
+    state.verifiedGender === profile.gender
+  );
 }

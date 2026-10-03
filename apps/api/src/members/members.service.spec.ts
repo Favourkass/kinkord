@@ -102,19 +102,11 @@ const makeService = () => {
     following,
     areFriends,
   } as unknown as FollowsService;
-  const kyc = { isFullyVerified: vi.fn(async () => false) };
   const postCountsFor = vi.fn(async () => new Map<string, number>());
   const postMediaFor = vi.fn(async () => ({ rows: [], total: 0 }));
   const posts = { postCountsFor, postMediaFor } as unknown as PostsService;
   return {
-    service: new MembersService(
-      db,
-      storage,
-      follows,
-      posts,
-      kyc as unknown as import("../verification/kyc.service").KycService,
-    ),
-    kyc,
+    service: new MembersService(db, storage, follows, posts),
     postCountsFor,
     postMediaFor,
     select,
@@ -452,18 +444,35 @@ describe("MembersService.publicProfile visibility (Edit Profile → Privacy)", (
     expect(areFriends).not.toHaveBeenCalled();
   });
 
-  it("emits the unified kyc flag only when the policy service awards full KYC", async () => {
-    const { service, select, kyc } = makeService();
-    kyc.isFullyVerified.mockResolvedValueOnce(true);
-    select.mockReturnValueOnce(chain(rowFor("public")));
-    const sealed = await service.publicProfile("nene", "me");
-    expect(sealed.verification.kyc).toBe(true);
-    expect(kyc.isFullyVerified).toHaveBeenCalledWith("u2");
+  it("shows the Verified badge only for the profile as verified, and as the member allows", async () => {
+    const { service, select } = makeService();
+    const verified = (over: Record<string, unknown> = {}, visibility = "public") => {
+      const [row] = rowFor(visibility);
+      return [
+        {
+          ...row,
+          p: { ...row.p, avatarKey: "avatars/u2/a.jpg", showVerifiedBadge: true, ...over },
+          bronze: {
+            status: "verified",
+            verifiedAvatarKey: "avatars/u2/a.jpg",
+            verifiedDob: "2000-01-01",
+            verifiedGender: "Female",
+          },
+        },
+      ];
+    };
+    select.mockReturnValueOnce(chain(verified()));
+    expect((await service.publicProfile("nene", "me")).verification.identity).toBe(true);
 
-    kyc.isFullyVerified.mockResolvedValueOnce(false);
-    select.mockReturnValueOnce(chain(rowFor("public")));
-    const open = await service.publicProfile("nene", "me");
-    expect(open.verification.kyc).toBeUndefined();
+    // A new birth date since verifying takes it away.
+    select.mockReturnValueOnce(chain(verified({ dateOfBirth: "1990-01-01" })));
+    expect((await service.publicProfile("nene", "me")).verification.identity).toBeUndefined();
+
+    // The member chose to hide it from others, but still sees it themselves.
+    select.mockReturnValueOnce(chain(verified({ showVerifiedBadge: false })));
+    expect((await service.publicProfile("nene", "me")).verification.identity).toBeUndefined();
+    select.mockReturnValueOnce(chain(verified({ showVerifiedBadge: false })));
+    expect((await service.publicProfile("nene", "u2")).verification.identity).toBe(true);
   });
 });
 

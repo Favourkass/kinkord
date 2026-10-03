@@ -1,48 +1,29 @@
 import { Module } from "@nestjs/common";
+import { AdminGuard } from "../moderation/admin.guard";
+import { PushModule } from "../push/push.module";
 import {
+  BronzeAdminController,
   BronzeController,
-  BronzeReviewController,
   DiditCallbackController,
-  SmileIdCallbackController,
 } from "./bronze.controller";
 import { BronzeRepository } from "./bronze.repository";
 import { BronzeService } from "./bronze.service";
-import { SmileIdService } from "./smile-id.service";
 import { DiditService } from "./didit.service";
 import { ProfileMatchService } from "./profile-match.service";
-import { KycController, KycReviewController, MonoCallbackController } from "./kyc.controller";
-import { KycRepository } from "./kyc.repository";
-import { KycService } from "./kyc.service";
-import { KycIngestionService } from "./kyc-ingestion.service";
-import { KycLocationService } from "./kyc-location.service";
-import { MonoService } from "./mono.service";
-import { KycFinancialService } from "./kyc-financial.service";
-import { KycReviewService } from "./kyc-review.service";
+import { VerificationConfig } from "./verification-config";
 
+/** Identity verification through Didit; off until its settings say otherwise. */
 @Module({
-  controllers: [
-    BronzeController,
-    BronzeReviewController,
-    DiditCallbackController,
-    SmileIdCallbackController,
-    KycController,
-    MonoCallbackController,
-    KycReviewController,
-  ],
+  imports: [PushModule],
+  controllers: [BronzeController, DiditCallbackController, BronzeAdminController],
   providers: [
+    VerificationConfig,
     BronzeRepository,
     BronzeService,
     DiditService,
-    SmileIdService,
     ProfileMatchService,
-    KycRepository,
-    KycService,
-    KycIngestionService,
-    KycLocationService,
-    MonoService,
-    KycFinancialService,
-    KycReviewService,
+    AdminGuard,
   ],
-  exports: [KycService, KycRepository],
+  exports: [BronzeService],
 })
 export class VerificationModule {}

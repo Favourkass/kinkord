@@ -18,7 +18,7 @@ export default function ModerationLayout({ children }: { children: ReactNode }) 
       handle={vm.handle}
       avatarUrl={vm.avatarUrl}
       membersCount={vm.membersCount}
-      kycVerified={vm.kycVerified}
+      verified={vm.verified}
       notificationsUnread={vm.notificationsUnread}
       activeNav="settings"
       drawerOpen={vm.drawerOpen}

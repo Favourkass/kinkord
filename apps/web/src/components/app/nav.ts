@@ -11,6 +11,8 @@ export type AppNav =
   | "settings"
   | "saved"
   | "edit-profile"
+  | "security"
+  | "verification"
   | "none";
 
 export interface AppNavLinks {
@@ -57,6 +59,10 @@ export interface DrawerNavItem {
   href: string;
   icon: DrawerIcon;
   count?: "members";
+  /** Marked as the current page when the shell's active nav matches. */
+  nav?: AppNav;
+  /** Not built yet: the link opens a "coming soon" screen. */
+  soon?: boolean;
 }
 
 export interface DrawerNavGroup {
@@ -65,7 +71,11 @@ export interface DrawerNavGroup {
 }
 
 export interface DrawerNavigation {
+  menuLabel: string;
   primary: DrawerNavItem[];
   settingsLabel: string;
   settingsGroups: DrawerNavGroup[];
+  soonLabel: string;
+  viewProfileLabel: string;
+  verifiedLabel: string;
 }

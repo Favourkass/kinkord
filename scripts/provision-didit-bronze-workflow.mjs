@@ -1,7 +1,11 @@
 /**
- * Provision Kinkord's linear Bronze workflow in a Didit application.
+ * Creates Kinkord's identity verification workflow ("Bronze") in a Didit
+ * application: ID document, active liveness, face match to the ID, and for
+ * Nigerian IDs a NIMC lookup. Put the returned id in the verification
+ * settings (DIDIT_WORKFLOW_ID locally, diditWorkflowId in kinkord/verification).
+ *
  * Run with: node --env-file=apps/api/.env scripts/provision-didit-bronze-workflow.mjs dry-run|inspect|create sandbox|live
- * The environment defaults to sandbox. Live creation must be requested explicitly.
+ * The environment defaults to sandbox; live must be asked for explicitly.
  * The API key is read only from the environment and is never logged.
  */
 
@@ -23,7 +27,9 @@ const payload = {
   workflow_label: label,
   status: "published",
   is_default: false,
-  is_desktop_allowed: true,
+  // Phone cameras only: a desktop webcam is easier to feed a fake video.
+  // Didit offers desktop visitors a QR code to carry on on their phone.
+  is_desktop_allowed: false,
   session_expiration_time: 86400,
   features: [
     {

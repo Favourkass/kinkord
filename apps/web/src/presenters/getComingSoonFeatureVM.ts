@@ -5,12 +5,13 @@ export interface ComingSoonFeatureVM {
   subcopy: string;
 }
 
-const features: Record<string, ComingSoonFeatureVM> = {
-  saved: {
-    headline: "SAVED",
-    constructionLead: "Saved content is",
+/** Menu destinations that aren't built yet, by their /coming-soon/[feature] slug. */
+const FEATURES = {
+  kinkopedia: {
+    headline: "KINKOPEDIA",
+    constructionLead: "Kinkopedia is",
     constructionAccent: "coming soon",
-    subcopy: "Your private collection of saved posts, profiles and resources is being prepared.",
+    subcopy: "The library on consent, safety and the lifestyle is being written.",
   },
   "kinkcoins-payment": {
     headline: "KINKCOINS & PAYMENT",
@@ -48,15 +49,11 @@ const features: Record<string, ComingSoonFeatureVM> = {
     constructionAccent: "coming soon",
     subcopy: "Reporting, blocking and community-safety tools are being brought together here.",
   },
-};
+} satisfies Record<string, ComingSoonFeatureVM>;
 
-export function getComingSoonFeatureVM(feature: string): ComingSoonFeatureVM {
-  return (
-    features[feature] ?? {
-      headline: "COMING SOON",
-      constructionLead: "This feature is",
-      constructionAccent: "on the way",
-      subcopy: "We are still preparing this part of Kinkord.",
-    }
-  );
+export const COMING_SOON_FEATURES = Object.keys(FEATURES);
+
+/** Copy for one unfinished feature; null for a slug that isn't one (the route 404s). */
+export function getComingSoonFeatureVM(feature: string): ComingSoonFeatureVM | null {
+  return Object.hasOwn(FEATURES, feature) ? FEATURES[feature as keyof typeof FEATURES] : null;
 }

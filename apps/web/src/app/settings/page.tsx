@@ -53,7 +53,7 @@ export default function SettingsPage() {
       handle={vm.handle}
       avatarUrl={vm.avatarUrl}
       membersCount={vm.membersCount}
-      kycVerified={vm.kycVerified}
+      verified={vm.verified}
       notificationsUnread={vm.notificationsUnread}
       activeNav="settings"
       drawerOpen={vm.drawerOpen}
@@ -99,10 +99,10 @@ export default function SettingsPage() {
           <ChevronRightIcon className="text-[#b8850f]" />
         </Link>
         <Link
-          href={Routes.settingsKyc}
+          href={Routes.settingsVerification}
           className="mt-[12px] flex h-[52px] items-center justify-between rounded-[16px] bg-app-members px-[18px] text-[18px] font-medium text-app-name"
         >
-          Kinkord KYC
+          Verification
           <ChevronRightIcon className="text-[#b8850f]" />
         </Link>
         {admin.isAdmin ? (

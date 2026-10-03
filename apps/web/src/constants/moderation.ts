@@ -1,7 +1,12 @@
 /** Copy for the admin moderation screens. */
 export const MODERATION_COPY = {
   title: "Admin",
-  tabs: { members: "Members", reports: "Reports", blocklist: "Block list" },
+  tabs: {
+    members: "Members",
+    reports: "Reports",
+    verification: "Verification",
+    blocklist: "Block list",
+  },
   reports: {
     statuses: { open: "Open", resolved: "Resolved", dismissed: "Dismissed" },
     loading: "Loading reports…",
@@ -17,6 +22,59 @@ export const MODERATION_COPY = {
     dismiss: "Dismiss",
     photo: "Photo",
   },
+  verification: {
+    intro:
+      "Identity checks Didit couldn't settle alone. Compare the photo members see with the original upload and the Didit session, then decide.",
+    loading: "Loading verifications…",
+    empty: "No verifications to review.",
+    refresh: "Refresh (photo links last 10 minutes)",
+    noName: "Unnamed member",
+    openMember: "Open member",
+    photo: "Profile photo (as members see it)",
+    original: "Original upload",
+    session: "Didit session",
+    why: "Why it needs a person",
+    checksHeading: "Checks",
+    passed: "Passed",
+    notPassed: "Not passed",
+    approve: "Approve",
+    reject: "Reject",
+    cannotApprove: "The ID checks didn't pass, so this can only be rejected.",
+    checks: {
+      governmentId: "Government ID",
+      liveness: "Live selfie",
+      idFace: "Selfie matches ID",
+      profileFace: "Selfie matches profile photo",
+      dateOfBirth: "Birth date matches profile",
+      gender: "Gender matches profile",
+      country: "ID country matches profile",
+    },
+    reasons: {
+      PROFILE_PHOTO_FACE_MATCH_REQUIRED: "The profile photo match needs a person to check it",
+      PROFILE_PHOTO_MATCH_INCONCLUSIVE: "The selfie and profile photo didn't clearly match",
+      LOW_FACE_MATCH_SIMILARITY: "The selfie and profile photo didn't look alike enough",
+      PROFILE_PHOTO_MATCH_UNAVAILABLE: "The profile photo comparison wasn't available",
+      PROFILE_PHOTO_MATCH_INTERRUPTED: "The profile photo comparison was interrupted",
+      PROFILE_PHOTO_MATCH_CONSENT_REQUIRED: "No consent on record for the photo comparison",
+      PROFILE_PHOTO_CAPTURE_UNAVAILABLE: "Didit didn't return a selfie to compare",
+      PROFILE_CHANGED_DURING_VERIFICATION: "They changed their profile during the check",
+      ID_COUNTRY_UNCONFIRMED: "The ID's country doesn't match their nationality or country",
+      IDENTITY_ON_ANOTHER_ACCOUNT: "This ID is already verified on another account",
+    } as Record<string, string>,
+    decision: {
+      approveTitle: "Approve this verification?",
+      approveBody:
+        "They get the verified badge. Only approve if the selfie in Didit and the profile photo are clearly the same person, and the ID's country makes sense for them.",
+      rejectTitle: "Reject this verification?",
+      rejectBody: "The attempt counts as failed. They can try again if they have attempts left.",
+      evidenceLabel: "Evidence reference (e.g. the Didit session)",
+      reasonLabel: "Reason (at least 10 characters, kept in the audit log)",
+    },
+    notices: {
+      approved: "Approved. They're verified.",
+      rejected: "Rejected.",
+    },
+  },
   denied: "This area is for admins only.",
   checking: "Checking access…",
   search: {
@@ -31,12 +89,25 @@ export const MODERATION_COPY = {
     noPosts: "No posts.",
     rules: "Sign-up rules for this member",
     protected: "Admin accounts can't be blocked or deleted here.",
+    verification: "Identity verification",
+    verificationStatuses: {
+      not_started: "Not verified",
+      pending: "Checking with Didit",
+      failed: "Last check didn't pass",
+      manual_review: "Waiting for review",
+      verified: "Verified",
+      rejected: "Rejected",
+      revoked: "Revoked",
+    },
+    attemptsUsed: (n: number) => `${n} of 3 attempts used`,
     actions: {
       block: "Block",
       unblock: "Unblock",
       deletePosts: "Delete all posts",
       deleteAccount: "Delete account",
       deletePost: "Delete",
+      revokeVerification: "Revoke verification",
+      reopenVerification: "Allow verifying again",
     },
   },
   dialogs: {
@@ -63,6 +134,16 @@ export const MODERATION_COPY = {
       body: "The post and its photos are removed. This can't be undone.",
       confirm: "Delete post",
     },
+    revokeVerification: {
+      title: "Revoke their verification?",
+      body: "Their verified badge goes, and any check in progress stops. They can't verify again until an admin allows it.",
+      confirm: "Revoke",
+    },
+    reopenVerification: {
+      title: "Let them verify again?",
+      body: "They get a fresh set of 3 attempts.",
+      confirm: "Allow",
+    },
     deleteAccount: {
       title: "Delete this account?",
       body: "The account, posts, comments, likes, follows and photos are permanently deleted. This can't be undone.",
@@ -79,6 +160,8 @@ export const MODERATION_COPY = {
     unblocked: "Unblocked.",
     postsDeleted: (n: number) => `${n} ${n === 1 ? "post" : "posts"} deleted.`,
     postDeleted: "Post deleted.",
+    verificationRevoked: "Verification revoked.",
+    verificationReopened: "They can verify again.",
   },
   blocklist: {
     intro:

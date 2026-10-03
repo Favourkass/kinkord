@@ -11,7 +11,13 @@ import {
 } from "@nestjs/common";
 import { z } from "zod";
 import { AuthGuard, type AuthedRequest } from "../auth/auth.guard";
+import { AdminGuard } from "../moderation/admin.guard";
 import { BronzeService } from "./bronze.service";
+
+const consentSchema = z.object({
+  accepted: z.literal(true),
+  policyVersion: z.string().trim().min(1).max(128),
+});
 
 @Controller("verification/bronze")
 @UseGuards(AuthGuard)
@@ -21,30 +27,30 @@ export class BronzeController {
   @Get("status") status(@Req() req: AuthedRequest) {
     return this.bronze.status(req.user.id);
   }
-  @Post("consent") consent(
-    @Req() req: AuthedRequest,
-    @Body() body: { accepted?: boolean; policyVersion?: string },
-  ) {
-    return this.bronze.consent(req.user.id, body?.accepted === true, body?.policyVersion ?? "");
+
+  @Post("consent") consent(@Req() req: AuthedRequest, @Body() body: unknown) {
+    const parsed = consentSchema.safeParse(body);
+    if (!parsed.success)
+      throw new BadRequestException("The current verification consent is required.");
+    return this.bronze.consent(req.user.id, true, parsed.data.policyVersion);
   }
+
+  @Post("consent/withdraw") withdraw(@Req() req: AuthedRequest) {
+    return this.bronze.withdraw(req.user.id);
+  }
+
   @Post("attempts") start(@Req() req: AuthedRequest) {
     return this.bronze.start(req.user.id);
-  }
-}
-
-@Controller("webhooks/smile-id")
-export class SmileIdCallbackController {
-  constructor(private readonly bronze: BronzeService) {}
-  @Post() callback(@Body() body: unknown) {
-    return this.bronze.smileCallback(body);
   }
 }
 
 @Controller("webhooks/didit")
 export class DiditCallbackController {
   constructor(private readonly bronze: BronzeService) {}
+
+  /** The body arrives as raw bytes (main.ts), because Didit signs exactly those. */
   @Post() callback(
-    @Body() body: Buffer,
+    @Body() body: unknown,
     @Headers("x-signature-v2") signatureV2?: string,
     @Headers("x-signature") signatureRaw?: string,
     @Headers("x-timestamp") timestamp?: string,
@@ -53,31 +59,47 @@ export class DiditCallbackController {
   }
 }
 
-const reviewDecisionSchema = z.object({
+const decisionSchema = z.object({
   decision: z.enum(["approve", "reject"]),
-  profileFaceMatches: z.boolean(),
   evidenceReference: z.string().trim().min(3).max(256),
   reason: z.string().trim().min(10).max(1000),
 });
+const uuid = z.string().uuid();
+const userId = z.string().trim().min(1).max(64);
 
-@Controller("verification/bronze/reviews")
-@UseGuards(AuthGuard)
-export class BronzeReviewController {
+/** Verification reviews, for the same admins who moderate. */
+@Controller("admin/verification")
+@UseGuards(AuthGuard, AdminGuard)
+export class BronzeAdminController {
   constructor(private readonly bronze: BronzeService) {}
 
-  @Get() list(@Req() req: AuthedRequest) {
+  @Get("reviews") reviews(@Req() req: AuthedRequest) {
     return this.bronze.reviews(req.user);
   }
 
-  @Post(":id/decision") decide(
+  @Post("reviews/:id/decision") decide(
     @Req() req: AuthedRequest,
     @Param("id") id: string,
     @Body() body: unknown,
   ) {
-    const parsed = reviewDecisionSchema.safeParse(body);
-    if (!z.string().uuid().safeParse(id).success || !parsed.success) {
-      throw new BadRequestException("A valid review decision and evidence reference are required.");
-    }
+    const parsed = decisionSchema.safeParse(body);
+    if (!uuid.safeParse(id).success || !parsed.success)
+      throw new BadRequestException("A decision, an evidence reference and a reason are required.");
     return this.bronze.decideReview(req.user, { id, ...parsed.data });
+  }
+
+  @Get("members/:userId") member(@Param("userId") id: string) {
+    if (!userId.safeParse(id).success) throw new BadRequestException("Invalid member.");
+    return this.bronze.adminStatus(id);
+  }
+
+  @Post("members/:userId/revoke") revoke(@Req() req: AuthedRequest, @Param("userId") id: string) {
+    if (!userId.safeParse(id).success) throw new BadRequestException("Invalid member.");
+    return this.bronze.revoke(req.user, id);
+  }
+
+  @Post("members/:userId/reopen") reopen(@Req() req: AuthedRequest, @Param("userId") id: string) {
+    if (!userId.safeParse(id).success) throw new BadRequestException("Invalid member.");
+    return this.bronze.reopen(req.user, id);
   }
 }

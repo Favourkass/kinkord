@@ -120,8 +120,8 @@ export interface PublicProfilePM {
   restricted: boolean;
   /** Only your own profile carries the birth date. */
   dateOfBirth: string | null;
-  /** `legacyIdentity` is deliberately not promoted to full KYC during migration. */
-  verification: { email: boolean; phone: boolean; kyc?: boolean; legacyIdentity?: boolean };
+  /** `identity`: a verified ID and selfie, sent only when the member shows it to this viewer. */
+  verification: { email: boolean; phone: boolean; identity?: boolean };
 }
 
 export type SocialPlatform = "facebook" | "x";
@@ -218,7 +218,7 @@ export interface PublicProfileVM {
   roles: string[];
   limits: string | null;
   socialLinks: SocialLinkVM[];
-  verification: { level: "kyc" | "identity" | "basic" | "none"; email: boolean; phone: boolean };
+  verification: { level: "identity" | "basic" | "none"; email: boolean; phone: boolean };
   restricted: boolean;
 }
 
@@ -366,13 +366,11 @@ export function toPublicProfileVM(
       return url ? [{ platform, url, handle: socialHandle(url) }] : [];
     }),
     verification: {
-      level: pm.verification?.kyc
-        ? "kyc"
-        : pm.verification?.legacyIdentity
-          ? "identity"
-          : pm.verification?.email || pm.verification?.phone
-            ? "basic"
-            : "none",
+      level: pm.verification?.identity
+        ? "identity"
+        : pm.verification?.email || pm.verification?.phone
+          ? "basic"
+          : "none",
       email: Boolean(pm.verification?.email),
       phone: Boolean(pm.verification?.phone),
     },

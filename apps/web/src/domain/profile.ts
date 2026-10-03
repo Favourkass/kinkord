@@ -37,6 +37,10 @@ export interface OwnProfilePM {
   limits: string | null;
   socialLinks: SocialLinks;
   profileVisibility: ProfileVisibility;
+  /** Identity verified, and still true for the current photo, birth date and gender. */
+  identityVerified: boolean;
+  /** Whether other members see the verified badge. */
+  showVerifiedBadge: boolean;
   displayNameChangedAt: string | null;
   /** null = a change is allowed now; otherwise when the 30-day lock lifts. */
   canChangeDisplayNameAt: string | null;
@@ -97,7 +101,9 @@ export type EditRowKey =
   | "occupation"
   | "languages"
   | "socialLinks"
-  | "profileVisibility";
+  | "profileVisibility"
+  /** Show or hide the verified badge; only offered once the member is verified. */
+  | "verifiedBadge";
 
 export interface EditorOption {
   value: string;

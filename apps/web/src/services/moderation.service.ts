@@ -7,12 +7,16 @@ import type {
   AdminMemberPM,
   AdminReportPM,
   AdminReportStatus,
+  AdminVerificationReviewPM,
+  AdminVerificationStatePM,
+  AdminVerificationStatus,
   BlockRulePM,
   NewBlockRulePM,
 } from "@/domain/moderation";
 import { api } from "./apiClient";
 
 const member = (id: string) => `/admin/members/${encodeURIComponent(id)}`;
+const verificationOf = (id: string) => `/admin/verification/members/${encodeURIComponent(id)}`;
 
 export const moderationService = {
   access: () => api.get<{ isAdmin: boolean }>("/admin/access"),
@@ -47,6 +51,26 @@ export const moderationService = {
       `/admin/reports/${encodeURIComponent(id)}/resolve`,
       { status },
     ),
+
+  /** Identity checks waiting for an admin, oldest first. Needs 2FA on the admin's account. */
+  verificationReviews: () => api.get<AdminVerificationReviewPM[]>("/admin/verification/reviews"),
+
+  decideVerification: (
+    id: string,
+    body: { decision: "approve" | "reject"; evidenceReference: string; reason: string },
+  ) =>
+    api.post<{ status: AdminVerificationStatus }>(
+      `/admin/verification/reviews/${encodeURIComponent(id)}/decision`,
+      body,
+    ),
+
+  memberVerification: (id: string) => api.get<AdminVerificationStatePM>(verificationOf(id)),
+
+  revokeVerification: (id: string) =>
+    api.post<{ status: AdminVerificationStatus }>(`${verificationOf(id)}/revoke`, {}),
+
+  reopenVerification: (id: string) =>
+    api.post<{ status: AdminVerificationStatus }>(`${verificationOf(id)}/reopen`, {}),
 
   rules: () => api.get<BlockRulePM[]>("/admin/blocklist"),
 

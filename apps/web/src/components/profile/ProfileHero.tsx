@@ -1,6 +1,6 @@
 import Link from "next/link";
 import MaskIcon from "@/components/app/MaskIcon";
-import KycVerifiedMark from "@/components/brand/KycVerifiedMark";
+import VerifiedMark from "@/components/brand/VerifiedMark";
 import type { PublicProfileVM } from "@/domain/member";
 import ExpandableAvatar from "./ExpandableAvatar";
 
@@ -13,6 +13,8 @@ export interface ProfileHeroLabels {
   /** Own profile (Figma 1167:552); inert until stories ship. */
   addToStory: string;
   comingSoon: string;
+  /** Shown when the member's identity is verified and they show it. */
+  identityVerified: string;
   stats: { friends: string; followers: string; following: string };
 }
 
@@ -91,15 +93,10 @@ export default function ProfileHero({
             <span className="text-[16px] leading-[19px] text-pf-muted">· {vm.handle}</span>
           )}
         </p>
-        {vm.verification.level === "kyc" ? (
-          <span className="flex items-center gap-1.5 rounded-full border border-kink-gold-bright px-3 py-1 text-xs font-bold text-kink-gold-bright">
-            <KycVerifiedMark size={16} />
-            Kinkord KYC Verified
-          </span>
-        ) : null}
         {vm.verification.level === "identity" ? (
-          <span className="rounded-full border border-kink-gold-bright/60 px-3 py-1 text-xs font-bold text-kink-gold-bright">
-            Identity Verified
+          <span className="flex items-center gap-[6px] rounded-full border border-kink-gold-bright/60 px-[12px] py-[4px] text-[12px] font-bold text-kink-gold-bright">
+            <VerifiedMark size={16} />
+            {labels.identityVerified}
           </span>
         ) : null}
         <p className="flex items-center gap-[12px] text-[13px] font-bold leading-[16px] text-pf-muted">

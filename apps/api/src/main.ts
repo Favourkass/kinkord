@@ -52,11 +52,8 @@ async function bootstrap() {
     if (req.url.startsWith("/api/auth")) return void authHandler(req, res);
     next();
   });
-  // Smile's biometric KYC callback can include ID-authority data up to 1.5 MB;
-  // retain the tighter limit on all other API routes.
-  express.use("/webhooks/smile-id", json({ limit: "2mb" }));
-  // Didit signs the exact request bytes; parse this route as a Buffer first.
-  express.use("/webhooks/didit", raw({ type: "application/json", limit: "2mb" }));
+  // Didit signs the exact request bytes; keep this route's body as a Buffer.
+  express.use("/webhooks/didit", raw({ type: "application/json", limit: "512kb" }));
   express.use(json({ limit: "1mb" }));
   express.use(urlencoded({ extended: true }));
 

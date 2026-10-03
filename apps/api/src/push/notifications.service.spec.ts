@@ -280,6 +280,7 @@ describe("notification links and search words", () => {
     expect(notificationUrl("follow", null, null)).toBe("/notifications");
     expect(notificationUrl("like", "p1", "ada")).toBe("/p/p1");
     expect(notificationUrl("report", null, null)).toBe("/moderation/reports");
+    expect(notificationUrl("verification", null, null)).toBe("/moderation/verification");
     expect(notificationUrl("test", null, null)).toBe("/settings");
   });
 

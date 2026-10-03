@@ -12,7 +12,7 @@ export interface FeedShellProps {
   name: string;
   avatarUrl: string | null;
   membersCount: string;
-  kycVerified: boolean;
+  verified: boolean;
   notificationsUnread?: boolean;
   drawerOpen: boolean;
   settingsMenuOpen: boolean;
@@ -45,7 +45,7 @@ export default function FeedShell({
   name,
   avatarUrl,
   membersCount,
-  kycVerified,
+  verified,
   notificationsUnread,
   drawerOpen,
   settingsMenuOpen,
@@ -113,12 +113,13 @@ export default function FeedShell({
           notificationsUnread={notificationsUnread}
         />
         <SidebarDrawer
+          active="home"
           open={drawerOpen}
           onClose={onCloseDrawer}
           name={name}
           avatarUrl={avatarUrl}
           membersCount={membersCount}
-          kycVerified={kycVerified}
+          verified={verified}
           links={links}
           labels={labels}
           navigation={drawerNavigation}

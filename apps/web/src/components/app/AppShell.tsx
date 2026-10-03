@@ -16,7 +16,7 @@ export interface AppShellProps {
   handle: string;
   avatarUrl: string | null;
   membersCount: string;
-  kycVerified: boolean;
+  verified: boolean;
   notificationsUnread?: boolean;
   /** Highlighted bottom tab; omit on screens outside the tab bar (e.g. Settings). */
   activeTab?: AppTab;
@@ -47,7 +47,7 @@ export default function AppShell({
   name,
   avatarUrl,
   membersCount,
-  kycVerified,
+  verified,
   notificationsUnread,
   activeTab,
   activeNav,
@@ -87,10 +87,11 @@ export default function AppShell({
         <SidebarDrawer
           open={drawerOpen}
           onClose={onCloseDrawer}
+          active={activeNav}
           name={name}
           avatarUrl={avatarUrl}
           membersCount={membersCount}
-          kycVerified={kycVerified}
+          verified={verified}
           links={links}
           labels={labels}
           navigation={drawerNavigation}

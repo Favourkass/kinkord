@@ -22,6 +22,7 @@ export default function ModerationMemberPage() {
     >
       <MemberDetailView
         vm={p.vm}
+        verification={p.verification}
         loading={p.loading}
         error={p.error}
         notice={p.notice}
@@ -33,6 +34,8 @@ export default function ModerationMemberPage() {
         onDeletePosts={p.onDeletePosts}
         onDeleteAccount={p.onDeleteAccount}
         onDeletePost={p.onDeletePost}
+        onRevokeVerification={p.onRevokeVerification}
+        onReopenVerification={p.onReopenVerification}
       />
     </ModerationFrame>
   );

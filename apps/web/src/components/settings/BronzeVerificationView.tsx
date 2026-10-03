@@ -1,118 +1,208 @@
 import Link from "next/link";
-import { ShieldCheck } from "lucide-react";
+import VerifiedMark from "@/components/brand/VerifiedMark";
+
+interface LinkVM {
+  linkLabel: string;
+  href: string;
+}
 
 export interface BronzeVerificationViewProps {
-  status: string;
-  attemptsRemaining: number;
-  missing: string[];
-  checked: boolean;
-  onChecked: (value: boolean) => void;
-  busy: boolean;
-  canStart: boolean;
-  providerAvailable: boolean;
-  policyUrl: string | null;
-  onStart: () => void;
-  onRefresh: () => void;
-  editProfileHref: string;
+  title: string;
+  intro: string;
+  status: {
+    heading: string;
+    label: string;
+    detail: string;
+    tone: "neutral" | "good" | "warn" | "bad";
+  };
+  attempts: string | null;
+  badgeHint: ({ text: string } & LinkVM) | null;
+  unavailable: string | null;
+  needs: ({ heading: string; text: string; items: string[] } & LinkVM) | null;
+  settling: string | null;
+  checks: { heading: string; items: readonly string[]; note: string };
+  privacy: { label: string; href: string };
+  consent: { text: string; checked: boolean; onChange: (checked: boolean) => void } | null;
+  outdatedPage: string | null;
+  start: { label: string; visible: boolean; enabled: boolean; onClick: () => void } | null;
+  refresh: { label: string; onClick: () => void } | null;
+  withdraw: { label: string; onClick: () => void } | null;
+  withdrawConfirm: {
+    title: string;
+    body: string;
+    confirmLabel: string;
+    cancelLabel: string;
+    busy: boolean;
+    onConfirm: () => void;
+    onCancel: () => void;
+  } | null;
+  notice: string | null;
+  actionError: string | null;
 }
 
 const card = "rounded-[16px] border border-app-card-border bg-app-card p-[18px]";
+const toneClass = {
+  neutral: "text-app-value",
+  good: "text-kink-gold-bright",
+  warn: "text-kink-amber",
+  bad: "text-app-danger",
+} as const;
+const textLink = "font-bold text-kink-gold-bright underline underline-offset-4";
 
+/** Settings → Verification. Renders the presenter's view model; decides nothing. */
 export default function BronzeVerificationView(p: BronzeVerificationViewProps) {
   return (
-    <div className="flex flex-col gap-5 text-app-text">
-      <div>
-        <div className="flex items-center gap-3">
-          <ShieldCheck aria-hidden="true" size={36} className="text-kink-gold-bright" />
-          <h1 className="text-[24px] font-black text-kink-gold-bright">Kinkord KYC</h1>
-        </div>
-        <p className="mt-2 text-sm text-app-subtle">
-          Start the identity and live-biometric stage of Kinkord KYC. Your identity documents and
-          camera capture are never displayed on your profile.
-        </p>
-      </div>
-      <section className={card}>
-        <h2 className="font-bold">Status: {p.status}</h2>
-        <p className="mt-2 text-sm">
-          {p.attemptsRemaining} automated attempt{p.attemptsRemaining === 1 ? "" : "s"} remaining
-          (maximum 3).
-        </p>
-        <button
-          type="button"
-          onClick={p.onRefresh}
-          className="mt-3 text-sm font-bold text-kink-gold-bright underline"
+    <div className="flex flex-col gap-[16px] text-app-text">
+      <header>
+        <h1 className="text-[24px] font-medium text-app-value">{p.title}</h1>
+        <p className="mt-[6px] text-[14px] leading-[20px] text-app-subtle">{p.intro}</p>
+      </header>
+
+      <section className={card} aria-live="polite">
+        <h2 className="text-[13px] font-bold uppercase tracking-wide text-app-muted">
+          {p.status.heading}
+        </h2>
+        <p
+          className={`mt-[6px] flex items-center gap-[8px] text-[18px] font-bold ${toneClass[p.status.tone]}`}
         >
-          Refresh status
-        </button>
-      </section>
-      {p.missing.length ? (
-        <section className={card}>
-          <h2 className="font-bold">Before you begin</h2>
-          <p className="mt-2 text-sm">
-            Add {p.missing.join(", ")} to your profile first. Your profile photo must be a genuine
-            image of you uploaded in the last 90 days.
+          {p.status.tone === "good" ? <VerifiedMark size={22} /> : null}
+          {p.status.label}
+        </p>
+        <p className="mt-[4px] text-[14px] leading-[20px] text-app-subtle">{p.status.detail}</p>
+        {p.attempts ? <p className="mt-[6px] text-[13px] text-app-muted">{p.attempts}</p> : null}
+        {p.badgeHint ? (
+          <p className="mt-[8px] text-[13px] text-app-subtle">
+            {p.badgeHint.text}{" "}
+            <Link href={p.badgeHint.href} className={textLink}>
+              {p.badgeHint.linkLabel}
+            </Link>
           </p>
-          <Link
-            href={p.editProfileHref}
-            className="mt-3 inline-block font-bold text-kink-gold-bright underline"
+        ) : null}
+        {p.refresh ? (
+          <button
+            type="button"
+            onClick={p.refresh.onClick}
+            className={`mt-[10px] text-[14px] ${textLink}`}
           >
-            Edit profile
+            {p.refresh.label}
+          </button>
+        ) : null}
+      </section>
+
+      {p.notice ? (
+        <p
+          role="status"
+          className="rounded-[12px] bg-app-input px-[14px] py-[10px] text-[14px] text-app-value"
+        >
+          {p.notice}
+        </p>
+      ) : null}
+
+      {p.unavailable ? (
+        <p className={`${card} text-[14px] text-app-subtle`}>{p.unavailable}</p>
+      ) : null}
+
+      {p.needs ? (
+        <section className={card}>
+          <h2 className="text-[16px] font-bold text-app-value">{p.needs.heading}</h2>
+          <p className="mt-[6px] text-[14px] text-app-subtle">{p.needs.text}</p>
+          <ul className="mt-[6px] list-disc pl-[20px] text-[14px] text-app-value">
+            {p.needs.items.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+          <Link href={p.needs.href} className={`mt-[10px] inline-block text-[14px] ${textLink}`}>
+            {p.needs.linkLabel}
           </Link>
         </section>
       ) : null}
+
+      {p.settling ? <p className="text-[14px] text-app-subtle">{p.settling}</p> : null}
+
       <section className={card}>
-        <h2 className="font-bold">What we check</h2>
-        <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm">
-          <li>Your supported government ID and official ID details.</li>
-          <li>A live camera capture and face match to the government ID.</li>
-          <li>Your live face against your current Kinkord profile photo.</li>
-          <li>Date of birth, gender and country against your profile.</li>
+        <h2 className="text-[16px] font-bold text-app-value">{p.checks.heading}</h2>
+        <ol className="mt-[8px] list-decimal space-y-[6px] pl-[20px] text-[14px] leading-[20px]">
+          {p.checks.items.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
         </ol>
-        <p className="mt-3 text-sm text-app-subtle">
-          A clear profile-photo match can complete this identity stage automatically. An uncertain
-          result, changed profile photo, or three failed attempts goes to manual review. Kinkord KYC
-          is awarded only after every required KYC stage has passed.
-        </p>
+        <p className="mt-[10px] text-[13px] leading-[19px] text-app-subtle">{p.checks.note}</p>
+        <a
+          href={p.privacy.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`mt-[10px] inline-block text-[14px] ${textLink}`}
+        >
+          {p.privacy.label}
+        </a>
       </section>
-      <section className={card}>
-        {p.policyUrl ? (
-          <a
-            href={p.policyUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mb-3 inline-block text-sm font-bold text-kink-gold-bright underline"
+
+      {p.start?.visible ? (
+        <section className={card}>
+          {p.consent ? (
+            <label className="flex items-start gap-[10px] text-[14px] leading-[20px] text-app-value">
+              <input
+                type="checkbox"
+                checked={p.consent.checked}
+                onChange={(e) => p.consent?.onChange(e.target.checked)}
+                className="mt-[3px] h-[18px] w-[18px] shrink-0 accent-kink-amber"
+              />
+              <span>{p.consent.text}</span>
+            </label>
+          ) : null}
+          {p.outdatedPage ? <p className="text-[14px] text-app-danger">{p.outdatedPage}</p> : null}
+          <button
+            type="button"
+            disabled={!p.start.enabled}
+            onClick={p.start.onClick}
+            className="mt-[16px] h-[48px] w-full rounded-[12px] bg-kink-amber text-[16px] font-bold text-black disabled:opacity-50"
           >
-            Read the Kinkord KYC privacy notice
-          </a>
-        ) : null}
-        <label className="flex items-start gap-3 text-sm">
-          <input
-            type="checkbox"
-            className="mt-1 accent-kink-amber"
-            checked={p.checked}
-            onChange={(e) => p.onChecked(e.target.checked)}
-          />
-          <span>
-            I have read the Kinkord KYC Privacy Notice and explicitly consent to Kinkord and Didit
-            processing my government ID information, live biometric images, and current profile
-            photo for the identity stage, fraud prevention, and review. I understand that a clear
-            result may be decided automatically and that uncertain results may require human review.
-          </span>
-        </label>
+            {p.start.label}
+          </button>
+        </section>
+      ) : null}
+
+      {p.actionError ? (
+        <p role="alert" className="text-[14px] font-semibold text-app-danger">
+          {p.actionError}
+        </p>
+      ) : null}
+
+      {p.withdrawConfirm ? (
+        <section className={`${card} border-app-danger`} aria-label={p.withdrawConfirm.title}>
+          <h2 className="text-[16px] font-bold text-app-value">{p.withdrawConfirm.title}</h2>
+          <p className="mt-[6px] text-[14px] leading-[20px] text-app-subtle">
+            {p.withdrawConfirm.body}
+          </p>
+          <div className="mt-[14px] flex flex-col-reverse gap-[10px] md:flex-row md:justify-end">
+            <button
+              type="button"
+              onClick={p.withdrawConfirm.onCancel}
+              disabled={p.withdrawConfirm.busy}
+              autoFocus
+              className="h-[44px] rounded-[12px] border border-app-input-border bg-app-input px-[18px] text-[15px] font-bold text-app-value disabled:opacity-50"
+            >
+              {p.withdrawConfirm.cancelLabel}
+            </button>
+            <button
+              type="button"
+              onClick={p.withdrawConfirm.onConfirm}
+              disabled={p.withdrawConfirm.busy}
+              className="h-[44px] rounded-[12px] bg-app-danger px-[18px] text-[15px] font-bold text-white disabled:opacity-40"
+            >
+              {p.withdrawConfirm.busy ? "…" : p.withdrawConfirm.confirmLabel}
+            </button>
+          </div>
+        </section>
+      ) : p.withdraw ? (
         <button
           type="button"
-          disabled={!p.canStart}
-          onClick={p.onStart}
-          className="mt-5 w-full rounded-xl bg-kink-amber p-3 font-bold text-black disabled:opacity-50"
+          onClick={p.withdraw.onClick}
+          className="self-start text-[14px] font-bold text-app-subtle underline underline-offset-4"
         >
-          {p.busy ? "Starting…" : "Start identity verification"}
+          {p.withdraw.label}
         </button>
-        {!p.providerAvailable ? (
-          <p className="mt-2 text-sm text-app-subtle">
-            The verification service is not configured yet.
-          </p>
-        ) : null}
-      </section>
+      ) : null}
     </div>
   );
 }

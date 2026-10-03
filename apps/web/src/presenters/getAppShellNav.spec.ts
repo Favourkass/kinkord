@@ -49,6 +49,22 @@ describe("getAppShellNav", () => {
       ],
     );
   });
+
+  it("marks what isn't built yet and keeps Kinkopedia inside the app", () => {
+    const drawer = getAppShellNav().drawer;
+    const items = [...drawer.primary, ...drawer.settingsGroups.flatMap((g) => g.items)];
+    expect(items.filter((item) => item.soon).map((item) => item.key)).toEqual([
+      "kinkopedia",
+      "kinkcoins",
+      "subscription",
+      "marketplace",
+      "your-data",
+      "content-experience",
+      "community-safety",
+    ]);
+    expect(items.every((item) => !item.soon || item.href.startsWith("/coming-soon/"))).toBe(true);
+    expect(items.find((item) => item.key === "verification")?.href).toBe("/settings/verification");
+  });
 });
 
 describe("appShellProps", () => {
@@ -62,7 +78,7 @@ describe("appShellProps", () => {
         handle: "@tega",
         avatarUrl: null,
         membersCount: "128",
-        kycVerified: false,
+        verified: false,
         drawerOpen: false,
         settingsMenuOpen: false,
         openDrawer,

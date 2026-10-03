@@ -1,12 +1,6 @@
-export interface ProfileMatchAudit {
-  outcome: "matched" | "review";
-  reason: string | null;
-  mode: string;
-  threshold: number;
-  score: number | null;
-  requestId: string | null;
-  providerStatus: string | null;
-}
+import type { ProfileMatchAudit } from "../db/schema";
+
+export type { ProfileMatchAudit };
 
 export function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)

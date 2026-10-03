@@ -25,6 +25,7 @@ describe("notification presentation", () => {
     "like",
     "repost",
     "report",
+    "verification",
     "test",
   ])("maps %s into a labelled notification", (type) => {
     const vm = toNotificationVM({ ...item, type }, new Date(item.createdAt));
@@ -58,6 +59,10 @@ describe("notification presentation", () => {
     const vm = toNotificationVM({ ...item, type: "report", actor: null });
     expect(vm).toMatchObject({ official: true, actorName: null, avatarUrl: null });
     expect(vm.body).toBe("New report to review.");
+    expect(toNotificationVM({ ...item, type: "verification", actor: null })).toMatchObject({
+      official: true,
+      body: "New verification to review.",
+    });
   });
 
   it("distinguishes read state and formats recent times", () => {

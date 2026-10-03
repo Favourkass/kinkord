@@ -101,7 +101,7 @@ describe("Badge outcome safety", () => {
     ).toMatchObject({ status: "manual_review", failureCodes: ["PROFILE_PHOTO_MATCH_UNAVAILABLE"] });
     expect(bronzeCallbackOutcome({ ...input, status: "failed" }).status).toBe("failed");
     expect(bronzeCallbackOutcome({ ...input, status: "failed", attemptNumber: 3 }).status).toBe(
-      "manual_review",
+      "rejected",
     );
   });
 });

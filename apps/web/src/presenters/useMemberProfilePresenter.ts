@@ -395,6 +395,7 @@ export function useMemberProfilePresenter(
       editProfile: copy.editProfile,
       addToStory: copy.addToStory,
       comingSoon: copy.comingSoon,
+      identityVerified: copy.about.verified.identity,
       stats: copy.stats,
     },
     sideLabels: {
@@ -404,6 +405,7 @@ export function useMemberProfilePresenter(
       yourself: copy.yourself,
       editProfile: copy.editProfile,
       tagsHeading: copy.desktop.tagsHeading,
+      identityVerified: copy.about.verified.identity,
       stats: copy.stats,
     },
     aboutLabels: copy.about,

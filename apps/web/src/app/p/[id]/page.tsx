@@ -23,7 +23,7 @@ export default function PostPage() {
         name: home.name,
         avatarUrl: home.avatarUrl,
         membersCount: home.membersCount,
-        kycVerified: home.kycVerified,
+        verified: home.verified,
         notificationsUnread: home.notificationsUnread,
         drawerOpen: home.drawerOpen,
         settingsMenuOpen: home.settingsMenuOpen,

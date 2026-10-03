@@ -20,7 +20,7 @@ export default function MembersCountryPage() {
       handle={shell.handle}
       avatarUrl={shell.avatarUrl}
       membersCount={shell.membersCount}
-      kycVerified={shell.kycVerified}
+      verified={shell.verified}
       notificationsUnread={shell.notificationsUnread}
       activeTab="home"
       activeNav="members"

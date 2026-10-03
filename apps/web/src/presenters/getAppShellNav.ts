@@ -24,15 +24,21 @@ interface AppShellDrawerItemVM {
   href: string;
   icon: AppShellDrawerIcon;
   count?: "members";
+  nav?: "members" | "saved" | "settings" | "security" | "verification";
+  soon?: boolean;
 }
 
 interface AppShellDrawerVM {
+  menuLabel: string;
   primary: AppShellDrawerItemVM[];
   settingsLabel: string;
   settingsGroups: Array<{
     label: string;
     items: AppShellDrawerItemVM[];
   }>;
+  soonLabel: string;
+  viewProfileLabel: string;
+  verifiedLabel: string;
 }
 
 /** Structurally matches the shell components' AppNavLinks / AppNavLabels contracts. */
@@ -73,6 +79,7 @@ export function getAppShellNav(): AppShellNavVM {
     },
     labels: { ...MEMBERS_COPY.nav },
     drawer: {
+      menuLabel: "Account menu",
       primary: [
         {
           key: "members",
@@ -80,23 +87,44 @@ export function getAppShellNav(): AppShellNavVM {
           href: Routes.members,
           icon: "members",
           count: "members",
+          nav: "members",
         },
-        { key: "saved", label: "Saved", href: Routes.saved, icon: "saved" },
-        { key: "kinkopedia", label: "Kinkopedia", href: Routes.kinkopedia, icon: "kinkopedia" },
+        { key: "saved", label: "Saved", href: Routes.saved, icon: "saved", nav: "saved" },
+        {
+          key: "kinkopedia",
+          label: "Kinkopedia",
+          href: Routes.kinkopediaInApp,
+          icon: "kinkopedia",
+          soon: true,
+        },
         {
           key: "verification",
           label: "Verification",
-          href: Routes.settingsKyc,
+          href: Routes.settingsVerification,
           icon: "verification",
+          nav: "verification",
         },
-        { key: "kinkcoins", label: "KinkCoins & Payment", href: Routes.kinkCoins, icon: "coins" },
+        {
+          key: "kinkcoins",
+          label: "KinkCoins & Payment",
+          href: Routes.kinkCoins,
+          icon: "coins",
+          soon: true,
+        },
         {
           key: "subscription",
           label: "Subscription",
           href: Routes.subscription,
           icon: "subscription",
+          soon: true,
         },
-        { key: "marketplace", label: "Marketplace", href: Routes.marketplace, icon: "marketplace" },
+        {
+          key: "marketplace",
+          label: "Marketplace",
+          href: Routes.marketplace,
+          icon: "marketplace",
+          soon: true,
+        },
       ],
       settingsLabel: "Settings & Privacy",
       settingsGroups: [
@@ -108,15 +136,28 @@ export function getAppShellNav(): AppShellNavVM {
               label: "Account Settings",
               href: Routes.settings,
               icon: "account",
+              nav: "settings",
             },
-            { key: "your-data", label: "Your Data", href: Routes.settingsData, icon: "data" },
+            {
+              key: "your-data",
+              label: "Your Data",
+              href: Routes.settingsData,
+              icon: "data",
+              soon: true,
+            },
           ],
         },
         {
           label: "Privacy & Security",
           items: [
             { key: "privacy", label: "Privacy", href: Routes.profileEditPrivacy, icon: "privacy" },
-            { key: "security", label: "Security", href: Routes.settingsSecurity, icon: "security" },
+            {
+              key: "security",
+              label: "Security",
+              href: Routes.settingsSecurity,
+              icon: "security",
+              nav: "security",
+            },
           ],
         },
         {
@@ -127,6 +168,7 @@ export function getAppShellNav(): AppShellNavVM {
               label: "Content & Experience",
               href: Routes.settingsContent,
               icon: "content",
+              soon: true,
             },
           ],
         },
@@ -138,6 +180,7 @@ export function getAppShellNav(): AppShellNavVM {
               label: "Community & Safety",
               href: Routes.settingsCommunitySafety,
               icon: "safety",
+              soon: true,
             },
           ],
         },
@@ -149,6 +192,9 @@ export function getAppShellNav(): AppShellNavVM {
           ],
         },
       ],
+      soonLabel: "Soon",
+      viewProfileLabel: "View profile",
+      verifiedLabel: MEMBERS_COPY.profile.about.verified.identity,
     },
   };
 }
@@ -160,7 +206,7 @@ export interface ShellSource {
   handle: string;
   avatarUrl: string | null;
   membersCount: string;
-  kycVerified: boolean;
+  verified: boolean;
   notificationsUnread?: boolean;
   drawerOpen: boolean;
   settingsMenuOpen: boolean;
@@ -179,7 +225,7 @@ export function appShellProps(home: ShellSource, nav: ReturnType<typeof getAppSh
     handle: home.handle,
     avatarUrl: home.avatarUrl,
     membersCount: home.membersCount,
-    kycVerified: home.kycVerified,
+    verified: home.verified,
     notificationsUnread: home.notificationsUnread,
     drawerOpen: home.drawerOpen,
     settingsMenuOpen: home.settingsMenuOpen,

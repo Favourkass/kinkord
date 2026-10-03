@@ -7,7 +7,6 @@ import { api, ApiError } from "@/services/apiClient";
 import { pushService } from "@/services/push.service";
 import { Routes } from "@/constants/Routes";
 import type { MeVM, ProfileVM } from "./useProfilePresenter";
-import type { KycProgressPM } from "@/domain/kyc";
 import { useNotificationBadgePresenter } from "./useNotificationBadgePresenter";
 
 interface CommunityStatsVM {
@@ -17,7 +16,7 @@ interface CommunityStatsVM {
 const settingsDrawerRoutes = new Set<string>([
   Routes.settings,
   Routes.settingsSecurity,
-  Routes.settingsKyc,
+  Routes.settingsVerification,
   Routes.settingsData,
   Routes.settingsContent,
   Routes.settingsCommunitySafety,
@@ -48,7 +47,7 @@ export function useHomePresenter() {
     name: "",
     handle: "",
     avatarUrl: null as string | null,
-    kycVerified: false,
+    verified: false,
     membersCount: "—",
   });
 
@@ -56,11 +55,10 @@ export function useHomePresenter() {
     let cancelled = false;
     void (async () => {
       try {
-        const [me, profile, stats, kyc] = await Promise.all([
+        const [me, profile, stats] = await Promise.all([
           api.get<MeVM & { name?: string | null }>("/me"),
           api.get<ProfileVM>("/profile"),
           api.get<CommunityStatsVM>("/community/stats"),
-          api.get<KycProgressPM>("/verification/kyc/status").catch(() => null),
         ]);
         if (cancelled) return;
         setSignedIn(true);
@@ -72,7 +70,7 @@ export function useHomePresenter() {
           name: profile.displayName || me.username || "",
           handle: me.username ? `@${me.username}` : "",
           avatarUrl: profile.avatarUrl,
-          kycVerified: Boolean(kyc?.fullKycVerified),
+          verified: Boolean(profile.identityVerified),
           membersCount: String(stats.members),
         });
         // Signed in: keep this device's notification subscription current.
