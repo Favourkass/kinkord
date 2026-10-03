@@ -24,6 +24,7 @@ export default function StartChatPage({ params }: { params: Promise<{ userId: st
       handle={shell.handle}
       avatarUrl={shell.avatarUrl}
       membersCount={shell.membersCount}
+      notificationsUnread={shell.notificationsUnread}
       activeTab="chat"
       activeNav="chat"
       drawerOpen={shell.drawerOpen}

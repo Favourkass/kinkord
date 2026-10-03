@@ -70,8 +70,13 @@ export class PostInteractionsService {
 
   /** Idempotent: the composite primary key is what makes a double tap harmless. */
   async like(postId: string, userId: string): Promise<LikeVM> {
-    await this.visiblePost(postId, userId);
-    await this.db.insert(postLike).values({ postId, userId }).onConflictDoNothing();
+    const authorId = await this.visiblePost(postId, userId);
+    const added = await this.db
+      .insert(postLike)
+      .values({ postId, userId })
+      .onConflictDoNothing()
+      .returning({ userId: postLike.userId });
+    if (added.length) this.push.newLike(postId, authorId, userId);
     return this.likeState(postId, userId);
   }
 

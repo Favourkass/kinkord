@@ -31,7 +31,7 @@ const posts = (author: string | null = "u2", postId = "p1") => ({
   byId: vi.fn(async () => (author ? { postId, author: { userId: author } } : null)),
 });
 
-const push = { newComment: vi.fn() };
+const push = { newComment: vi.fn(), newLike: vi.fn() };
 
 const service = (db = makeDb(), p = posts()) =>
   new PostInteractionsService(db as never, p as never, storage() as never, push as never);
@@ -186,5 +186,24 @@ describe("PostInteractionsService saves", () => {
 
   it("will not let a stranger save a post they cannot read", async () => {
     await expect(service(makeDb(), posts(null)).save("p1", "u1")).rejects.toThrow(/not found/i);
+  });
+});
+
+describe("like notifications", () => {
+  it("notifies only on a new like, not a duplicate request", async () => {
+    push.newLike.mockClear();
+    const db = makeDb([
+      [{ userId: "u1" }],
+      [{ total: 1 }],
+      [{ postId: "p1" }],
+      [],
+      [{ total: 1 }],
+      [{ postId: "p1" }],
+    ]);
+    const svc = service(db);
+    await svc.like("p1", "u1");
+    await svc.like("p1", "u1");
+    expect(push.newLike).toHaveBeenCalledTimes(1);
+    expect(push.newLike).toHaveBeenCalledWith("p1", "u2", "u1");
   });
 });

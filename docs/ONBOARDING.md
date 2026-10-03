@@ -82,6 +82,36 @@ Codes expire in 10 minutes, a resend is refused for 60 seconds, and three wrong
 codes lock that challenge for 24 hours — all of which you will hit while
 testing. `docs/OTP.md` has the full rules.
 
+## Notifications inbox
+
+The member inbox at `/notifications` stores activity independently of browser
+push permission. Opening an item marks it read before navigating; the bell dot
+stays visible while any unread items remain. Read state is stored per member,
+shared across devices. The reference layout has All, Comments and Mentions tabs.
+The search button opens search, the Unread filter, refresh and “Mark all as read”.
+Row menus also let members mark individual items read without navigating.
+Category filtering happens before pagination in the inbox API. Actor names and
+avatar keys are captured with the event; the API signs small avatar URLs for the
+inbox only, and device pushes keep their discreet text-only payload.
+
+Mentions has an empty state until a mention producer is implemented; the tab
+and API support filtering that event type, but current posting does not emit it.
+
+| Event | Recipient | Opens |
+|---|---|---|
+| New message (text or photo) | Other conversation member | Conversation |
+| New follow | Followed member | Follower’s profile |
+| Comment | Post author, except their own comments | Post |
+| Like | Post author, except their own likes | Post |
+| Repost | Original post author, except their own reposts | Original post |
+| Member report | Moderators | Report queue |
+| Push test | Member enabling push | Settings |
+
+Repeated follow/like/repost requests that do not insert a new activity do not
+create another notification. Saved posts remain private and generate no alert.
+Verification codes and password-reset emails remain separate from this inbox.
+Earlier pushes were not stored, so history begins after the inbox migration.
+
 ## Changing the database schema
 
 Drizzle owns the schema; never hand-write SQL in `apps/api/drizzle/`.

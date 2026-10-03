@@ -19,7 +19,7 @@ function make() {
     publicKey: vi.fn(async () => "PUB"),
     subscribe: vi.fn(async () => undefined),
     unsubscribe: vi.fn(async () => undefined),
-    sendTo: vi.fn(async () => 2),
+    deliver: vi.fn(async () => 2),
   };
   return { controller: new PushController(push as unknown as PushService), push };
 }
@@ -55,6 +55,10 @@ describe("PushController", () => {
   it("sends a test notification to the member's own devices", async () => {
     const { controller, push } = make();
     await expect(controller.test(req)).resolves.toEqual({ sent: 2 });
-    expect(push.sendTo).toHaveBeenCalledWith("u1", expect.objectContaining({ tag: "test" }));
+    expect(push.deliver).toHaveBeenCalledWith(
+      "u1",
+      "test",
+      expect.objectContaining({ tag: "test" }),
+    );
   });
 });

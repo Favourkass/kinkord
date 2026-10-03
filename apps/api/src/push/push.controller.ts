@@ -42,9 +42,9 @@ export class PushController {
   /** A notification to the member's own devices, so turning them on shows they work. */
   @Post("test")
   async test(@Req() req: AuthedRequest) {
-    const sent = await this.push.sendTo(req.user.id, {
+    const sent = await this.push.deliver(req.user.id, "test", {
       title: "Kinkord",
-      body: "Notifications are on. You'll hear about new messages, followers and comments.",
+      body: "Notifications are on. You'll hear about messages, followers and activity on your posts.",
       url: "/settings",
       tag: "test",
     });

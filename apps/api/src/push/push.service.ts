@@ -4,6 +4,8 @@ import webpush from "web-push";
 import { DRIZZLE, type Db } from "../db/db.module";
 import { profile, pushSubscription, pushVapidKey, user } from "../db/schema";
 import { adminUserIds, notBanned } from "../moderation/admins";
+import { NotificationsService } from "./notifications.service";
+import type { NotificationType } from "../db/schema";
 
 /**
  * What a notification says and where tapping it goes. Discreet on purpose: on
@@ -15,6 +17,8 @@ export interface PushMessage {
   url: string;
   /** Same tag replaces the last one, so a busy chat is one notification, not twenty. */
   tag: string;
+  notificationId?: string;
+  actor?: { name: string; avatarKey: string | null };
 }
 
 export interface SubscriptionInput {
@@ -39,7 +43,22 @@ export class PushService {
   private readonly log = new Logger(PushService.name);
   private keys: Promise<VapidKeys> | null = null;
 
-  constructor(@Inject(DRIZZLE) private readonly db: Db) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: Db,
+    private readonly inbox: NotificationsService,
+  ) {}
+
+  /** Store once per recipient, before attempting optional device delivery. */
+  async deliver(userId: string, type: NotificationType, message: PushMessage): Promise<number> {
+    const notificationId = await this.inbox.create(userId, {
+      type,
+      title: message.title,
+      body: message.body,
+      url: message.url,
+      ...(message.actor ? { actor: message.actor } : {}),
+    });
+    return this.sendTo(userId, { ...message, notificationId });
+  }
 
   /** The key a browser subscribes with. */
   async publicKey(): Promise<string> {
@@ -87,7 +106,8 @@ export class PushService {
       .where(and(eq(pushSubscription.userId, userId), notBanned(pushSubscription.userId)));
     if (subs.length === 0) return 0;
     const { publicKey, privateKey } = await this.vapid();
-    const payload = JSON.stringify(message);
+    const { actor: _actor, ...deviceMessage } = message;
+    const payload = JSON.stringify(deviceMessage);
     const results = await Promise.all(
       subs.map(async (s) => {
         try {
@@ -118,26 +138,33 @@ export class PushService {
   }
 
   newMessage(senderId: string, recipientId: string, conversationId: string): void {
-    this.notify(async () => ({
-      to: recipientId,
-      message: {
-        title: "Kinkord",
-        body: `New message from ${(await this.member(senderId)).name}`,
-        url: `/messages/${conversationId}`,
-        tag: `chat-${conversationId}`,
-      },
-    }));
+    if (senderId === recipientId) return;
+    this.notify("message", async () => {
+      const who = await this.member(senderId);
+      return {
+        to: recipientId,
+        message: {
+          title: "Kinkord",
+          body: `New message from ${who.name}`,
+          actor: who,
+          url: `/messages/${conversationId}`,
+          tag: `chat-${conversationId}`,
+        },
+      };
+    });
   }
 
   newFollower(followerId: string, followedId: string): void {
-    this.notify(async () => {
+    if (followerId === followedId) return;
+    this.notify("follow", async () => {
       const who = await this.member(followerId);
       return {
         to: followedId,
         message: {
           title: "Kinkord",
           body: `${who.name} followed you`,
-          url: who.username ? `/u/${who.username}` : "/home",
+          actor: who,
+          url: who.username ? `/u/${encodeURIComponent(who.username)}` : "/home",
           tag: `follow-${followerId}`,
         },
       };
@@ -147,14 +174,47 @@ export class PushService {
   newComment(postId: string, authorId: string, commenterId: string): void {
     // Nobody needs telling they commented on their own post.
     if (authorId === commenterId) return;
-    this.notify(async () => {
+    this.notify("comment", async () => {
+      const who = await this.member(commenterId);
       return {
         to: authorId,
         message: {
           title: "Kinkord",
-          body: `${(await this.member(commenterId)).name} commented on your post`,
+          body: `${who.name} commented on your post`,
+          actor: who,
           url: `/p/${postId}`,
           tag: `post-${postId}`,
+        },
+      };
+    });
+  }
+
+  newLike(postId: string, authorId: string, actorId: string): void {
+    this.postActivity("like", "liked", postId, authorId, actorId);
+  }
+
+  newRepost(postId: string, authorId: string, actorId: string): void {
+    this.postActivity("repost", "reposted", postId, authorId, actorId);
+  }
+
+  private postActivity(
+    type: "like" | "repost",
+    verb: string,
+    postId: string,
+    authorId: string,
+    actorId: string,
+  ): void {
+    if (authorId === actorId) return;
+    this.notify(type, async () => {
+      const who = await this.member(actorId);
+      return {
+        to: authorId,
+        message: {
+          title: "Kinkord",
+          body: `${who.name} ${verb} your post`,
+          actor: who,
+          url: `/p/${postId}`,
+          tag: `${type}-${postId}`,
         },
       };
     });
@@ -170,7 +230,7 @@ export class PushService {
       .then((ids) =>
         Promise.all(
           ids.map((id) =>
-            this.sendTo(id, {
+            this.deliver(id, "report", {
               title: "Kinkord",
               body: "New report to review",
               url: "/moderation/reports",
@@ -183,15 +243,25 @@ export class PushService {
   }
 
   /** Fire and forget: a notification that can't go out never fails what caused it. */
-  private notify(build: () => Promise<{ to: string; message: PushMessage } | null>): void {
+  private notify(
+    type: NotificationType,
+    build: () => Promise<{ to: string; message: PushMessage } | null>,
+  ): void {
     void build()
-      .then((n) => (n ? this.sendTo(n.to, n.message) : 0))
+      .then((n) => (n ? this.deliver(n.to, type, n.message) : 0))
       .catch((e) => this.log.warn(`push failed: ${String(e)}`));
   }
 
-  private async member(userId: string): Promise<{ name: string; username: string | null }> {
+  private async member(
+    userId: string,
+  ): Promise<{ name: string; username: string | null; avatarKey: string | null }> {
     const [row] = await this.db
-      .select({ username: user.username, name: user.name, displayName: profile.displayName })
+      .select({
+        username: user.username,
+        name: user.name,
+        displayName: profile.displayName,
+        avatarKey: profile.avatarKey,
+      })
       .from(user)
       .leftJoin(profile, eq(profile.userId, user.id))
       .where(eq(user.id, userId))
@@ -199,6 +269,7 @@ export class PushService {
     return {
       name: row?.displayName ?? row?.username ?? row?.name ?? "Someone",
       username: row?.username ?? null,
+      avatarKey: row?.avatarKey ?? null,
     };
   }
 
