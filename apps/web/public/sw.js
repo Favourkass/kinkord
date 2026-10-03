@@ -1,5 +1,5 @@
 // Kinkord Service Worker
-const CACHE_NAME = "kinkord-pwa-v4";
+const CACHE_NAME = "kinkord-pwa-v5";
 const OFFLINE_URL = "/offline";
 
 const PRECACHE_ASSETS = [
@@ -99,8 +99,9 @@ self.addEventListener("fetch", (event) => {
 });
 
 // Web Push notifications (VAPID)
-// Push: what the API sends is { title, body, url, tag }. The same tag replaces
-// the last notification, so a busy chat stays one notification, not twenty.
+// Every received push requests a visible alert, including while its screen is open.
+// Inbox ids keep separate events distinct; redelivery of one event can replace itself.
+// The browser/OS still controls banners, sounds and Do Not Disturb.
 self.addEventListener("push", (event) => {
   let data = {};
   try {
@@ -117,21 +118,24 @@ self.addEventListener("push", (event) => {
     // with no badge Chrome shows its own logo), so this is the K in its ring,
     // white on transparent, like the marks X and Instagram show up there.
     badge: "/icons/badge-96x96.png",
-    tag: data.tag,
-    renotify: Boolean(data.tag),
+    tag: data.notificationId ? `notification-${data.notificationId}` : undefined,
+    renotify: Boolean(data.notificationId),
+    silent: false,
+    vibrate: [200, 100, 200],
     data: { url, notificationId: data.notificationId },
   };
 
   event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
-      windows.forEach((client) => client.postMessage({ type: "kinkord:notification" }));
-      // Already looking at that very screen: nothing to tell them.
-      const watching = windows.some(
-        (w) => w.visibilityState === "visible" && new URL(w.url).pathname === new URL(url).pathname,
-      );
-      if (watching) return undefined;
-      return self.registration.showNotification(data.title || "Kinkord", options);
-    }),
+    Promise.all([
+      self.registration.showNotification(data.title || "Kinkord", options),
+      // Refreshing the inbox must never prevent the device alert.
+      self.clients
+        .matchAll({ type: "window", includeUncontrolled: true })
+        .then((windows) => {
+          windows.forEach((client) => client.postMessage({ type: "kinkord:notification" }));
+        })
+        .catch(() => undefined),
+    ]),
   );
 });
 

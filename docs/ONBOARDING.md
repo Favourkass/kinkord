@@ -125,6 +125,15 @@ Saved posts remain private and generate no alert. Verification codes and
 password-reset emails remain separate from this inbox. Earlier pushes were not
 stored, so history begins after the inbox migration.
 
+Every received device push requests an alert, including when its destination is
+already open. Distinct inbox events use distinct notification tags; redelivery
+of the same event can replace its own alert. Sound and vibration are requested,
+and API delivery uses high urgency. The browser and OS decide whether to display
+a banner: on Android, use Alerting and enable Pop on screen / Floating
+notifications in the installed app or browser's notification settings. Focus,
+Do Not Disturb and notification cooldown can suppress banners. Inbox storage
+alone does not enable device push: permission and a device subscription are required.
+
 ## Changing the database schema
 
 Drizzle owns the schema; never hand-write SQL in `apps/api/drizzle/`.

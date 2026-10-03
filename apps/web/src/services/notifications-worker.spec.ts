@@ -23,7 +23,7 @@ function worker(windows: unknown[] = []) {
     });
     await pending;
   };
-  return { dispatch, showNotification, openWindow };
+  return { dispatch, showNotification, openWindow, matchAll: self.clients.matchAll };
 }
 
 describe("notification service worker", () => {
@@ -50,11 +50,14 @@ describe("notification service worker", () => {
       "Kinkord",
       expect.objectContaining({
         data: { url: "https://kinkord.test/messages/c1", notificationId: "n1" },
+        tag: "notification-n1",
         renotify: true,
+        silent: false,
+        vibrate: [200, 100, 200],
       }),
     );
   });
-  it("refreshes the inbox without a redundant OS alert while watching the destination", async () => {
+  it("alerts even while the recipient is watching the destination", async () => {
     const client = {
       visibilityState: "visible",
       url: "https://kinkord.test/messages/c1",
@@ -63,7 +66,36 @@ describe("notification service worker", () => {
     const w = worker([client]);
     await w.dispatch("push", { data: { json: () => ({ url: "/messages/c1" }) } });
     expect(client.postMessage).toHaveBeenCalled();
-    expect(w.showNotification).not.toHaveBeenCalled();
+    expect(w.showNotification).toHaveBeenCalledWith(
+      "Kinkord",
+      expect.objectContaining({ silent: false, renotify: false }),
+    );
+  });
+  it("keeps successive messages in the same conversation as separate device alerts", async () => {
+    const w = worker();
+    for (const notificationId of ["n1", "n2"]) {
+      await w.dispatch("push", {
+        data: { json: () => ({ url: "/messages/c1", tag: "chat-c1", notificationId }) },
+      });
+    }
+    expect(w.showNotification.mock.calls.map((call) => call[1].tag)).toEqual([
+      "notification-n1",
+      "notification-n2",
+    ]);
+  });
+  it("does not collapse older pushes without an inbox id into one chat tag", async () => {
+    const w = worker();
+    await w.dispatch("push", { data: { json: () => ({ tag: "chat-c1" }) } });
+    expect(w.showNotification).toHaveBeenCalledWith(
+      "Kinkord",
+      expect.objectContaining({ tag: undefined, renotify: false, silent: false }),
+    );
+  });
+  it("still displays the alert when refreshing browser clients fails", async () => {
+    const w = worker();
+    w.matchAll.mockRejectedValueOnce(new Error("Clients unavailable"));
+    await w.dispatch("push", { data: { json: () => ({ notificationId: "n1" }) } });
+    expect(w.showNotification).toHaveBeenCalledTimes(1);
   });
   it("routes an OS click through the inbox so the server can mark it read", async () => {
     const w = worker();
