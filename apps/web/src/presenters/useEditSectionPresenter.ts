@@ -37,6 +37,11 @@ interface EditorState {
 
 const visibilityCopy = (value: string) =>
   PROFILE_EDIT_COPY.visibility[value as ProfileVisibility] ?? { label: value, help: "" };
+const badgeCopy = (value: string) =>
+  PROFILE_EDIT_COPY.verifiedBadge[value as "show" | "hide"] ?? { label: value, help: "" };
+/** Rows whose options carry their own label and help text. */
+const OPTION_COPY: Partial<Record<EditRowKey, (value: string) => { label: string; help: string }>> =
+  { profileVisibility: visibilityCopy, verifiedBadge: badgeCopy };
 
 /** Editor sheet props for one row's spec, with copy applied. */
 function toEditorVM(key: EditRowKey, spec: EditorSpec) {
@@ -52,15 +57,16 @@ function toEditorVM(key: EditRowKey, spec: EditorSpec) {
       };
     case "textarea":
       return { kind: "textarea" as const, maxLength: spec.maxLength, placeholder };
-    case "single":
+    case "single": {
+      const optionCopy = OPTION_COPY[key];
       return {
         kind: "single" as const,
         searchable: spec.searchable,
-        options:
-          key === "profileVisibility"
-            ? spec.options.map((o) => ({ value: o.value, ...visibilityCopy(o.value) }))
-            : spec.options,
+        options: optionCopy
+          ? spec.options.map((o) => ({ value: o.value, ...optionCopy(o.value) }))
+          : spec.options,
       };
+    }
     case "multi":
       return {
         kind: "multi" as const,
@@ -187,16 +193,18 @@ export function useEditSectionPresenter(section: EditSectionKey) {
     }
   }, [editor, current, profile, copy, router]);
 
-  const rowItems = rows.map((r) => ({
-    key: r.key,
-    icon: ROW_ICONS[r.key],
-    title: copy.rows[r.key].title,
-    subtitle:
-      r.key === "profileVisibility"
-        ? visibilityCopy(r.value ?? "public").label
+  const rowItems = rows.map((r) => {
+    const optionCopy = OPTION_COPY[r.key];
+    return {
+      key: r.key,
+      icon: ROW_ICONS[r.key],
+      title: copy.rows[r.key].title,
+      subtitle: optionCopy
+        ? optionCopy(r.value ?? "").label
         : (r.value ?? (r.key === "socialLinks" ? copy.notLinked : copy.empty)),
-    onClick: () => openRow(r.key),
-  }));
+      onClick: () => openRow(r.key),
+    };
+  });
 
   let editorVM = null;
   if (editor && current) {

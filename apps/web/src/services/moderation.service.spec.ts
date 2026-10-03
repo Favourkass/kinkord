@@ -58,4 +58,26 @@ describe("moderationService", () => {
     await moderationService.removeRule("r1");
     expect(del.mock.calls.map((c) => c[0])).toEqual(["/admin/posts/p%2F1", "/admin/blocklist/r1"]);
   });
+
+  it("reads and decides verification reviews, and acts on a member's verification", async () => {
+    const body = {
+      decision: "reject" as const,
+      evidenceReference: "didit-1",
+      reason: "Not the same person.",
+    };
+    await moderationService.verificationReviews();
+    await moderationService.decideVerification("v/1", body);
+    await moderationService.memberVerification("u9");
+    await moderationService.revokeVerification("u9");
+    await moderationService.reopenVerification("u9");
+    expect(get.mock.calls).toEqual([
+      ["/admin/verification/reviews"],
+      ["/admin/verification/members/u9"],
+    ]);
+    expect(post.mock.calls).toEqual([
+      ["/admin/verification/reviews/v%2F1/decision", body],
+      ["/admin/verification/members/u9/revoke", {}],
+      ["/admin/verification/members/u9/reopen", {}],
+    ]);
+  });
 });

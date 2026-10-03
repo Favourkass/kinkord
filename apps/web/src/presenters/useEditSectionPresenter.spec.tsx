@@ -58,6 +58,8 @@ const profile: OwnProfilePM = {
   limits: null,
   socialLinks: { facebook: "https://facebook.com/nene" },
   profileVisibility: "public",
+  identityVerified: false,
+  showVerifiedBadge: true,
   displayNameChangedAt: null,
   canChangeDisplayNameAt: null,
   usernameChangedAt: "2026-09-01T00:00:00.000Z",
@@ -195,6 +197,17 @@ describe("useEditSectionPresenter", () => {
     if (editor?.kind === "single") {
       expect(editor.options.map((o) => o.label)).toEqual(["Public", "Friends only"]);
     }
+  });
+
+  it("lets a verified member show or hide their badge", async () => {
+    serve({ ...profile, identityVerified: true, showVerifiedBadge: false });
+    const { result } = renderHook(() => useEditSectionPresenter("privacy"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.rows.map((r) => r.subtitle)).toEqual(["Facebook", "Public", "Hidden"]);
+    act(() => result.current.rows[2].onClick?.());
+    const editor = result.current.editor?.editor;
+    if (editor?.kind !== "single") throw new Error("expected a picker");
+    expect(editor.options.map((o) => o.label)).toEqual(["Shown", "Hidden"]);
   });
 
   it("sends an expired session back to login", async () => {

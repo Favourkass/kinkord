@@ -17,11 +17,22 @@ export interface MemberDetailLabels {
     deletePosts: string;
     deleteAccount: string;
     deletePost: string;
+    revokeVerification: string;
+    reopenVerification: string;
   };
+}
+
+export interface MemberVerificationVM {
+  label: string;
+  status: string;
+  attempts: string;
+  revoke: boolean;
+  reopen: boolean;
 }
 
 export interface MemberDetailViewProps {
   vm: AdminMemberDetailVM | null;
+  verification: MemberVerificationVM | null;
   loading: boolean;
   error: string | null;
   notice: string | null;
@@ -33,6 +44,8 @@ export interface MemberDetailViewProps {
   onDeletePosts: () => void;
   onDeleteAccount: () => void;
   onDeletePost: (postId: string) => void;
+  onRevokeVerification: () => void;
+  onReopenVerification: () => void;
 }
 
 const outline =
@@ -40,6 +53,7 @@ const outline =
 
 export default function MemberDetailView({
   vm,
+  verification,
   loading,
   error,
   notice,
@@ -51,6 +65,8 @@ export default function MemberDetailView({
   onDeletePosts,
   onDeleteAccount,
   onDeletePost,
+  onRevokeVerification,
+  onReopenVerification,
 }: MemberDetailViewProps) {
   return (
     <div>
@@ -95,6 +111,38 @@ export default function MemberDetailView({
               </div>
             ))}
           </dl>
+
+          {verification ? (
+            <section className="mt-[12px] rounded-[16px] border border-app-card-border bg-app-card p-[14px]">
+              <h2 className="text-[12px] font-bold uppercase tracking-wide text-app-muted">
+                {verification.label}
+              </h2>
+              <p className="text-[15px] text-app-value">{verification.status}</p>
+              <p className="text-[13px] text-app-subtle">{verification.attempts}</p>
+              {verification.revoke || verification.reopen ? (
+                <div className="flex flex-wrap gap-[10px] pt-[10px]">
+                  {verification.reopen ? (
+                    <button
+                      type="button"
+                      onClick={onReopenVerification}
+                      className={`${outline} border-app-input-border bg-app-input text-app-value`}
+                    >
+                      {labels.actions.reopenVerification}
+                    </button>
+                  ) : null}
+                  {verification.revoke ? (
+                    <button
+                      type="button"
+                      onClick={onRevokeVerification}
+                      className={`${outline} border-app-danger bg-transparent text-app-danger`}
+                    >
+                      {labels.actions.revokeVerification}
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+            </section>
+          ) : null}
 
           {vm.protectedAccount ? (
             <p className="pt-[16px] text-[14px] text-app-subtle">{labels.protectedAccount}</p>

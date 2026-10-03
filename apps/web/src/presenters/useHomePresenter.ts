@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { authClient } from "@/services/authClient";
 import { api, ApiError } from "@/services/apiClient";
 import { pushService } from "@/services/push.service";
@@ -13,19 +13,41 @@ interface CommunityStatsVM {
   members: number;
 }
 
+const settingsDrawerRoutes = new Set<string>([
+  Routes.settings,
+  Routes.settingsSecurity,
+  Routes.settingsVerification,
+  Routes.settingsData,
+  Routes.settingsContent,
+  Routes.settingsCommunitySafety,
+  Routes.profileEditPrivacy,
+  Routes.contact,
+  Routes.about,
+]);
+
+export function isSettingsDrawerPath(pathname: string) {
+  return settingsDrawerRoutes.has(pathname) || pathname.startsWith(`${Routes.settings}/`);
+}
+
 /** Post-login home: greeting, drawer identity, live member count. */
 export function useHomePresenter() {
   const router = useRouter();
+  const pathname = usePathname();
   const [loading, setLoading] = useState(true);
   const [signedIn, setSignedIn] = useState(false);
   const notificationsUnread = useNotificationBadgePresenter(signedIn);
   const [error, setError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [settingsMenuState, setSettingsMenuState] = useState(() => ({
+    pathname,
+    open: isSettingsDrawerPath(pathname),
+  }));
   const [vm, setVm] = useState({
     greeting: "Hi there, Welcome",
     name: "",
     handle: "",
     avatarUrl: null as string | null,
+    verified: false,
     membersCount: "—",
   });
 
@@ -48,6 +70,7 @@ export function useHomePresenter() {
           name: profile.displayName || me.username || "",
           handle: me.username ? `@${me.username}` : "",
           avatarUrl: profile.avatarUrl,
+          verified: Boolean(profile.identityVerified),
           membersCount: String(stats.members),
         });
         // Signed in: keep this device's notification subscription current.
@@ -70,6 +93,18 @@ export function useHomePresenter() {
 
   const openDrawer = useCallback(() => setDrawerOpen(true), []);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
+  const settingsMenuOpen =
+    settingsMenuState.pathname === pathname
+      ? settingsMenuState.open
+      : isSettingsDrawerPath(pathname);
+  const toggleSettingsMenu = useCallback(
+    () =>
+      setSettingsMenuState((current) => ({
+        pathname,
+        open: !(current.pathname === pathname ? current.open : isSettingsDrawerPath(pathname)),
+      })),
+    [pathname],
+  );
 
   const logout = useCallback(async () => {
     setSignedIn(false);
@@ -83,8 +118,10 @@ export function useHomePresenter() {
     loading,
     error,
     drawerOpen,
+    settingsMenuOpen,
     openDrawer,
     closeDrawer,
+    toggleSettingsMenu,
     logout,
     notificationsUnread,
     signedIn,

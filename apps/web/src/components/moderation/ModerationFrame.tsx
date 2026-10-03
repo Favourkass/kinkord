@@ -36,13 +36,16 @@ export default function ModerationFrame({
         <p className="pt-[24px] text-[15px] text-app-subtle">{deniedLabel}</p>
       ) : (
         <>
-          <nav className="flex gap-[8px] pt-[16px]" aria-label={title}>
+          <nav
+            className="-mx-[16px] flex gap-[8px] overflow-x-auto px-[16px] pt-[16px] [scrollbar-width:none] md:mx-0 md:px-0 [&::-webkit-scrollbar]:hidden"
+            aria-label={title}
+          >
             {tabs.map((t) => (
               <Link
                 key={t.href}
                 href={t.href}
                 aria-current={t.active ? "page" : undefined}
-                className={`rounded-full px-[16px] py-[8px] text-[14px] font-bold ${
+                className={`shrink-0 whitespace-nowrap rounded-full px-[16px] py-[8px] text-[14px] font-bold ${
                   t.active
                     ? "bg-kink-amber text-black"
                     : "border border-app-input-border bg-app-input text-app-value"

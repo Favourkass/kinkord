@@ -3,7 +3,7 @@ import AppMobileHeader from "@/components/app/AppMobileHeader";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import DesktopSidebar from "@/components/app/DesktopSidebar";
 import MobileTabBar from "@/components/app/MobileTabBar";
-import type { AppNavLabels, AppNavLinks } from "@/components/app/nav";
+import type { AppNavLabels, AppNavLinks, DrawerNavigation } from "@/components/app/nav";
 import SidebarDrawer from "@/components/app/SidebarDrawer";
 
 export interface FeedShellProps {
@@ -12,13 +12,17 @@ export interface FeedShellProps {
   name: string;
   avatarUrl: string | null;
   membersCount: string;
+  verified: boolean;
   notificationsUnread?: boolean;
   drawerOpen: boolean;
+  settingsMenuOpen: boolean;
   onMenu: () => void;
   onCloseDrawer: () => void;
+  onToggleSettingsMenu: () => void;
   onLogout: () => void;
   links: AppNavLinks;
   labels: AppNavLabels;
+  drawerNavigation: DrawerNavigation;
   /** Desktop right rail; hidden on a phone, where the feed carries it inline. Null on the list screens. */
   aside: ReactNode;
   children: ReactNode;
@@ -41,13 +45,17 @@ export default function FeedShell({
   name,
   avatarUrl,
   membersCount,
+  verified,
   notificationsUnread,
   drawerOpen,
+  settingsMenuOpen,
   onMenu,
   onCloseDrawer,
+  onToggleSettingsMenu,
   onLogout,
   links,
   labels,
+  drawerNavigation,
   aside,
   children,
 }: FeedShellProps) {
@@ -64,8 +72,12 @@ export default function FeedShell({
             active="home"
             notificationsUnread={notificationsUnread}
             avatarUrl={avatarUrl}
+            membersCount={membersCount}
             links={links}
             labels={labels}
+            navigation={drawerNavigation}
+            settingsOpen={settingsMenuOpen}
+            onToggleSettings={onToggleSettingsMenu}
             onLogout={onLogout}
           />
         </div>
@@ -101,13 +113,18 @@ export default function FeedShell({
           notificationsUnread={notificationsUnread}
         />
         <SidebarDrawer
+          active="home"
           open={drawerOpen}
           onClose={onCloseDrawer}
           name={name}
           avatarUrl={avatarUrl}
           membersCount={membersCount}
+          verified={verified}
           links={links}
           labels={labels}
+          navigation={drawerNavigation}
+          settingsOpen={settingsMenuOpen}
+          onToggleSettings={onToggleSettingsMenu}
           onLogout={onLogout}
         />
       </div>

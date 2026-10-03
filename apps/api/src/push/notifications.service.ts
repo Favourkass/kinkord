@@ -97,6 +97,7 @@ const SEARCH_WORDS: Record<NotificationType, readonly string[]> = {
   like: ["like", "liked", "likes"],
   repost: ["repost", "reposted", "reposts"],
   report: ["report", "reports", "moderation"],
+  verification: ["verification", "verify", "moderation"],
   test: ["notifications", "enabled"],
 };
 
@@ -115,6 +116,8 @@ export function notificationUrl(
       return actorUsername ? `/u/${encodeURIComponent(actorUsername)}` : "/notifications";
     case "report":
       return "/moderation/reports";
+    case "verification":
+      return "/moderation/verification";
     case "test":
       return "/settings";
     default:

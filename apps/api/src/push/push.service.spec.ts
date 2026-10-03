@@ -221,6 +221,20 @@ describe("PushService notifications", () => {
     });
   });
 
+  it("pings every moderator about a verification waiting for them, saying nothing about whose", async () => {
+    const { db } = queuedDb([[{ id: "f1" }], [], [sub("s1")], [KEYS]]);
+    new PushService(db, inbox()).newVerificationReview();
+    await flush();
+    expect(inboxRecord).toHaveBeenCalledWith("f1", { type: "verification" });
+    expect(sent()).toEqual({
+      title: "Kinkord",
+      body: "New verification to review",
+      url: "/moderation/verification",
+      tag: "verification",
+      notificationId: "notification-1",
+    });
+  });
+
   it("never throws into the request that caused it", async () => {
     // Once, not a standing implementation: Vitest reports a reset mock's thrown
     // implementation as a failure even when the code catches it.

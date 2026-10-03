@@ -22,13 +22,17 @@ export default function HomePage() {
         name: home.name,
         avatarUrl: home.avatarUrl,
         membersCount: home.membersCount,
+        verified: home.verified,
         notificationsUnread: home.notificationsUnread,
         drawerOpen: home.drawerOpen,
+        settingsMenuOpen: home.settingsMenuOpen,
         onMenu: home.openDrawer,
         onCloseDrawer: home.closeDrawer,
+        onToggleSettingsMenu: home.toggleSettingsMenu,
         onLogout: home.logout,
         links: nav.links,
         labels: nav.labels,
+        drawerNavigation: nav.drawer,
       }}
       loading={feed.loading}
       error={home.error ?? feed.error}

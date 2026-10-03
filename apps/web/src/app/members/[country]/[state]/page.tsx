@@ -24,15 +24,19 @@ function MembersRegion() {
       handle={shell.handle}
       avatarUrl={shell.avatarUrl}
       membersCount={shell.membersCount}
+      verified={shell.verified}
       notificationsUnread={shell.notificationsUnread}
       activeTab="home"
       activeNav="members"
       drawerOpen={shell.drawerOpen}
       onMenu={shell.openDrawer}
       onCloseDrawer={shell.closeDrawer}
+      settingsMenuOpen={shell.settingsMenuOpen}
+      onToggleSettingsMenu={shell.toggleSettingsMenu}
       onLogout={shell.logout}
       links={nav.links}
       labels={nav.labels}
+      drawerNavigation={nav.drawer}
       mobileTone="members"
       desktopGreeting={false}
     >

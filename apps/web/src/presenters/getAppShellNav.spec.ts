@@ -24,6 +24,47 @@ describe("getAppShellNav", () => {
       logout: "Log Out",
     });
   });
+
+  it("uses the client-approved mobile drawer order and groups settings behind one accordion", () => {
+    const drawer = getAppShellNav().drawer;
+    expect(drawer.primary.map((item) => item.label)).toEqual([
+      "Members",
+      "Saved",
+      "Kinkopedia",
+      "Verification",
+      "KinkCoins & Payment",
+      "Subscription",
+      "Marketplace",
+    ]);
+    expect(drawer.settingsGroups.flatMap((group) => group.items.map((item) => item.label))).toEqual(
+      [
+        "Account Settings",
+        "Your Data",
+        "Privacy",
+        "Security",
+        "Content & Experience",
+        "Community & Safety",
+        "Help & Support",
+        "About Kinkord",
+      ],
+    );
+  });
+
+  it("marks what isn't built yet and keeps Kinkopedia inside the app", () => {
+    const drawer = getAppShellNav().drawer;
+    const items = [...drawer.primary, ...drawer.settingsGroups.flatMap((g) => g.items)];
+    expect(items.filter((item) => item.soon).map((item) => item.key)).toEqual([
+      "kinkopedia",
+      "kinkcoins",
+      "subscription",
+      "marketplace",
+      "your-data",
+      "content-experience",
+      "community-safety",
+    ]);
+    expect(items.every((item) => !item.soon || item.href.startsWith("/coming-soon/"))).toBe(true);
+    expect(items.find((item) => item.key === "verification")?.href).toBe("/settings/verification");
+  });
 });
 
 describe("appShellProps", () => {
@@ -37,9 +78,12 @@ describe("appShellProps", () => {
         handle: "@tega",
         avatarUrl: null,
         membersCount: "128",
+        verified: false,
         drawerOpen: false,
+        settingsMenuOpen: false,
         openDrawer,
         closeDrawer: () => {},
+        toggleSettingsMenu: () => {},
         logout: () => {},
       },
       nav,

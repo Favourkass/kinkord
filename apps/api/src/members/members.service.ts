@@ -4,6 +4,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { Db, DRIZZLE } from "../db/db.module";
 import { notBanned } from "../moderation/admins";
 import {
+  bronzeVerification,
   follow,
   profile,
   profileMedia,
@@ -14,6 +15,7 @@ import {
 import { PostsService } from "../posts/posts.service";
 import { ONLINE_WINDOW_SECONDS, PresenceService } from "../presence/presence.service";
 import { StorageService } from "../storage/storage.service";
+import { stillVerified } from "../verification/bronze-policy";
 import { FollowsService } from "./follows.service";
 
 export type MembersSort = "recent" | "followers" | "name";
@@ -209,9 +211,10 @@ export class MembersService {
   async publicProfile(username: string, viewerId: string) {
     const handle = username.replace(/^@/, "").toLowerCase();
     const [row] = await this.db
-      .select({ u: user, p: profile })
+      .select({ u: user, p: profile, bronze: bronzeVerification })
       .from(user)
       .innerJoin(profile, eq(profile.userId, user.id))
+      .leftJoin(bronzeVerification, eq(bronzeVerification.userId, user.id))
       .where(and(eq(user.username, handle), notBanned(user.id)))
       .limit(1);
     if (!row) throw new NotFoundException("Member not found.");
@@ -267,7 +270,15 @@ export class MembersService {
       restricted,
       // Only you see your own birth date; everyone else gets the derived age.
       dateOfBirth: isSelf ? p.dateOfBirth : null,
-      verification: { email: u.emailVerified, phone: p.phoneVerified },
+      verification: {
+        email: u.emailVerified,
+        phone: p.phoneVerified,
+        // Only while the verified photo, birth date and gender are still the
+        // profile's; others see it only if the member shows it and may see them.
+        ...(stillVerified(row.bronze, p) && (isSelf || (p.showVerifiedBadge && !restricted))
+          ? { identity: true as const }
+          : {}),
+      },
     };
   }
 
