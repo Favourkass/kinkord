@@ -333,3 +333,11 @@ describe("notification menu and category totals", () => {
     expect(capped.chains.some((c) => c[0].method === "insert")).toBe(false);
   });
 });
+
+it("still opens a message push even though messages are hidden from the inbox", async () => {
+  const t = make([[{ id: ID }], [row({ type: "message", subjectId: "c1" })]]);
+  const item = await t.service.read("kemi", ID);
+  expect(item.url).toBe("/messages/c1");
+  const where = t.sqlOf(t.arg("select", "where"));
+  expect(where.sql).not.toContain('"notification"."type" <>');
+});

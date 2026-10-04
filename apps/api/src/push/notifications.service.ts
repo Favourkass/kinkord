@@ -215,6 +215,7 @@ export class NotificationsService {
     const rows = await this.rows(
       and(
         eq(notification.userId, userId),
+        ne(notification.type, "message"),
         query.type ? eq(notification.type, query.type) : undefined,
         query.unreadOnly ? isNull(notification.readAt) : undefined,
         term ? this.matching(term) : undefined,
@@ -399,7 +400,7 @@ export class NotificationsService {
       .from(notification)
       .leftJoin(user, eq(user.id, notification.actorId))
       .leftJoin(profile, eq(profile.userId, notification.actorId))
-      .where(and(where, this.shownTo(userId), ne(notification.type, "message")))
+      .where(and(where, this.shownTo(userId)))
       .orderBy(desc(notification.createdAt), desc(notification.id))
       .limit(limit);
   }
