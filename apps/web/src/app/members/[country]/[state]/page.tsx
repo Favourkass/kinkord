@@ -27,7 +27,6 @@ function MembersRegion() {
       notificationsUnread={shell.notificationsUnread}
       notificationsCount={shell.notificationsCount}
       messagesCount={shell.messagesCount}
-      activeTab="home"
       activeNav="members"
       drawerOpen={shell.drawerOpen}
       onMenu={shell.openDrawer}

@@ -17,6 +17,7 @@ export default function HomePage() {
   return (
     <FeedScreen
       shell={{
+        activeTab: "home",
         brand: "KINKORD",
         greeting: home.greeting,
         name: home.name,
