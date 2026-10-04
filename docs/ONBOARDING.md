@@ -91,7 +91,6 @@ shared across devices. The reference layout has All, Comments and Mentions tabs.
 The search button opens search (run by the API across the whole inbox, by name
 or by a word like "liked"), the Unread filter, refresh and "Mark all as read".
 Row menus let members mark individual items read or delete a notification.
-Reporting notifications is not exposed in this menu.
 
 Rows store who did what to what (`actor_id`, `subject_id`), never names or
 photos: the inbox looks those up when it loads, so a renamed or re-photographed
@@ -124,19 +123,18 @@ The All, Comments and Mentions badges count the entire matching inbox, not only
 the loaded page. The Unread filter applies to those totals. The separate chat
 badge counts unread incoming messages across all conversations.
 
-Friend-request presentation is supported for local icon previews; there is no
-friend-request producer or accept/decline workflow. Friends remain mutual follows.
-
 Mentions has an empty state until a mention producer is implemented; the tab and
 API support filtering that event type, but current posting does not emit it.
 Saved posts remain private and generate no alert. Verification codes and
 password-reset emails remain separate from this inbox. Earlier pushes were not
 stored, so history begins after the inbox migration.
 
-Every received device push requests an alert, including when its destination is
-already open. Distinct inbox events use distinct notification tags; redelivery
-of the same event can replace its own alert. Sound and vibration are requested,
-and API delivery uses high urgency. The browser and OS decide whether to display
+Every received device push shows a notification, because Safari cancels a
+site's push after a few that show nothing. One for the screen a member already
+has open and focused arrives silently; the rest request sound and vibration.
+Each inbox row has its own notification tag, so separate events stay separate,
+while a chat's messages share one row and replace each other's alert. API
+delivery uses high urgency. The browser and OS decide whether to display
 a banner: on Android, use Alerting and enable Pop on screen / Floating
 notifications in the installed app or browser's notification settings. Focus,
 Do Not Disturb and notification cooldown can suppress banners. Inbox storage

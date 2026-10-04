@@ -85,11 +85,6 @@ describe("notification presentation", () => {
     expect(notificationDestination("/p/post-1")).toBe("/p/post-1"));
 });
 
-it("uses different badges for follows and friend requests", () => {
-  expect(toNotificationVM({ ...item, type: "friend_request" })).toMatchObject({
-    category: "Friend request",
-    icon: "friend-add",
-    official: false,
-  });
+it("shows follows with the person badge", () => {
   expect(toNotificationVM({ ...item, type: "follow" }).icon).toBe("person-add");
 });

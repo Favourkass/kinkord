@@ -72,8 +72,12 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
       const order = ++request;
       const version = revision.current;
       const depth = pageCount.current;
+      // The tab totals load alongside the pages, not before them.
+      const countsRequest = notificationsApi.counts(unreadOnly);
+      // Awaited below; this only keeps a failure there from going unhandled
+      // when a page read fails first.
+      countsRequest.catch(() => undefined);
       try {
-        const counts = await notificationsApi.counts(unreadOnly);
         // Re-read loaded pages too: reads made on another device must clear
         // older dots, including while the Unread filter is selected.
         let nextCursor: string | null = null;
@@ -89,6 +93,7 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
           nextCursor = result.nextCursor;
           if (!nextCursor) break;
         }
+        const counts = await countsRequest;
         if (
           generation.current !== mine ||
           request !== order ||

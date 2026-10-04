@@ -100,9 +100,11 @@ self.addEventListener("fetch", (event) => {
 });
 
 // Web Push notifications (VAPID)
-// Every received push requests a visible alert, including while its screen is open.
-// Inbox ids keep separate events distinct; redelivery of one event can replace itself.
-// The browser/OS still controls banners, sounds and Do Not Disturb.
+// Every push shows a notification: Safari cancels a site's push after a few
+// that show nothing. One for the page a member already has open and focused
+// arrives silently. Each inbox row has its own tag, so separate events stay
+// separate; a chat's messages share one row, so they replace each other and
+// alert again. The browser/OS still controls banners and Do Not Disturb.
 self.addEventListener("push", (event) => {
   let data = {};
   try {
@@ -120,23 +122,39 @@ self.addEventListener("push", (event) => {
     // white on transparent, like the marks X and Instagram show up there.
     badge: "/icons/badge-96x96.png",
     tag: data.notificationId ? `notification-${data.notificationId}` : undefined,
-    renotify: Boolean(data.notificationId),
-    silent: false,
-    vibrate: [200, 100, 200],
     data: { url, notificationId: data.notificationId },
   };
 
   event.waitUntil(
-    Promise.all([
-      self.registration.showNotification(data.title || "Kinkord", options),
-      // Refreshing the inbox must never prevent the device alert.
-      self.clients
-        .matchAll({ type: "window", includeUncontrolled: true })
-        .then((windows) => {
-          windows.forEach((client) => client.postMessage({ type: "kinkord:notification" }));
-        })
-        .catch(() => undefined),
-    ]),
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      // Refreshing open tabs must never stop the notification.
+      .catch(() => [])
+      .then((windows) => {
+        for (const client of windows) {
+          try {
+            client.postMessage({ type: "kinkord:notification" });
+          } catch {
+            // A tab that is closing; the others still refresh.
+          }
+        }
+        const watching = windows.some(
+          (w) =>
+            w.focused &&
+            w.visibilityState === "visible" &&
+            new URL(w.url).pathname === new URL(url).pathname,
+        );
+        // Chrome refuses a silent notification that vibrates or renotifies.
+        const alert = watching
+          ? { ...options, silent: true, renotify: false }
+          : {
+              ...options,
+              silent: false,
+              renotify: Boolean(options.tag),
+              vibrate: [200, 100, 200],
+            };
+        return self.registration.showNotification(data.title || "Kinkord", alert);
+      }),
   );
 });
 

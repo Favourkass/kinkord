@@ -308,30 +308,6 @@ describe("notification menu and category totals", () => {
       "Notification not found",
     );
   });
-  it("preserves notification evidence in the moderation queue", async () => {
-    const t = make([[row()], [{ total: 0 }], [{ id: "r1" }]]);
-    expect(await t.service.report("kemi", ID, { reason: "spam", details: "Unexpected" })).toEqual({
-      id: "r1",
-    });
-    expect(t.sqlOf(t.arg("select", "where")).params).toEqual(["kemi", ID]);
-    const saved = t.arg("insert", "values") as { details: string };
-    expect(saved).toMatchObject({ reporterId: "kemi", reportedUserId: "ada", reason: "spam" });
-    expect(saved.details).toContain(ID);
-    expect(saved.details).toContain("Unexpected");
-    expect(saved.details).toContain('"subjectId":"p1"');
-  });
-  it("rejects foreign notification reports and enforces the shared daily limit", async () => {
-    const foreign = make([[]]);
-    await expect(foreign.service.report("intruder", ID, { reason: "spam" })).rejects.toThrow(
-      "Notification not found",
-    );
-    expect(foreign.chains.some((c) => c[0].method === "insert")).toBe(false);
-    const capped = make([[row()], [{ total: 10 }]]);
-    await expect(capped.service.report("kemi", ID, { reason: "spam" })).rejects.toThrow(
-      "reports today",
-    );
-    expect(capped.chains.some((c) => c[0].method === "insert")).toBe(false);
-  });
 });
 
 it("still opens a message push even though messages are hidden from the inbox", async () => {

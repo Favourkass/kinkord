@@ -1,39 +1,22 @@
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  Logger,
-  NotFoundException,
-  HttpException,
-  HttpStatus,
-} from "@nestjs/common";
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import {
   and,
   count,
   desc,
   eq,
-  gt,
   ilike,
   inArray,
   isNull,
   lt,
-  ne,
   lte,
+  ne,
   or,
   sql,
   type SQL,
 } from "drizzle-orm";
 import { z } from "zod";
 import { DRIZZLE, type Db } from "../db/db.module";
-import {
-  memberBlock,
-  notification,
-  profile,
-  user,
-  report,
-  type ReportReason,
-  type NotificationType,
-} from "../db/schema";
+import { memberBlock, notification, profile, user, type NotificationType } from "../db/schema";
 import { notBanned } from "../moderation/admins";
 import { RealtimeService } from "../realtime/realtime.service";
 import { blockedBy } from "../safety/blocks";
@@ -109,7 +92,6 @@ const REPEATS: Partial<
 /** Words a search can use to find a kind of notification, besides names. */
 const SEARCH_WORDS: Record<NotificationType, readonly string[]> = {
   message: ["message", "messages", "chat"],
-  friend_request: ["friend", "request"],
   follow: ["follow", "followed", "follower", "followers"],
   comment: ["comment", "commented", "comments"],
   mention: ["mention", "mentioned", "mentions"],
@@ -287,45 +269,6 @@ export class NotificationsService {
     if (!deleted) throw new NotFoundException("Notification not found.");
     void this.realtime.notify([userId], { type: "notification" });
     return { id: deleted.id };
-  }
-
-  async report(userId: string, id: string, input: { reason: ReportReason; details?: string }) {
-    const [item] = await this.db
-      .select()
-      .from(notification)
-      .where(and(eq(notification.userId, userId), eq(notification.id, id)))
-      .limit(1);
-    if (!item) throw new NotFoundException("Notification not found.");
-    const [today] = await this.db
-      .select({ total: count() })
-      .from(report)
-      .where(
-        and(eq(report.reporterId, userId), gt(report.createdAt, sql`now() - interval '1 day'`)),
-      );
-    if (Number(today?.total ?? 0) >= 10)
-      throw new HttpException(
-        "You've sent a lot of reports today. Please try again tomorrow.",
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
-    const snapshot = JSON.stringify({
-      id: item.id,
-      type: item.type,
-      subjectId: item.subjectId,
-      actorId: item.actorId,
-      count: item.count,
-      createdAt: item.createdAt,
-    });
-    const [created] = await this.db
-      .insert(report)
-      .values({
-        reporterId: userId,
-        reportedUserId: item.actorId,
-        reason: input.reason,
-        details: `${input.details ?? ""}\n\nReported notification: ${snapshot}`.trim(),
-        evidence: [],
-      })
-      .returning({ id: report.id });
-    return { id: created.id };
   }
 
   /** Ownership is part of every query; another member's id is never readable. */

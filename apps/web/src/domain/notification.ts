@@ -1,13 +1,5 @@
 export type NotificationKind =
-  | "message"
-  | "follow"
-  | "friend_request"
-  | "comment"
-  | "mention"
-  | "like"
-  | "repost"
-  | "report"
-  | "test";
+  "message" | "follow" | "comment" | "mention" | "like" | "repost" | "report" | "test";
 
 /**
  * GET /notifications item. Who did it is looked up when the inbox loads, so a
@@ -38,16 +30,7 @@ export interface NotificationVM {
   avatarUrl: string | null;
   action: string;
   official: boolean;
-  icon:
-    | "message"
-    | "person-add"
-    | "friend-add"
-    | "comment"
-    | "heart"
-    | "repost"
-    | "shield"
-    | "bell"
-    | "mention";
+  icon: "message" | "person-add" | "comment" | "heart" | "repost" | "shield" | "bell" | "mention";
   unread: boolean;
   time: string;
   dateTime: string;
@@ -62,11 +45,6 @@ const KINDS: Record<
     category: "Message",
     icon: "message",
     action: (n) => (n > 1 ? `sent you ${n} messages.` : "sent you a message."),
-  },
-  friend_request: {
-    category: "Friend request",
-    icon: "friend-add",
-    action: () => "sent you a friend request.",
   },
   follow: { category: "New follower", icon: "person-add", action: () => "followed you." },
   mention: { category: "Mention", icon: "mention", action: () => "mentioned you." },

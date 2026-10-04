@@ -17,7 +17,6 @@ import AvatarCircle from "../app/AvatarCircle";
 const ICONS = {
   message: MessageCircleMore,
   "person-add": FollowIcon,
-  "friend-add": FriendRequestIcon,
   comment: MessageCircleMore,
   heart: ThumbsUp,
   repost: Repeat2,
@@ -352,23 +351,6 @@ function FollowIcon({ size = 13, strokeWidth = 2.25, ...props }: LucideProps) {
       <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth={strokeWidth} />
       <circle cx="12" cy="9" r="3" fill="currentColor" />
       <path d="M5 19a7 7 0 0 1 14 0 10 10 0 0 1-14 0Z" fill="currentColor" />
-    </svg>
-  );
-}
-
-/** Filled person plus a separate plus sign for friend requests. */
-function FriendRequestIcon({ size = 13, strokeWidth = 2.25, ...props }: LucideProps) {
-  return (
-    <svg {...props} width={size} height={size} viewBox="0 0 24 24">
-      <circle cx="8" cy="7" r="3.5" fill="currentColor" />
-      <path d="M1 21v-2a7 7 0 0 1 14 0v2Z" fill="currentColor" />
-      <path
-        d="M19 10v8m-4-4h8"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={strokeWidth}
-        strokeLinecap="round"
-      />
     </svg>
   );
 }

@@ -58,7 +58,7 @@ export interface AdminReportDto {
   status: ReportStatus;
   createdAt: string;
   reviewedAt: string | null;
-  reportedUserId: string | null;
+  reportedUserId: string;
   /** Null once the account is gone; the report stays. */
   reporter: ReportMemberDto | null;
   reported: ReportMemberDto | null;

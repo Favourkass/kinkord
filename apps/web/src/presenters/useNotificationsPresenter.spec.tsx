@@ -3,14 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { useNotificationsPresenter } from "./useNotificationsPresenter";
 import type { NotificationPM } from "@/domain/notification";
-const { list, read, readAll, push, replace, remove, report } = vi.hoisted(() => ({
+const { list, read, readAll, push, replace, remove } = vi.hoisted(() => ({
   list: vi.fn(),
   read: vi.fn(),
   readAll: vi.fn(),
   push: vi.fn(),
   replace: vi.fn(),
   remove: vi.fn(),
-  report: vi.fn(),
 }));
 const router = { push, replace };
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
@@ -21,7 +20,6 @@ vi.mock("@/services/notifications.service", async (original) => ({
     read,
     readAll,
     delete: remove,
-    report,
     counts: vi.fn().mockResolvedValue({ all: 9, comment: 2, mention: 3 }),
   },
   listenForInboxChanges: () => () => undefined,

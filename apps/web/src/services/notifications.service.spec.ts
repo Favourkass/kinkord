@@ -84,10 +84,3 @@ it("deletes through the API and broadcasts only after success", async () => {
   expect(changed).toHaveBeenCalledOnce();
   stop();
 });
-it("sends the notification id, reason and note for reporting", async () => {
-  await notificationsApi.report("n1", "spam", "Unexpected");
-  expect(post).toHaveBeenLastCalledWith("/notifications/n1/report", {
-    reason: "spam",
-    details: "Unexpected",
-  });
-});
