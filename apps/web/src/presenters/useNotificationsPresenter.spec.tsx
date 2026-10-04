@@ -3,18 +3,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { useNotificationsPresenter } from "./useNotificationsPresenter";
 import type { NotificationPM } from "@/domain/notification";
-const { list, read, readAll, push, replace } = vi.hoisted(() => ({
+const { list, read, readAll, push, replace, remove } = vi.hoisted(() => ({
   list: vi.fn(),
   read: vi.fn(),
   readAll: vi.fn(),
   push: vi.fn(),
   replace: vi.fn(),
+  remove: vi.fn(),
 }));
 const router = { push, replace };
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("@/services/notifications.service", async (original) => ({
   ...(await original<typeof import("@/services/notifications.service")>()),
-  notificationsApi: { list, read, readAll },
+  notificationsApi: {
+    list,
+    read,
+    readAll,
+    delete: remove,
+    counts: vi.fn().mockResolvedValue({ all: 9, comment: 2, mention: 3 }),
+  },
   listenForInboxChanges: () => () => undefined,
 }));
 // Live events, delivered by hand: `hear` is whatever the screen subscribed.
@@ -187,4 +194,17 @@ describe("useNotificationsPresenter", () => {
     act(() => live.hear?.({ type: "notification" }));
     await waitFor(() => expect(list).toHaveBeenCalledTimes(calls + 1));
   });
+});
+
+it("removes a deleted item and keeps it after a failed deletion", async () => {
+  remove.mockRejectedValueOnce(new Error("offline"));
+  const { result } = renderHook(() => useNotificationsPresenter(true));
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  await act(async () => result.current.deleteNotification("n1"));
+  expect(result.current.items).toHaveLength(1);
+  expect(result.current.error).toContain("delete");
+  remove.mockResolvedValueOnce({ id: "n1" });
+  list.mockResolvedValue({ items: [], nextCursor: null });
+  await act(async () => result.current.deleteNotification("n1"));
+  await waitFor(() => expect(result.current.items).toHaveLength(0));
 });

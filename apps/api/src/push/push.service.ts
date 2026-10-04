@@ -14,7 +14,7 @@ export interface PushMessage {
   title: string;
   body: string;
   url: string;
-  /** Same tag replaces the last one, so a busy chat is one notification, not twenty. */
+  /** Activity grouping hint; device alerts use the individual inbox id. */
   tag: string;
   /** The inbox row it stands for: tapping it marks that row read. */
   notificationId?: string;

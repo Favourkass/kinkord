@@ -35,7 +35,9 @@ function NotificationsScreen() {
         <NotificationTabBar
           links={nav.links}
           labels={nav.labels}
-          unread={shell.notificationsUnread}
+          notificationsCount={shell.notificationsCount}
+          messagesCount={shell.messagesCount}
+          avatarUrl={shell.avatarUrl}
         />
       }
     >

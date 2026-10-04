@@ -85,12 +85,12 @@ testing. `docs/OTP.md` has the full rules.
 ## Notifications inbox
 
 The member inbox at `/notifications` stores activity independently of browser
-push permission. Opening an item marks it read before navigating; the bell dot
-stays visible while any unread items remain. Read state is stored per member,
+push permission. Opening an item marks it read before navigating; the bell badge
+shows the unread notification count. Read state is stored per member,
 shared across devices. The reference layout has All, Comments and Mentions tabs.
 The search button opens search (run by the API across the whole inbox, by name
 or by a word like "liked"), the Unread filter, refresh and "Mark all as read".
-Row menus also let members mark individual items read without navigating.
+Row menus let members mark individual items read or delete a notification.
 
 Rows store who did what to what (`actor_id`, `subject_id`), never names or
 photos: the inbox looks those up when it loads, so a renamed or re-photographed
@@ -99,7 +99,7 @@ them. Device pushes keep their discreet text-only payload.
 
 | Event | Recipient | Opens |
 |---|---|---|
-| New message (text or photo) | Other conversation member: one row per chat, counting messages, cleared when the chat is read | Conversation |
+| New message (text or photo) | Device push to the other conversation member; excluded from the notification inbox and bell count | Conversation |
 | New follow | Followed member | Follower's profile |
 | Comment | Post author, except their own comments | Post |
 | Like | Post author, except their own likes | Post |
@@ -119,11 +119,26 @@ them. Device pushes keep their discreet text-only payload.
   once. Without it (locally, say) they check every minute, and every five
   minutes while it's live.
 
+The All, Comments and Mentions badges count the entire matching inbox, not only
+the loaded page. The Unread filter applies to those totals. The separate chat
+badge counts unread incoming messages across all conversations.
+
 Mentions has an empty state until a mention producer is implemented; the tab and
 API support filtering that event type, but current posting does not emit it.
 Saved posts remain private and generate no alert. Verification codes and
 password-reset emails remain separate from this inbox. Earlier pushes were not
 stored, so history begins after the inbox migration.
+
+Every received device push shows a notification, because Safari cancels a
+site's push after a few that show nothing. One for the screen a member already
+has open and focused arrives silently; the rest request sound and vibration.
+Each inbox row has its own notification tag, so separate events stay separate,
+while a chat's messages share one row and replace each other's alert. API
+delivery uses high urgency. The browser and OS decide whether to display
+a banner: on Android, use Alerting and enable Pop on screen / Floating
+notifications in the installed app or browser's notification settings. Focus,
+Do Not Disturb and notification cooldown can suppress banners. Inbox storage
+alone does not enable device push: permission and a device subscription are required.
 
 ## Changing the database schema
 

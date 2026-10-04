@@ -3,16 +3,19 @@ import AppMobileHeader from "@/components/app/AppMobileHeader";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import DesktopSidebar from "@/components/app/DesktopSidebar";
 import MobileTabBar from "@/components/app/MobileTabBar";
-import type { AppNavLabels, AppNavLinks } from "@/components/app/nav";
+import type { AppNavLabels, AppNavLinks, AppTab } from "@/components/app/nav";
 import SidebarDrawer from "@/components/app/SidebarDrawer";
 
 export interface FeedShellProps {
+  activeTab?: AppTab;
   brand: string;
   greeting: string;
   name: string;
   avatarUrl: string | null;
   membersCount: string;
   notificationsUnread?: boolean;
+  notificationsCount?: number;
+  messagesCount?: number;
   drawerOpen: boolean;
   onMenu: () => void;
   onCloseDrawer: () => void;
@@ -36,12 +39,15 @@ export interface FeedShellProps {
  * where there is finally room for one.
  */
 export default function FeedShell({
+  activeTab,
   brand,
   greeting,
   name,
   avatarUrl,
   membersCount,
   notificationsUnread,
+  notificationsCount,
+  messagesCount,
   drawerOpen,
   onMenu,
   onCloseDrawer,
@@ -63,6 +69,8 @@ export default function FeedShell({
             brand={brand}
             active="home"
             notificationsUnread={notificationsUnread}
+            notificationsCount={notificationsCount}
+            messagesCount={messagesCount}
             avatarUrl={avatarUrl}
             links={links}
             labels={labels}
@@ -94,11 +102,12 @@ export default function FeedShell({
 
       <div className="lg:hidden">
         <MobileTabBar
-          active="home"
+          active={activeTab}
           avatarUrl={avatarUrl}
           links={links}
           labels={labels}
-          notificationsUnread={notificationsUnread}
+          notificationsCount={notificationsCount}
+          messagesCount={messagesCount}
         />
         <SidebarDrawer
           open={drawerOpen}

@@ -1,10 +1,11 @@
 // Kinkord Service Worker
-const CACHE_NAME = "kinkord-pwa-v4";
+const CACHE_NAME = "kinkord-pwa-v6";
 const OFFLINE_URL = "/offline";
 
 const PRECACHE_ASSETS = [
   OFFLINE_URL,
   "/icons/icon-192x192.png",
+  "/icons/push-icon-v2.png",
   "/icons/badge-96x96.png",
   "/icons/icon-512x512.png",
   "/icons/icon-maskable-512x512.png",
@@ -99,8 +100,11 @@ self.addEventListener("fetch", (event) => {
 });
 
 // Web Push notifications (VAPID)
-// Push: what the API sends is { title, body, url, tag }. The same tag replaces
-// the last notification, so a busy chat stays one notification, not twenty.
+// Every push shows a notification: Safari cancels a site's push after a few
+// that show nothing. One for the page a member already has open and focused
+// arrives silently. Each inbox row has its own tag, so separate events stay
+// separate; a chat's messages share one row, so they replace each other and
+// alert again. The browser/OS still controls banners and Do Not Disturb.
 self.addEventListener("push", (event) => {
   let data = {};
   try {
@@ -111,27 +115,46 @@ self.addEventListener("push", (event) => {
   const url = new URL(data.url || "/", self.location.origin).href;
   const options = {
     body: data.body || "New activity on Kinkord",
-    icon: "/icons/icon-192x192.png",
+    icon: "/icons/push-icon-v2.png",
     // The status-bar icon. Android draws only its transparency, as a white
     // silhouette: the full-colour app icon came out as a blank square (and
     // with no badge Chrome shows its own logo), so this is the K in its ring,
     // white on transparent, like the marks X and Instagram show up there.
     badge: "/icons/badge-96x96.png",
-    tag: data.tag,
-    renotify: Boolean(data.tag),
+    tag: data.notificationId ? `notification-${data.notificationId}` : undefined,
     data: { url, notificationId: data.notificationId },
   };
 
   event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
-      windows.forEach((client) => client.postMessage({ type: "kinkord:notification" }));
-      // Already looking at that very screen: nothing to tell them.
-      const watching = windows.some(
-        (w) => w.visibilityState === "visible" && new URL(w.url).pathname === new URL(url).pathname,
-      );
-      if (watching) return undefined;
-      return self.registration.showNotification(data.title || "Kinkord", options);
-    }),
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      // Refreshing open tabs must never stop the notification.
+      .catch(() => [])
+      .then((windows) => {
+        for (const client of windows) {
+          try {
+            client.postMessage({ type: "kinkord:notification" });
+          } catch {
+            // A tab that is closing; the others still refresh.
+          }
+        }
+        const watching = windows.some(
+          (w) =>
+            w.focused &&
+            w.visibilityState === "visible" &&
+            new URL(w.url).pathname === new URL(url).pathname,
+        );
+        // Chrome refuses a silent notification that vibrates or renotifies.
+        const alert = watching
+          ? { ...options, silent: true, renotify: false }
+          : {
+              ...options,
+              silent: false,
+              renotify: Boolean(options.tag),
+              vibrate: [200, 100, 200],
+            };
+        return self.registration.showNotification(data.title || "Kinkord", alert);
+      }),
   );
 });
 

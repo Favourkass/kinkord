@@ -84,3 +84,7 @@ describe("notification presentation", () => {
   it("accepts internal destinations", () =>
     expect(notificationDestination("/p/post-1")).toBe("/p/post-1"));
 });
+
+it("shows follows with the person badge", () => {
+  expect(toNotificationVM({ ...item, type: "follow" }).icon).toBe("person-add");
+});

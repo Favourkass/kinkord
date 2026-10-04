@@ -6,8 +6,8 @@ import {
   notificationsApi,
 } from "./notifications.service";
 import type { NotificationPM } from "@/domain/notification";
-const { get, post } = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
-vi.mock("./apiClient", () => ({ api: { get, post } }));
+const { get, post, del } = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), del: vi.fn() }));
+vi.mock("./apiClient", () => ({ api: { get, post, del } }));
 const item: NotificationPM = {
   id: "n1",
   type: "follow",
@@ -65,4 +65,22 @@ describe("notificationsApi", () => {
     const read = { ...item, readAt: item.createdAt };
     expect(mergeNotifications([item, old], [read])).toEqual([read, old]);
   });
+});
+
+it("loads tab totals with the selected unread filter", async () => {
+  await notificationsApi.counts(true);
+  expect(get).toHaveBeenLastCalledWith("/notifications/counts?unread=true");
+});
+
+it("deletes through the API and broadcasts only after success", async () => {
+  const changed = vi.fn();
+  const stop = listenForInboxChanges(changed);
+  del.mockRejectedValueOnce(new Error("offline"));
+  await expect(notificationsApi.delete("n1")).rejects.toThrow("offline");
+  expect(changed).not.toHaveBeenCalled();
+  del.mockResolvedValueOnce({ id: "n1" });
+  await notificationsApi.delete("n1");
+  expect(del).toHaveBeenLastCalledWith("/notifications/n1");
+  expect(changed).toHaveBeenCalledOnce();
+  stop();
 });

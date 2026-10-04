@@ -771,3 +771,22 @@ describe("blocks in chat", () => {
     );
   });
 });
+
+describe("chat unread badge", () => {
+  it("counts incoming unread messages without the conversation-list limit", async () => {
+    const { service, calls } = make([[{ total: 17 }]]);
+    await expect(service.unreadCount("u1")).resolves.toEqual({ count: 17 });
+    expect(calls.some((c) => c.op === "limit")).toBe(false);
+    const query = whereSql(calls, 0);
+    expect(query).toContain('"message"."deleted_at" is null');
+    expect(query).toContain('"message"."sender_id" <>');
+    expect(query).toContain('"conversation_participant"."last_read_at"');
+    const join = new PgDialect().sqlToQuery(
+      calls.find((c) => c.op === "innerJoin")!.args[1] as SQL,
+    );
+    expect(join.params).toContain("u1");
+  });
+  it("returns zero when no messages are unread", async () => {
+    await expect(make([[{ total: 0 }]]).service.unreadCount("u1")).resolves.toEqual({ count: 0 });
+  });
+});

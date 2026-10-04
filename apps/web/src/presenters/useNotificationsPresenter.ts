@@ -27,6 +27,7 @@ export const SEARCH_DEBOUNCE_MS = 300;
 
 export function useNotificationsPresenter(ready: boolean, openId: string | null = null) {
   const router = useRouter();
+  const [tabCounts, setTabCounts] = useState({ all: 0, comment: 0, mention: 0 });
   const [tab, setTab] = useState<NotificationTab>("all");
   const [query, setQuery] = useState("");
   // What the server is asked for: the box's text, once typing pauses.
@@ -71,6 +72,11 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
       const order = ++request;
       const version = revision.current;
       const depth = pageCount.current;
+      // The tab totals load alongside the pages, not before them.
+      const countsRequest = notificationsApi.counts(unreadOnly);
+      // Awaited below; this only keeps a failure there from going unhandled
+      // when a page read fails first.
+      countsRequest.catch(() => undefined);
       try {
         // Re-read loaded pages too: reads made on another device must clear
         // older dots, including while the Unread filter is selected.
@@ -87,6 +93,7 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
           nextCursor = result.nextCursor;
           if (!nextCursor) break;
         }
+        const counts = await countsRequest;
         if (
           generation.current !== mine ||
           request !== order ||
@@ -94,6 +101,7 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
           pageCount.current !== depth
         )
           return;
+        setTabCounts(counts);
         setItems(refreshed);
         setCursor(nextCursor);
         setLoadedFor(filterKey);
@@ -225,6 +233,24 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
   }, [cursor, unreadOnly, tab, search]);
 
   // The search itself ran on the server; only an item read here since stays filtered out.
+  const deleteNotification = async (id: string) => {
+    if (busy.current) return;
+    busy.current = true;
+    setMenuId(null);
+    setOpening(id);
+    try {
+      await notificationsApi.delete(id);
+      revision.current++;
+      setItems((previous) => previous.filter((item) => item.id !== id));
+      refreshRef.current();
+      setError(null);
+    } catch {
+      setError(NOTIFICATIONS_COPY.deleteError);
+    } finally {
+      busy.current = false;
+      setOpening(null);
+    }
+  };
   const visibleItems = useMemo(
     () =>
       loadedFor === filterKey
@@ -237,6 +263,8 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
 
   return {
     items: visibleItems,
+    tabCounts,
+    deleteNotification,
     tab,
     setTab,
     query,
