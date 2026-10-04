@@ -210,16 +210,3 @@ it("removes a deleted item and keeps it after a failed deletion", async () => {
   await act(async () => result.current.deleteNotification("n1"));
   await waitFor(() => expect(result.current.items).toHaveLength(0));
 });
-it("opens a reason form and confirms only accepted reports", async () => {
-  report.mockResolvedValueOnce({ id: "r1" });
-  const { result } = renderHook(() => useNotificationsPresenter(true));
-  act(() => result.current.reportNotification("n1"));
-  expect(result.current.reportSheet?.canSubmit).toBe(false);
-  act(() => {
-    result.current.reportSheet!.onReason("spam");
-    result.current.reportSheet!.onDetails(" Test ");
-  });
-  await act(async () => result.current.reportSheet!.onSubmit());
-  expect(report).toHaveBeenCalledWith("n1", "spam", "Test");
-  expect(result.current.reportSheet?.sent).toBe(true);
-});

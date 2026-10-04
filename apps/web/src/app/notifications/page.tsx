@@ -3,7 +3,6 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import AppShell from "@/components/app/AppShell";
-import ReportSheet from "@/components/chat/ReportSheet";
 import NotificationHeader from "@/components/notifications/NotificationHeader";
 import NotificationTabBar from "@/components/notifications/NotificationTabBar";
 import NotificationInbox from "@/components/notifications/NotificationInbox";
@@ -54,7 +53,6 @@ function NotificationsScreen() {
         onRefresh={inbox.refresh}
         copy={NOTIFICATIONS_COPY}
       />
-      {inbox.reportSheet && <ReportSheet {...inbox.reportSheet} />}
     </AppShell>
   );
 }

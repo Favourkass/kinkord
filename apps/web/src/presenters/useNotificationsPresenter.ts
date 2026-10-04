@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CHAT_COPY } from "@/constants/chat";
-import { REPORT_REASONS, REPORT_DETAILS_MAX, type ReportReason } from "@/domain/safety";
 import { NOTIFICATIONS_COPY } from "@/constants/notifications";
 import { Routes } from "@/constants/Routes";
 import {
@@ -29,12 +27,6 @@ export const SEARCH_DEBOUNCE_MS = 300;
 
 export function useNotificationsPresenter(ready: boolean, openId: string | null = null) {
   const router = useRouter();
-  const [reportId, setReportId] = useState<string | null>(null);
-  const [reportReason, setReportReason] = useState<ReportReason | null>(null);
-  const [reportDetails, setReportDetails] = useState("");
-  const [reportSent, setReportSent] = useState(false);
-  const [reportSending, setReportSending] = useState(false);
-  const [reportError, setReportError] = useState<string | null>(null);
   const [tabCounts, setTabCounts] = useState({ all: 0, comment: 0, mention: 0 });
   const [tab, setTab] = useState<NotificationTab>("all");
   const [query, setQuery] = useState("");
@@ -254,55 +246,6 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
       setOpening(null);
     }
   };
-  const reportNotification = (id: string) => {
-    setMenuId(null);
-    setReportId(id);
-    setReportReason(null);
-    setReportDetails("");
-    setReportSent(false);
-    setReportError(null);
-  };
-  const closeReport = () => {
-    if (!reportSending) setReportId(null);
-  };
-  const submitReport = async () => {
-    if (!reportId || !reportReason || reportSending) return;
-    setReportSending(true);
-    setReportError(null);
-    try {
-      await notificationsApi.report(reportId, reportReason, reportDetails.trim());
-      setReportSent(true);
-    } catch {
-      setReportError(NOTIFICATIONS_COPY.reportError);
-    } finally {
-      setReportSending(false);
-    }
-  };
-  const reportSheet = reportId
-    ? {
-        title: NOTIFICATIONS_COPY.reportNotification,
-        intro: NOTIFICATIONS_COPY.reportIntro,
-        reasons: REPORT_REASONS.map((value) => ({ value, label: CHAT_COPY.report.reasons[value] })),
-        selected: reportReason,
-        details: reportDetails,
-        detailsLabel: CHAT_COPY.report.detailsLabel,
-        detailsMax: REPORT_DETAILS_MAX,
-        alsoBlock: null,
-        submitLabel: reportSending ? CHAT_COPY.report.sending : CHAT_COPY.report.submit,
-        cancelLabel: NOTIFICATIONS_COPY.close,
-        canSubmit: Boolean(reportReason) && !reportSending,
-        sent: reportSent,
-        doneText: CHAT_COPY.report.done,
-        closeLabel: CHAT_COPY.report.close,
-        error: reportError,
-        onReason: setReportReason,
-        onDetails: setReportDetails,
-        onToggleBlock: () => undefined,
-        onSubmit: submitReport,
-        onClose: closeReport,
-      }
-    : null;
-
   const visibleItems = useMemo(
     () =>
       loadedFor === filterKey
@@ -317,8 +260,6 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
     items: visibleItems,
     tabCounts,
     deleteNotification,
-    reportNotification,
-    reportSheet,
     tab,
     setTab,
     query,
