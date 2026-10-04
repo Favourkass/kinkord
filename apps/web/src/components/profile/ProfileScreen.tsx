@@ -49,6 +49,8 @@ export interface ProfileScreenProps {
   activeTab?: AppTab;
   viewerAvatarUrl: string | null;
   notificationsUnread?: boolean;
+  notificationsCount?: number;
+  messagesCount?: number;
   links: AppNavLinks;
   labels: AppNavLabels;
 }
@@ -88,6 +90,8 @@ export default function ProfileScreen(p: ProfileScreenProps) {
         aside={ready ? <SuggestedFriends {...p.suggested} /> : null}
         viewerAvatarUrl={p.viewerAvatarUrl}
         notificationsUnread={p.notificationsUnread}
+        notificationsCount={p.notificationsCount}
+        messagesCount={p.messagesCount}
         activeTab={p.activeTab}
         links={p.links}
         labels={p.labels}

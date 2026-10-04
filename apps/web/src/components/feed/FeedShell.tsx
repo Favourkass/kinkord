@@ -13,6 +13,8 @@ export interface FeedShellProps {
   avatarUrl: string | null;
   membersCount: string;
   notificationsUnread?: boolean;
+  notificationsCount?: number;
+  messagesCount?: number;
   drawerOpen: boolean;
   onMenu: () => void;
   onCloseDrawer: () => void;
@@ -42,6 +44,8 @@ export default function FeedShell({
   avatarUrl,
   membersCount,
   notificationsUnread,
+  notificationsCount,
+  messagesCount,
   drawerOpen,
   onMenu,
   onCloseDrawer,
@@ -98,7 +102,8 @@ export default function FeedShell({
           avatarUrl={avatarUrl}
           links={links}
           labels={labels}
-          notificationsUnread={notificationsUnread}
+          notificationsCount={notificationsCount}
+          messagesCount={messagesCount}
         />
         <SidebarDrawer
           open={drawerOpen}

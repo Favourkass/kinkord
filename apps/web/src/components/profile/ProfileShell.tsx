@@ -15,6 +15,8 @@ export interface ProfileShellProps {
   aside: ReactNode;
   viewerAvatarUrl: string | null;
   notificationsUnread?: boolean;
+  notificationsCount?: number;
+  messagesCount?: number;
   /** "profile" on your own profile so the avatar tab lights up; undefined elsewhere. */
   activeTab?: AppTab;
   links: AppNavLinks;
@@ -37,7 +39,8 @@ export default function ProfileShell({
   sideCard,
   aside,
   viewerAvatarUrl,
-  notificationsUnread,
+  notificationsCount,
+  messagesCount,
   activeTab,
   links,
   labels,
@@ -64,7 +67,8 @@ export default function ProfileShell({
       <div className="lg:hidden">
         <MobileTabBar
           active={activeTab}
-          notificationsUnread={notificationsUnread}
+          notificationsCount={notificationsCount}
+          messagesCount={messagesCount}
           avatarUrl={viewerAvatarUrl}
           links={links}
           labels={labels}
