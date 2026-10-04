@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Bell, Home, MessageCircle } from "lucide-react";
 import AvatarCircle from "./AvatarCircle";
+import UnreadBadge from "./UnreadBadge";
 import type { AppNavLabels, AppNavLinks, AppTab } from "./nav";
 export type { AppTab } from "./nav";
 
@@ -49,7 +50,7 @@ export default function MobileTabBar({
             strokeWidth={1.8}
             fill={active === "chat" ? "currentColor" : "none"}
           />
-          <UnreadBadge count={messagesCount} />
+          <UnreadBadge count={messagesCount} className="-top-0.5 right-0 ring-app-surface" />
         </Link>
         <Link
           href={links.notifications}
@@ -66,7 +67,7 @@ export default function MobileTabBar({
             strokeWidth={1.8}
             fill={active === "notifications" ? "currentColor" : "none"}
           />
-          <UnreadBadge count={notificationsCount} />
+          <UnreadBadge count={notificationsCount} className="-top-0.5 right-0 ring-app-surface" />
         </Link>
         <Link
           href={links.profile}
@@ -83,17 +84,5 @@ export default function MobileTabBar({
         </Link>
       </div>
     </nav>
-  );
-}
-
-function UnreadBadge({ count }: { count: number }) {
-  if (count <= 0) return null;
-  return (
-    <span
-      aria-hidden
-      className="absolute -top-0.5 right-0 grid min-w-[18px] h-[18px] px-1 place-items-center rounded-full bg-kink-gold-bright text-[10px] font-bold leading-none text-black ring-2 ring-app-surface"
-    >
-      {count > 99 ? "99+" : count}
-    </span>
   );
 }

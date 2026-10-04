@@ -2,11 +2,15 @@ import Link from "next/link";
 import AvatarCircle from "./AvatarCircle";
 import MaskIcon, { type MaskIconName } from "./MaskIcon";
 import type { AppNav, AppNavLabels, AppNavLinks } from "./nav";
+import UnreadBadge from "./UnreadBadge";
 
 export interface DesktopSidebarProps {
   brand: string;
   active: AppNav;
   notificationsUnread?: boolean;
+  /** Unread counts; without them the bell falls back to a dot. */
+  notificationsCount?: number;
+  messagesCount?: number;
   avatarUrl: string | null;
   links: AppNavLinks;
   labels: AppNavLabels;
@@ -22,11 +26,22 @@ export default function DesktopSidebar({
   brand,
   active,
   notificationsUnread,
+  notificationsCount,
+  messagesCount = 0,
   avatarUrl,
   links,
   labels,
   onLogout,
 }: DesktopSidebarProps) {
+  const unread = { home: 0, chat: messagesCount, notifications: notificationsCount ?? 0 };
+  const unreadLabel = (key: "home" | "chat" | "notifications") =>
+    key === "chat" && messagesCount > 0
+      ? `${labels.chat}, ${messagesCount} unread messages`
+      : key === "notifications" && (unread.notifications > 0 || notificationsUnread)
+        ? unread.notifications > 0
+          ? `${labels.notifications}, ${unread.notifications} unread notifications`
+          : `${labels.notifications}, unread notifications`
+        : undefined;
   const items: Array<{
     key: "home" | "chat" | "notifications";
     icon: MaskIconName;
@@ -50,11 +65,7 @@ export default function DesktopSidebar({
           <Link
             key={item.key}
             href={links[item.key]}
-            aria-label={
-              item.key === "notifications" && notificationsUnread
-                ? `${labels[item.key]}, unread notifications`
-                : undefined
-            }
+            aria-label={unreadLabel(item.key)}
             aria-current={active === item.key ? "page" : undefined}
             className={row(active === item.key)}
           >
@@ -64,12 +75,15 @@ export default function DesktopSidebar({
                 width={29}
                 height={item.icon === "bell-outline" ? 29 : 29}
               />
-              {item.key === "notifications" && notificationsUnread && (
-                <span
-                  aria-hidden
-                  className="absolute -right-1 -top-1 size-2 rounded-full bg-app-members-count ring-2 ring-side-bg"
-                />
-              )}
+              <UnreadBadge count={unread[item.key]} className="-right-2 -top-2 ring-side-bg" />
+              {item.key === "notifications" &&
+                notificationsCount === undefined &&
+                notificationsUnread && (
+                  <span
+                    aria-hidden
+                    className="absolute -right-1 -top-1 size-2 rounded-full bg-app-members-count ring-2 ring-side-bg"
+                  />
+                )}
             </span>
             {labels[item.key]}
           </Link>

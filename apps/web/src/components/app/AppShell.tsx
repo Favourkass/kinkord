@@ -99,6 +99,8 @@ export default function AppShell({
           brand={brand}
           active={activeNav}
           notificationsUnread={notificationsUnread}
+          notificationsCount={notificationsCount}
+          messagesCount={messagesCount}
           avatarUrl={avatarUrl}
           links={links}
           labels={labels}

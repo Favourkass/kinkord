@@ -69,6 +69,8 @@ export default function FeedShell({
             brand={brand}
             active="home"
             notificationsUnread={notificationsUnread}
+            notificationsCount={notificationsCount}
+            messagesCount={messagesCount}
             avatarUrl={avatarUrl}
             links={links}
             labels={labels}

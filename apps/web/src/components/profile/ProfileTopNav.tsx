@@ -2,6 +2,7 @@ import Link from "next/link";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import MaskIcon from "@/components/app/MaskIcon";
 import type { AppNavLabels, AppNavLinks } from "@/components/app/nav";
+import UnreadBadge from "@/components/app/UnreadBadge";
 
 export interface ProfileTopNavProps {
   brand: string;
@@ -10,6 +11,8 @@ export interface ProfileTopNavProps {
   accountLabel: string;
   viewerAvatarUrl: string | null;
   notificationsUnread?: boolean;
+  notificationsCount?: number;
+  messagesCount?: number;
   links: Pick<AppNavLinks, "home" | "chat" | "notifications" | "settings" | "profile">;
   labels: Pick<AppNavLabels, "home" | "chat" | "notifications" | "settings" | "profile">;
 }
@@ -34,22 +37,35 @@ export default function ProfileTopNav(p: ProfileTopNavProps) {
         <Link
           href={p.links.notifications}
           aria-label={
-            p.notificationsUnread
-              ? `${p.labels.notifications}, unread notifications`
-              : p.labels.notifications
+            p.notificationsCount
+              ? `${p.labels.notifications}, ${p.notificationsCount} unread notifications`
+              : p.notificationsUnread
+                ? `${p.labels.notifications}, unread notifications`
+                : p.labels.notifications
           }
           className={`relative ${circle}`}
         >
           <MaskIcon name="bell-outline-24" width={20} />
-          {p.notificationsUnread && (
+          <UnreadBadge
+            count={p.notificationsCount ?? 0}
+            className="-right-1.5 -top-1.5 ring-pf-nav"
+          />
+          {p.notificationsCount === undefined && p.notificationsUnread && (
             <span
               aria-hidden
               className="absolute right-0 top-0 size-2 rounded-full bg-app-members-count ring-2 ring-pf-nav"
             />
           )}
         </Link>
-        <Link href={p.links.chat} aria-label={p.labels.chat} className={circle}>
+        <Link
+          href={p.links.chat}
+          aria-label={
+            p.messagesCount ? `${p.labels.chat}, ${p.messagesCount} unread messages` : p.labels.chat
+          }
+          className={`relative ${circle}`}
+        >
           <MaskIcon name="message" width={20} />
+          <UnreadBadge count={p.messagesCount ?? 0} className="-right-1.5 -top-1.5 ring-pf-nav" />
         </Link>
         <Link href={p.links.home} aria-label={p.labels.home} className="text-kink-amber">
           <MaskIcon name="home-solid" width={24} />
