@@ -73,7 +73,7 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
       const version = revision.current;
       const depth = pageCount.current;
       // The tab totals load alongside the pages, not before them.
-      const countsRequest = notificationsApi.counts(unreadOnly);
+      const countsRequest = notificationsApi.counts(true);
       // Awaited below; this only keeps a failure there from going unhandled
       // when a page read fails first.
       countsRequest.catch(() => undefined);
@@ -173,9 +173,18 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
       setOpening(id);
       setError(null);
       try {
+        const previousItem = items.find((row) => row.id === id);
         const item = await notificationsApi.read(id);
         revision.current++;
+        if (previousItem?.readAt === null && previousItem.type !== "message") {
+          setTabCounts((previous) => ({
+            all: Math.max(0, previous.all - 1),
+            comment: Math.max(0, previous.comment - (previousItem.type === "comment" ? 1 : 0)),
+            mention: Math.max(0, previous.mention - (previousItem.type === "mention" ? 1 : 0)),
+          }));
+        }
         setItems((previous) => previous.map((row) => (row.id === id ? item : row)));
+        refreshRef.current();
         if (navigate) router.push(notificationDestination(item.url) ?? Routes.notifications);
       } catch {
         setError(NOTIFICATIONS_COPY.readError);
@@ -184,7 +193,7 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
         setOpening(null);
       }
     },
-    [router],
+    [router, items],
   );
 
   const markAll = useCallback(async () => {
@@ -195,6 +204,7 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
     try {
       await notificationsApi.readAll();
       revision.current++;
+      setTabCounts({ all: 0, comment: 0, mention: 0 });
       const readAt = new Date().toISOString();
       setItems((previous) => previous.map((item) => ({ ...item, readAt: item.readAt ?? readAt })));
       refreshRef.current();

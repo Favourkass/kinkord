@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { useNotificationsPresenter } from "./useNotificationsPresenter";
 import type { NotificationPM } from "@/domain/notification";
-const { list, read, readAll, push, replace, remove } = vi.hoisted(() => ({
+const { counts, list, read, readAll, push, replace, remove } = vi.hoisted(() => ({
+  counts: vi.fn(),
   list: vi.fn(),
   read: vi.fn(),
   readAll: vi.fn(),
@@ -20,7 +21,7 @@ vi.mock("@/services/notifications.service", async (original) => ({
     read,
     readAll,
     delete: remove,
-    counts: vi.fn().mockResolvedValue({ all: 9, comment: 2, mention: 3 }),
+    counts,
   },
   listenForInboxChanges: () => () => undefined,
 }));
@@ -50,8 +51,13 @@ const page = (over: Record<string, unknown> = {}) => ({
 });
 afterEach(cleanup);
 beforeEach(() => {
+  counts.mockReset().mockResolvedValue({ all: 9, comment: 2, mention: 3 });
   list.mockReset().mockResolvedValue({ items: [item], nextCursor: null });
-  read.mockReset().mockResolvedValue({ ...item, readAt: item.createdAt });
+  read.mockReset().mockImplementation(async () => {
+    const updated = { ...item, readAt: item.createdAt };
+    list.mockResolvedValue({ items: [updated], nextCursor: null });
+    return updated;
+  });
   readAll.mockReset().mockResolvedValue(undefined);
   push.mockClear();
   replace.mockClear();
@@ -81,6 +87,7 @@ describe("useNotificationsPresenter", () => {
     });
     expect(push).not.toHaveBeenCalled();
     expect(result.current.opening).toBe("n1");
+    list.mockResolvedValue({ items: [{ ...item, readAt: item.createdAt }], nextCursor: null });
     await act(async () => resolve({ ...item, readAt: item.createdAt }));
     expect(push).toHaveBeenCalledWith("/messages/c1");
     expect(result.current.items[0].unread).toBe(false);
@@ -207,4 +214,73 @@ it("removes a deleted item and keeps it after a failed deletion", async () => {
   list.mockResolvedValue({ items: [], nextCursor: null });
   await act(async () => result.current.deleteNotification("n1"));
   await waitFor(() => expect(result.current.items).toHaveLength(0));
+});
+
+describe("unread tab badges", () => {
+  it("requests unread totals while the list still includes read notifications", async () => {
+    const { result } = renderHook(() => useNotificationsPresenter(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(counts).toHaveBeenCalledWith(true);
+    expect(result.current.unreadOnly).toBe(false);
+    expect(result.current.tabCounts).toEqual({ all: 9, comment: 2, mention: 3 });
+    act(() => result.current.setTab("comment"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(counts.mock.calls.every(([unread]) => unread === true)).toBe(true);
+  });
+
+  it.each([
+    ["comment", { all: 8, comment: 1, mention: 3 }],
+    ["mention", { all: 8, comment: 2, mention: 2 }],
+    ["follow", { all: 8, comment: 2, mention: 3 }],
+  ] as const)(
+    "reduces the matching unread badges for %s once after reading",
+    async (type, expected) => {
+      const notification = { ...item, type };
+      const readNotification = { ...notification, readAt: item.createdAt };
+      list.mockResolvedValue({ items: [notification], nextCursor: null });
+      read.mockResolvedValue(readNotification);
+      const { result } = renderHook(() => useNotificationsPresenter(true));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      // Hold the server refresh to verify the immediate update independently.
+      counts.mockImplementationOnce(() => new Promise(() => undefined));
+      list.mockResolvedValue({ items: [readNotification], nextCursor: null });
+      await act(async () => result.current.markRead(item.id));
+      expect(result.current.tabCounts).toEqual(expected);
+      expect(result.current.items[0].unread).toBe(false);
+      counts.mockResolvedValue(expected);
+      await act(async () => result.current.markRead(item.id));
+      expect(result.current.tabCounts).toEqual(expected);
+    },
+  );
+
+  it("keeps unread badges when a read fails", async () => {
+    read.mockRejectedValueOnce(new Error("offline"));
+    const { result } = renderHook(() => useNotificationsPresenter(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => result.current.markRead(item.id));
+    expect(result.current.tabCounts).toEqual({ all: 9, comment: 2, mention: 3 });
+  });
+
+  it("clears all badges after marking the whole inbox read", async () => {
+    const { result } = renderHook(() => useNotificationsPresenter(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    counts.mockImplementationOnce(() => new Promise(() => undefined));
+    await act(async () => result.current.markAll());
+    expect(result.current.tabCounts).toEqual({ all: 0, comment: 0, mention: 0 });
+  });
+
+  it("refreshes unread badges for reads on another device and deletions", async () => {
+    const { result } = renderHook(() => useNotificationsPresenter(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    counts.mockResolvedValue({ all: 4, comment: 1, mention: 1 });
+    act(() => window.dispatchEvent(new Event("focus")));
+    await waitFor(() => expect(result.current.tabCounts.all).toBe(4));
+    remove.mockResolvedValueOnce({ id: item.id });
+    list.mockResolvedValue({ items: [], nextCursor: null });
+    counts.mockResolvedValue({ all: 3, comment: 0, mention: 1 });
+    await act(async () => result.current.deleteNotification(item.id));
+    await waitFor(() =>
+      expect(result.current.tabCounts).toEqual({ all: 3, comment: 0, mention: 1 }),
+    );
+  });
 });
