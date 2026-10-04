@@ -56,7 +56,7 @@ export function getVerificationPrivacyVM(): VerificationPrivacyVM {
           "From your Kinkord account: your account ID, date of birth, gender, country, nationality, current profile photo, your consent, your verification status and the reference of your Didit session.",
           "In Didit's hosted check you're asked for a supported government ID and a live selfie. Didit processes the ID image and the details on it, the selfie or short video, face and liveness signals, device and network security information, and the results of each check. For Nigerian members, the ID details are also checked against NIMC or bank verification (BVN) records through Didit.",
           "Face measurements used to recognise or confirm you are sensitive biometric data. With your explicit consent, Kinkord sends your current profile photo and the selfie from your Didit session to Didit for a one-to-one face comparison.",
-          "Kinkord doesn't copy your ID image, ID number, selfie or video into its own systems. It keeps the pass or fail result of each check, reason codes, the face-comparison score and the threshold used, and a keyed fingerprint made from the name, birth date and gender on your ID. The fingerprint can't be turned back into those details; it only lets us notice when one identity is used to verify more than one account.",
+          "Kinkord doesn't copy your ID image, ID number, selfie or video into its own systems. It keeps the pass or fail result of each check, reason codes, the face-comparison score and the threshold used, and a keyed fingerprint made from the name, birth date and gender on your ID. The fingerprint doesn't contain those details; it only lets us notice when one identity is used to verify more than one account.",
         ],
       },
       {
@@ -106,7 +106,7 @@ export function getVerificationPrivacyVM(): VerificationPrivacyVM {
         id: "sharing",
         title: "Who receives it, and where",
         paragraphs: [
-          "Didit and its approved infrastructure providers receive what's needed to run the check. Inside Kinkord, only admins who review verifications can see results and your profile photo. Information may be disclosed to regulators, courts or law enforcement where the law requires it.",
+          "Didit and its approved infrastructure providers receive what's needed to run the check. Inside Kinkord, only admins can see your verification results. Information may be disclosed to regulators, courts or law enforcement where the law requires it.",
           "Didit processes verification data in the European Union by default, including in Ireland. Kinkord relies on Didit's data-protection terms and the transfer safeguards required by Nigerian law for this processing outside Nigeria.",
         ],
       },
