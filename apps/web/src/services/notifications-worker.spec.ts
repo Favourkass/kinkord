@@ -59,30 +59,61 @@ describe("notification service worker", () => {
       }),
     );
   });
-  it("alerts even while the recipient is watching the destination", async () => {
+  it("alerts when the destination is open but not in front of the member", async () => {
     const client = {
       visibilityState: "visible",
+      focused: false,
       url: "https://kinkord.test/messages/c1",
       postMessage: vi.fn(),
     };
     const w = worker([client]);
-    await w.dispatch("push", { data: { json: () => ({ url: "/messages/c1" }) } });
+    await w.dispatch("push", {
+      data: { json: () => ({ url: "/messages/c1", notificationId: "n1" }) },
+    });
     expect(client.postMessage).toHaveBeenCalled();
     expect(w.showNotification).toHaveBeenCalledWith(
       "Kinkord",
-      expect.objectContaining({ silent: false, renotify: false }),
+      expect.objectContaining({ silent: false, renotify: true, vibrate: [200, 100, 200] }),
     );
   });
-  it("keeps successive messages in the same conversation as separate device alerts", async () => {
+  it("still shows, silently, a push for the page the member is looking at", async () => {
+    const client = {
+      visibilityState: "visible",
+      focused: true,
+      url: "https://kinkord.test/messages/c1",
+      postMessage: vi.fn(),
+    };
+    const w = worker([client]);
+    await w.dispatch("push", {
+      data: { json: () => ({ url: "/messages/c1", notificationId: "n1" }) },
+    });
+    const [, options] = w.showNotification.mock.calls[0];
+    expect(options).toMatchObject({ silent: true, renotify: false, tag: "notification-n1" });
+    expect(options.vibrate).toBeUndefined();
+  });
+  it("keeps different inbox events as separate device alerts", async () => {
     const w = worker();
     for (const notificationId of ["n1", "n2"]) {
       await w.dispatch("push", {
-        data: { json: () => ({ url: "/messages/c1", tag: "chat-c1", notificationId }) },
+        data: { json: () => ({ url: "/p/p1", notificationId }) },
       });
     }
     expect(w.showNotification.mock.calls.map((call) => call[1].tag)).toEqual([
       "notification-n1",
       "notification-n2",
+    ]);
+  });
+  it("lets a chat's next message replace its alert and sound again", async () => {
+    // The API keeps one inbox row per chat, so its pushes share an id.
+    const w = worker();
+    for (let i = 0; i < 2; i++) {
+      await w.dispatch("push", {
+        data: { json: () => ({ url: "/messages/c1", notificationId: "n1" }) },
+      });
+    }
+    expect(w.showNotification.mock.calls.map((call) => [call[1].tag, call[1].renotify])).toEqual([
+      ["notification-n1", true],
+      ["notification-n1", true],
     ]);
   });
   it("does not collapse older pushes without an inbox id into one chat tag", async () => {

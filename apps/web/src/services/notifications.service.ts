@@ -1,5 +1,4 @@
 import type { NotificationPagePM, NotificationPM } from "@/domain/notification";
-import type { ReportReason } from "@/domain/safety";
 import { api } from "./apiClient";
 
 const CHANGE_EVENT = "kinkord:notifications-changed";
@@ -67,11 +66,6 @@ export const notificationsApi = {
     notifyInboxChanged();
     return result;
   },
-  report: (id: string, reason: ReportReason, details: string) =>
-    api.post<{ id: string }>(`/notifications/${encodeURIComponent(id)}/report`, {
-      reason,
-      details,
-    }),
   readAll: async () => {
     await api.post<{ ok: true }>("/notifications/read-all", {});
     notifyInboxChanged();

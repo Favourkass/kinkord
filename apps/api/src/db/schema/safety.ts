@@ -50,7 +50,7 @@ export const report = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     reporterId: text("reporter_id").notNull(),
-    reportedUserId: text("reported_user_id"),
+    reportedUserId: text("reported_user_id").notNull(),
     conversationId: uuid("conversation_id"),
     reason: text("reason").$type<ReportReason>().notNull(),
     details: text("details"),

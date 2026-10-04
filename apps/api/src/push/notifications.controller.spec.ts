@@ -10,7 +10,6 @@ function make() {
     read: vi.fn(),
     readAll: vi.fn(),
     delete: vi.fn(),
-    report: vi.fn(),
     counts: vi.fn(),
   };
   return { controller: new NotificationsController(inbox as never), inbox };
@@ -52,12 +51,9 @@ describe("NotificationsController", () => {
   });
 });
 
-it("validates menu actions and uses the session recipient", () => {
+it("deletes for the session recipient and refuses a malformed id", () => {
   const { controller, inbox } = make();
   controller.delete(req, ID);
   expect(inbox.delete).toHaveBeenCalledWith("member", ID);
-  controller.report(req, ID, { reason: "spam", details: "  Test  ", userId: "intruder" });
-  expect(inbox.report).toHaveBeenCalledWith("member", ID, { reason: "spam", details: "Test" });
-  expect(() => controller.report(req, ID, { reason: "invalid" })).toThrow();
   expect(() => controller.delete(req, "bad-id")).toThrow();
 });

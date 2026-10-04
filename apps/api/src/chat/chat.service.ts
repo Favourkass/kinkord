@@ -401,12 +401,6 @@ export class ChatService {
       );
   }
 
-  /**
-   * The inbox. Threads whose other member was suspended or deleted are left
-   * out: they can't be answered, and a block should read as gone. A thread
-   * nobody has written in yet belongs to whoever opened it: the other member
-   * first hears of it with the first message, which the daily allowance counts.
-   */
   /** Total unread incoming messages, across every accessible conversation. */
   async unreadCount(userId: string): Promise<{ count: number }> {
     const [row] = await this.db
@@ -431,6 +425,12 @@ export class ChatService {
     return { count: Number(row?.total ?? 0) };
   }
 
+  /**
+   * The inbox. Threads whose other member was suspended or deleted are left
+   * out: they can't be answered, and a block should read as gone. A thread
+   * nobody has written in yet belongs to whoever opened it: the other member
+   * first hears of it with the first message, which the daily allowance counts.
+   */
   async listConversations(userId: string): Promise<ConversationSummaryDto[]> {
     const rows = await this.summaries(userId, null);
     return rows
