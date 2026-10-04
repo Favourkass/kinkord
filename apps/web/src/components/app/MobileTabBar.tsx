@@ -1,87 +1,86 @@
 import Link from "next/link";
+import { Bell, Home, MessageCircle } from "lucide-react";
 import AvatarCircle from "./AvatarCircle";
-import MaskIcon, { type MaskIconName } from "./MaskIcon";
+import UnreadBadge from "./UnreadBadge";
 import type { AppNavLabels, AppNavLinks, AppTab } from "./nav";
-
 export type { AppTab } from "./nav";
 
 export interface MobileTabBarProps {
-  /** Undefined when the current screen isn't one of the tabs (e.g. Settings). */
   active?: AppTab;
-  notificationsUnread?: boolean;
-  avatarUrl: string | null;
   links: Pick<AppNavLinks, "home" | "chat" | "notifications" | "profile">;
   labels: Pick<AppNavLabels, "home" | "chat" | "notifications" | "profile">;
+  notificationsCount?: number;
+  messagesCount?: number;
+  avatarUrl: string | null;
 }
 
-/** Figma tab bar: 57px tall, icon-only; centres at 79/176/265.5/360.5 of a 440px frame. */
-const ICON_TABS: Array<{
-  key: Exclude<AppTab, "profile">;
-  icon: MaskIconName;
-  size: number;
-  centerPct: number;
-}> = [
-  { key: "home", icon: "home-solid", size: 24, centerPct: 17.95 },
-  { key: "chat", icon: "chat", size: 24, centerPct: 40 },
-  { key: "notifications", icon: "bell", size: 21, centerPct: 60.34 },
-];
-const PROFILE_CENTER_PCT = 81.93;
-
-/** Bottom tab bar: Home, Chat, Notifications, Profile (live avatar) with a 60px gold indicator over the active tab. */
+/** Member navigation with a live profile photo. */
 export default function MobileTabBar({
-  active,
-  avatarUrl,
   links,
   labels,
-  notificationsUnread,
+  active,
+  notificationsCount = 0,
+  messagesCount = 0,
+  avatarUrl,
 }: MobileTabBarProps) {
-  const indicatorCenter =
-    active === "profile" ? PROFILE_CENTER_PCT : ICON_TABS.find((t) => t.key === active)?.centerPct;
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-20 border-t border-mem-hairline bg-mem-header pb-[env(safe-area-inset-bottom)]"
+      className="fixed inset-x-0 bottom-0 z-20 border-t border-app-card-border bg-app-surface pb-[env(safe-area-inset-bottom)]"
     >
-      <div className="relative h-[57px]">
-        {indicatorCenter !== undefined && (
-          <span
-            aria-hidden
-            className="absolute top-[-1px] h-[1.5px] w-[60px] -translate-x-1/2 bg-kink-gold-bright"
-            style={{ left: `${indicatorCenter}%` }}
+      <div className="flex h-[57px] items-center justify-around">
+        <Link
+          href={links.home}
+          aria-label={labels.home}
+          aria-current={active === "home" ? "page" : undefined}
+          className={`grid size-11 place-items-center ${active === "home" ? "text-kink-gold-bright" : "text-app-text"}`}
+        >
+          <Home size={25} strokeWidth={1.8} fill={active === "home" ? "currentColor" : "none"} />
+        </Link>
+        <Link
+          href={links.chat}
+          aria-label={
+            messagesCount > 0 ? `${labels.chat}, ${messagesCount} unread messages` : labels.chat
+          }
+          aria-current={active === "chat" ? "page" : undefined}
+          className={`relative grid size-11 place-items-center ${active === "chat" ? "text-kink-gold-bright" : "text-app-text"}`}
+        >
+          <MessageCircle
+            size={25}
+            strokeWidth={1.8}
+            fill={active === "chat" ? "currentColor" : "none"}
           />
-        )}
-        {ICON_TABS.map((tab) => (
-          <Link
-            key={tab.key}
-            href={links[tab.key]}
-            aria-label={
-              tab.key === "notifications" && notificationsUnread
-                ? `${labels[tab.key]}, unread notifications`
-                : labels[tab.key]
-            }
-            aria-current={active === tab.key ? "page" : undefined}
-            className={`absolute top-[12.5px] grid size-[24px] -translate-x-1/2 place-items-center ${
-              active === tab.key ? "text-kink-amber" : "text-mem-tab-icon"
-            }`}
-            style={{ left: `${tab.centerPct}%` }}
-          >
-            <MaskIcon name={tab.icon} width={tab.size} />
-            {tab.key === "notifications" && notificationsUnread && (
-              <span
-                aria-hidden
-                className="absolute -right-1 -top-1 size-2 rounded-full bg-app-members-count ring-2 ring-mem-header"
-              />
-            )}
-          </Link>
-        ))}
+          <UnreadBadge count={messagesCount} className="-top-0.5 right-0 ring-app-surface" />
+        </Link>
+        <Link
+          href={links.notifications}
+          aria-label={
+            notificationsCount > 0
+              ? `${labels.notifications}, ${notificationsCount} unread notifications`
+              : labels.notifications
+          }
+          aria-current={active === "notifications" ? "page" : undefined}
+          className={`relative grid size-11 place-items-center ${active === "notifications" ? "text-kink-gold-bright" : "text-app-text"}`}
+        >
+          <Bell
+            size={24}
+            strokeWidth={1.8}
+            fill={active === "notifications" ? "currentColor" : "none"}
+          />
+          <UnreadBadge count={notificationsCount} className="-top-0.5 right-0 ring-app-surface" />
+        </Link>
         <Link
           href={links.profile}
           aria-label={labels.profile}
           aria-current={active === "profile" ? "page" : undefined}
-          className="absolute top-[12.5px] -translate-x-1/2"
-          style={{ left: `${PROFILE_CENTER_PCT}%` }}
+          className="grid size-11 place-items-center"
         >
-          <AvatarCircle src={avatarUrl} alt="" size={21} ringClassName="bg-kink-gold-bright" />
+          <AvatarCircle
+            src={avatarUrl}
+            alt=""
+            size={30}
+            ringClassName={active === "profile" ? "bg-kink-gold-bright" : "bg-app-card-border"}
+          />
         </Link>
       </div>
     </nav>

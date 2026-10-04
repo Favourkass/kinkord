@@ -48,6 +48,8 @@ export interface ShellSource {
   avatarUrl: string | null;
   membersCount: string;
   notificationsUnread?: boolean;
+  notificationsCount?: number;
+  messagesCount?: number;
   drawerOpen: boolean;
   openDrawer: () => void;
   closeDrawer: () => void;
@@ -64,6 +66,8 @@ export function appShellProps(home: ShellSource, nav: ReturnType<typeof getAppSh
     avatarUrl: home.avatarUrl,
     membersCount: home.membersCount,
     notificationsUnread: home.notificationsUnread,
+    notificationsCount: home.notificationsCount,
+    messagesCount: home.messagesCount,
     drawerOpen: home.drawerOpen,
     onMenu: home.openDrawer,
     onCloseDrawer: home.closeDrawer,

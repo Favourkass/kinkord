@@ -7,6 +7,7 @@ import { api, ApiError } from "@/services/apiClient";
 import { pushService } from "@/services/push.service";
 import { Routes } from "@/constants/Routes";
 import type { MeVM, ProfileVM } from "./useProfilePresenter";
+import { useMessageBadgePresenter } from "./useMessageBadgePresenter";
 import { useNotificationCountPresenter } from "./useNotificationBadgePresenter";
 
 interface CommunityStatsVM {
@@ -18,6 +19,7 @@ export function useHomePresenter() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [signedIn, setSignedIn] = useState(false);
+  const messagesCount = useMessageBadgePresenter(signedIn);
   const notificationsCount = useNotificationCountPresenter(signedIn);
   const notificationsUnread = notificationsCount > 0;
   const [error, setError] = useState<string | null>(null);
@@ -89,6 +91,7 @@ export function useHomePresenter() {
     logout,
     notificationsUnread,
     notificationsCount,
+    messagesCount,
     signedIn,
     ...vm,
   };
