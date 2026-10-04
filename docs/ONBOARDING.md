@@ -90,9 +90,8 @@ shows the unread notification count. Read state is stored per member,
 shared across devices. The reference layout has All, Comments and Mentions tabs.
 The search button opens search (run by the API across the whole inbox, by name
 or by a word like "liked"), the Unread filter, refresh and "Mark all as read".
-Row menus let members mark individual items read, delete a notification, or
-report it with a reason and optional note. Reports preserve an event snapshot in
-the moderation queue even after the original notification is deleted.
+Row menus let members mark individual items read or delete a notification.
+Reporting notifications is not exposed in this menu.
 
 Rows store who did what to what (`actor_id`, `subject_id`), never names or
 photos: the inbox looks those up when it loads, so a renamed or re-photographed

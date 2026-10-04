@@ -38,7 +38,6 @@ export interface NotificationInboxProps {
   menuId: string | null;
   setMenuId: (id: string | null) => void;
   deleteNotification: (id: string) => void;
-  reportNotification: (id: string) => void;
   markRead: (id: string) => void;
   loading: boolean;
   loadingMore: boolean;
@@ -63,7 +62,6 @@ export interface NotificationInboxProps {
     menu: string;
     markRead: string;
     deleteNotification: string;
-    reportNotification: string;
     openNotification: string;
     unread: string;
     unreadLabel: string;
@@ -316,14 +314,6 @@ export default function NotificationInbox(p: NotificationInboxProps) {
                       className="block min-h-11 w-full px-3 text-left text-app-danger hover:bg-app-input"
                     >
                       {p.copy.deleteNotification}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => p.reportNotification(item.id)}
-                      disabled={disabled}
-                      className="block min-h-11 w-full px-3 text-left hover:bg-app-input"
-                    >
-                      {p.copy.reportNotification}
                     </button>
                     <button
                       type="button"
