@@ -1,24 +1,24 @@
 import {
   AtSign,
   Bell,
-  Heart,
-  MessageCircle,
+  ThumbsUp,
+  MessageCircleMore,
   MoreHorizontal,
   Repeat2,
   Search,
   ShieldCheck,
-  UserPlus,
   BadgeCheck,
   Check,
 } from "lucide-react";
+import type { LucideProps } from "lucide-react";
 import type { NotificationVM } from "@/domain/notification";
 import AvatarCircle from "../app/AvatarCircle";
 
 const ICONS = {
-  message: MessageCircle,
-  "person-add": UserPlus,
-  comment: MessageCircle,
-  heart: Heart,
+  message: MessageCircleMore,
+  "person-add": FollowIcon,
+  comment: MessageCircleMore,
+  heart: ThumbsUp,
   repost: Repeat2,
   shield: ShieldCheck,
   bell: Bell,
@@ -27,6 +27,7 @@ const ICONS = {
 
 export interface NotificationInboxProps {
   items: NotificationVM[];
+  tabCounts: Record<"all" | "comment" | "mention", number>;
   tab: "all" | "comment" | "mention";
   setTab: (tab: "all" | "comment" | "mention") => void;
   query: string;
@@ -35,6 +36,7 @@ export interface NotificationInboxProps {
   toggleSearch: () => void;
   menuId: string | null;
   setMenuId: (id: string | null) => void;
+  deleteNotification: (id: string) => void;
   markRead: (id: string) => void;
   loading: boolean;
   loadingMore: boolean;
@@ -58,6 +60,7 @@ export interface NotificationInboxProps {
     search: string;
     menu: string;
     markRead: string;
+    deleteNotification: string;
     openNotification: string;
     unread: string;
     unreadLabel: string;
@@ -89,7 +92,7 @@ export default function NotificationInbox(p: NotificationInboxProps) {
       className="mx-auto w-full max-w-[760px] bg-app-surface text-app-text lg:pb-12"
     >
       <header className="hidden h-20 items-center justify-between lg:flex">
-        <h1 className="text-[28px] font-bold uppercase text-kink-gold-bright">{p.copy.title}</h1>
+        <h1 className="text-[28px] font-bold text-kink-gold-bright">{p.copy.title}</h1>
         <button
           type="button"
           aria-label={p.copy.search}
@@ -135,7 +138,7 @@ export default function NotificationInbox(p: NotificationInboxProps) {
       <div
         role="group"
         aria-label={p.copy.categories}
-        className="flex h-[47px] items-start gap-2 border-b border-app-card-border px-4 pt-2"
+        className="mx-4 my-3 flex min-h-11 items-center rounded-full border border-app-card-border bg-app-input p-0.5"
       >
         {(
           [
@@ -149,9 +152,14 @@ export default function NotificationInbox(p: NotificationInboxProps) {
             type="button"
             aria-pressed={p.tab === tab}
             onClick={() => p.setTab(tab)}
-            className={`min-h-[26px] rounded-full px-[18px] py-1 text-[11px] leading-[18px] focus-visible:outline-2 focus-visible:outline-kink-gold-bright min-[420px]:text-[13px] ${p.tab === tab ? "bg-kink-gold-bright font-semibold text-black" : "text-app-text"}`}
+            className={`flex min-h-10 min-w-0 flex-1 items-center justify-center gap-2 rounded-full px-2 py-1 text-[12px] font-semibold focus-visible:outline-2 focus-visible:outline-kink-gold-bright min-[420px]:text-[14px] ${p.tab === tab ? "bg-gradient-to-b from-kink-gold-bright to-kink-amber text-black" : "text-app-text"}`}
           >
             {label}
+            <span
+              className={`grid min-w-5 h-5 px-1 place-items-center rounded-full text-[11px] leading-none ${p.tab === tab ? "bg-black text-kink-gold-bright" : "border border-app-subtle text-app-text"}`}
+            >
+              {p.tabCounts[tab]}
+            </span>
           </button>
         ))}
       </div>
@@ -200,16 +208,16 @@ export default function NotificationInbox(p: NotificationInboxProps) {
                   onClick={() => p.onOpen(item.id)}
                   disabled={disabled}
                   aria-label={`${item.body}. ${item.unread ? p.copy.unreadLabel : item.category}`}
-                  className="flex min-h-[66px] min-w-0 flex-1 items-center gap-[20px] py-2 text-left focus-visible:outline-2 focus-visible:outline-kink-gold-bright disabled:cursor-wait lg:min-h-[87px]"
+                  className="flex min-h-[66px] min-w-0 flex-1 items-center gap-3 py-2 text-left focus-visible:outline-2 focus-visible:outline-kink-gold-bright disabled:cursor-wait lg:min-h-[87px]"
                 >
                   <span className="relative shrink-0">
                     {item.official ? (
-                      <span className="grid size-[50px] place-items-center overflow-hidden rounded-full border border-kink-gold-bright bg-black">
+                      <span className="grid size-[50px] place-items-center overflow-hidden rounded-full bg-black">
                         {/* eslint-disable-next-line @next/next/no-img-element -- local brand mark */}
                         <img
-                          src="/brand/logo-badge.png"
+                          src="/icons/push-icon-v2.png"
                           alt=""
-                          className="size-[60px] max-w-none"
+                          className="size-full object-contain"
                         />
                       </span>
                     ) : (
@@ -221,24 +229,24 @@ export default function NotificationInbox(p: NotificationInboxProps) {
                       />
                     )}
                     {item.official ? (
-                      <span className="absolute -bottom-0.5 -right-2">
+                      <span className="absolute bottom-0 right-0 grid size-[23px] place-items-center">
                         <BadgeCheck
-                          size={25}
+                          size={23}
                           aria-hidden
                           className="fill-kink-gold-bright text-kink-gold-bright"
                         />
                         <Check
-                          size={12}
+                          size={11}
                           strokeWidth={3}
                           aria-hidden
-                          className="absolute left-[6px] top-[6px] text-white"
+                          className="absolute text-white"
                         />
                       </span>
                     ) : (
-                      <span className="absolute -bottom-0.5 -right-2 grid size-[25px] place-items-center rounded-full border-[1.3px] border-kink-gold-bright bg-app-surface text-kink-gold-bright">
+                      <span className="absolute bottom-0 right-0 grid size-[23px] place-items-center rounded-full border-2 border-app-surface bg-kink-gold-bright text-black">
                         <Icon
-                          size={16}
-                          strokeWidth={2}
+                          size={13}
+                          strokeWidth={2.25}
                           fill={item.icon === "heart" ? "currentColor" : "none"}
                           aria-hidden
                         />
@@ -246,10 +254,10 @@ export default function NotificationInbox(p: NotificationInboxProps) {
                     )}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block break-words text-[13px] leading-[19px] min-[420px]:text-[14px] lg:text-[16px]">
+                    <span className="block break-words text-[13px] font-medium leading-[19px] min-[420px]:text-[14px] lg:text-[16px]">
                       {item.actorName && (
                         <>
-                          <strong className="font-bold">{item.actorName}</strong>{" "}
+                          <strong className="font-extrabold">{item.actorName}</strong>{" "}
                         </>
                       )}
                       <span>{item.action}</span>
@@ -300,6 +308,14 @@ export default function NotificationInbox(p: NotificationInboxProps) {
                     )}
                     <button
                       type="button"
+                      onClick={() => p.deleteNotification(item.id)}
+                      disabled={disabled}
+                      className="block min-h-11 w-full px-3 text-left text-app-danger hover:bg-app-input"
+                    >
+                      {p.copy.deleteNotification}
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => p.setMenuId(null)}
                       className="block min-h-9 w-full px-3 text-left text-app-subtle"
                     >
@@ -325,5 +341,16 @@ export default function NotificationInbox(p: NotificationInboxProps) {
         </div>
       )}
     </section>
+  );
+}
+
+/** A filled person inside a ring, matching the follow badge reference. */
+function FollowIcon({ size = 13, strokeWidth = 2.25, ...props }: LucideProps) {
+  return (
+    <svg {...props} width={size} height={size} viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth={strokeWidth} />
+      <circle cx="12" cy="9" r="3" fill="currentColor" />
+      <path d="M5 19a7 7 0 0 1 14 0 10 10 0 0 1-14 0Z" fill="currentColor" />
+    </svg>
   );
 }

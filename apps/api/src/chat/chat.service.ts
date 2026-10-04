@@ -401,6 +401,30 @@ export class ChatService {
       );
   }
 
+  /** Total unread incoming messages, across every accessible conversation. */
+  async unreadCount(userId: string): Promise<{ count: number }> {
+    const [row] = await this.db
+      .select({ total: count() })
+      .from(message)
+      .innerJoin(
+        conversationParticipant,
+        and(
+          eq(conversationParticipant.conversationId, message.conversationId),
+          eq(conversationParticipant.userId, userId),
+        ),
+      )
+      .where(
+        and(
+          isNull(message.deletedAt),
+          ne(message.senderId, userId),
+          notBanned(message.senderId),
+          notBlocking(message.senderId, userId),
+          sql`${message.createdAt} > coalesce(${conversationParticipant.lastReadAt}, 'epoch')`,
+        ),
+      );
+    return { count: Number(row?.total ?? 0) };
+  }
+
   /**
    * The inbox. Threads whose other member was suspended or deleted are left
    * out: they can't be answered, and a block should read as gone. A thread

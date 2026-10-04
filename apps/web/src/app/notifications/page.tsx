@@ -9,10 +9,12 @@ import NotificationInbox from "@/components/notifications/NotificationInbox";
 import { NOTIFICATIONS_COPY } from "@/constants/notifications";
 import { appShellProps, getAppShellNav } from "@/presenters/getAppShellNav";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
+import { useMessageBadgePresenter } from "@/presenters/useMessageBadgePresenter";
 import { useNotificationsPresenter } from "@/presenters/useNotificationsPresenter";
 
 function NotificationsScreen() {
   const shell = useHomePresenter();
+  const messagesCount = useMessageBadgePresenter(shell.signedIn);
   const search = useSearchParams();
   const inbox = useNotificationsPresenter(shell.signedIn, search.get("open"));
   const nav = getAppShellNav();
@@ -35,7 +37,9 @@ function NotificationsScreen() {
         <NotificationTabBar
           links={nav.links}
           labels={nav.labels}
-          unread={shell.notificationsUnread}
+          notificationsCount={shell.notificationsCount}
+          messagesCount={messagesCount}
+          avatarUrl={shell.avatarUrl}
         />
       }
     >

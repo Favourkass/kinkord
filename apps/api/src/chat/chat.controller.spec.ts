@@ -11,6 +11,7 @@ const req = {
 
 function make() {
   const chat = {
+    unreadCount: vi.fn(async () => ({ count: 4 })),
     startDm: vi.fn(async () => "c1"),
     history: vi.fn(async () => []),
     sendMessage: vi.fn(async () => ({ id: "m1" })),
@@ -111,4 +112,10 @@ describe("ChatController", () => {
     await expect(controller.read(req, "c1", { messageId })).resolves.toEqual({ ok: true });
     expect(chat.markRead).toHaveBeenCalledWith("u1", "c1", messageId);
   });
+});
+
+it("returns the signed-in member's unread message count", async () => {
+  const { controller, chat } = make();
+  await expect(controller.unreadCount(req)).resolves.toEqual({ count: 4 });
+  expect(chat.unreadCount).toHaveBeenCalledWith("u1");
 });

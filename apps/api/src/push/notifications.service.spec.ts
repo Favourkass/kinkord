@@ -259,7 +259,7 @@ describe("NotificationsService reading", () => {
   it("marks all of this member's unread rows", async () => {
     const t = make([[{ id: ID }]]);
     await expect(t.service.readAll("kemi")).resolves.toEqual({ ok: true });
-    expect(t.sqlOf(t.arg("update", "where")).params).toEqual(["kemi"]);
+    expect(t.sqlOf(t.arg("update", "where")).params).toEqual(["kemi", "message"]);
     expect(t.realtime.notify).toHaveBeenCalledTimes(1);
   });
 
@@ -288,4 +288,32 @@ describe("notification links and search words", () => {
     expect(typesMatching("rep")).toEqual(["repost", "report"]);
     expect(typesMatching("a")).toEqual([]);
   });
+});
+
+describe("notification menu and category totals", () => {
+  it("counts all pages and excludes message alerts from category totals", async () => {
+    const t = make([[{ all: "8", comment: "2", mention: "3" }]]);
+    expect(await t.service.counts("kemi", true)).toEqual({ all: 8, comment: 2, mention: 3 });
+    const where = t.sqlOf(t.arg("select", "where"));
+    expect(where.params).toContain("kemi");
+    expect(where.params).toContain("message");
+    expect(where.sql).toContain('"read_at" is null');
+  });
+  it("deletes only the owned row and notifies other devices", async () => {
+    const t = make([[{ id: ID }]]);
+    expect(await t.service.delete("kemi", ID)).toEqual({ id: ID });
+    expect(t.sqlOf(t.arg("delete", "where")).params).toEqual(["kemi", ID]);
+    expect(t.realtime.notify).toHaveBeenCalledWith(["kemi"], { type: "notification" });
+    await expect(make([[]]).service.delete("intruder", ID)).rejects.toThrow(
+      "Notification not found",
+    );
+  });
+});
+
+it("still opens a message push even though messages are hidden from the inbox", async () => {
+  const t = make([[{ id: ID }], [row({ type: "message", subjectId: "c1" })]]);
+  const item = await t.service.read("kemi", ID);
+  expect(item.url).toBe("/messages/c1");
+  const where = t.sqlOf(t.arg("select", "where"));
+  expect(where.sql).not.toContain('"notification"."type" <>');
 });

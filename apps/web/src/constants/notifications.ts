@@ -20,6 +20,8 @@ export const NOTIFICATIONS_COPY = {
   emptySearch: "No matching notifications.",
   emptyComments: "Comments on your posts will appear here.",
   emptyMentions: "No mention notifications yet.",
+  deleteNotification: "Delete notification",
+  deleteError: "Could not delete this notification. Please try again.",
   close: "Close",
   categories: "Notification categories",
   emptyUnread: "No unread notifications. You’re up to date.",
