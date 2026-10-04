@@ -1,15 +1,24 @@
 import Link from "next/link";
 import { Bell, Home, MessageCircle } from "lucide-react";
+import AvatarCircle from "../app/AvatarCircle";
 import type { AppNavLabels, AppNavLinks } from "../app/nav";
 
 export interface NotificationTabBarProps {
   links: AppNavLinks;
   labels: AppNavLabels;
-  unread: boolean;
+  notificationsCount: number;
+  messagesCount: number;
+  avatarUrl: string | null;
 }
 
-/** Navigation geometry and brand mark from the notification reference. */
-export default function NotificationTabBar({ links, labels, unread }: NotificationTabBarProps) {
+/** Member navigation with a live profile photo. */
+export default function NotificationTabBar({
+  links,
+  labels,
+  notificationsCount,
+  messagesCount,
+  avatarUrl,
+}: NotificationTabBarProps) {
   return (
     <nav
       aria-label="Primary"
@@ -19,44 +28,53 @@ export default function NotificationTabBar({ links, labels, unread }: Notificati
         <Link
           href={links.home}
           aria-label={labels.home}
-          className="grid size-11 place-items-center text-kink-gold-bright"
+          className="grid size-11 place-items-center text-app-text"
         >
           <Home size={25} strokeWidth={1.8} />
         </Link>
         <Link
           href={links.chat}
-          aria-label={labels.chat}
-          className="grid size-11 place-items-center text-app-text"
+          aria-label={
+            messagesCount > 0 ? `${labels.chat}, ${messagesCount} unread messages` : labels.chat
+          }
+          className="relative grid size-11 place-items-center text-app-text"
         >
           <MessageCircle size={25} strokeWidth={1.8} />
+          <UnreadBadge count={messagesCount} />
         </Link>
         <Link
           href={links.notifications}
           aria-label={
-            unread ? `${labels.notifications}, unread notifications` : labels.notifications
+            notificationsCount > 0
+              ? `${labels.notifications}, ${notificationsCount} unread notifications`
+              : labels.notifications
           }
           aria-current="page"
-          className="relative grid size-11 place-items-center text-app-text"
+          className="relative grid size-11 place-items-center text-kink-gold-bright"
         >
-          <Bell size={24} strokeWidth={1.8} />
-          {unread && (
-            <span
-              aria-hidden
-              className="absolute right-2 top-1.5 size-1.5 rounded-full bg-kink-gold-bright"
-            />
-          )}
+          <Bell size={24} strokeWidth={1.8} fill="currentColor" />
+          <UnreadBadge count={notificationsCount} />
         </Link>
         <Link
           href={links.profile}
           aria-label={labels.profile}
           className="grid size-11 place-items-center"
         >
-          <span className="grid size-[25px] place-items-center overflow-hidden rounded-full border border-kink-gold-bright bg-black">
-            {/* eslint-disable-next-line @next/next/no-img-element -- local brand mark */}
-            <img src="/brand/logo-badge.png" alt="" className="size-8 max-w-none" />
-          </span>
+          <AvatarCircle src={avatarUrl} alt="" size={30} ringClassName="bg-app-card-border" />
         </Link>
       </div>
     </nav>
+  );
+}
+
+function UnreadBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span
+      aria-hidden
+      className="absolute -top-0.5 right-0 grid min-w-[18px] h-[18px] px-1 place-items-center rounded-full bg-kink-gold-bright text-[10px] font-bold leading-none text-black ring-2 ring-app-surface"
+    >
+      {count > 99 ? "99+" : count}
+    </span>
   );
 }

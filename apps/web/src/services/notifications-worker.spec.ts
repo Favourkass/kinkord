@@ -50,6 +50,8 @@ describe("notification service worker", () => {
       "Kinkord",
       expect.objectContaining({
         data: { url: "https://kinkord.test/messages/c1", notificationId: "n1" },
+        icon: "/icons/push-icon-v2.png",
+        badge: "/icons/badge-96x96.png",
         tag: "notification-n1",
         renotify: true,
         silent: false,

@@ -1,10 +1,11 @@
 // Kinkord Service Worker
-const CACHE_NAME = "kinkord-pwa-v5";
+const CACHE_NAME = "kinkord-pwa-v6";
 const OFFLINE_URL = "/offline";
 
 const PRECACHE_ASSETS = [
   OFFLINE_URL,
   "/icons/icon-192x192.png",
+  "/icons/push-icon-v2.png",
   "/icons/badge-96x96.png",
   "/icons/icon-512x512.png",
   "/icons/icon-maskable-512x512.png",
@@ -112,7 +113,7 @@ self.addEventListener("push", (event) => {
   const url = new URL(data.url || "/", self.location.origin).href;
   const options = {
     body: data.body || "New activity on Kinkord",
-    icon: "/icons/icon-192x192.png",
+    icon: "/icons/push-icon-v2.png",
     // The status-bar icon. Android draws only its transparency, as a white
     // silhouette: the full-colour app icon came out as a blank square (and
     // with no badge Chrome shows its own logo), so this is the K in its ring,

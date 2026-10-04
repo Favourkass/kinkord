@@ -19,11 +19,7 @@ export default function NotificationHeader(p: NotificationHeaderProps) {
       >
         <Menu size={25} strokeWidth={2} />
       </button>
-      <span className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-full border border-kink-gold-bright bg-black">
-        {/* eslint-disable-next-line @next/next/no-img-element -- local brand mark */}
-        <img src="/brand/logo-badge.png" alt="" className="size-10 max-w-none" />
-      </span>
-      <h1 className="min-w-0 flex-1 text-[20px] font-bold uppercase leading-none tracking-[0.01em] text-kink-gold-bright min-[420px]:text-[22px]">
+      <h1 className="min-w-0 flex-1 text-[20px] font-bold leading-none tracking-[0.01em] text-kink-gold-bright min-[420px]:text-[22px]">
         {p.title}
       </h1>
       <button

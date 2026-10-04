@@ -85,12 +85,14 @@ testing. `docs/OTP.md` has the full rules.
 ## Notifications inbox
 
 The member inbox at `/notifications` stores activity independently of browser
-push permission. Opening an item marks it read before navigating; the bell dot
-stays visible while any unread items remain. Read state is stored per member,
+push permission. Opening an item marks it read before navigating; the bell badge
+shows the unread notification count. Read state is stored per member,
 shared across devices. The reference layout has All, Comments and Mentions tabs.
 The search button opens search (run by the API across the whole inbox, by name
 or by a word like "liked"), the Unread filter, refresh and "Mark all as read".
-Row menus also let members mark individual items read without navigating.
+Row menus let members mark individual items read, delete a notification, or
+report it with a reason and optional note. Reports preserve an event snapshot in
+the moderation queue even after the original notification is deleted.
 
 Rows store who did what to what (`actor_id`, `subject_id`), never names or
 photos: the inbox looks those up when it loads, so a renamed or re-photographed
@@ -99,7 +101,7 @@ them. Device pushes keep their discreet text-only payload.
 
 | Event | Recipient | Opens |
 |---|---|---|
-| New message (text or photo) | Other conversation member: one row per chat, counting messages, cleared when the chat is read | Conversation |
+| New message (text or photo) | Device push to the other conversation member; excluded from the notification inbox and bell count | Conversation |
 | New follow | Followed member | Follower's profile |
 | Comment | Post author, except their own comments | Post |
 | Like | Post author, except their own likes | Post |
@@ -118,6 +120,13 @@ them. Device pushes keep their discreet text-only payload.
   the live chat connection (AppSync Events), so the bell and inbox update at
   once. Without it (locally, say) they check every minute, and every five
   minutes while it's live.
+
+The All, Comments and Mentions badges count the entire matching inbox, not only
+the loaded page. The Unread filter applies to those totals. The separate chat
+badge counts unread incoming messages across all conversations.
+
+Friend-request presentation is supported for local icon previews; there is no
+friend-request producer or accept/decline workflow. Friends remain mutual follows.
 
 Mentions has an empty state until a mention producer is implemented; the tab and
 API support filtering that event type, but current posting does not emit it.

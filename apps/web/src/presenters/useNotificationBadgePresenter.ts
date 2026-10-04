@@ -10,7 +10,7 @@ export const BADGE_POLL_MS = 60_000;
 export const BADGE_FALLBACK_POLL_MS = 5 * 60_000;
 
 /** Owned by the top-level screen's home presenter, never by a navigation component. */
-export function useNotificationBadgePresenter(enabled: boolean) {
+export function useNotificationCountPresenter(enabled: boolean) {
   const [count, setCount] = useState(0);
   const refreshRef = useRef<() => void>(() => undefined);
   const onRealtime = useCallback((e: RealtimeEventPM) => {
@@ -58,5 +58,9 @@ export function useNotificationBadgePresenter(enabled: boolean) {
     return () => clearInterval(timer);
   }, [enabled, live]);
 
-  return enabled && count > 0;
+  return enabled ? count : 0;
+}
+
+export function useNotificationBadgePresenter(enabled: boolean) {
+  return useNotificationCountPresenter(enabled) > 0;
 }

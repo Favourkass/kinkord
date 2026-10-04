@@ -92,3 +92,9 @@ describe("chatService", () => {
     expect(get).toHaveBeenCalledWith("/chat/allowance");
   });
 });
+
+it("requests a total unread count independently of the capped chat list", async () => {
+  get.mockResolvedValueOnce({ count: 8 });
+  await expect(chatService.unreadCount()).resolves.toEqual({ count: 8 });
+  expect(get).toHaveBeenLastCalledWith("/chat/unread-count");
+});

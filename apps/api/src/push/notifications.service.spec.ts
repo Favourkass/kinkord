@@ -259,7 +259,7 @@ describe("NotificationsService reading", () => {
   it("marks all of this member's unread rows", async () => {
     const t = make([[{ id: ID }]]);
     await expect(t.service.readAll("kemi")).resolves.toEqual({ ok: true });
-    expect(t.sqlOf(t.arg("update", "where")).params).toEqual(["kemi"]);
+    expect(t.sqlOf(t.arg("update", "where")).params).toEqual(["kemi", "message"]);
     expect(t.realtime.notify).toHaveBeenCalledTimes(1);
   });
 
@@ -287,5 +287,49 @@ describe("notification links and search words", () => {
     expect(typesMatching("Liked")).toEqual(["like"]);
     expect(typesMatching("rep")).toEqual(["repost", "report"]);
     expect(typesMatching("a")).toEqual([]);
+  });
+});
+
+describe("notification menu and category totals", () => {
+  it("counts all pages and excludes message alerts from category totals", async () => {
+    const t = make([[{ all: "8", comment: "2", mention: "3" }]]);
+    expect(await t.service.counts("kemi", true)).toEqual({ all: 8, comment: 2, mention: 3 });
+    const where = t.sqlOf(t.arg("select", "where"));
+    expect(where.params).toContain("kemi");
+    expect(where.params).toContain("message");
+    expect(where.sql).toContain('"read_at" is null');
+  });
+  it("deletes only the owned row and notifies other devices", async () => {
+    const t = make([[{ id: ID }]]);
+    expect(await t.service.delete("kemi", ID)).toEqual({ id: ID });
+    expect(t.sqlOf(t.arg("delete", "where")).params).toEqual(["kemi", ID]);
+    expect(t.realtime.notify).toHaveBeenCalledWith(["kemi"], { type: "notification" });
+    await expect(make([[]]).service.delete("intruder", ID)).rejects.toThrow(
+      "Notification not found",
+    );
+  });
+  it("preserves notification evidence in the moderation queue", async () => {
+    const t = make([[row()], [{ total: 0 }], [{ id: "r1" }]]);
+    expect(await t.service.report("kemi", ID, { reason: "spam", details: "Unexpected" })).toEqual({
+      id: "r1",
+    });
+    expect(t.sqlOf(t.arg("select", "where")).params).toEqual(["kemi", ID]);
+    const saved = t.arg("insert", "values") as { details: string };
+    expect(saved).toMatchObject({ reporterId: "kemi", reportedUserId: "ada", reason: "spam" });
+    expect(saved.details).toContain(ID);
+    expect(saved.details).toContain("Unexpected");
+    expect(saved.details).toContain('"subjectId":"p1"');
+  });
+  it("rejects foreign notification reports and enforces the shared daily limit", async () => {
+    const foreign = make([[]]);
+    await expect(foreign.service.report("intruder", ID, { reason: "spam" })).rejects.toThrow(
+      "Notification not found",
+    );
+    expect(foreign.chains.some((c) => c[0].method === "insert")).toBe(false);
+    const capped = make([[row()], [{ total: 10 }]]);
+    await expect(capped.service.report("kemi", ID, { reason: "spam" })).rejects.toThrow(
+      "reports today",
+    );
+    expect(capped.chains.some((c) => c[0].method === "insert")).toBe(false);
   });
 });

@@ -1,0 +1,1 @@
+ALTER TABLE "report" ALTER COLUMN "reported_user_id" DROP NOT NULL;

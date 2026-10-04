@@ -1,4 +1,5 @@
 import type { NotificationPagePM, NotificationPM } from "@/domain/notification";
+import type { ReportReason } from "@/domain/safety";
 import { api } from "./apiClient";
 
 const CHANGE_EVENT = "kinkord:notifications-changed";
@@ -48,6 +49,10 @@ export const notificationsApi = {
     if (cursor) query.set("cursor", cursor);
     return api.get<NotificationPagePM>(`/notifications${query.size ? `?${query}` : ""}`);
   },
+  counts: (unread = false) =>
+    api.get<{ all: number; comment: number; mention: number }>(
+      `/notifications/counts${unread ? "?unread=true" : ""}`,
+    ),
   unreadCount: () => api.get<{ count: number }>("/notifications/unread-count"),
   read: async (id: string) => {
     const item = await api.post<NotificationPM>(
@@ -57,6 +62,16 @@ export const notificationsApi = {
     notifyInboxChanged();
     return item;
   },
+  delete: async (id: string) => {
+    const result = await api.del<{ id: string }>(`/notifications/${encodeURIComponent(id)}`);
+    notifyInboxChanged();
+    return result;
+  },
+  report: (id: string, reason: ReportReason, details: string) =>
+    api.post<{ id: string }>(`/notifications/${encodeURIComponent(id)}/report`, {
+      reason,
+      details,
+    }),
   readAll: async () => {
     await api.post<{ ok: true }>("/notifications/read-all", {});
     notifyInboxChanged();

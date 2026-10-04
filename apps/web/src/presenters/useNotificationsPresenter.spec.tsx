@@ -3,18 +3,27 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { useNotificationsPresenter } from "./useNotificationsPresenter";
 import type { NotificationPM } from "@/domain/notification";
-const { list, read, readAll, push, replace } = vi.hoisted(() => ({
+const { list, read, readAll, push, replace, remove, report } = vi.hoisted(() => ({
   list: vi.fn(),
   read: vi.fn(),
   readAll: vi.fn(),
   push: vi.fn(),
   replace: vi.fn(),
+  remove: vi.fn(),
+  report: vi.fn(),
 }));
 const router = { push, replace };
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("@/services/notifications.service", async (original) => ({
   ...(await original<typeof import("@/services/notifications.service")>()),
-  notificationsApi: { list, read, readAll },
+  notificationsApi: {
+    list,
+    read,
+    readAll,
+    delete: remove,
+    report,
+    counts: vi.fn().mockResolvedValue({ all: 9, comment: 2, mention: 3 }),
+  },
   listenForInboxChanges: () => () => undefined,
 }));
 // Live events, delivered by hand: `hear` is whatever the screen subscribed.
@@ -187,4 +196,30 @@ describe("useNotificationsPresenter", () => {
     act(() => live.hear?.({ type: "notification" }));
     await waitFor(() => expect(list).toHaveBeenCalledTimes(calls + 1));
   });
+});
+
+it("removes a deleted item and keeps it after a failed deletion", async () => {
+  remove.mockRejectedValueOnce(new Error("offline"));
+  const { result } = renderHook(() => useNotificationsPresenter(true));
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  await act(async () => result.current.deleteNotification("n1"));
+  expect(result.current.items).toHaveLength(1);
+  expect(result.current.error).toContain("delete");
+  remove.mockResolvedValueOnce({ id: "n1" });
+  list.mockResolvedValue({ items: [], nextCursor: null });
+  await act(async () => result.current.deleteNotification("n1"));
+  await waitFor(() => expect(result.current.items).toHaveLength(0));
+});
+it("opens a reason form and confirms only accepted reports", async () => {
+  report.mockResolvedValueOnce({ id: "r1" });
+  const { result } = renderHook(() => useNotificationsPresenter(true));
+  act(() => result.current.reportNotification("n1"));
+  expect(result.current.reportSheet?.canSubmit).toBe(false);
+  act(() => {
+    result.current.reportSheet!.onReason("spam");
+    result.current.reportSheet!.onDetails(" Test ");
+  });
+  await act(async () => result.current.reportSheet!.onSubmit());
+  expect(report).toHaveBeenCalledWith("n1", "spam", "Test");
+  expect(result.current.reportSheet?.sent).toBe(true);
 });

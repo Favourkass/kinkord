@@ -123,12 +123,14 @@ export default function ReportsView(p: ReportsViewProps) {
             )}
 
             <div className="flex flex-wrap items-center gap-[8px] pt-[14px]">
-              <Link
-                href={r.reportedHref}
-                className="rounded-[10px] border border-app-input-border px-[12px] py-[7px] text-[13px] font-bold text-app-value"
-              >
-                {p.labels.openMember}
-              </Link>
+              {r.reportedHref && (
+                <Link
+                  href={r.reportedHref}
+                  className="rounded-[10px] border border-app-input-border px-[12px] py-[7px] text-[13px] font-bold text-app-value"
+                >
+                  {p.labels.openMember}
+                </Link>
+              )}
               {r.open ? (
                 <>
                   <button

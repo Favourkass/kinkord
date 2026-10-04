@@ -266,7 +266,7 @@ export interface AdminReportPM {
   status: AdminReportStatus;
   createdAt: string;
   reviewedAt: string | null;
-  reportedUserId: string;
+  reportedUserId: string | null;
   /** Null once the account is gone; the report stays. */
   reporter: AdminReportMemberPM | null;
   reported: AdminReportMemberPM | null;
@@ -291,7 +291,7 @@ export interface AdminReportVM {
   reportedName: string;
   reportedHandle: string | null;
   /** The member's moderation page, where they can be blocked. */
-  reportedHref: string;
+  reportedHref: string | null;
   reporter: string;
   details: string | null;
   evidence: AdminReportEvidenceVM[];
@@ -321,7 +321,9 @@ export function toAdminReportVM(
   labels: { deletedAccount: string },
   now = new Date(),
 ): AdminReportVM {
-  const reportedName = pm.reported?.displayName ?? labels.deletedAccount;
+  const reportedName =
+    pm.reported?.displayName ??
+    (pm.reportedUserId === null ? "Notification" : labels.deletedAccount);
   const reporterName = pm.reporter?.displayName ?? labels.deletedAccount;
   return {
     id: pm.id,
@@ -330,7 +332,7 @@ export function toAdminReportVM(
     when: timeAgo(pm.createdAt, now) ?? "",
     reportedName,
     reportedHandle: pm.reported?.username ? `@${pm.reported.username}` : null,
-    reportedHref: memberHref(pm.reportedUserId),
+    reportedHref: pm.reportedUserId ? memberHref(pm.reportedUserId) : null,
     reporter: memberLabel(pm.reporter, labels.deletedAccount),
     details: pm.details?.trim() || null,
     evidence: pm.evidence.map((e) => ({
