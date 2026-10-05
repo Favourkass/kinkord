@@ -75,8 +75,9 @@ const PAGE_SIZE = 20;
 
 /**
  * How a type repeats. "skip": the same person doing the same thing to the same
- * post again (unlike then like, unfollow then follow) tells nobody twice, until
- * the old row has been read and swept. "bump": another message in a chat, or a
+ * post again (unlike then like) tells nobody twice, until the old row has been
+ * read and swept. A new follow always gets its own row; the follow service
+ * only emits it when a relationship is actually added. "bump": another message in a chat, or a
  * new push test, moves the existing row back to the top as unread.
  */
 const REPEATS: Partial<
@@ -84,7 +85,6 @@ const REPEATS: Partial<
 > = {
   like: { key: (e) => `like:${e.actorId}:${e.subjectId}`, on: "skip" },
   repost: { key: (e) => `repost:${e.actorId}:${e.subjectId}`, on: "skip" },
-  follow: { key: (e) => `follow:${e.actorId}`, on: "skip" },
   message: { key: (e) => `message:${e.subjectId}`, on: "bump" },
   test: { key: () => "test", on: "bump" },
 };
