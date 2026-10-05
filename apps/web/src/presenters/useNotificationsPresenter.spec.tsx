@@ -253,6 +253,41 @@ describe("unread tab badges", () => {
     },
   );
 
+  it("doesn't lower a tab twice when fresher totals arrive during the read", async () => {
+    const comment = { ...item, type: "comment" as const };
+    const readComment = { ...comment, readAt: item.createdAt };
+    list.mockResolvedValue({ items: [comment], nextCursor: null });
+    let finishRead!: (value: NotificationPM) => void;
+    read.mockImplementationOnce(
+      () =>
+        new Promise<NotificationPM>((resolve) => {
+          finishRead = resolve;
+        }),
+    );
+    const { result } = renderHook(() => useNotificationsPresenter(true));
+    await waitFor(() =>
+      expect(result.current.tabCounts).toEqual({ all: 9, comment: 2, mention: 3 }),
+    );
+
+    let opening!: Promise<void>;
+    act(() => {
+      opening = result.current.markRead(item.id) as unknown as Promise<void>;
+    });
+    // The server has already counted the read when another refresh lands.
+    counts.mockResolvedValue({ all: 8, comment: 1, mention: 3 });
+    list.mockResolvedValue({ items: [readComment], nextCursor: null });
+    act(() => window.dispatchEvent(new Event("focus")));
+    await waitFor(() => expect(result.current.tabCounts.all).toBe(8));
+
+    // Hold the refresh that follows the read, to see the counts the read itself leaves.
+    counts.mockImplementation(() => new Promise(() => undefined));
+    await act(async () => {
+      finishRead(readComment);
+      await opening;
+    });
+    expect(result.current.tabCounts).toEqual({ all: 8, comment: 1, mention: 3 });
+  });
+
   it("keeps unread badges when a read fails", async () => {
     read.mockRejectedValueOnce(new Error("offline"));
     const { result } = renderHook(() => useNotificationsPresenter(true));

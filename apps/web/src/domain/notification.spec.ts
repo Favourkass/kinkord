@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  countsAfterRead,
   notificationDestination,
   toNotificationVM,
   type NotificationKind,
@@ -87,4 +88,21 @@ describe("notification presentation", () => {
 
 it("shows follows with the person badge", () => {
   expect(toNotificationVM({ ...item, type: "follow" }).icon).toBe("person-add");
+});
+
+describe("countsAfterRead", () => {
+  const counts = { all: 5, comment: 2, mention: 1 };
+  it("lowers All and the matching tab", () => {
+    expect(countsAfterRead(counts, "comment")).toEqual({ all: 4, comment: 1, mention: 1 });
+    expect(countsAfterRead(counts, "mention")).toEqual({ all: 4, comment: 2, mention: 0 });
+    expect(countsAfterRead(counts, "follow")).toEqual({ all: 4, comment: 2, mention: 1 });
+  });
+  it("never goes below zero, and leaves messages out", () => {
+    expect(countsAfterRead({ all: 0, comment: 0, mention: 0 }, "comment")).toEqual({
+      all: 0,
+      comment: 0,
+      mention: 0,
+    });
+    expect(countsAfterRead(counts, "message")).toBe(counts);
+  });
 });

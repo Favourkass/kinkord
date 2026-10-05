@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { NOTIFICATIONS_COPY } from "@/constants/notifications";
 import { Routes } from "@/constants/Routes";
 import {
+  countsAfterRead,
   notificationDestination,
   type NotificationTab,
   type NotificationPagePM,
@@ -48,6 +49,10 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
   const busy = useRef(false);
   const pageCount = useRef(1);
   const refreshRef = useRef<() => void>(() => undefined);
+  // The list as last shown, for the actions that need it, and how many times
+  // server totals have been applied, so a read can tell if fresher ones arrived.
+  const itemsRef = useRef<NotificationPM[]>([]);
+  const countsApplied = useRef(0);
 
   const filterKey = `${unreadOnly}-${tab}-${search}`;
 
@@ -102,6 +107,7 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
         )
           return;
         setTabCounts(counts);
+        countsApplied.current++;
         setItems(refreshed);
         setCursor(nextCursor);
         setLoadedFor(filterKey);
@@ -173,16 +179,14 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
       setOpening(id);
       setError(null);
       try {
-        const previousItem = items.find((row) => row.id === id);
+        const before = itemsRef.current.find((row) => row.id === id);
+        const appliedBefore = countsApplied.current;
         const item = await notificationsApi.read(id);
         revision.current++;
-        if (previousItem?.readAt === null && previousItem.type !== "message") {
-          setTabCounts((previous) => ({
-            all: Math.max(0, previous.all - 1),
-            comment: Math.max(0, previous.comment - (previousItem.type === "comment" ? 1 : 0)),
-            mention: Math.max(0, previous.mention - (previousItem.type === "mention" ? 1 : 0)),
-          }));
-        }
+        // Lower the tabs at once. If server totals landed while the read was
+        // out, they may already include it, so leave them to the refresh below.
+        if (before?.readAt === null && countsApplied.current === appliedBefore)
+          setTabCounts((previous) => countsAfterRead(previous, before.type));
         setItems((previous) => previous.map((row) => (row.id === id ? item : row)));
         refreshRef.current();
         if (navigate) router.push(notificationDestination(item.url) ?? Routes.notifications);
@@ -193,7 +197,7 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
         setOpening(null);
       }
     },
-    [router, items],
+    [router],
   );
 
   const markAll = useCallback(async () => {
@@ -261,6 +265,10 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
       setOpening(null);
     }
   };
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
   const visibleItems = useMemo(
     () =>
       loadedFor === filterKey
