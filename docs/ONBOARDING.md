@@ -119,8 +119,9 @@ them. Device pushes keep their discreet text-only payload.
   once. Without it (locally, say) they check every minute, and every five
   minutes while it's live.
 
-The All, Comments and Mentions badges count the entire matching inbox, not only
-the loaded page. The Unread filter applies to those totals. The separate chat
+The All, Comments and Mentions badges count unread notifications across the
+whole inbox, not only the loaded page, whether or not the Unread filter is on.
+Opening one lowers them at once; the server's totals follow. The separate chat
 badge counts unread incoming messages across all conversations.
 
 Mentions has an empty state until a mention producer is implemented; the tab and

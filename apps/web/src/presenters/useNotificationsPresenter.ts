@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { NOTIFICATIONS_COPY } from "@/constants/notifications";
 import { Routes } from "@/constants/Routes";
 import {
+  countsAfterRead,
   notificationDestination,
   type NotificationTab,
   type NotificationPagePM,
@@ -48,6 +49,10 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
   const busy = useRef(false);
   const pageCount = useRef(1);
   const refreshRef = useRef<() => void>(() => undefined);
+  // The list as last shown, for the actions that need it, and how many times
+  // server totals have been applied, so a read can tell if fresher ones arrived.
+  const itemsRef = useRef<NotificationPM[]>([]);
+  const countsApplied = useRef(0);
 
   const filterKey = `${unreadOnly}-${tab}-${search}`;
 
@@ -73,7 +78,7 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
       const version = revision.current;
       const depth = pageCount.current;
       // The tab totals load alongside the pages, not before them.
-      const countsRequest = notificationsApi.counts(unreadOnly);
+      const countsRequest = notificationsApi.counts(true);
       // Awaited below; this only keeps a failure there from going unhandled
       // when a page read fails first.
       countsRequest.catch(() => undefined);
@@ -102,6 +107,7 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
         )
           return;
         setTabCounts(counts);
+        countsApplied.current++;
         setItems(refreshed);
         setCursor(nextCursor);
         setLoadedFor(filterKey);
@@ -173,9 +179,16 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
       setOpening(id);
       setError(null);
       try {
+        const before = itemsRef.current.find((row) => row.id === id);
+        const appliedBefore = countsApplied.current;
         const item = await notificationsApi.read(id);
         revision.current++;
+        // Lower the tabs at once. If server totals landed while the read was
+        // out, they may already include it, so leave them to the refresh below.
+        if (before?.readAt === null && countsApplied.current === appliedBefore)
+          setTabCounts((previous) => countsAfterRead(previous, before.type));
         setItems((previous) => previous.map((row) => (row.id === id ? item : row)));
+        refreshRef.current();
         if (navigate) router.push(notificationDestination(item.url) ?? Routes.notifications);
       } catch {
         setError(NOTIFICATIONS_COPY.readError);
@@ -195,6 +208,7 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
     try {
       await notificationsApi.readAll();
       revision.current++;
+      setTabCounts({ all: 0, comment: 0, mention: 0 });
       const readAt = new Date().toISOString();
       setItems((previous) => previous.map((item) => ({ ...item, readAt: item.readAt ?? readAt })));
       refreshRef.current();
@@ -251,6 +265,10 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
       setOpening(null);
     }
   };
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
   const visibleItems = useMemo(
     () =>
       loadedFor === filterKey
