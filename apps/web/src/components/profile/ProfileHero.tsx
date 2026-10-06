@@ -1,4 +1,6 @@
 import Link from "next/link";
+import CoinBalance from "@/components/kinkcoins/CoinBalance";
+import type { CoinBalanceVM } from "@/domain/kinkcoins";
 import MaskIcon from "@/components/app/MaskIcon";
 import type { PublicProfileVM } from "@/domain/member";
 import ExpandableAvatar from "./ExpandableAvatar";
@@ -17,6 +19,7 @@ export interface ProfileHeroLabels {
 
 export interface ProfileHeroProps {
   vm: PublicProfileVM;
+  coinBalance?: CoinBalanceVM;
   /** "Online" / "Last seen an hour ago"; null when never seen. */
   presenceText: string | null;
   labels: ProfileHeroLabels;
@@ -34,6 +37,7 @@ export interface ProfileHeroProps {
  */
 export default function ProfileHero({
   vm,
+  coinBalance,
   presenceText,
   labels,
   messageHref,
@@ -103,6 +107,7 @@ export default function ProfileHero({
             {vm.stats.following} {labels.stats.following}
           </span>
         </p>
+        {coinBalance && <CoinBalance balance={coinBalance} />}
         {vm.locationParts.length > 0 && (
           <p className="flex items-center gap-[4px] text-[13px] font-bold leading-[16px] text-pf-muted">
             <MaskIcon name="map-pin" width={14} className="text-kink-gold-bright" />

@@ -3,7 +3,15 @@
 export type AppTab = "home" | "chat" | "notifications" | "profile";
 
 export type AppNav =
-  "home" | "members" | "chat" | "notifications" | "profile" | "settings" | "saved" | "edit-profile";
+  | "home"
+  | "members"
+  | "chat"
+  | "notifications"
+  | "profile"
+  | "settings"
+  | "saved"
+  | "edit-profile"
+  | "kinkcoins";
 
 export interface AppNavLinks {
   home: string;
@@ -13,6 +21,7 @@ export interface AppNavLinks {
   profile: string;
   settings: string;
   saved: string;
+  kinkcoins?: string;
 }
 
 export interface AppNavLabels {
@@ -23,5 +32,6 @@ export interface AppNavLabels {
   profile: string;
   settings: string;
   saved: string;
+  kinkcoins?: string;
   logout: string;
 }

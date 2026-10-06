@@ -24,6 +24,7 @@ export const Routes = {
   messageThread: (conversationId: string) => `/messages/${encodeURIComponent(conversationId)}`,
   /** Opens (or reuses) the 1:1 thread with a member, then lands in it. */
   messageWith: (userId: string) => `/messages/with/${encodeURIComponent(userId)}`,
+  kinkcoins: "/kinkcoins",
   settings: "/settings",
   /** Password + 2FA moved here from /profile (CEO, 2026-09-12: "we still need to keep the change password and co"). */
   settingsSecurity: "/settings/security",

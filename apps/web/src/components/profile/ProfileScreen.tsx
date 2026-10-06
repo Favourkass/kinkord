@@ -3,6 +3,7 @@ import CommentsPanel, { type CommentsPanelProps } from "@/components/feed/Commen
 import ConfirmDialog, { type ConfirmDialogProps } from "@/components/feed/ConfirmDialog";
 import MediaLightbox, { type MediaLightboxProps } from "@/components/feed/MediaLightbox";
 import Toast, { type ToastProps } from "@/components/feed/Toast";
+import type { CoinBalanceVM } from "@/domain/kinkcoins";
 import type { PublicProfileVM } from "@/domain/member";
 import AboutTab, { type AboutLabels } from "./AboutTab";
 import MediaTab, { type MediaTabProps } from "./MediaTab";
@@ -32,6 +33,7 @@ export interface ProfileScreenProps {
   followBusy: boolean;
   messageHref: string;
   editHref: string;
+  coinBalance: CoinBalanceVM;
   heroLabels: ProfileHeroLabels;
   sideLabels: ProfileSideCardLabels;
   aboutLabels: AboutLabels;
@@ -67,6 +69,7 @@ export default function ProfileScreen(p: ProfileScreenProps) {
   );
   const actions = {
     presenceText: p.presenceText,
+    coinBalance: p.coinBalance,
     messageHref: p.messageHref,
     editHref: p.editHref,
     onToggleFollow: p.toggleFollow,

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Coins } from "lucide-react";
 import AvatarCircle from "./AvatarCircle";
 import MaskIcon from "./MaskIcon";
 import type { AppNavLabels, AppNavLinks } from "./nav";
@@ -9,8 +10,8 @@ export interface SidebarDrawerProps {
   name: string;
   avatarUrl: string | null;
   membersCount: string;
-  links: Pick<AppNavLinks, "members" | "settings" | "profile" | "saved">;
-  labels: Pick<AppNavLabels, "members" | "settings" | "logout" | "profile" | "saved">;
+  links: Pick<AppNavLinks, "members" | "settings" | "profile" | "saved" | "kinkcoins">;
+  labels: Pick<AppNavLabels, "members" | "settings" | "logout" | "profile" | "saved" | "kinkcoins">;
   onLogout: () => void;
 }
 
@@ -79,6 +80,21 @@ export default function SidebarDrawer({
           <span className="pl-[10px] text-[12px] font-medium text-drawer-text">{labels.saved}</span>
           <MaskIcon name="chevron-right-14" width={14} className="ml-auto text-app-members-count" />
         </Link>
+        {links.kinkcoins && labels.kinkcoins && (
+          <Link
+            href={links.kinkcoins}
+            onClick={onClose}
+            className="ml-[18px] mt-[11px] flex h-[36px] w-[245px] items-center gap-[10px] rounded-[12px] pl-[13px] pr-[9px] text-[12px] font-medium text-drawer-text"
+          >
+            <Coins size={16} className="text-app-members-count" />
+            <span>{labels.kinkcoins}</span>
+            <MaskIcon
+              name="chevron-right-14"
+              width={14}
+              className="ml-auto text-app-members-count"
+            />
+          </Link>
+        )}
         <div className="mt-auto pb-[37px]">
           <Link
             href={links.settings}

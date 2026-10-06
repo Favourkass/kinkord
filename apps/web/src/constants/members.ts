@@ -178,6 +178,7 @@ export const MEMBERS_COPY = {
     profile: "Profile",
     settings: "Settings and Privacy",
     saved: "Saved",
+    kinkcoins: "KinkCoins & Payment",
     logout: "Log Out",
   },
   notifications: {

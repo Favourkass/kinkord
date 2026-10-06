@@ -1,4 +1,6 @@
 import Link from "next/link";
+import CoinBalance from "@/components/kinkcoins/CoinBalance";
+import type { CoinBalanceVM } from "@/domain/kinkcoins";
 import MaskIcon from "@/components/app/MaskIcon";
 import type { PublicProfileVM } from "@/domain/member";
 import ExpandableAvatar from "./ExpandableAvatar";
@@ -15,6 +17,7 @@ export interface ProfileSideCardLabels {
 
 export interface ProfileSideCardProps {
   vm: PublicProfileVM;
+  coinBalance?: CoinBalanceVM;
   presenceText: string | null;
   labels: ProfileSideCardLabels;
   messageHref: string;
@@ -26,6 +29,7 @@ export interface ProfileSideCardProps {
 /** Figma desktop profile left column (987:5489): 340px card with cover, avatar, details and actions. */
 export default function ProfileSideCard({
   vm,
+  coinBalance,
   presenceText,
   labels,
   messageHref,
@@ -111,6 +115,7 @@ export default function ProfileSideCard({
             {vm.stats.following} <span className="text-pf-muted">{labels.stats.following}</span>
           </span>
         </p>
+        {coinBalance && <CoinBalance balance={coinBalance} />}
         {vm.locationParts.length > 0 && (
           <p className="flex items-center gap-[6px] text-[13px] font-semibold leading-[16px] text-pf-muted">
             <MaskIcon name="map-pin" width={14} className="text-kink-gold-bright" />
