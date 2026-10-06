@@ -9,6 +9,7 @@ import {
   isNull,
   lt,
   lte,
+  ne,
   or,
   sql,
   type SQL,
@@ -199,6 +200,7 @@ export class NotificationsService {
     const rows = await this.rows(
       and(
         eq(notification.userId, userId),
+        ne(notification.type, "message"),
         query.type ? eq(notification.type, query.type) : undefined,
         query.unreadOnly ? isNull(notification.readAt) : undefined,
         term ? this.matching(term) : undefined,
@@ -228,9 +230,48 @@ export class NotificationsService {
       .select({ total: count() })
       .from(notification)
       .where(
-        and(eq(notification.userId, userId), isNull(notification.readAt), this.shownTo(userId)),
+        and(
+          eq(notification.userId, userId),
+          isNull(notification.readAt),
+          this.shownTo(userId),
+          ne(notification.type, "message"),
+        ),
       );
     return { count: Number(row?.total ?? 0) };
+  }
+
+  async counts(userId: string, unreadOnly = false) {
+    const [row] = await this.db
+      .select({
+        all: count(),
+        comment: sql<number>`count(*) filter (where ${notification.type} = 'comment')`,
+        mention: sql<number>`count(*) filter (where ${notification.type} = 'mention')`,
+      })
+      .from(notification)
+      .where(
+        and(
+          eq(notification.userId, userId),
+          ne(notification.type, "message"),
+          this.shownTo(userId),
+          ...(unreadOnly ? [isNull(notification.readAt)] : []),
+        ),
+      );
+    return {
+      all: Number(row?.all ?? 0),
+      comment: Number(row?.comment ?? 0),
+      mention: Number(row?.mention ?? 0),
+    };
+  }
+
+  /** Deletion is scoped to the session recipient, never another member's row. */
+  async delete(userId: string, id: string) {
+    const [deleted] = await this.db
+      .delete(notification)
+      .where(and(eq(notification.userId, userId), eq(notification.id, id)))
+      .returning({ id: notification.id });
+    if (!deleted) throw new NotFoundException("Notification not found.");
+    void this.realtime.notify([userId], { type: "notification" });
+    return { id: deleted.id };
   }
 
   /** Ownership is part of every query; another member's id is never readable. */
@@ -257,7 +298,13 @@ export class NotificationsService {
     const marked = await this.db
       .update(notification)
       .set({ readAt: new Date() })
-      .where(and(eq(notification.userId, userId), isNull(notification.readAt)))
+      .where(
+        and(
+          eq(notification.userId, userId),
+          isNull(notification.readAt),
+          ne(notification.type, "message"),
+        ),
+      )
       .returning({ id: notification.id });
     if (marked.length) void this.realtime.notify([userId], { type: "notification" });
     return { ok: true };

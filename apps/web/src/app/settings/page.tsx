@@ -55,6 +55,8 @@ export default function SettingsPage() {
       membersCount={vm.membersCount}
       verified={vm.verified}
       notificationsUnread={vm.notificationsUnread}
+      notificationsCount={vm.notificationsCount}
+      messagesCount={vm.messagesCount}
       activeNav="settings"
       drawerOpen={vm.drawerOpen}
       onMenu={vm.openDrawer}

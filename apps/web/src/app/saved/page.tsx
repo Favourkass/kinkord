@@ -23,6 +23,8 @@ export default function SavedPage() {
         membersCount: home.membersCount,
         verified: home.verified,
         notificationsUnread: home.notificationsUnread,
+        notificationsCount: home.notificationsCount,
+        messagesCount: home.messagesCount,
         drawerOpen: home.drawerOpen,
         settingsMenuOpen: home.settingsMenuOpen,
         onMenu: home.openDrawer,

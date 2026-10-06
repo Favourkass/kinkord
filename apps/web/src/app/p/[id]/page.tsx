@@ -25,6 +25,8 @@ export default function PostPage() {
         membersCount: home.membersCount,
         verified: home.verified,
         notificationsUnread: home.notificationsUnread,
+        notificationsCount: home.notificationsCount,
+        messagesCount: home.messagesCount,
         drawerOpen: home.drawerOpen,
         settingsMenuOpen: home.settingsMenuOpen,
         onMenu: home.openDrawer,

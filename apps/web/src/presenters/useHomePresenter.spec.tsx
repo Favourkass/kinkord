@@ -116,3 +116,18 @@ describe("useHomePresenter", () => {
     expect(result.current.error).toMatch(/Could not load/);
   });
 });
+
+it("exposes unread chat and notification totals on every member screen", async () => {
+  let messages = 6;
+  apiGet.mockImplementation((path) => {
+    if (path === "/chat/unread-count") return Promise.resolve({ count: messages });
+    if (path === "/notifications/unread-count") return Promise.resolve({ count: 17 });
+    return routeGet(path);
+  });
+  const { result } = renderHook(() => useHomePresenter());
+  await waitFor(() => expect(result.current.messagesCount).toBe(6));
+  expect(result.current.notificationsCount).toBe(17);
+  messages = 3;
+  act(() => window.dispatchEvent(new Event("kinkord:chat-read")));
+  await waitFor(() => expect(result.current.messagesCount).toBe(3));
+});

@@ -208,6 +208,8 @@ export interface ShellSource {
   membersCount: string;
   verified: boolean;
   notificationsUnread?: boolean;
+  notificationsCount?: number;
+  messagesCount?: number;
   drawerOpen: boolean;
   settingsMenuOpen: boolean;
   openDrawer: () => void;
@@ -227,6 +229,8 @@ export function appShellProps(home: ShellSource, nav: ReturnType<typeof getAppSh
     membersCount: home.membersCount,
     verified: home.verified,
     notificationsUnread: home.notificationsUnread,
+    notificationsCount: home.notificationsCount,
+    messagesCount: home.messagesCount,
     drawerOpen: home.drawerOpen,
     settingsMenuOpen: home.settingsMenuOpen,
     onMenu: home.openDrawer,

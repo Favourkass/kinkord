@@ -25,7 +25,8 @@ export default function MembersCountryPage() {
       membersCount={shell.membersCount}
       verified={shell.verified}
       notificationsUnread={shell.notificationsUnread}
-      activeTab="home"
+      notificationsCount={shell.notificationsCount}
+      messagesCount={shell.messagesCount}
       activeNav="members"
       drawerOpen={shell.drawerOpen}
       onMenu={shell.openDrawer}

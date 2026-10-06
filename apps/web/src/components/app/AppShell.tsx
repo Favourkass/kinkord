@@ -18,6 +18,8 @@ export interface AppShellProps {
   membersCount: string;
   verified: boolean;
   notificationsUnread?: boolean;
+  notificationsCount?: number;
+  messagesCount?: number;
   /** Highlighted bottom tab; omit on screens outside the tab bar (e.g. Settings). */
   activeTab?: AppTab;
   activeNav: AppNav;
@@ -49,6 +51,8 @@ export default function AppShell({
   membersCount,
   verified,
   notificationsUnread,
+  notificationsCount,
+  messagesCount,
   activeTab,
   activeNav,
   drawerOpen,
@@ -81,7 +85,8 @@ export default function AppShell({
             avatarUrl={avatarUrl}
             links={links}
             labels={labels}
-            notificationsUnread={notificationsUnread}
+            notificationsCount={notificationsCount}
+            messagesCount={messagesCount}
           />
         )}
         <SidebarDrawer
@@ -107,6 +112,8 @@ export default function AppShell({
           brand={brand}
           active={activeNav}
           notificationsUnread={notificationsUnread}
+          notificationsCount={notificationsCount}
+          messagesCount={messagesCount}
           avatarUrl={avatarUrl}
           membersCount={membersCount}
           links={links}

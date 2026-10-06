@@ -24,6 +24,8 @@ function OwnProfile() {
       {...getProfilePosts(feed, shell.avatarUrl)}
       viewerAvatarUrl={shell.avatarUrl}
       notificationsUnread={shell.notificationsUnread}
+      notificationsCount={shell.notificationsCount}
+      messagesCount={shell.messagesCount}
       links={nav.links}
       labels={nav.labels}
     />

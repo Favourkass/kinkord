@@ -48,6 +48,10 @@ export const notificationsApi = {
     if (cursor) query.set("cursor", cursor);
     return api.get<NotificationPagePM>(`/notifications${query.size ? `?${query}` : ""}`);
   },
+  counts: (unread = false) =>
+    api.get<{ all: number; comment: number; mention: number }>(
+      `/notifications/counts${unread ? "?unread=true" : ""}`,
+    ),
   unreadCount: () => api.get<{ count: number }>("/notifications/unread-count"),
   read: async (id: string) => {
     const item = await api.post<NotificationPM>(
@@ -56,6 +60,11 @@ export const notificationsApi = {
     );
     notifyInboxChanged();
     return item;
+  },
+  delete: async (id: string) => {
+    const result = await api.del<{ id: string }>(`/notifications/${encodeURIComponent(id)}`);
+    notifyInboxChanged();
+    return result;
   },
   readAll: async () => {
     await api.post<{ ok: true }>("/notifications/read-all", {});

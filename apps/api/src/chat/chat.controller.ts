@@ -43,6 +43,11 @@ export class ChatController {
     private readonly realtime: RealtimeService,
   ) {}
 
+  @Get("unread-count")
+  unreadCount(@Req() req: AuthedRequest) {
+    return this.chat.unreadCount(req.user.id);
+  }
+
   @Get("conversations")
   list(@Req() req: AuthedRequest) {
     return this.chat.listConversations(req.user.id);

@@ -3,10 +3,11 @@ import AppMobileHeader from "@/components/app/AppMobileHeader";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import DesktopSidebar from "@/components/app/DesktopSidebar";
 import MobileTabBar from "@/components/app/MobileTabBar";
-import type { AppNavLabels, AppNavLinks, DrawerNavigation } from "@/components/app/nav";
+import type { AppNavLabels, AppNavLinks, AppTab, DrawerNavigation } from "@/components/app/nav";
 import SidebarDrawer from "@/components/app/SidebarDrawer";
 
 export interface FeedShellProps {
+  activeTab?: AppTab;
   brand: string;
   greeting: string;
   name: string;
@@ -14,6 +15,8 @@ export interface FeedShellProps {
   membersCount: string;
   verified: boolean;
   notificationsUnread?: boolean;
+  notificationsCount?: number;
+  messagesCount?: number;
   drawerOpen: boolean;
   settingsMenuOpen: boolean;
   onMenu: () => void;
@@ -40,6 +43,7 @@ export interface FeedShellProps {
  * where there is finally room for one.
  */
 export default function FeedShell({
+  activeTab,
   brand,
   greeting,
   name,
@@ -47,6 +51,8 @@ export default function FeedShell({
   membersCount,
   verified,
   notificationsUnread,
+  notificationsCount,
+  messagesCount,
   drawerOpen,
   settingsMenuOpen,
   onMenu,
@@ -71,6 +77,8 @@ export default function FeedShell({
             brand={brand}
             active="home"
             notificationsUnread={notificationsUnread}
+            notificationsCount={notificationsCount}
+            messagesCount={messagesCount}
             avatarUrl={avatarUrl}
             membersCount={membersCount}
             links={links}
@@ -106,11 +114,12 @@ export default function FeedShell({
 
       <div className="lg:hidden">
         <MobileTabBar
-          active="home"
+          active={activeTab}
           avatarUrl={avatarUrl}
           links={links}
           labels={labels}
-          notificationsUnread={notificationsUnread}
+          notificationsCount={notificationsCount}
+          messagesCount={messagesCount}
         />
         <SidebarDrawer
           active="home"

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -37,9 +38,23 @@ export class NotificationsController {
     });
   }
 
+  @Get("counts")
+  counts(@Req() req: AuthedRequest, @Query() query: unknown) {
+    const parsed = querySchema.safeParse(query);
+    if (!parsed.success) throw new BadRequestException("Invalid notification query.");
+    return this.inbox.counts(req.user.id, parsed.data.unread === "true");
+  }
+
   @Get("unread-count")
   unreadCount(@Req() req: AuthedRequest) {
     return this.inbox.unreadCount(req.user.id);
+  }
+
+  @Delete(":id")
+  delete(@Req() req: AuthedRequest, @Param("id") id: string) {
+    if (!z.string().uuid().safeParse(id).success)
+      throw new BadRequestException("Invalid notification id.");
+    return this.inbox.delete(req.user.id, id);
   }
 
   @Post("read-all")

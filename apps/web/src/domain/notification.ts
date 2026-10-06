@@ -117,3 +117,19 @@ export function notificationDestination(url: string): string | null {
 }
 
 export type NotificationTab = "all" | "comment" | "mention";
+
+export type NotificationTabCounts = Record<NotificationTab, number>;
+
+/** The unread tab totals once one unread notification of `type` is read. */
+export function countsAfterRead(
+  counts: NotificationTabCounts,
+  type: NotificationKind,
+): NotificationTabCounts {
+  // Messages never count toward the inbox.
+  if (type === "message") return counts;
+  return {
+    all: Math.max(0, counts.all - 1),
+    comment: Math.max(0, counts.comment - (type === "comment" ? 1 : 0)),
+    mention: Math.max(0, counts.mention - (type === "mention" ? 1 : 0)),
+  };
+}

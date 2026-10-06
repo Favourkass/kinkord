@@ -20,7 +20,14 @@ interface PhotoUploadSlot {
   variantUploadUrls: Record<ImageVariant, string>;
 }
 
+const CHAT_READ_EVENT = "kinkord:chat-read";
+export function listenForChatRead(onRead: () => void): () => void {
+  window.addEventListener(CHAT_READ_EVENT, onRead);
+  return () => window.removeEventListener(CHAT_READ_EVENT, onRead);
+}
+
 export const chatService = {
+  unreadCount: () => api.get<{ count: number }>("/chat/unread-count"),
   list: () => api.get<ConversationSummaryPM[]>("/chat/conversations"),
 
   conversation: (id: string) => api.get<ConversationThreadPM>(thread(id)),
@@ -63,8 +70,11 @@ export const chatService = {
     return slot.key;
   },
 
-  markRead: (id: string, messageId: string) =>
-    api.post<{ ok: true }>(`${thread(id)}/read`, { messageId }),
+  markRead: async (id: string, messageId: string) => {
+    const result = await api.post<{ ok: true }>(`${thread(id)}/read`, { messageId });
+    if (typeof window !== "undefined") window.dispatchEvent(new Event(CHAT_READ_EVENT));
+    return result;
+  },
 
   /** Today's new-chat allowance: how many first messages to someone new are left. */
   allowance: () => api.get<ChatAllowancePM>("/chat/allowance"),

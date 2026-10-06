@@ -17,6 +17,7 @@ export default function HomePage() {
   return (
     <FeedScreen
       shell={{
+        activeTab: "home",
         brand: "KINKORD",
         greeting: home.greeting,
         name: home.name,
@@ -24,6 +25,8 @@ export default function HomePage() {
         membersCount: home.membersCount,
         verified: home.verified,
         notificationsUnread: home.notificationsUnread,
+        notificationsCount: home.notificationsCount,
+        messagesCount: home.messagesCount,
         drawerOpen: home.drawerOpen,
         settingsMenuOpen: home.settingsMenuOpen,
         onMenu: home.openDrawer,

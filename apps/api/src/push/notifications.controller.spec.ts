@@ -4,7 +4,14 @@ import { NotificationsController } from "./notifications.controller";
 const req = { user: { id: "member" } } as AuthedRequest;
 const ID = "00000000-0000-4000-8000-000000000001";
 function make() {
-  const inbox = { list: vi.fn(), unreadCount: vi.fn(), read: vi.fn(), readAll: vi.fn() };
+  const inbox = {
+    list: vi.fn(),
+    unreadCount: vi.fn(),
+    read: vi.fn(),
+    readAll: vi.fn(),
+    delete: vi.fn(),
+    counts: vi.fn(),
+  };
   return { controller: new NotificationsController(inbox as never), inbox };
 }
 describe("NotificationsController", () => {
@@ -42,4 +49,11 @@ describe("NotificationsController", () => {
     expect(inbox.read).not.toHaveBeenCalled();
     expect(inbox.list).not.toHaveBeenCalled();
   });
+});
+
+it("deletes for the session recipient and refuses a malformed id", () => {
+  const { controller, inbox } = make();
+  controller.delete(req, ID);
+  expect(inbox.delete).toHaveBeenCalledWith("member", ID);
+  expect(() => controller.delete(req, "bad-id")).toThrow();
 });

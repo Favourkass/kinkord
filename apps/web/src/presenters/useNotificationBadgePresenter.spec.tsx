@@ -5,6 +5,7 @@ import {
   BADGE_FALLBACK_POLL_MS,
   BADGE_POLL_MS,
   useNotificationBadgePresenter,
+  useNotificationCountPresenter,
 } from "./useNotificationBadgePresenter";
 const { count, listeners, live } = vi.hoisted(() => ({
   count: vi.fn(),
@@ -95,4 +96,10 @@ describe("notification badge", () => {
     await act(async () => resolve({ count: 3 }));
     expect(result.current).toBe(false);
   });
+});
+
+it("exposes the unread inbox number for footer labels", async () => {
+  count.mockResolvedValueOnce({ count: 24 });
+  const { result } = renderHook(() => useNotificationCountPresenter(true));
+  await waitFor(() => expect(result.current).toBe(24));
 });
