@@ -37,6 +37,21 @@ export default function manifest(): MetadataRoute.Manifest {
         sizes: "512x512",
         type: "image/svg+xml",
       },
+      // The status-bar icon of the installed app. Android draws it from the
+      // transparency alone, and an installed app ignores a notification's own
+      // badge for this, so without these it shows a blank square.
+      {
+        src: "/icons/badge-96x96.png",
+        sizes: "96x96",
+        type: "image/png",
+        purpose: "monochrome",
+      },
+      {
+        src: "/icons/badge-192x192.png",
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "monochrome",
+      },
     ],
   };
 }

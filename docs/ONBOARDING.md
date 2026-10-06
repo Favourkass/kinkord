@@ -141,6 +141,13 @@ notifications in the installed app or browser's notification settings. Focus,
 Do Not Disturb and notification cooldown can suppress banners. Inbox storage
 alone does not enable device push: permission and a device subscription are required.
 
+The status-bar icon is Android's to draw, from transparency alone. In a browser
+tab it comes from the notification's `badge` (`icons/badge-96x96.png`); in the
+installed app it comes from the manifest's `monochrome` icons (`icons/badge-*.png`)
+instead, and without them Android shows a blank square. Installed phones pick up
+a change to those icons when Chrome next updates the app, which can take a few
+days; removing Kinkord from the home screen and adding it again applies it at once.
+
 ## Changing the database schema
 
 Drizzle owns the schema; never hand-write SQL in `apps/api/drizzle/`.
