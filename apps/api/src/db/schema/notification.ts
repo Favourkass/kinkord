@@ -2,7 +2,15 @@ import { index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "dri
 import { user } from "./auth";
 
 export type NotificationType =
-  "message" | "follow" | "comment" | "mention" | "like" | "repost" | "report" | "test";
+  | "message"
+  | "follow"
+  | "comment"
+  | "mention"
+  | "like"
+  | "repost"
+  | "report"
+  | "verification"
+  | "test";
 
 /**
  * Member inbox, independent of whether any device has enabled browser push.

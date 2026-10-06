@@ -218,6 +218,14 @@ describe("About cards + media (profile rebuild, 2026-09-12)", () => {
     expect(locked.verification.level).toBe("none");
   });
 
+  it("puts a verified identity above email and phone", () => {
+    const vm = toPublicProfileVM({
+      ...base,
+      verification: { email: true, phone: true, identity: true },
+    });
+    expect(vm.verification.level).toBe("identity");
+  });
+
   it("derives handles from links and features the current profile photo", () => {
     expect(socialHandle("https://x.com/naughty_neze")).toBe("@naughty_neze");
     expect(socialHandle("https://facebook.com/")).toBe("facebook.com");

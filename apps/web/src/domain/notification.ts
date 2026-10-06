@@ -1,5 +1,13 @@
 export type NotificationKind =
-  "message" | "follow" | "comment" | "mention" | "like" | "repost" | "report" | "test";
+  | "message"
+  | "follow"
+  | "comment"
+  | "mention"
+  | "like"
+  | "repost"
+  | "report"
+  | "verification"
+  | "test";
 
 /**
  * GET /notifications item. Who did it is looked up when the inbox loads, so a
@@ -52,6 +60,11 @@ const KINDS: Record<
   like: { category: "Like", icon: "heart", action: () => "liked your post." },
   repost: { category: "Repost", icon: "repost", action: () => "reposted your post." },
   report: { category: "Moderation", icon: "shield", action: () => "New report to review." },
+  verification: {
+    category: "Moderation",
+    icon: "shield",
+    action: () => "New verification to review.",
+  },
   test: {
     category: "Notifications enabled",
     icon: "bell",
@@ -61,7 +74,7 @@ const KINDS: Record<
 };
 
 /** Kinkord's own notices, shown with the brand mark rather than a member. */
-const OFFICIAL: ReadonlySet<NotificationKind> = new Set(["report", "test"]);
+const OFFICIAL: ReadonlySet<NotificationKind> = new Set(["report", "verification", "test"]);
 
 export function toNotificationVM(item: NotificationPM, now = new Date()): NotificationVM {
   const date = new Date(item.createdAt);

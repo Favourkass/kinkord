@@ -3,7 +3,7 @@ import AppMobileHeader from "./AppMobileHeader";
 import AvatarCircle from "./AvatarCircle";
 import DesktopSidebar from "./DesktopSidebar";
 import MobileTabBar from "./MobileTabBar";
-import type { AppNav, AppNavLabels, AppNavLinks, AppTab } from "./nav";
+import type { AppNav, AppNavLabels, AppNavLinks, AppTab, DrawerNavigation } from "./nav";
 import SidebarDrawer from "./SidebarDrawer";
 
 export type { AppNav, AppNavLabels, AppNavLinks, AppTab } from "./nav";
@@ -16,6 +16,7 @@ export interface AppShellProps {
   handle: string;
   avatarUrl: string | null;
   membersCount: string;
+  verified: boolean;
   notificationsUnread?: boolean;
   notificationsCount?: number;
   messagesCount?: number;
@@ -25,9 +26,12 @@ export interface AppShellProps {
   drawerOpen: boolean;
   onMenu: () => void;
   onCloseDrawer: () => void;
+  settingsMenuOpen: boolean;
+  onToggleSettingsMenu: () => void;
   onLogout: () => void;
   links: AppNavLinks;
   labels: AppNavLabels;
+  drawerNavigation: DrawerNavigation;
   /** Page background; the members directory screens use the Figma `mem-page` tone. */
   mobileTone?: "surface" | "members";
   /** Desktop greeting strip (avatar + "Hi …"); the directory screens don't have one in the PC frames. */
@@ -45,6 +49,7 @@ export default function AppShell({
   name,
   avatarUrl,
   membersCount,
+  verified,
   notificationsUnread,
   notificationsCount,
   messagesCount,
@@ -53,9 +58,12 @@ export default function AppShell({
   drawerOpen,
   onMenu,
   onCloseDrawer,
+  settingsMenuOpen,
+  onToggleSettingsMenu,
   onLogout,
   links,
   labels,
+  drawerNavigation,
   mobileTone = "surface",
   desktopGreeting = true,
   mobileHeader,
@@ -84,11 +92,16 @@ export default function AppShell({
         <SidebarDrawer
           open={drawerOpen}
           onClose={onCloseDrawer}
+          active={activeNav}
           name={name}
           avatarUrl={avatarUrl}
           membersCount={membersCount}
+          verified={verified}
           links={links}
           labels={labels}
+          navigation={drawerNavigation}
+          settingsOpen={settingsMenuOpen}
+          onToggleSettings={onToggleSettingsMenu}
           onLogout={onLogout}
         />
       </div>
@@ -102,8 +115,12 @@ export default function AppShell({
           notificationsCount={notificationsCount}
           messagesCount={messagesCount}
           avatarUrl={avatarUrl}
+          membersCount={membersCount}
           links={links}
           labels={labels}
+          navigation={drawerNavigation}
+          settingsOpen={settingsMenuOpen}
+          onToggleSettings={onToggleSettingsMenu}
           onLogout={onLogout}
         />
         <main className={`flex min-h-dvh min-w-0 flex-1 flex-col ${tone}`}>

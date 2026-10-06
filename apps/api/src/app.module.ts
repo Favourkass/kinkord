@@ -17,6 +17,7 @@ import { OtpModule } from "./otp/otp.module";
 import { PostsModule } from "./posts/posts.module";
 import { SafetyModule } from "./safety/safety.module";
 import { StorageModule } from "./storage/storage.module";
+import { VerificationModule } from "./verification/verification.module";
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { StorageModule } from "./storage/storage.module";
     ProfilesModule,
     CommunityModule,
     MembersModule,
+    VerificationModule,
     OtpModule,
     PostsModule,
     SafetyModule,

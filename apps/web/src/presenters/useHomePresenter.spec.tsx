@@ -6,7 +6,8 @@ import { useHomePresenter } from "./useHomePresenter";
 const push = vi.fn();
 const replace = vi.fn();
 const router = { push, replace };
-vi.mock("next/navigation", () => ({ useRouter: () => router }));
+let pathname = "/home";
+vi.mock("next/navigation", () => ({ useRouter: () => router, usePathname: () => pathname }));
 
 const signOut = vi.fn();
 vi.mock("@/services/authClient", () => ({
@@ -55,6 +56,7 @@ describe("useHomePresenter", () => {
     pushSync.mockClear();
     forgetDevice.mockClear();
     apiGet.mockReset().mockImplementation(routeGet);
+    pathname = "/home";
   });
 
   it("greets by first name and exposes drawer identity + member count", async () => {
@@ -65,6 +67,7 @@ describe("useHomePresenter", () => {
     expect(result.current.handle).toBe("@tegamaxwell");
     expect(result.current.avatarUrl).toBe("https://s3/avatar.jpg");
     expect(result.current.membersCount).toBe("128");
+    expect(result.current.verified).toBe(false);
   });
 
   it("redirects to login when the session is gone", async () => {
@@ -82,6 +85,8 @@ describe("useHomePresenter", () => {
     expect(result.current.drawerOpen).toBe(true);
     act(() => result.current.closeDrawer());
     expect(result.current.drawerOpen).toBe(false);
+    act(() => result.current.toggleSettingsMenu());
+    expect(result.current.settingsMenuOpen).toBe(true);
     act(() => {
       void result.current.logout();
     });
@@ -95,6 +100,13 @@ describe("useHomePresenter", () => {
     const { result } = renderHook(() => useHomePresenter());
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(pushSync).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens the settings accordion on a settings child route", async () => {
+    pathname = "/settings/security";
+    const { result } = renderHook(() => useHomePresenter());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.settingsMenuOpen).toBe(true);
   });
 
   it("surfaces a friendly error on non-auth failures", async () => {

@@ -4,6 +4,8 @@ export const Routes = {
   about: "/about",
   team: "/about/team",
   contact: "/contact",
+  /** Privacy notice for identity verification, linked before members consent. */
+  verificationPrivacy: "/privacy/verification",
   invest: "/invest",
   lectures: "/lectures",
   lecture: (slug: string) => `/lectures/${slug}`,
@@ -17,6 +19,7 @@ export const Routes = {
   moderationMember: (id: string) => `/moderation/members/${encodeURIComponent(id)}`,
   moderationBlocklist: "/moderation/blocklist",
   moderationReports: "/moderation/reports",
+  moderationVerification: "/moderation/verification",
   signup: "/signup",
   login: "/login",
   appHome: "/home",
@@ -24,9 +27,18 @@ export const Routes = {
   messageThread: (conversationId: string) => `/messages/${encodeURIComponent(conversationId)}`,
   /** Opens (or reuses) the 1:1 thread with a member, then lands in it. */
   messageWith: (userId: string) => `/messages/with/${encodeURIComponent(userId)}`,
+  // Menu entries for features still being built; each shows a "coming soon" screen.
+  kinkopediaInApp: "/coming-soon/kinkopedia",
+  kinkCoins: "/coming-soon/kinkcoins-payment",
+  subscription: "/coming-soon/subscription",
+  marketplace: "/coming-soon/marketplace",
   settings: "/settings",
+  settingsData: "/coming-soon/your-data",
+  settingsContent: "/coming-soon/content-experience",
+  settingsCommunitySafety: "/coming-soon/community-safety",
   /** Password + 2FA moved here from /profile (CEO, 2026-09-12: "we still need to keep the change password and co"). */
   settingsSecurity: "/settings/security",
+  settingsVerification: "/settings/verification",
   // Edit Profile hub (Figma 1542:30) and its five sections.
   profileEdit: "/profile/edit",
   profileEditPhotos: "/profile/edit/photos",

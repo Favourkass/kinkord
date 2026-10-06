@@ -12,7 +12,7 @@ export default function SecuritySettingsPage() {
   const vm = useSecurityPagePresenter();
 
   return (
-    <AppShell {...appShellProps(shell, getAppShellNav())} activeNav="settings">
+    <AppShell {...appShellProps(shell, getAppShellNav())} activeNav="security">
       <div className="mx-auto w-full max-w-[720px] px-[18px] pb-[32px] pt-[20px] lg:px-0">
         {vm.loading ? (
           <p className="text-[14px] text-app-subtle">Loading…</p>
