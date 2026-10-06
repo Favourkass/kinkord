@@ -3,7 +3,10 @@ import {
   clampBody,
   handleOf,
   needsClamp,
+  POST_BODY_MAX,
   POST_PREVIEW_CHARS,
+  postBodyMax,
+  SILVER_POST_BODY_MAX,
   toCommentVM,
   toPostVM,
   type CommentPM,
@@ -165,5 +168,13 @@ describe("toCommentVM", () => {
       canDelete: true,
       body: "nice one",
     });
+  });
+});
+
+describe("postBodyMax", () => {
+  it("gives Silver members the longer limit", () => {
+    expect(postBodyMax(false)).toBe(POST_BODY_MAX);
+    expect(postBodyMax(true)).toBe(SILVER_POST_BODY_MAX);
+    expect(SILVER_POST_BODY_MAX).toBe(25_000);
   });
 });

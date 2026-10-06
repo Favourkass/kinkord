@@ -3,7 +3,7 @@
 import FeedScreen from "@/components/feed/FeedScreen";
 import { FEED_COPY, FEED_VISIBILITIES, POST_CARD_LABELS } from "@/constants/feed";
 import { Routes } from "@/constants/Routes";
-import { COMMENT_BODY_MAX, POST_BODY_MAX } from "@/domain/post";
+import { COMMENT_BODY_MAX, postBodyMax } from "@/domain/post";
 import { getAppShellNav } from "@/presenters/getAppShellNav";
 import { useFeedPresenter } from "@/presenters/useFeedPresenter";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
@@ -66,7 +66,7 @@ export default function HomePage() {
         avatarUrl: home.avatarUrl,
         draft: feed.draft,
         onDraftChange: feed.setDraft,
-        maxLength: POST_BODY_MAX,
+        maxLength: postBodyMax(home.silver),
         visibility: feed.visibility,
         visibilities: FEED_VISIBILITIES,
         onVisibilityChange: (v) => feed.setVisibility(v === "friends" ? "friends" : "public"),

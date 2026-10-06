@@ -99,6 +99,9 @@ const SEARCH_WORDS: Record<NotificationType, readonly string[]> = {
   repost: ["repost", "reposted", "reposts"],
   report: ["report", "reports", "moderation"],
   test: ["notifications", "enabled"],
+  payment: ["payment", "payments", "verify"],
+  payment_verified: ["payment", "silver", "premium", "subscription"],
+  payment_rejected: ["payment", "silver", "premium", "subscription"],
 };
 
 const cursorSchema = z.object({ at: z.string().datetime(), id: z.string().uuid() });
@@ -116,6 +119,11 @@ export function notificationUrl(
       return actorUsername ? `/u/${encodeURIComponent(actorUsername)}` : "/notifications";
     case "report":
       return "/moderation/reports";
+    case "payment":
+      return "/moderation/payments";
+    case "payment_verified":
+    case "payment_rejected":
+      return "/subscription";
     case "test":
       return "/settings";
     default:

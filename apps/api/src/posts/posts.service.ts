@@ -32,6 +32,7 @@ import {
   variantKey,
   type ImageVariant,
 } from "../storage/storage.service";
+import { hasSilver, SILVER_POST_BODY_MAX } from "../subscriptions/plans";
 
 /** Photos only for now; the column takes video so the grid can grow into it. */
 const IMAGE_TYPES: Record<string, string> = {
@@ -49,12 +50,18 @@ export const FEED_MAX_PAGE_SIZE = 30;
 export const COMMENT_PAGE_SIZE = 10;
 export const COMMENT_MAX_PAGE_SIZE = 50;
 
+/** Said when a Basic member's post is longer than POST_BODY_MAX. */
+export const LONG_POST_NEEDS_SILVER = `Posts can be up to ${POST_BODY_MAX.toLocaleString(
+  "en-US",
+)} characters. Silver members can write up to ${SILVER_POST_BODY_MAX.toLocaleString("en-US")}.`;
+
 /** `posts/<userId>/<uuid>.jpg` — the prefix is what proves a key belongs to its uploader. */
 export const POST_MEDIA_PREFIX = "posts";
 
 export const createPostSchema = z
   .object({
-    body: z.string().trim().max(POST_BODY_MAX).optional(),
+    // Silver's limit; everyone else's is checked in create(), where the plan is known.
+    body: z.string().trim().max(SILVER_POST_BODY_MAX).optional(),
     visibility: z.enum(["public", "friends"]).default("public"),
     media: z
       .array(
@@ -197,6 +204,9 @@ export class PostsService {
   }
 
   async create(userId: string, input: CreatePostInput): Promise<PostVM> {
+    if ((input.body?.length ?? 0) > POST_BODY_MAX && !(await hasSilver(this.db, userId))) {
+      throw new BadRequestException(LONG_POST_NEEDS_SILVER);
+    }
     await this.verifyMedia(userId, input.media);
     const [row] = await this.db
       .insert(post)

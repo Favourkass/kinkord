@@ -17,6 +17,7 @@ import { OtpModule } from "./otp/otp.module";
 import { PostsModule } from "./posts/posts.module";
 import { SafetyModule } from "./safety/safety.module";
 import { StorageModule } from "./storage/storage.module";
+import { SubscriptionsModule } from "./subscriptions/subscriptions.module";
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { StorageModule } from "./storage/storage.module";
     SafetyModule,
     ChatModule,
     PushModule,
+    SubscriptionsModule,
   ],
   controllers: [HealthController],
   providers: [HealthService],

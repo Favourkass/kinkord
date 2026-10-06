@@ -27,6 +27,9 @@ describe("notification presentation", () => {
     "repost",
     "report",
     "test",
+    "payment",
+    "payment_verified",
+    "payment_rejected",
   ])("maps %s into a labelled notification", (type) => {
     const vm = toNotificationVM({ ...item, type }, new Date(item.createdAt));
     expect(vm.category).toBeTruthy();
@@ -59,6 +62,16 @@ describe("notification presentation", () => {
     const vm = toNotificationVM({ ...item, type: "report", actor: null });
     expect(vm).toMatchObject({ official: true, actorName: null, avatarUrl: null });
     expect(vm.body).toBe("New report to review.");
+    expect(toNotificationVM({ ...item, type: "payment_verified", actor: null })).toMatchObject({
+      official: true,
+      category: "Silver Premium",
+    });
+  });
+
+  it("still shows a kind this version doesn't know, rather than breaking the inbox", () => {
+    const vm = toNotificationVM({ ...item, type: "gift" as NotificationKind });
+    expect(vm).toMatchObject({ official: true, actorName: null, icon: "bell" });
+    expect(vm.body).toBe("Something new for you.");
   });
 
   it("distinguishes read state and formats recent times", () => {

@@ -13,6 +13,7 @@ export interface AppNavLinks {
   profile: string;
   settings: string;
   saved: string;
+  subscription: string;
 }
 
 export interface AppNavLabels {
@@ -23,5 +24,6 @@ export interface AppNavLabels {
   profile: string;
   settings: string;
   saved: string;
+  subscription: string;
   logout: string;
 }

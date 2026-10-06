@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
-import { clamp, createPostSchema, parseCursor, PostsService } from "./posts.service";
+import {
+  clamp,
+  createPostSchema,
+  LONG_POST_NEEDS_SILVER,
+  parseCursor,
+  PostsService,
+} from "./posts.service";
 
 /**
  * Drizzle's builders are chainable and awaited at the end, so a stub returns
@@ -151,6 +157,35 @@ describe("PostsService.create", () => {
 
   beforeEach(() => {
     storage = makeStorage();
+  });
+
+  it("keeps a Basic member's post to 2,000 characters", async () => {
+    await expect(
+      service(makeDb([[]]), storage).create("u1", {
+        body: "x".repeat(2001),
+        visibility: "public",
+        media: [],
+      }),
+    ).rejects.toThrow(LONG_POST_NEEDS_SILVER);
+  });
+
+  it("lets a Silver member write a longer post", async () => {
+    const silver = [{ end: new Date(Date.now() + 86_400_000) }];
+    // Past the length check, it fails on the media instead.
+    await expect(
+      service(makeDb([silver]), storage).create("u1", {
+        body: "x".repeat(25_000),
+        visibility: "public",
+        media: [{ key: "posts/u2/stolen.jpg", kind: "image" }],
+      }),
+    ).rejects.toThrow(/unknown upload/);
+  });
+
+  it("caps everyone at Silver's 25,000 characters", () => {
+    const parse = (body: string) =>
+      createPostSchema.safeParse({ body, visibility: "public" }).success;
+    expect(parse("x".repeat(25_000))).toBe(true);
+    expect(parse("x".repeat(25_001))).toBe(false);
   });
 
   it("refuses a key belonging to somebody else", async () => {
