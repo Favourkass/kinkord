@@ -266,7 +266,7 @@ export default function PaymentProofView(p: PaymentProofViewProps) {
         <input
           id={RECEIPT_INPUT}
           type="file"
-          accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+          accept="image/jpeg,image/png,image/webp"
           onChange={onFile}
           className="sr-only"
         />
