@@ -31,6 +31,8 @@ export interface MemberCardPM {
   postsCount: number;
   followersCount: number;
   isFollowing: boolean;
+  /** Shows the Silver check; absent from an older API. */
+  silver?: boolean;
 }
 
 export interface MemberCardVM {
@@ -49,6 +51,7 @@ export interface MemberCardVM {
   posts: string;
   followers: string;
   isFollowing: boolean;
+  silver: boolean;
 }
 
 /**
@@ -83,6 +86,7 @@ export function toMemberCardVM(pm: MemberCardPM): MemberCardVM {
     posts: compactNumber(pm.postsCount),
     followers: compactNumber(pm.followersCount),
     isFollowing: pm.isFollowing,
+    silver: Boolean(pm.silver),
   };
 }
 
@@ -121,6 +125,8 @@ export interface PublicProfilePM {
   /** Only your own profile carries the birth date. */
   dateOfBirth: string | null;
   verification: { email: boolean; phone: boolean };
+  /** The Silver check, with when their Silver began; absent from an older API. */
+  silver?: { since: string } | null;
 }
 
 export type SocialPlatform = "facebook" | "x";
@@ -218,6 +224,8 @@ export interface PublicProfileVM {
   limits: string | null;
   socialLinks: SocialLinkVM[];
   verification: { level: "basic" | "none"; email: boolean; phone: boolean };
+  /** The Silver check beside their name; `since` is "October 2026". */
+  silver: { since: string | null } | null;
   restricted: boolean;
 }
 
@@ -369,6 +377,7 @@ export function toPublicProfileVM(
       email: Boolean(pm.verification?.email),
       phone: Boolean(pm.verification?.phone),
     },
+    silver: pm.silver ? { since: monthYear(pm.silver.since) } : null,
     restricted: Boolean(pm.restricted),
   };
 }
@@ -417,4 +426,5 @@ export interface FriendRowVM {
   location: string | null;
   isFollowing: boolean;
   busy: boolean;
+  silver: boolean;
 }

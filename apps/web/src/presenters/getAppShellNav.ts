@@ -12,6 +12,7 @@ export interface AppShellNavVM {
     settings: string;
     saved: string;
     kinkcoins: string;
+    subscription: string;
   };
   labels: {
     home: string;
@@ -22,6 +23,7 @@ export interface AppShellNavVM {
     settings: string;
     saved: string;
     kinkcoins: string;
+    subscription: string;
     logout: string;
   };
 }
@@ -38,6 +40,7 @@ export function getAppShellNav(): AppShellNavVM {
       settings: Routes.settings,
       saved: Routes.saved,
       kinkcoins: Routes.kinkcoins,
+      subscription: Routes.subscription,
     },
     labels: { ...MEMBERS_COPY.nav },
   };

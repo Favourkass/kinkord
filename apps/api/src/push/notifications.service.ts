@@ -21,6 +21,7 @@ import { notBanned } from "../moderation/admins";
 import { RealtimeService } from "../realtime/realtime.service";
 import { blockedBy } from "../safety/blocks";
 import { StorageService } from "../storage/storage.service";
+import { silverCheck } from "../subscriptions/plans";
 
 /** Something that happened, as the code that saw it describes it. */
 export interface InboxEvent {
@@ -36,7 +37,13 @@ export interface InboxEvent {
 export interface InboxItem {
   id: string;
   type: NotificationType;
-  actor: { name: string; username: string | null; avatarUrl: string | null } | null;
+  actor: {
+    name: string;
+    username: string | null;
+    avatarUrl: string | null;
+    /** Shows the Silver check beside their name. */
+    silver: boolean;
+  } | null;
   url: string;
   /** Messages in a chat since its row was last read; 1 otherwise. */
   count: number;
@@ -57,6 +64,7 @@ interface InboxRow {
   actorName: string | null;
   actorDisplayName: string | null;
   actorAvatarKey: string | null;
+  actorSilver: boolean | null;
 }
 
 export interface InboxQuery {
@@ -99,6 +107,10 @@ const SEARCH_WORDS: Record<NotificationType, readonly string[]> = {
   repost: ["repost", "reposted", "reposts"],
   report: ["report", "reports", "moderation"],
   test: ["notifications", "enabled"],
+  payment: ["payment", "payments", "verify"],
+  payment_verified: ["payment", "silver", "premium", "subscription"],
+  payment_rejected: ["payment", "silver", "premium", "subscription"],
+  silver_check: ["silver", "check", "review"],
 };
 
 const cursorSchema = z.object({ at: z.string().datetime(), id: z.string().uuid() });
@@ -116,6 +128,12 @@ export function notificationUrl(
       return actorUsername ? `/u/${encodeURIComponent(actorUsername)}` : "/notifications";
     case "report":
       return "/moderation/reports";
+    case "payment":
+    case "silver_check":
+      return "/moderation/payments";
+    case "payment_verified":
+    case "payment_rejected":
+      return "/subscription";
     case "test":
       return "/settings";
     default:
@@ -339,6 +357,7 @@ export class NotificationsService {
         actorName: user.name,
         actorDisplayName: profile.displayName,
         actorAvatarKey: profile.avatarKey,
+        actorSilver: silverCheck(notification.actorId),
       })
       .from(notification)
       .leftJoin(user, eq(user.id, notification.actorId))
@@ -414,6 +433,7 @@ export class NotificationsService {
             avatarUrl: row.actorAvatarKey
               ? await this.storage.presignDownload(row.actorAvatarKey, "sm")
               : null,
+            silver: Boolean(row.actorSilver),
           }
         : null,
       url: notificationUrl(row.type, row.subjectId, row.actorUsername ?? null),

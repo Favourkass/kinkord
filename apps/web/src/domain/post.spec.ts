@@ -3,7 +3,10 @@ import {
   clampBody,
   handleOf,
   needsClamp,
+  POST_BODY_MAX,
   POST_PREVIEW_CHARS,
+  postBodyMax,
+  SILVER_POST_BODY_MAX,
   toCommentVM,
   toPostVM,
   type CommentPM,
@@ -148,6 +151,12 @@ describe("toPostVM", () => {
     expect(vm.handle).toBeNull();
     expect(vm.authorHref).toBeNull();
   });
+
+  it("shows the Silver check only when the API says the author has one", () => {
+    expect(toPostVM(post(), false, href, NOW).authorSilver).toBe(false);
+    const silver = post({ author: { ...author, silver: true } });
+    expect(toPostVM(silver, false, href, NOW).authorSilver).toBe(true);
+  });
 });
 
 describe("toCommentVM", () => {
@@ -164,6 +173,18 @@ describe("toCommentVM", () => {
       authorHref: "/u/tegamaxwell",
       canDelete: true,
       body: "nice one",
+      authorSilver: false,
     });
+    expect(
+      toCommentVM({ ...pm, author: { ...author, silver: true } }, href, NOW).authorSilver,
+    ).toBe(true);
+  });
+});
+
+describe("postBodyMax", () => {
+  it("gives Silver members the longer limit", () => {
+    expect(postBodyMax(false)).toBe(POST_BODY_MAX);
+    expect(postBodyMax(true)).toBe(SILVER_POST_BODY_MAX);
+    expect(SILVER_POST_BODY_MAX).toBe(25_000);
   });
 });

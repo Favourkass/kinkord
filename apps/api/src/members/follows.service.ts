@@ -4,6 +4,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { Db, DRIZZLE } from "../db/db.module";
 import { PushService } from "../push/push.service";
 import { follow, profile, user } from "../db/schema";
+import { silverCheck } from "../subscriptions/plans";
 
 export interface FollowCounts {
   /** Mutual follows — the product's definition of "friends". */
@@ -24,6 +25,8 @@ export interface FriendRow {
   city: string | null;
   state: string | null;
   isFollowing: boolean;
+  /** Shows the Silver check beside their name. */
+  silver: boolean;
 }
 
 export interface FriendsPage {
@@ -140,6 +143,7 @@ export class FollowsService {
         gender: profile.gender,
         city: profile.city,
         state: profile.state,
+        silver: silverCheck(user.id),
 
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
       })
@@ -159,7 +163,14 @@ export class FollowsService {
       .limit(limit)
       .offset(offset);
     const total = await this.friendsCount(userId);
-    return { items: rows.map((r) => ({ ...r, isFollowing: Boolean(r.isFollowing) })), total };
+    return {
+      items: rows.map((r) => ({
+        ...r,
+        isFollowing: Boolean(r.isFollowing),
+        silver: Boolean(r.silver),
+      })),
+      total,
+    };
   }
 
   /** People who follow `userId`, newest first, with the viewer's follow state on each. */
@@ -180,6 +191,7 @@ export class FollowsService {
         gender: profile.gender,
         city: profile.city,
         state: profile.state,
+        silver: silverCheck(user.id),
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
       })
       .from(follow)
@@ -194,7 +206,14 @@ export class FollowsService {
       .limit(limit)
       .offset(offset);
     const total = await this.followersCount(userId);
-    return { items: rows.map((r) => ({ ...r, isFollowing: Boolean(r.isFollowing) })), total };
+    return {
+      items: rows.map((r) => ({
+        ...r,
+        isFollowing: Boolean(r.isFollowing),
+        silver: Boolean(r.silver),
+      })),
+      total,
+    };
   }
 
   /** People `userId` follows, newest first, with the viewer's follow state on each. */
@@ -216,6 +235,7 @@ export class FollowsService {
         gender: profile.gender,
         city: profile.city,
         state: profile.state,
+        silver: silverCheck(user.id),
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
       })
 
@@ -231,7 +251,14 @@ export class FollowsService {
       .limit(limit)
       .offset(offset);
     const total = await this.followingCount(userId);
-    return { items: rows.map((r) => ({ ...r, isFollowing: Boolean(r.isFollowing) })), total };
+    return {
+      items: rows.map((r) => ({
+        ...r,
+        isFollowing: Boolean(r.isFollowing),
+        silver: Boolean(r.silver),
+      })),
+      total,
+    };
   }
 
   /** Friends `userId` and the viewer have in common. The viewer follows all of them by definition. */
@@ -255,6 +282,7 @@ export class FollowsService {
           gender: profile.gender,
           city: profile.city,
           state: profile.state,
+          silver: silverCheck(user.id),
         })
         .from(follow)
         .innerJoin(
@@ -268,7 +296,10 @@ export class FollowsService {
         .where(and(eq(follow.followerId, userId), ne(follow.followingId, viewerId)));
     const rows = await base().orderBy(desc(back.createdAt)).limit(limit).offset(offset);
     const total = await this.mutualFriendsCount(userId, viewerId);
-    return { items: rows.map((r) => ({ ...r, isFollowing: true })), total };
+    return {
+      items: rows.map((r) => ({ ...r, isFollowing: true, silver: Boolean(r.silver) })),
+      total,
+    };
   }
 
   async mutualFriendsCount(userId: string, viewerId: string): Promise<number> {

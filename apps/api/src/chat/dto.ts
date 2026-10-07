@@ -73,6 +73,8 @@ export interface ChatPeerDto {
   username: string | null;
   displayName: string;
   avatarUrl: string | null;
+  /** Shows the Silver check beside their name. */
+  silver: boolean;
   online: boolean;
   /** The viewer blocked them: the thread stays, read-only until they unblock. */
   blockedByMe: boolean;

@@ -235,24 +235,61 @@ export class PushService {
    * who or why: that's for the moderation screen.
    */
   newReport(): void {
+    this.toAdmins("report", "New report to review");
+  }
+
+  /** A member sent proof of a transfer: the admins check it against the bank statement. */
+  newPayment(): void {
+    this.toAdmins("payment", "New payment to verify");
+  }
+
+  /** A Silver member changed their name, username or photo: their check waits for an admin. */
+  silverCheckReview(): void {
+    this.toAdmins("silver_check", "A Silver check needs review");
+  }
+
+  /** An admin confirmed the member's transfer: Silver is on. */
+  paymentVerified(userId: string, paymentId: string): void {
+    this.toMember(userId, "payment_verified", paymentId, "Your Silver Premium is active");
+  }
+
+  /** An admin couldn't match the transfer; the subscription screen says why. */
+  paymentRejected(userId: string, paymentId: string): void {
+    this.toMember(userId, "payment_rejected", paymentId, "We couldn't confirm your payment");
+  }
+
+  private toAdmins(type: "report" | "payment" | "silver_check", body: string): void {
     void adminUserIds(this.db)
       .then((ids) =>
         Promise.all(
           ids.map((id) =>
             this.deliver(
               id,
-              { type: "report" },
-              {
-                title: "Kinkord",
-                body: "New report to review",
-                url: notificationUrl("report", null, null),
-                tag: "report",
-              },
+              { type },
+              { title: "Kinkord", body, url: notificationUrl(type, null, null), tag: type },
             ),
           ),
         ),
       )
       .catch((e) => this.log.warn(`push failed: ${String(e)}`));
+  }
+
+  private toMember(
+    userId: string,
+    type: "payment_verified" | "payment_rejected",
+    paymentId: string,
+    body: string,
+  ): void {
+    this.notify(async () => ({
+      to: userId,
+      event: { type, subjectId: paymentId },
+      message: {
+        title: "Kinkord",
+        body,
+        url: notificationUrl(type, paymentId, null),
+        tag: `payment-${paymentId}`,
+      },
+    }));
   }
 
   /** Fire and forget: a notification that can't go out never fails what caused it. */

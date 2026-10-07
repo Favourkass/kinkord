@@ -13,6 +13,7 @@ describe("getAppShellNav", () => {
       settings: "/settings",
       saved: "/saved",
       kinkcoins: "/kinkcoins",
+      subscription: "/subscription",
     });
     expect(nav.labels).toEqual({
       home: "Home",
@@ -23,6 +24,7 @@ describe("getAppShellNav", () => {
       settings: "Settings and Privacy",
       saved: "Saved",
       kinkcoins: "KinkCoins & Payment",
+      subscription: "Silver Premium",
       logout: "Log Out",
     });
   });

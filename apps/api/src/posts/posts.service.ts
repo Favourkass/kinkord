@@ -32,6 +32,7 @@ import {
   variantKey,
   type ImageVariant,
 } from "../storage/storage.service";
+import { hasSilver, SILVER_POST_BODY_MAX, silverCheck } from "../subscriptions/plans";
 
 /** Photos only for now; the column takes video so the grid can grow into it. */
 const IMAGE_TYPES: Record<string, string> = {
@@ -49,12 +50,18 @@ export const FEED_MAX_PAGE_SIZE = 30;
 export const COMMENT_PAGE_SIZE = 10;
 export const COMMENT_MAX_PAGE_SIZE = 50;
 
+/** Said when a Basic member's post is longer than POST_BODY_MAX. */
+export const LONG_POST_NEEDS_SILVER = `Posts can be up to ${POST_BODY_MAX.toLocaleString(
+  "en-US",
+)} characters. Silver members can write up to ${SILVER_POST_BODY_MAX.toLocaleString("en-US")}.`;
+
 /** `posts/<userId>/<uuid>.jpg` — the prefix is what proves a key belongs to its uploader. */
 export const POST_MEDIA_PREFIX = "posts";
 
 export const createPostSchema = z
   .object({
-    body: z.string().trim().max(POST_BODY_MAX).optional(),
+    // Silver's limit; everyone else's is checked in create(), where the plan is known.
+    body: z.string().trim().max(SILVER_POST_BODY_MAX).optional(),
     visibility: z.enum(["public", "friends"]).default("public"),
     media: z
       .array(
@@ -100,6 +107,8 @@ export interface PostAuthorVM {
   username: string | null;
   displayName: string;
   avatarUrl: string | null;
+  /** Shows the Silver check beside their name. */
+  silver: boolean;
 }
 
 export interface PostVM {
@@ -197,6 +206,9 @@ export class PostsService {
   }
 
   async create(userId: string, input: CreatePostInput): Promise<PostVM> {
+    if ((input.body?.length ?? 0) > POST_BODY_MAX && !(await hasSilver(this.db, userId))) {
+      throw new BadRequestException(LONG_POST_NEEDS_SILVER);
+    }
     await this.verifyMedia(userId, input.media);
     const [row] = await this.db
       .insert(post)
@@ -497,6 +509,7 @@ export class PostsService {
         username: user.username,
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
+        silver: silverCheck(post.authorId),
       })
       .from(post)
       .innerJoin(user, eq(user.id, post.authorId))
@@ -534,6 +547,7 @@ export class PostsService {
         username: user.username,
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
+        silver: silverCheck(post.authorId),
       })
       .from(post)
       .innerJoin(user, eq(user.id, post.authorId))
@@ -640,6 +654,7 @@ export class PostsService {
           username: content.username,
           displayName: content.displayName ?? content.username ?? "Member",
           avatarUrl: await avatar(content.avatarKey),
+          silver: Boolean(content.silver),
         },
         media: mediaByPost.get(content.id) ?? [],
         likes: likeCount.get(content.id) ?? 0,

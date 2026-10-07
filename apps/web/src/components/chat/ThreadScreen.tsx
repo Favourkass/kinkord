@@ -4,6 +4,7 @@ import { useEffect, useRef, type CSSProperties } from "react";
 import Link from "next/link";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import MaskIcon from "@/components/app/MaskIcon";
+import SilverCheck from "@/components/app/SilverCheck";
 import ConfirmDialog, { type ConfirmDialogProps } from "@/components/feed/ConfirmDialog";
 import MediaLightbox from "@/components/feed/MediaLightbox";
 import type { ThreadMessageVM, ThreadPeerVM } from "@/domain/chat";
@@ -100,8 +101,11 @@ export default function ThreadScreen(p: ThreadScreenProps) {
         />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[15px] font-bold text-app-text">
-          {p.peer?.displayName ?? (p.loading ? "…" : "Member")}
+        <span className="flex items-center gap-[3px]">
+          <span className="truncate text-[15px] font-bold text-app-text">
+            {p.peer?.displayName ?? (p.loading ? "…" : "Member")}
+          </span>
+          {p.peer?.silver ? <SilverCheck size={15} /> : null}
         </span>
         {p.peer?.isOnline && (
           <span className="block text-[12px] text-app-online">{p.onlineLabel}</span>

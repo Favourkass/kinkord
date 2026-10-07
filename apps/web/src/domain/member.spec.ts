@@ -43,7 +43,9 @@ describe("toMemberCardVM", () => {
       posts: "24",
       followers: "1.2K",
       isFollowing: false,
+      silver: false,
     });
+    expect(toMemberCardVM({ ...card, silver: true }).silver).toBe(true);
   });
 
   it("falls back to the display name when a member has no handle and drops unknown parts", () => {
@@ -118,6 +120,16 @@ describe("toPublicProfileVM", () => {
     expect(vm.joined).toBe("March 2023");
     expect(vm.basic.age).toBe("25");
     expect(vm.isFollowing).toBe(true);
+    expect(vm.silver).toBeNull();
+  });
+
+  it("carries the Silver check with the month it began", () => {
+    const vm = toPublicProfileVM(
+      { ...profile, silver: { since: "2026-10-06T12:00:00.000Z" } },
+      () => null,
+      now,
+    );
+    expect(vm.silver).toEqual({ since: "October 2026" });
   });
 
   it("degrades gracefully when optional fields are missing", () => {

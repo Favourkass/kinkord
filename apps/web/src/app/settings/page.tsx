@@ -90,6 +90,13 @@ export default function SettingsPage() {
           <ChevronRightIcon className="text-[#b8850f]" />
         </Link>
         <Link
+          href={Routes.subscription}
+          className="mt-[12px] flex h-[52px] items-center justify-between rounded-[16px] bg-app-members px-[18px] text-[18px] font-medium text-app-name"
+        >
+          {nav.labels.subscription}
+          <ChevronRightIcon className="text-[#b8850f]" />
+        </Link>
+        <Link
           href={Routes.settingsSecurity}
           className="mt-[12px] flex h-[52px] items-center justify-between rounded-[16px] bg-app-members px-[18px] text-[18px] font-medium text-app-name"
         >

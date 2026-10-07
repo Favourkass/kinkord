@@ -54,6 +54,9 @@ export interface MePM {
   twoFactorEnabled: boolean;
   /** Account creation — "Member since" on the profile. */
   createdAt: string;
+  /** Silver lifts limits the app shows before asking, like a post's length. */
+  plan?: "basic" | "silver";
+  silverUntil?: string | null;
 }
 
 /** GET /profile/options — every picker list, owned by the API. */

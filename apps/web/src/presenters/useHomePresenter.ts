@@ -30,6 +30,7 @@ export function useHomePresenter() {
     handle: "",
     avatarUrl: null as string | null,
     membersCount: "—",
+    silver: false,
   });
 
   useEffect(() => {
@@ -52,6 +53,7 @@ export function useHomePresenter() {
           handle: me.username ? `@${me.username}` : "",
           avatarUrl: profile.avatarUrl,
           membersCount: String(stats.members),
+          silver: me.plan === "silver",
         });
         // Signed in: keep this device's notification subscription current.
         void pushService.sync().catch(() => undefined);

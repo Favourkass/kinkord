@@ -1,5 +1,6 @@
 import Link from "next/link";
 import AvatarCircle from "@/components/app/AvatarCircle";
+import SilverCheck from "@/components/app/SilverCheck";
 import type { ConversationRowVM } from "@/domain/chat";
 import PresenceDot from "./PresenceDot";
 
@@ -26,8 +27,11 @@ export default function ConversationRow({ row, onlineLabel }: ConversationRowPro
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex items-baseline gap-[8px]">
-            <span className="min-w-0 flex-1 truncate text-[15px] font-bold text-app-text">
-              {row.displayName}
+            <span className="flex min-w-0 flex-1 items-center gap-[3px]">
+              <span className="truncate text-[15px] font-bold text-app-text">
+                {row.displayName}
+              </span>
+              {row.silver ? <SilverCheck size={15} /> : null}
             </span>
             <span className="shrink-0 text-[12px] text-app-muted">{row.time}</span>
           </span>

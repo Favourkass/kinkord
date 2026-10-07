@@ -17,6 +17,7 @@ export const Routes = {
   moderationMember: (id: string) => `/moderation/members/${encodeURIComponent(id)}`,
   moderationBlocklist: "/moderation/blocklist",
   moderationReports: "/moderation/reports",
+  moderationPayments: "/moderation/payments",
   signup: "/signup",
   login: "/login",
   appHome: "/home",
@@ -61,4 +62,8 @@ export const Routes = {
   post: (id: string) => `/p/${encodeURIComponent(id)}`,
   /** The viewer's saved posts. */
   saved: "/saved",
+  /** Silver Premium: the plans, then paying by bank transfer and sending proof. */
+  subscription: "/subscription",
+  subscriptionPay: (paymentId: string) => `/subscription/pay/${encodeURIComponent(paymentId)}`,
+  subscriptionProof: (paymentId: string) => `/subscription/proof/${encodeURIComponent(paymentId)}`,
 } as const;

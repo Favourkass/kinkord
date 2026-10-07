@@ -139,7 +139,10 @@ describe("toConversationRowVM", () => {
       preview: "hello",
       unread: 2,
       isOnline: true,
+      silver: false,
     });
+    const silver = summary({ peer: { ...summary().peer!, silver: true } });
+    expect(toConversationRowVM(silver, "u1", (id) => `/messages/${id}`).silver).toBe(true);
   });
 });
 
@@ -170,7 +173,9 @@ describe("thread view models", () => {
     expect(toThreadPeerVM(summary().peer, href)).toMatchObject({
       displayName: "Ada",
       isOnline: true,
+      silver: false,
     });
+    expect(toThreadPeerVM({ ...summary().peer!, silver: true }, href)?.silver).toBe(true);
   });
 
   it("links the header to their profile, by username or, without one, by id", () => {

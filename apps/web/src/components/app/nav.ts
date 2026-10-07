@@ -22,6 +22,7 @@ export interface AppNavLinks {
   settings: string;
   saved: string;
   kinkcoins?: string;
+  subscription: string;
 }
 
 export interface AppNavLabels {
@@ -33,5 +34,6 @@ export interface AppNavLabels {
   settings: string;
   saved: string;
   kinkcoins?: string;
+  subscription: string;
   logout: string;
 }

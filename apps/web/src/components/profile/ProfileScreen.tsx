@@ -34,6 +34,7 @@ export interface ProfileScreenProps {
   messageHref: string;
   editHref: string;
   coinBalance: CoinBalanceVM;
+  silverHref: string;
   heroLabels: ProfileHeroLabels;
   sideLabels: ProfileSideCardLabels;
   aboutLabels: AboutLabels;
@@ -72,6 +73,7 @@ export default function ProfileScreen(p: ProfileScreenProps) {
     coinBalance: p.coinBalance,
     messageHref: p.messageHref,
     editHref: p.editHref,
+    silverHref: p.silverHref,
     onToggleFollow: p.toggleFollow,
     followBusy: p.followBusy,
   };

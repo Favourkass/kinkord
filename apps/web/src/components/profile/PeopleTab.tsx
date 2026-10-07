@@ -1,5 +1,6 @@
 import Link from "next/link";
 import MaskIcon from "@/components/app/MaskIcon";
+import SilverCheck from "@/components/app/SilverCheck";
 import type { FriendRowVM } from "@/domain/member";
 
 export interface PeopleRowVM extends FriendRowVM {
@@ -73,8 +74,9 @@ export default function PeopleTab(p: PeopleTabProps) {
                 )}
               </span>
               <span className="flex min-w-0 flex-col gap-[2px]">
-                <span className="truncate text-[13px] font-bold leading-[16px] text-pf-text">
-                  {r.displayName}
+                <span className="flex min-w-0 items-center gap-[3px] text-[13px] font-bold leading-[16px] text-pf-text">
+                  <span className="truncate">{r.displayName}</span>
+                  {r.silver ? <SilverCheck size={13} /> : null}
                 </span>
                 {r.ageTag || r.location ? (
                   <span className="truncate text-[11px] leading-[13px] text-pf-muted">

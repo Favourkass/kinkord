@@ -221,6 +221,57 @@ describe("PushService notifications", () => {
     });
   });
 
+  it("pings every admin about a payment to verify, saying nothing about whose", async () => {
+    const { db } = queuedDb([[{ id: "f1" }], [], [sub("s1")], [KEYS]]);
+    new PushService(db, inbox()).newPayment();
+    await flush();
+    expect(inboxRecord).toHaveBeenCalledWith("f1", { type: "payment" });
+    expect(sent()).toEqual({
+      title: "Kinkord",
+      body: "New payment to verify",
+      url: "/moderation/payments",
+      tag: "payment",
+      notificationId: "notification-1",
+    });
+  });
+
+  it("asks the admins to look at a Silver check after a profile change", async () => {
+    const { db } = queuedDb([[{ id: "f1" }], [], [sub("s1")], [KEYS]]);
+    new PushService(db, inbox()).silverCheckReview();
+    await flush();
+    expect(inboxRecord).toHaveBeenCalledWith("f1", { type: "silver_check" });
+    expect(sent()).toMatchObject({
+      body: "A Silver check needs review",
+      url: "/moderation/payments",
+      tag: "silver_check",
+    });
+  });
+
+  it("tells a member their payment was confirmed, or wasn't", async () => {
+    const verified = queuedDb([[sub("s1")], [KEYS]]);
+    new PushService(verified.db, inbox()).paymentVerified("u2", "pay1");
+    await flush();
+    expect(inboxRecord).toHaveBeenCalledWith("u2", {
+      type: "payment_verified",
+      subjectId: "pay1",
+    });
+    expect(sent()).toMatchObject({
+      body: "Your Silver Premium is active",
+      url: "/subscription",
+      tag: "payment-pay1",
+    });
+
+    sendNotification.mockClear();
+    const rejected = queuedDb([[sub("s1")], [KEYS]]);
+    new PushService(rejected.db, inbox()).paymentRejected("u2", "pay2");
+    await flush();
+    expect(sent()).toMatchObject({
+      body: "We couldn't confirm your payment",
+      url: "/subscription",
+      tag: "payment-pay2",
+    });
+  });
+
   it("never throws into the request that caused it", async () => {
     // Once, not a standing implementation: Vitest reports a reset mock's thrown
     // implementation as a failure even when the code catches it.

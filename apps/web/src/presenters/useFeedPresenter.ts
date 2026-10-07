@@ -577,6 +577,7 @@ export function useFeedPresenter({
       suggestions.map((s) => ({
         userId: s.userId,
         displayName: s.displayName,
+        silver: Boolean(s.silver),
         handle: handleOf(s.username),
         avatarUrl: s.avatarUrl,
         isFollowing: s.isFollowing,

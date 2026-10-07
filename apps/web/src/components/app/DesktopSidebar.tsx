@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { Coins } from "lucide-react";
 import AvatarCircle from "./AvatarCircle";
@@ -123,6 +124,12 @@ export default function DesktopSidebar({
             <MaskIcon src="/app/feed/icon-bookmark.svg" width={29} />
           </span>
           {labels.saved}
+        </Link>
+        <Link href={links.subscription} className={`mt-[24px] ${row(false)}`}>
+          <span className="grid size-[29px] place-items-center">
+            <Image src="/app/subscription/silver-crest.png" alt="" width={29} height={26} />
+          </span>
+          {labels.subscription}
         </Link>
         <Link
           href={links.settings}

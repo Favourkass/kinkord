@@ -12,6 +12,8 @@ export interface PostAuthorPM {
   username: string | null;
   displayName: string;
   avatarUrl: string | null;
+  /** Shows the Silver check beside their name; absent from an older API. */
+  silver?: boolean;
 }
 
 export interface PostMediaPM {
@@ -83,6 +85,13 @@ export interface SavePM {
 
 /** Matches the API's POST_BODY_MAX / COMMENT_BODY_MAX. */
 export const POST_BODY_MAX = 2000;
+/** Silver's longer posts, matching the API's SILVER_POST_BODY_MAX. */
+export const SILVER_POST_BODY_MAX = 25_000;
+
+/** How long a post this member may write. */
+export function postBodyMax(silver: boolean): number {
+  return silver ? SILVER_POST_BODY_MAX : POST_BODY_MAX;
+}
 export const COMMENT_BODY_MAX = 1000;
 export const POST_MEDIA_MAX = 4;
 
@@ -114,6 +123,8 @@ export interface PostVM {
    */
   isRepost: boolean;
   authorName: string;
+  /** The Silver check beside the author's name. */
+  authorSilver: boolean;
   handle: string | null;
   /** Link to the author's profile, or null for a member with no username yet. */
   authorHref: string | null;
@@ -148,6 +159,7 @@ export interface DraftPhotoVM {
 export interface FeedSuggestionVM {
   userId: string;
   displayName: string;
+  silver: boolean;
   handle: string | null;
   avatarUrl: string | null;
   isFollowing: boolean;
@@ -159,6 +171,7 @@ export interface FeedSuggestionVM {
 export interface CommentVM {
   id: string;
   authorName: string;
+  authorSilver: boolean;
   handle: string | null;
   authorHref: string | null;
   avatarUrl: string | null;
@@ -200,6 +213,7 @@ export function toPostVM(
     repostedByName: pm.repostedBy?.displayName ?? null,
     isRepost: pm.id !== pm.postId,
     authorName: pm.author.displayName,
+    authorSilver: Boolean(pm.author.silver),
     handle: handleOf(pm.author.username),
     authorHref: hrefFor(pm.author.username),
     avatarUrl: pm.author.avatarUrl,
@@ -229,6 +243,7 @@ export function toCommentVM(pm: CommentPM, hrefFor: HrefFor, now = new Date()): 
   return {
     id: pm.id,
     authorName: pm.author.displayName,
+    authorSilver: Boolean(pm.author.silver),
     handle: handleOf(pm.author.username),
     authorHref: hrefFor(pm.author.username),
     avatarUrl: pm.author.avatarUrl,

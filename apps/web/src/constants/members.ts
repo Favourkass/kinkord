@@ -158,6 +158,14 @@ export const MEMBERS_COPY = {
     },
     notFound: "We couldn’t find that member.",
     yourself: "This is you",
+    /** What the Silver check says when tapped, X-style. */
+    silver: {
+      title: "Silver Premium",
+      body: "This member has the check because they're subscribed to Silver Premium.",
+      since: (when: string) => `Silver since ${when}`,
+      get: "Get Silver",
+      manage: "Your Silver",
+    },
     /** Desktop-only chrome (Figma desktop-profile-* frames). */
     desktop: {
       searchPlaceholder: "Search friends, kinks, groups...",
@@ -179,6 +187,7 @@ export const MEMBERS_COPY = {
     settings: "Settings and Privacy",
     saved: "Saved",
     kinkcoins: "KinkCoins & Payment",
+    subscription: "Silver Premium",
     logout: "Log Out",
   },
   notifications: {

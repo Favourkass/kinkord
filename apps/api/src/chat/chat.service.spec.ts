@@ -11,6 +11,7 @@ import { conversation, conversationParticipant, message } from "../db/schema";
 import type { PushService } from "../push/push.service";
 import type { RealtimeService } from "../realtime/realtime.service";
 import type { StorageService } from "../storage/storage.service";
+import { SILVER_NEW_CHATS_PER_DAY } from "../subscriptions/plans";
 import { NEW_CHAT_LIMIT } from "./allowance";
 import {
   CHAT_PHOTO_MAX_MB,
@@ -265,6 +266,7 @@ describe("ChatService.sendMessage", () => {
         [{ userId: "u2" }],
         [{ n: 0 }],
         [], // nobody has written in this thread yet
+        [], // on Basic: no Silver
         undefined, // the member's new-chat lock
         [{ n: 0 }], // no chats started today
         [saved],
@@ -288,6 +290,7 @@ describe("ChatService.sendMessage", () => {
         [{ userId: "u2" }],
         [{ n: 0 }],
         [], // an empty thread: this would be a new chat
+        [], // on Basic
         undefined, // lock
         [{ n: 1 }], // today's chat is already used
       ]);
@@ -301,6 +304,25 @@ describe("ChatService.sendMessage", () => {
         resetsAt: expect.stringMatching(/T23:00:00\.000Z$/),
       });
       expect(after("insert", message, "values")).toBeUndefined();
+    });
+
+    it("lets a Silver member start more new chats a day", async () => {
+      const saved = row("m1", { senderId: "u1", body: "hi" });
+      const { service, left } = make([
+        [{ userId: "u1" }],
+        [{ userId: "u2" }],
+        [{ n: 0 }],
+        [], // an empty thread
+        [{ end: new Date(Date.now() + 86_400_000) }], // on Silver
+        undefined, // lock
+        [{ n: SILVER_NEW_CHATS_PER_DAY - 1 }], // one left today
+        [saved],
+        undefined,
+      ]);
+      await expect(service.sendMessage(member("u1"), "c1", { body: "hi" })).resolves.toMatchObject({
+        id: "m1",
+      });
+      expect(left()).toBe(0);
     });
 
     it("doesn't limit the super admins", async () => {
@@ -329,11 +351,19 @@ describe("ChatService.allowance", () => {
   it("reports today's use and when it resets, at Lagos midnight", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-30T10:00:00Z"));
-    const { service } = make([[{ n: 1 }]]);
+    const { service } = make([[], [{ n: 1 }]]);
     await expect(service.allowance(member("u1"))).resolves.toEqual({
       newChatsPerDay: 1,
       usedToday: 1,
       resetsAt: "2026-09-30T23:00:00.000Z",
+    });
+  });
+
+  it("gives Silver members their larger allowance", async () => {
+    const { service } = make([[{ end: new Date(Date.now() + 86_400_000) }], [{ n: 2 }]]);
+    await expect(service.allowance(member("u1"))).resolves.toMatchObject({
+      newChatsPerDay: SILVER_NEW_CHATS_PER_DAY,
+      usedToday: 2,
     });
   });
 
@@ -405,6 +435,7 @@ describe("ChatService.listConversations", () => {
           displayName: "Ada",
           avatarKey: "avatars/u2/a.png",
           lastSeenAt: new Date(),
+          silver: true,
         },
       ],
       [row("m1")],
@@ -419,6 +450,7 @@ describe("ChatService.listConversations", () => {
         displayName: "Ada",
         avatarUrl: "https://media/avatars/u2/a.png?sm",
         online: true,
+        silver: true,
       },
       lastMessage: { id: "m1", body: "hello" },
       unreadCount: 2,
