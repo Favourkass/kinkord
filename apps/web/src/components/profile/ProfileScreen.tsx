@@ -32,6 +32,7 @@ export interface ProfileScreenProps {
   followBusy: boolean;
   messageHref: string;
   editHref: string;
+  silverHref: string;
   heroLabels: ProfileHeroLabels;
   sideLabels: ProfileSideCardLabels;
   aboutLabels: AboutLabels;
@@ -69,6 +70,7 @@ export default function ProfileScreen(p: ProfileScreenProps) {
     presenceText: p.presenceText,
     messageHref: p.messageHref,
     editHref: p.editHref,
+    silverHref: p.silverHref,
     onToggleFollow: p.toggleFollow,
     followBusy: p.followBusy,
   };

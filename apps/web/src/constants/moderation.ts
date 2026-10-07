@@ -62,6 +62,46 @@ export const MODERATION_COPY = {
     usd: "$",
     invalid: "Check the account number (10 digits) and the prices.",
   },
+  /** Silver checks hidden after a member changed their name, username or photo, X-style. */
+  silverChecks: {
+    title: "Silver checks to review",
+    hint: "These Silver members changed how they appear. Their check stays hidden until you approve it.",
+    loading: "Loading checks…",
+    empty: "No checks waiting.",
+    changes: {
+      name: "New name",
+      username: "New username",
+      photo: "New photo",
+      admin: "Removed by an admin",
+    },
+    approve: "Approve",
+    approving: "Approving…",
+    approved: (name: string) => `Approved. ${name}'s check shows again.`,
+  },
+  /** One member's Silver check, on their page. */
+  memberCheck: {
+    title: "Silver check",
+    until: (date: string) => `Silver until ${date}`,
+    shown: "Showing on their profile and posts.",
+    held: {
+      name: "Hidden until you approve their new name.",
+      username: "Hidden until you approve their new username.",
+      photo: "Hidden until you approve their new photo.",
+      admin: "Removed by an admin. Hidden until approved.",
+    },
+    photos: "Hidden until they add a profile photo and a cover photo.",
+    newAccount: (date: string) => `Hidden until ${date}, when the account is 30 days old.`,
+    approve: "Approve check",
+    remove: "Remove check",
+    approved: "Approved. Their check shows again.",
+    removed: "Removed. Their check stays hidden until an admin approves it.",
+    removeDialog: {
+      title: "Remove this member's Silver check?",
+      body: "Their check hides until an admin approves it again. They keep Silver and everything it unlocks.",
+      reasonLabel: "Reason (for the log)",
+      confirm: "Remove check",
+    },
+  },
   reports: {
     statuses: { open: "Open", resolved: "Resolved", dismissed: "Dismissed" },
     loading: "Loading reports…",

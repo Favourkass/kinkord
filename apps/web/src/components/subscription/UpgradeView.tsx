@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import SilverCheck from "@/components/app/SilverCheck";
 import type { PlanPeriod } from "@/domain/subscription";
 
 export type FeatureIcon = "pencil" | "chat" | "gift" | "shield" | "globe" | "ban";
@@ -31,7 +32,13 @@ export interface UpgradeViewProps {
   };
   /** "See all 15 Silver benefits"; null until the full list exists. */
   seeAll: string | null;
-  planCard: { title: string; body: string; href: string };
+  /** check: where the Silver check stands, under a running plan. */
+  planCard: {
+    title: string;
+    body: string;
+    check: { shown: boolean; text: string } | null;
+    href: string;
+  };
   options: UpgradeOptionVM[];
   onSelect: (period: PlanPeriod) => void;
   cta: { label: string; disabled: boolean; onClick: () => void };
@@ -200,6 +207,17 @@ function DesktopComingSoonCard({
   );
 }
 
+/** Under the running plan: the Silver check showing, or what it waits for. */
+function CheckNote({ check }: { check: { shown: boolean; text: string } | null }) {
+  if (!check) return null;
+  return (
+    <span className="mt-[4px] flex items-start gap-[5px] break-words text-[12px] text-sub-muted">
+      {check.shown ? <SilverCheck size={14} className="mt-px" /> : null}
+      <span className="min-w-0">{check.text}</span>
+    </span>
+  );
+}
+
 function Slogan({ text, wide }: { text: string; wide: boolean }) {
   // As drawn: a short rule, the words, then the second rule pushed to the far edge.
   return wide ? (
@@ -268,6 +286,7 @@ export default function UpgradeView(p: UpgradeViewProps) {
               <span className="block break-words text-[13px] text-sub-muted">
                 {p.planCard.body}
               </span>
+              <CheckNote check={p.planCard.check} />
             </span>
             <Image
               src={icon("chevron-right-18")}
@@ -390,6 +409,7 @@ export default function UpgradeView(p: UpgradeViewProps) {
                   <span className="block break-words text-[13px] text-sub-muted">
                     {p.planCard.body}
                   </span>
+                  <CheckNote check={p.planCard.check} />
                 </span>
               </span>
               <Image src={icon("chevron-right")} alt="" width={16} height={16} />

@@ -35,6 +35,8 @@ export interface ChatPeerPM {
   username: string | null;
   displayName: string;
   avatarUrl: string | null;
+  /** Shows the Silver check; absent from an older API. */
+  silver?: boolean;
   online: boolean;
   /** The viewer blocked them: the thread stays, read-only until they unblock. */
   blockedByMe: boolean;
@@ -70,6 +72,7 @@ export interface ConversationRowVM {
   id: string;
   href: string;
   displayName: string;
+  silver: boolean;
   avatarUrl: string | null;
   preview: string;
   time: string;
@@ -100,6 +103,7 @@ export interface ThreadMessageVM {
 export interface ThreadPeerVM {
   userId: string;
   displayName: string;
+  silver: boolean;
   avatarUrl: string | null;
   isOnline: boolean;
   blockedByMe: boolean;
@@ -128,6 +132,7 @@ export function toConversationRowVM(
     id: summary.id,
     href: href(summary.id),
     displayName: summary.peer?.displayName ?? "Member",
+    silver: Boolean(summary.peer?.silver),
     avatarUrl: summary.peer?.avatarUrl ?? null,
     preview: previewOf(summary, viewerId),
     time: conversationTime(summary.lastMessage?.createdAt ?? summary.lastMessageAt, now),
@@ -145,6 +150,7 @@ export function toThreadPeerVM(
   return {
     userId: peer.userId,
     displayName: peer.displayName,
+    silver: Boolean(peer.silver),
     avatarUrl: peer.avatarUrl,
     isOnline: peer.online,
     blockedByMe: peer.blockedByMe,

@@ -23,7 +23,7 @@ import {
   variantKey,
   type ImageVariant,
 } from "../storage/storage.service";
-import { hasSilver } from "../subscriptions/plans";
+import { hasSilver, silverCheck } from "../subscriptions/plans";
 import { chatDay, NEW_CHAT_LIMIT, newChatsPerDay } from "./allowance";
 import type {
   ChatAllowanceDto,
@@ -499,6 +499,7 @@ export class ChatService {
         avatarKey: profile.avatarKey,
         lastSeenAt: profile.lastSeenAt,
         blockedByMe: blockedBy(userId, conversationParticipant.userId),
+        silver: silverCheck(conversationParticipant.userId),
       })
       .from(conversationParticipant)
       .innerJoin(user, eq(user.id, conversationParticipant.userId))
@@ -553,6 +554,7 @@ export class ChatService {
                 avatarUrl: p.avatarKey
                   ? await this.storage.presignDownload(p.avatarKey, "sm")
                   : null,
+                silver: Boolean(p.silver),
                 online: PresenceService.isOnline(p.lastSeenAt),
                 blockedByMe: Boolean(p.blockedByMe),
               },

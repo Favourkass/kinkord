@@ -151,6 +151,12 @@ describe("toPostVM", () => {
     expect(vm.handle).toBeNull();
     expect(vm.authorHref).toBeNull();
   });
+
+  it("shows the Silver check only when the API says the author has one", () => {
+    expect(toPostVM(post(), false, href, NOW).authorSilver).toBe(false);
+    const silver = post({ author: { ...author, silver: true } });
+    expect(toPostVM(silver, false, href, NOW).authorSilver).toBe(true);
+  });
 });
 
 describe("toCommentVM", () => {
@@ -167,7 +173,11 @@ describe("toCommentVM", () => {
       authorHref: "/u/tegamaxwell",
       canDelete: true,
       body: "nice one",
+      authorSilver: false,
     });
+    expect(
+      toCommentVM({ ...pm, author: { ...author, silver: true } }, href, NOW).authorSilver,
+    ).toBe(true);
   });
 });
 

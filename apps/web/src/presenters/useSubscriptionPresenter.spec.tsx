@@ -2,7 +2,12 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PaymentPM, SubscriptionStatusPM } from "@/domain/subscription";
-import { planOptions, planState, useSubscriptionPresenter } from "./useSubscriptionPresenter";
+import {
+  checkNote,
+  planOptions,
+  planState,
+  useSubscriptionPresenter,
+} from "./useSubscriptionPresenter";
 
 const router = { push: vi.fn(), back: vi.fn() };
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
@@ -43,6 +48,7 @@ const payment = (over: Partial<PaymentPM> = {}): PaymentPM => ({
 const basic: SubscriptionStatusPM = {
   plan: "basic",
   silverUntil: null,
+  check: null,
   available: true,
   prices,
   open: null,
@@ -86,6 +92,30 @@ describe("planState", () => {
     expect(planState({ ...basic, plan: "silver", open: payment() })).toBe("pending");
     expect(planState({ ...basic, open: payment({ status: "submitted" }) })).toBe("review");
     expect(planState({ ...basic, rejected: payment({ status: "rejected" }) })).toBe("rejected");
+  });
+});
+
+describe("checkNote", () => {
+  const check = { shown: false, reason: null, heldFor: null, showsFrom: null };
+
+  it("says the check shows, or what it waits for", () => {
+    expect(checkNote({ ...check, shown: true })).toEqual({
+      shown: true,
+      text: "Your Silver check shows on your profile.",
+    });
+    expect(checkNote({ ...check, reason: "held", heldFor: "username" })).toEqual({
+      shown: false,
+      text: "Your check is hidden while we look at your new username.",
+    });
+    expect(checkNote({ ...check, reason: "held", heldFor: "admin" }).text).toBe(
+      "Your check is hidden after a review by our team.",
+    );
+    expect(checkNote({ ...check, reason: "photos" }).text).toBe(
+      "Add a profile photo and a cover photo to show your check.",
+    );
+    expect(
+      checkNote({ ...check, reason: "new_account", showsFrom: "2026-10-20T00:00:00Z" }).text,
+    ).toBe("Your check shows from 20 Oct 2026.");
   });
 });
 
@@ -141,12 +171,18 @@ describe("useSubscriptionPresenter", () => {
   });
 
   it("tells a Silver member until when, and offers to extend", async () => {
-    status.mockResolvedValue({ ...basic, plan: "silver", silverUntil: "2027-10-06T12:00:00Z" });
+    status.mockResolvedValue({
+      ...basic,
+      plan: "silver",
+      silverUntil: "2027-10-06T12:00:00Z",
+      check: { shown: false, reason: "held", heldFor: "name", showsFrom: null },
+    });
     const { result } = renderHook(() => useSubscriptionPresenter());
     await waitFor(() => expect(result.current.cta.label).toBe("Extend Silver"));
     expect(result.current.planCard).toMatchObject({
       title: "You're on Silver Premium",
       body: "Active until 6 Oct 2027.",
+      check: { shown: false, text: "Your check is hidden while we look at your new name." },
     });
   });
 

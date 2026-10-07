@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { type Db } from "../db/db.module";
 import { type StorageService } from "../storage/storage.service";
+import type { SilverChecksService } from "../subscriptions/silver-checks.service";
 import {
   ProfilesService,
   lockMessage,
@@ -212,8 +213,15 @@ describe("ProfilesService", () => {
       remove: vi.fn(async () => undefined),
       copy: vi.fn(async () => undefined),
     };
+    // A Silver member's check waits for an admin after a name or photo change.
+    const checks = { hold: vi.fn(async () => true) };
     return {
-      service: new ProfilesService(db, storage as unknown as StorageService),
+      service: new ProfilesService(
+        db,
+        storage as unknown as StorageService,
+        checks as unknown as SilverChecksService,
+      ),
+      checks,
       storage,
       db,
       row,
@@ -231,6 +239,21 @@ describe("ProfilesService", () => {
     key: "avatars/u1/old.jpg",
     createdAt: new Date("2026-09-01T00:00:00Z"),
   };
+
+  it("puts a Silver member's check on hold when their name or photo changes", async () => {
+    const renamed = makeService();
+    await renamed.service.updateOwn("u1", { displayName: "Favour K" }, "Favour", now);
+    expect(renamed.checks.hold).toHaveBeenCalledWith("u1", "name");
+
+    const rephotographed = makeService();
+    await rephotographed.service.updateOwn("u1", { avatarKey: "avatars/u1/new.jpg" }, "Favour");
+    expect(rephotographed.checks.hold).toHaveBeenCalledWith("u1", "photo");
+
+    // A bio or cover change doesn't make anyone look like someone else.
+    const other = makeService();
+    await other.service.updateOwn("u1", { bio: "hello", coverKey: "covers/u1/c.jpg" }, "Favour");
+    expect(other.checks.hold).not.toHaveBeenCalled();
+  });
 
   it("records a new avatar or cover in the media history, but not an unchanged key", async () => {
     const { service, inserted, row } = makeService();
@@ -328,9 +351,10 @@ describe("ProfilesService", () => {
     });
 
     it("updates user + profile in one transaction and returns the next allowed date", async () => {
-      const { service, setCalls, transaction } = makeService({ selects: [[account]] });
+      const { service, setCalls, transaction, checks } = makeService({ selects: [[account]] });
       const vm = await service.changeUsername("u1", "@Sir.Tega", now);
       expect(transaction).toHaveBeenCalledTimes(1);
+      expect(checks.hold).toHaveBeenCalledWith("u1", "username");
       expect(setCalls).toEqual([
         { username: "sir.tega", displayUsername: "Sir.Tega" },
         { usernameChangedAt: now },
@@ -344,9 +368,10 @@ describe("ProfilesService", () => {
     });
 
     it("is a no-op when the handle is unchanged", async () => {
-      const { service, transaction } = makeService({ selects: [[account]] });
+      const { service, transaction, checks } = makeService({ selects: [[account]] });
       const vm = await service.changeUsername("u1", "Tega", now);
       expect(transaction).not.toHaveBeenCalled();
+      expect(checks.hold).not.toHaveBeenCalled();
       expect(vm.canChangeUsernameAt).toBeNull();
     });
 

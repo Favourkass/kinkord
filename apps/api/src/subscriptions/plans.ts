@@ -1,6 +1,13 @@
-import { and, eq, gt, sql } from "drizzle-orm";
+import { and, eq, gt, sql, type AnyColumn, type SQL } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "../db/db.module";
-import { memberSubscription, type BillingPeriod } from "../db/schema";
+import {
+  memberSubscription,
+  profile,
+  user,
+  type BillingPeriod,
+  type SilverCheckHold,
+} from "../db/schema";
 
 /** What Silver costs until the founders change it on the admin screen (Figma 2:179). */
 export const DEFAULT_PRICES: Record<BillingPeriod, { kobo: number; usdCents: number }> = {
@@ -84,4 +91,86 @@ export async function silverUntil(db: Db, userId: string): Promise<Date | null> 
 
 export async function hasSilver(db: Db, userId: string): Promise<boolean> {
   return (await silverUntil(db, userId)) !== null;
+}
+
+/** Days an account must have before its Silver check shows: a new account can't buy one to impersonate. */
+export const CHECK_MIN_ACCOUNT_DAYS = 30;
+const CHECK_MIN_ACCOUNT_AGE = sql.raw(`interval '${CHECK_MIN_ACCOUNT_DAYS} days'`);
+
+// Aliased so the check can sit inside any query, even one that already reads `user` or `profile`.
+const SUB = "check_sub";
+const USER = "check_user";
+const PROFILE = "check_profile";
+const checkSub = alias(memberSubscription, SUB);
+const checkUser = alias(user, USER);
+const checkProfile = alias(profile, PROFILE);
+
+/**
+ * Whether the member with this id shows the Silver check, as an expression to
+ * select beside them. The rules are X's: Silver running, the check not held
+ * for review since a name or photo change, a profile photo and cover, and an
+ * account at least CHECK_MIN_ACCOUNT_DAYS old.
+ */
+export function silverCheck(userId: AnyColumn | SQL): SQL<boolean> {
+  // An alias renders as its bare name in raw SQL, so each table is named with its alias here.
+  return sql<boolean>`exists (
+    select 1 from ${memberSubscription} ${sql.identifier(SUB)}
+    inner join ${user} ${sql.identifier(USER)} on ${checkUser.id} = ${checkSub.userId}
+    inner join ${profile} ${sql.identifier(PROFILE)} on ${checkProfile.userId} = ${checkSub.userId}
+    where ${checkSub.userId} = ${userId}
+      and ${checkSub.currentPeriodEnd} > now()
+      and ${checkSub.checkHeldAt} is null
+      and ${checkProfile.avatarKey} is not null
+      and ${checkProfile.coverKey} is not null
+      and ${checkUser.createdAt} <= now() - ${CHECK_MIN_ACCOUNT_AGE}
+  )`;
+}
+
+/** Why a Silver member's check isn't showing, for their own Silver screen. */
+export interface SilverCheckStatus {
+  shown: boolean;
+  /** held: waiting for an admin after a change. new_account: shows once the account is old enough. */
+  reason: "held" | "new_account" | "photos" | null;
+  heldFor: SilverCheckHold | null;
+  /** When a new account's check appears. */
+  showsFrom: Date | null;
+}
+
+/** The member's own check: null when they aren't on Silver. */
+export async function silverCheckStatus(
+  db: Db,
+  userId: string,
+  now: Date = new Date(),
+): Promise<SilverCheckStatus | null> {
+  const [row] = await db
+    .select({
+      heldAt: memberSubscription.checkHeldAt,
+      heldFor: memberSubscription.checkHoldReason,
+      createdAt: user.createdAt,
+      avatarKey: profile.avatarKey,
+      coverKey: profile.coverKey,
+    })
+    .from(memberSubscription)
+    .innerJoin(user, eq(user.id, memberSubscription.userId))
+    .leftJoin(profile, eq(profile.userId, memberSubscription.userId))
+    .where(and(eq(memberSubscription.userId, userId), gt(memberSubscription.currentPeriodEnd, now)))
+    .limit(1);
+  if (!row) return null;
+  const showsFrom = new Date(row.createdAt.getTime() + CHECK_MIN_ACCOUNT_DAYS * 86_400_000);
+  if (row.heldAt) return { shown: false, reason: "held", heldFor: row.heldFor, showsFrom: null };
+  if (!row.avatarKey || !row.coverKey) {
+    return { shown: false, reason: "photos", heldFor: null, showsFrom: null };
+  }
+  if (showsFrom > now) return { shown: false, reason: "new_account", heldFor: null, showsFrom };
+  return { shown: true, reason: null, heldFor: null, showsFrom: null };
+}
+
+/** When a member showing the check began their current run of Silver, or null without one. */
+export async function silverSince(db: Db, userId: string): Promise<Date | null> {
+  const [row] = await db
+    .select({ since: memberSubscription.startedAt })
+    .from(memberSubscription)
+    .where(and(eq(memberSubscription.userId, userId), silverCheck(memberSubscription.userId)))
+    .limit(1);
+  return row?.since ?? null;
 }

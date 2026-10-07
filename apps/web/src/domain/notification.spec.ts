@@ -30,6 +30,7 @@ describe("notification presentation", () => {
     "payment",
     "payment_verified",
     "payment_rejected",
+    "silver_check",
   ])("maps %s into a labelled notification", (type) => {
     const vm = toNotificationVM({ ...item, type }, new Date(item.createdAt));
     expect(vm.category).toBeTruthy();
@@ -50,7 +51,13 @@ describe("notification presentation", () => {
       body: "Ada Lovelace liked your post.",
       avatarUrl: "/avatar.jpg",
       official: false,
+      actorSilver: false,
     });
+  });
+
+  it("puts the Silver check beside a Silver member's name", () => {
+    const actor = { name: "Ada", username: "ada", avatarUrl: null, silver: true };
+    expect(toNotificationVM({ ...item, type: "follow", actor }).actorSilver).toBe(true);
   });
 
   it("counts a chat's messages since it was last read", () => {
@@ -65,6 +72,11 @@ describe("notification presentation", () => {
     expect(toNotificationVM({ ...item, type: "payment_verified", actor: null })).toMatchObject({
       official: true,
       category: "Silver Premium",
+    });
+    expect(toNotificationVM({ ...item, type: "silver_check", actor: null })).toMatchObject({
+      official: true,
+      category: "Silver checks",
+      body: "A Silver member changed their name or photo. Review their check.",
     });
   });
 

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { BillingPeriod, PaymentStatus, SubscriptionPlan } from "../db/schema";
+import type { BillingPeriod, PaymentStatus, SilverCheckHold, SubscriptionPlan } from "../db/schema";
 
 /** ₦1 to ₦10m, in kobo: anything outside is a typo, not a payment. */
 const kobo = z.number().int().min(100).max(1_000_000_000);
@@ -96,10 +96,20 @@ export interface PaymentDto {
   createdAt: string;
 }
 
+/** The member's own Silver check: why it isn't showing, when it isn't. */
+export interface SilverCheckDto {
+  shown: boolean;
+  reason: "held" | "new_account" | "photos" | null;
+  heldFor: SilverCheckHold | null;
+  showsFrom: string | null;
+}
+
 export interface SubscriptionStatusDto {
   plan: "basic" | SubscriptionPlan;
   /** When Silver runs out; null on Basic. */
   silverUntil: string | null;
+  /** Null on Basic. */
+  check: SilverCheckDto | null;
   /** Checkout stays closed until there's an account to pay into. */
   available: boolean;
   prices: PlanPrices;

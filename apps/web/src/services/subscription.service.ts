@@ -1,6 +1,8 @@
 /** Silver by bank transfer: the member's checkout and proof, and the admins' queue. */
 import type {
   AdminPaymentPM,
+  HeldCheckPM,
+  MemberCheckPM,
   PaymentPM,
   PaymentSettingsInputPM,
   PaymentSettingsPM,
@@ -19,6 +21,7 @@ interface ReceiptUploadSlot {
 
 const payment = (id: string) => `/subscription/payments/${encodeURIComponent(id)}`;
 const adminPayment = (id: string) => `/admin/payments/${encodeURIComponent(id)}`;
+const adminCheck = (userId: string) => `/admin/silver-checks/${encodeURIComponent(userId)}`;
 
 export const subscriptionService = {
   status: () => api.get<SubscriptionStatusPM>("/subscription"),
@@ -60,4 +63,18 @@ export const paymentsAdminService = {
 
   saveSettings: (input: PaymentSettingsInputPM) =>
     api.put<PaymentSettingsPM>("/admin/payments/settings", input),
+};
+
+/** Silver checks hidden after a member changed their name, username or photo. */
+export const silverChecksAdminService = {
+  held: () => api.get<HeldCheckPM[]>("/admin/silver-checks"),
+
+  /** Null when the member isn't on Silver. */
+  forMember: async (userId: string) =>
+    (await api.get<{ check: MemberCheckPM | null }>(adminCheck(userId))).check,
+
+  approve: (userId: string) => api.post<{ userId: string }>(`${adminCheck(userId)}/approve`, {}),
+
+  remove: (userId: string, reason: string) =>
+    api.post<{ userId: string }>(`${adminCheck(userId)}/remove`, { reason }),
 };

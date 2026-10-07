@@ -26,6 +26,7 @@ import {
   PROOF_GRACE_MS,
   freeOffset,
   paymentReference,
+  silverCheckStatus,
   silverUntil,
   usdCentsFor,
 } from "./plans";
@@ -154,7 +155,7 @@ export class SubscriptionsService {
   /** The member's plan, the prices, and the payment they're in the middle of, if any. */
   async status(userId: string): Promise<SubscriptionStatusDto> {
     const now = new Date();
-    const [settings, until, recent] = await Promise.all([
+    const [settings, until, recent, check] = await Promise.all([
       readSettings(this.db),
       silverUntil(this.db, userId),
       this.db
@@ -163,6 +164,7 @@ export class SubscriptionsService {
         .where(eq(subscriptionPayment.userId, userId))
         .orderBy(desc(subscriptionPayment.createdAt))
         .limit(5),
+      silverCheckStatus(this.db, userId, now),
     ]);
     const payments = recent.map((row) => toPaymentDto(row, now));
     const open = payments.find((p) => p.status === "pending" || p.status === "submitted") ?? null;
@@ -170,6 +172,14 @@ export class SubscriptionsService {
     return {
       plan: until ? "silver" : "basic",
       silverUntil: until?.toISOString() ?? null,
+      check: check
+        ? {
+            shown: check.shown,
+            reason: check.reason,
+            heldFor: check.heldFor,
+            showsFrom: check.showsFrom?.toISOString() ?? null,
+          }
+        : null,
       available: settings.bank !== null,
       prices: settings.prices,
       open,

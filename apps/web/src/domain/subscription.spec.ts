@@ -9,9 +9,12 @@ import {
   savePercent,
   takesProof,
   toAdminPaymentVM,
+  toHeldCheckVM,
+  toMemberCheckVM,
   usd,
   yearlyListPrice,
   type AdminPaymentPM,
+  type MemberCheckPM,
   type PaymentPM,
 } from "./subscription";
 
@@ -175,5 +178,90 @@ describe("toAdminPaymentVM", () => {
     const vm = toAdminPaymentVM(admin({ status: "verified" }), (id) => id, labels, now);
     expect(vm.canVerify).toBe(false);
     expect(vm.canReject).toBe(false);
+  });
+});
+
+describe("toHeldCheckVM", () => {
+  const changes = {
+    name: "New name",
+    username: "New username",
+    photo: "New photo",
+    admin: "Removed by an admin",
+  };
+
+  it("says who, what changed and how long it has waited", () => {
+    const vm = toHeldCheckVM(
+      {
+        userId: "u1",
+        username: "ada",
+        displayName: "Ada O",
+        avatarUrl: null,
+        reason: "photo",
+        heldAt: "2026-10-07T09:00:00Z",
+        silverUntil: "2027-10-06T12:00:00Z",
+      },
+      (id) => `/moderation/members/${id}`,
+      changes,
+      new Date("2026-10-07T12:00:00Z"),
+    );
+    expect(vm).toEqual({
+      userId: "u1",
+      name: "Ada O",
+      handle: "@ada",
+      avatarUrl: null,
+      href: "/moderation/members/u1",
+      change: "New photo",
+      waiting: "3 hours ago",
+    });
+  });
+});
+
+describe("toMemberCheckVM", () => {
+  const labels = {
+    until: (d: string) => `Silver until ${d}`,
+    shown: "Showing.",
+    held: { name: "Name.", username: "Username.", photo: "Photo.", admin: "Removed." },
+    photos: "Photos.",
+    newAccount: (d: string) => `From ${d}.`,
+  };
+  const pm = (over: Partial<MemberCheckPM> = {}): MemberCheckPM => ({
+    silverUntil: "2027-10-06T12:00:00Z",
+    shown: true,
+    reason: null,
+    heldFor: null,
+    showsFrom: null,
+    ...over,
+  });
+
+  it("shows a running check, which can only be removed", () => {
+    expect(toMemberCheckVM(pm(), labels)).toEqual({
+      until: "Silver until 6 Oct 2027",
+      shown: true,
+      status: "Showing.",
+      canApprove: false,
+      canRemove: true,
+    });
+  });
+
+  it("approves a check held for review; one an admin removed can't be removed twice", () => {
+    expect(
+      toMemberCheckVM(pm({ shown: false, reason: "held", heldFor: "name" }), labels),
+    ).toMatchObject({ status: "Name.", canApprove: true, canRemove: true });
+    expect(
+      toMemberCheckVM(pm({ shown: false, reason: "held", heldFor: "admin" }), labels),
+    ).toMatchObject({ status: "Removed.", canApprove: true, canRemove: false });
+  });
+
+  it("says what a check waits for when nobody needs to act", () => {
+    expect(toMemberCheckVM(pm({ shown: false, reason: "photos" }), labels)).toMatchObject({
+      status: "Photos.",
+      canApprove: false,
+    });
+    expect(
+      toMemberCheckVM(
+        pm({ shown: false, reason: "new_account", showsFrom: "2026-10-20T00:00:00Z" }),
+        labels,
+      ).status,
+    ).toBe("From 20 Oct 2026.");
   });
 });

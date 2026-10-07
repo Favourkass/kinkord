@@ -18,7 +18,11 @@ vi.mock("@/util/image", () => ({
   compressImage: (...a: unknown[]) => compress(...(a as [File])),
 }));
 
-import { paymentsAdminService, subscriptionService } from "./subscription.service";
+import {
+  paymentsAdminService,
+  silverChecksAdminService,
+  subscriptionService,
+} from "./subscription.service";
 
 beforeEach(() => {
   get.mockReset().mockResolvedValue({});
@@ -94,5 +98,25 @@ describe("paymentsAdminService", () => {
     };
     await paymentsAdminService.saveSettings(input);
     expect(put).toHaveBeenCalledWith("/admin/payments/settings", input);
+  });
+});
+
+describe("silverChecksAdminService", () => {
+  it("lists held checks and reads one member's, null without Silver", async () => {
+    get.mockResolvedValueOnce([]);
+    await silverChecksAdminService.held();
+    expect(get).toHaveBeenCalledWith("/admin/silver-checks");
+    get.mockResolvedValueOnce({ check: null });
+    await expect(silverChecksAdminService.forMember("u/1")).resolves.toBeNull();
+    expect(get).toHaveBeenLastCalledWith("/admin/silver-checks/u%2F1");
+  });
+
+  it("approves, and removes with a reason", async () => {
+    await silverChecksAdminService.approve("u1");
+    expect(post).toHaveBeenCalledWith("/admin/silver-checks/u1/approve", {});
+    await silverChecksAdminService.remove("u1", "Impersonation");
+    expect(post).toHaveBeenLastCalledWith("/admin/silver-checks/u1/remove", {
+      reason: "Impersonation",
+    });
   });
 });

@@ -13,6 +13,7 @@ import {
   COMMENT_BODY_MAX,
 } from "../db/schema";
 import { StorageService } from "../storage/storage.service";
+import { silverCheck } from "../subscriptions/plans";
 import {
   clamp,
   parseCursor,
@@ -35,6 +36,8 @@ export interface CommentVM {
     username: string | null;
     displayName: string;
     avatarUrl: string | null;
+    /** Shows the Silver check beside their name. */
+    silver: boolean;
   };
   /** Whether the viewer may delete it: their own comment, or any comment on their post. */
   canDelete: boolean;
@@ -120,6 +123,7 @@ export class PostInteractionsService {
         username: user.username,
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
+        silver: silverCheck(postComment.authorId),
       })
       .from(postComment)
       .innerJoin(user, eq(user.id, postComment.authorId))
@@ -148,6 +152,7 @@ export class PostInteractionsService {
           username: r.username,
           displayName: r.displayName ?? r.username ?? "Member",
           avatarUrl: r.avatarKey ? await this.storage.presignDownload(r.avatarKey, "sm") : null,
+          silver: Boolean(r.silver),
         },
         canDelete: r.authorId === viewerId || authorId === viewerId,
       })),
@@ -172,6 +177,7 @@ export class PostInteractionsService {
         username: user.username,
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
+        silver: silverCheck(user.id),
       })
       .from(user)
       .leftJoin(profile, eq(profile.userId, user.id))
@@ -185,6 +191,7 @@ export class PostInteractionsService {
         username: me?.username ?? null,
         displayName: me?.displayName ?? me?.username ?? "Member",
         avatarUrl: me?.avatarKey ? await this.storage.presignDownload(me.avatarKey, "sm") : null,
+        silver: Boolean(me?.silver),
       },
       canDelete: true,
     };

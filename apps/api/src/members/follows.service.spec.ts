@@ -107,14 +107,28 @@ describe("FollowsService friends lists", () => {
     const { db, select } = makeDb();
     select.mockReturnValueOnce(
       chain([
-        { userId: "u3", username: "kay", displayName: "Kay", avatarKey: null, isFollowing: 1 },
+        {
+          userId: "u3",
+          username: "kay",
+          displayName: "Kay",
+          avatarKey: null,
+          isFollowing: 1,
+          silver: true,
+        },
       ]),
     );
     select.mockReturnValueOnce(chain([{ c: 1 }]));
     const svc = new FollowsService(db, push as never);
     await expect(svc.friends("u2", "me", 20, 0)).resolves.toEqual({
       items: [
-        { userId: "u3", username: "kay", displayName: "Kay", avatarKey: null, isFollowing: true },
+        {
+          userId: "u3",
+          username: "kay",
+          displayName: "Kay",
+          avatarKey: null,
+          isFollowing: true,
+          silver: true,
+        },
       ],
       total: 1,
     });
@@ -136,6 +150,7 @@ describe("FollowsService friends lists", () => {
           displayName: "Vee",
           avatarKey: "a.jpg",
           isFollowing: true,
+          silver: false,
         },
       ],
       total: 1,
@@ -176,7 +191,14 @@ describe("FollowsService.followers / following", () => {
     const page = await new FollowsService(db, push as never).followers("u2", "me", 20, 0);
     expect(page).toEqual({
       items: [
-        { userId: "u3", username: "kay", displayName: "Kay", avatarKey: null, isFollowing: false },
+        {
+          userId: "u3",
+          username: "kay",
+          displayName: "Kay",
+          avatarKey: null,
+          isFollowing: false,
+          silver: false,
+        },
       ],
       total: 7,
     });

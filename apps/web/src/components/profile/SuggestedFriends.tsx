@@ -1,4 +1,5 @@
 import MaskIcon from "@/components/app/MaskIcon";
+import SilverCheck from "@/components/app/SilverCheck";
 import type { FriendRowVM } from "@/domain/member";
 
 export interface SuggestedFriendsProps {
@@ -39,8 +40,9 @@ export default function SuggestedFriends(p: SuggestedFriendsProps) {
                   )}
                 </span>
                 <span className="flex flex-col gap-[2px]">
-                  <span className="text-[13px] font-bold leading-[16px] text-pf-text">
+                  <span className="inline-flex items-center gap-[3px] text-[13px] font-bold leading-[16px] text-pf-text">
                     {r.displayName}
+                    {r.silver ? <SilverCheck size={13} /> : null}
                   </span>
                   {r.handle && (
                     <span className="text-[11px] leading-[13px] text-pf-muted">{r.handle}</span>

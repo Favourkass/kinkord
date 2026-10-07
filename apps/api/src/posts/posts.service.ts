@@ -32,7 +32,7 @@ import {
   variantKey,
   type ImageVariant,
 } from "../storage/storage.service";
-import { hasSilver, SILVER_POST_BODY_MAX } from "../subscriptions/plans";
+import { hasSilver, SILVER_POST_BODY_MAX, silverCheck } from "../subscriptions/plans";
 
 /** Photos only for now; the column takes video so the grid can grow into it. */
 const IMAGE_TYPES: Record<string, string> = {
@@ -107,6 +107,8 @@ export interface PostAuthorVM {
   username: string | null;
   displayName: string;
   avatarUrl: string | null;
+  /** Shows the Silver check beside their name. */
+  silver: boolean;
 }
 
 export interface PostVM {
@@ -507,6 +509,7 @@ export class PostsService {
         username: user.username,
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
+        silver: silverCheck(post.authorId),
       })
       .from(post)
       .innerJoin(user, eq(user.id, post.authorId))
@@ -544,6 +547,7 @@ export class PostsService {
         username: user.username,
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
+        silver: silverCheck(post.authorId),
       })
       .from(post)
       .innerJoin(user, eq(user.id, post.authorId))
@@ -650,6 +654,7 @@ export class PostsService {
           username: content.username,
           displayName: content.displayName ?? content.username ?? "Member",
           avatarUrl: await avatar(content.avatarKey),
+          silver: Boolean(content.silver),
         },
         media: mediaByPost.get(content.id) ?? [],
         likes: likeCount.get(content.id) ?? 0,

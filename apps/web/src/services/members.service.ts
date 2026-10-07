@@ -30,6 +30,8 @@ export interface FriendPM {
   city: string | null;
   state: string | null;
   isFollowing: boolean;
+  /** Shows the Silver check; absent from an older API. */
+  silver?: boolean;
 }
 
 export interface FriendsPagePM {
