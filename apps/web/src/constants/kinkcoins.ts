@@ -102,6 +102,7 @@ export const KINKCOINS_OVERVIEW_COPY = {
       title: "Withdraw / Redeem",
       description: "Cash out or redeem your balance.",
     },
+    { kind: "banks", title: "Bank Accounts", description: "Manage your withdrawal bank accounts." },
   ],
 } as const;
 
@@ -145,6 +146,8 @@ export const KINKCOINS_WITHDRAW_COPY = {
   equivalent: "Equivalent Value",
   minimum: "Minimum redemption",
   bankTitle: "Withdraw to",
+  bankSelection: "Choose an account",
+  manageBanks: "Manage bank accounts",
   bank: "Access Bank",
   account: "**** 4587 | Savings Account",
   saved: "Sample account",
@@ -179,3 +182,32 @@ export const KINKCOINS_REDEMPTION_SAMPLES = [
   { kind: "star" as const, label: "Stars", balance: 180, rateCents: 80 },
   { kind: "crown" as const, label: "Crowns", balance: 12, rateCents: 800 },
 ];
+
+export const KINKCOINS_BANK_COPY = {
+  title: "Bank Accounts",
+  menu: "Open menu",
+  back: "Back to wallet",
+  heading: "Your withdrawal accounts",
+  description: "Add more than one bank account and choose a default for withdrawals.",
+  preview: "Wallet preview",
+  notice:
+    "Use test details only. Accounts are saved in this browser tab for this preview, not verified or usable for real withdrawals.",
+  empty: "No bank accounts yet",
+  emptyHint: "Add your first account below.",
+  bank: "Bank name",
+  holder: "Account holder name",
+  number: "Account number",
+  type: "Account type",
+  savings: "Savings",
+  current: "Current",
+  save: "Save bank account",
+  default: "Default",
+  makeDefault: "Set as default",
+  remove: "Remove",
+  add: "Add bank account",
+  saved: "Bank account saved.",
+  removed: "Bank account removed.",
+  updated: "Default bank account updated.",
+  invalid: "Enter a bank name, account holder name and an account number with 6–20 digits.",
+  storageError: "Could not save accounts in this browser. Please try again.",
+} as const;

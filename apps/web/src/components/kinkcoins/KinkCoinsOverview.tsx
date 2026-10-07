@@ -1,9 +1,18 @@
 import Link from "next/link";
-import { ArrowLeftRight, ChevronRight, Coins, Gift, ScrollText, Wallet } from "lucide-react";
+import {
+  ArrowLeftRight,
+  ChevronRight,
+  Coins,
+  Gift,
+  Landmark,
+  ScrollText,
+  Wallet,
+} from "lucide-react";
 import type { getKinkCoinsOverviewVM } from "@/presenters/getKinkCoinsVM";
 import CoinMedallion from "./CoinMedallion";
 
 const icons = {
+  banks: Landmark,
   buy: Coins,
   earn: Gift,
   history: ScrollText,

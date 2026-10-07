@@ -147,13 +147,39 @@ export default function KinkCoinsWithdrawView({ vm }: Props) {
             <Landmark size={33} className="shrink-0 text-app-members-count" aria-hidden="true" />
             <div className="flex-1">
               <h2 className="text-sm font-bold">{copy.bankTitle}</h2>
-              <p className="mt-1 text-xs text-app-subtle">{copy.bank}</p>
-              <p className="mt-1 text-[10px] text-app-subtle">{copy.account}</p>
+              <p className="mt-1 text-xs text-app-subtle">{vm.bankDetails.name}</p>
+              <p className="mt-1 text-[10px] text-app-subtle">{vm.bankDetails.account}</p>
             </div>
             <span className="rounded-full bg-kink-gold-bright/10 px-2 py-1 text-[9px] text-app-members-count">
-              {copy.saved}
+              {vm.bankDetails.label}
             </span>
           </section>
+          <div className="space-y-2">
+            {vm.bankOptions.length > 0 && (
+              <label className="block text-xs font-semibold">
+                {copy.bankSelection}
+                <select
+                  aria-label={copy.bankSelection}
+                  value={vm.bankId}
+                  onChange={(event) => vm.onBankChange(event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-app-card-border bg-app-card p-3 text-app-text"
+                >
+                  {vm.bankOptions.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.bank} {account.maskedNumber}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <Link
+              href={vm.banksHref}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-app-members-count"
+            >
+              {copy.manageBanks}
+              <ChevronRight size={14} aria-hidden="true" />
+            </Link>
+          </div>
           <section className={`${card} space-y-3 p-4`}>
             <div className="flex items-center gap-3 text-xs">
               <CoinMedallion kind={confirmation.kind} className="size-5 text-[6px]" />

@@ -11,6 +11,7 @@ export const kinkcoinsWithdrawService = {
   options: () => ({
     copy: KINKCOINS_WITHDRAW_COPY,
     walletHref: Routes.kinkcoins,
+    banksHref: Routes.kinkcoinsBanks,
     homeHref: Routes.appHome,
     currencies: KINKCOINS_REDEMPTION_SAMPLES.map((currency) => ({
       kind: currency.kind,

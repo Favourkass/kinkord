@@ -3,16 +3,16 @@
 import Link from "next/link";
 import { ChevronLeft, Menu } from "lucide-react";
 import AppShell from "@/components/app/AppShell";
-import KinkCoinsWithdrawView from "@/components/kinkcoins/KinkCoinsWithdrawView";
+import BankAccountsView from "@/components/kinkcoins/BankAccountsView";
 import { Routes } from "@/constants/Routes";
 import { appShellProps, getAppShellNav } from "@/presenters/getAppShellNav";
-import { useKinkCoinsWithdrawPresenter } from "@/presenters/useKinkCoinsWithdrawPresenter";
+import { useBankAccountsPresenter } from "@/presenters/useBankAccountsPresenter";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
 
-export default function KinkCoinsWithdrawPage() {
+export default function BankAccountsPage() {
   const home = useHomePresenter();
   const nav = getAppShellNav();
-  const vm = useKinkCoinsWithdrawPresenter(home.handle);
+  const vm = useBankAccountsPresenter(home.handle);
   return (
     <AppShell
       {...appShellProps(home, nav)}
@@ -20,25 +20,14 @@ export default function KinkCoinsWithdrawPage() {
       desktopGreeting={false}
       mobileHeader={
         <header className="flex h-14 items-center gap-4 border-b border-app-card-border bg-app-surface px-4 text-app-text">
-          {vm.step === "options" ? (
-            <Link
-              href={Routes.kinkcoins}
-              aria-label={vm.copy.back}
-              className="text-app-members-count"
-            >
-              <ChevronLeft size={22} />
-            </Link>
-          ) : (
-            <button
-              type="button"
-              onClick={vm.onBack}
-              aria-label={vm.copy.backOptions}
-              className="text-app-members-count"
-            >
-              <ChevronLeft size={22} />
-            </button>
-          )}
-          <h1 className="flex-1 text-sm font-semibold">{vm.title}</h1>
+          <Link
+            href={Routes.kinkcoins}
+            aria-label={vm.copy.back}
+            className="text-app-members-count"
+          >
+            <ChevronLeft size={22} />
+          </Link>
+          <h1 className="flex-1 text-sm font-semibold">{vm.copy.title}</h1>
           <button
             type="button"
             onClick={home.openDrawer}
@@ -51,9 +40,9 @@ export default function KinkCoinsWithdrawPage() {
       }
     >
       <h1 className="mx-auto hidden w-full max-w-[600px] px-5 pb-5 pt-8 text-xl font-semibold text-app-text lg:block">
-        {vm.title}
+        {vm.copy.title}
       </h1>
-      <KinkCoinsWithdrawView vm={vm} />
+      <BankAccountsView vm={vm} />
     </AppShell>
   );
 }

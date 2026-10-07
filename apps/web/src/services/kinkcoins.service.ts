@@ -24,15 +24,20 @@ export const kinkcoinsService = {
     actions: KINKCOINS_OVERVIEW_COPY.actions.map((action) => ({
       ...action,
       href:
-        action.kind === "buy"
-          ? Routes.kinkcoinsBuy
-          : action.kind === "history"
-            ? Routes.kinkcoinsHistory
-            : action.kind === "withdraw"
-              ? Routes.kinkcoinsWithdraw
-              : null,
+        action.kind === "banks"
+          ? Routes.kinkcoinsBanks
+          : action.kind === "buy"
+            ? Routes.kinkcoinsBuy
+            : action.kind === "history"
+              ? Routes.kinkcoinsHistory
+              : action.kind === "withdraw"
+                ? Routes.kinkcoinsWithdraw
+                : null,
       status:
-        action.kind === "buy" || action.kind === "history" || action.kind === "withdraw"
+        action.kind === "banks" ||
+        action.kind === "buy" ||
+        action.kind === "history" ||
+        action.kind === "withdraw"
           ? null
           : KINKCOINS_COPY.comingSoon,
     })),
