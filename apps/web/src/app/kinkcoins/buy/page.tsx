@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { ChevronLeft, Menu } from "lucide-react";
 import AppShell from "@/components/app/AppShell";
-import KinkCoinsOverview from "@/components/kinkcoins/KinkCoinsOverview";
+import KinkCoinsView from "@/components/kinkcoins/KinkCoinsView";
 import { Routes } from "@/constants/Routes";
 import { appShellProps, getAppShellNav } from "@/presenters/getAppShellNav";
-import { getKinkCoinsVM, getKinkCoinsOverviewVM } from "@/presenters/getKinkCoinsVM";
+import { getKinkCoinsVM } from "@/presenters/getKinkCoinsVM";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
 
-export default function KinkCoinsPage() {
+export default function BuyKinkCoinsPage() {
   const home = useHomePresenter();
   const nav = getAppShellNav();
   const vm = getKinkCoinsVM();
@@ -20,7 +20,11 @@ export default function KinkCoinsPage() {
       desktopGreeting={false}
       mobileHeader={
         <header className="flex h-14 items-center gap-4 border-b border-app-card-border bg-app-surface px-4 text-app-text">
-          <Link href={Routes.appHome} aria-label={vm.copy.back} className="text-app-members-count">
+          <Link
+            href={Routes.kinkcoins}
+            aria-label="Back to wallet"
+            className="text-app-members-count"
+          >
             <ChevronLeft size={22} />
           </Link>
           <h1 className="flex-1 text-sm font-semibold">{vm.copy.title}</h1>
@@ -38,7 +42,7 @@ export default function KinkCoinsPage() {
       <h1 className="mx-auto hidden w-full max-w-[600px] px-5 pb-5 pt-8 text-xl font-semibold text-app-text lg:block">
         {vm.copy.title}
       </h1>
-      <KinkCoinsOverview vm={getKinkCoinsOverviewVM()} />
+      <KinkCoinsView vm={vm} />
     </AppShell>
   );
 }

@@ -73,3 +73,34 @@ export const KINK_CURRENCIES: CurrencyPM[] = [
     ],
   },
 ];
+
+export const KINKCOINS_OVERVIEW_COPY = {
+  heading: "KinkCoins",
+  description:
+    "KinkCoins are Kinkord’s virtual currency. Use them to unlock premium experiences, support creators and more.",
+  balance: "Your balance",
+  preview: "Preview · Transactions coming soon",
+  actions: [
+    { kind: "buy", title: "Buy KinkCoins", description: "Get more coins, stars and crowns." },
+    {
+      kind: "earn",
+      title: "Earn KinkCoins",
+      description: "Complete tasks, join events and get rewarded.",
+    },
+    {
+      kind: "history",
+      title: "Transaction History",
+      description: "View your coin, star and crown activity.",
+    },
+    {
+      kind: "convert",
+      title: "Convert / Use KinkCoins",
+      description: "Turn your coins into stars, crowns or other benefits.",
+    },
+    {
+      kind: "withdraw",
+      title: "Withdraw / Redeem",
+      description: "Cash out or redeem your balance.",
+    },
+  ],
+} as const;
