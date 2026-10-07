@@ -5,7 +5,8 @@ import { memberBan, staff, user } from "../db/schema";
 /**
  * The founders' accounts are admins by their email rather than by a row, so
  * admin access doesn't depend on a migration running after the account exists.
- * Being on this list means the moderation tools, no daily new-chat limit, a
+ * Being on this list means the moderation tools, Silver without paying (see
+ * SubscriptionsService.silverUntil), no daily new-chat limit, a
  * push for every report, the moderation alert emails, and an account the admin
  * screens can't block or delete. The email must be verified: without that,
  * anyone could sign up with one of these addresses first and inherit all that.

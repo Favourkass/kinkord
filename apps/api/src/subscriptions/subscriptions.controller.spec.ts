@@ -27,7 +27,8 @@ describe("SubscriptionsController", () => {
   it("reads the signed-in member's own plan", async () => {
     const { controller, subscriptions } = make();
     await controller.status(req);
-    expect(subscriptions.status).toHaveBeenCalledWith("u1");
+    // The whole member, so a founder can be put on Silver by their verified email.
+    expect(subscriptions.status).toHaveBeenCalledWith(req.user);
   });
 
   it("starts a checkout for a plan it knows", async () => {
