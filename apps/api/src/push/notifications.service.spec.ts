@@ -161,7 +161,12 @@ describe("NotificationsService.list", () => {
     expect(items[0]).toEqual({
       id: ID,
       type: "follow",
-      actor: { name: "Ada", username: "ada_x", avatarUrl: "https://media.test/avatars/ada/a.jpg" },
+      actor: {
+        name: "Ada",
+        username: "ada_x",
+        avatarUrl: "https://media.test/avatars/ada/a.jpg",
+        silver: false,
+      },
       url: "/u/ada_x",
       count: 1,
       createdAt: AT.toISOString(),
@@ -282,6 +287,7 @@ describe("notification links and search words", () => {
     expect(notificationUrl("report", null, null)).toBe("/moderation/reports");
     expect(notificationUrl("test", null, null)).toBe("/settings");
     expect(notificationUrl("payment", null, null)).toBe("/moderation/payments");
+    expect(notificationUrl("silver_check", null, null)).toBe("/moderation/payments");
     expect(notificationUrl("payment_verified", "pay1", null)).toBe("/subscription");
     expect(notificationUrl("payment_rejected", "pay1", null)).toBe("/subscription");
   });
@@ -290,7 +296,11 @@ describe("notification links and search words", () => {
     expect(typesMatching("Liked")).toEqual(["like"]);
     expect(typesMatching("rep")).toEqual(["repost", "report"]);
     expect(typesMatching("a")).toEqual([]);
-    expect(typesMatching("silver")).toEqual(["payment_verified", "payment_rejected"]);
+    expect(typesMatching("silver")).toEqual([
+      "payment_verified",
+      "payment_rejected",
+      "silver_check",
+    ]);
   });
 });
 

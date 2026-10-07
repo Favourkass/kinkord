@@ -324,6 +324,7 @@ export function useMemberProfilePresenter(
     location: locationOf(f.city, f.state),
     isFollowing: f.isFollowing,
     busy: rowBusy.has(f.userId),
+    silver: Boolean(f.silver),
   });
   const peopleRows = useMemo(
     () =>
@@ -355,6 +356,13 @@ export function useMemberProfilePresenter(
           : key === "mutual"
             ? copy.people.tabs.mutual(stats?.mutualFriends ?? "0")
             : copy.people.tabs.suggested;
+  // Your own check leads to your Silver; someone else's to getting it.
+  const silverLabels = {
+    title: copy.silver.title,
+    body: copy.silver.body,
+    since: copy.silver.since,
+    cta: pm?.isSelf ? copy.silver.manage : copy.silver.get,
+  };
 
   return {
     loading: username === null || current === null,
@@ -387,6 +395,7 @@ export function useMemberProfilePresenter(
     followBusy,
     messageHref: pm ? Routes.messageWith(pm.userId) : Routes.messages,
     editHref: Routes.profileEdit,
+    silverHref: Routes.subscription,
     heroLabels: {
       follow: copy.follow,
       following: copy.following,
@@ -396,6 +405,7 @@ export function useMemberProfilePresenter(
       addToStory: copy.addToStory,
       comingSoon: copy.comingSoon,
       stats: copy.stats,
+      silver: silverLabels,
     },
     sideLabels: {
       follow: copy.follow,
@@ -405,6 +415,7 @@ export function useMemberProfilePresenter(
       editProfile: copy.editProfile,
       tagsHeading: copy.desktop.tagsHeading,
       stats: copy.stats,
+      silver: silverLabels,
     },
     aboutLabels: copy.about,
     people: {

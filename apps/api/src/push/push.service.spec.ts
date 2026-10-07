@@ -235,6 +235,18 @@ describe("PushService notifications", () => {
     });
   });
 
+  it("asks the admins to look at a Silver check after a profile change", async () => {
+    const { db } = queuedDb([[{ id: "f1" }], [], [sub("s1")], [KEYS]]);
+    new PushService(db, inbox()).silverCheckReview();
+    await flush();
+    expect(inboxRecord).toHaveBeenCalledWith("f1", { type: "silver_check" });
+    expect(sent()).toMatchObject({
+      body: "A Silver check needs review",
+      url: "/moderation/payments",
+      tag: "silver_check",
+    });
+  });
+
   it("tells a member their payment was confirmed, or wasn't", async () => {
     const verified = queuedDb([[sub("s1")], [KEYS]]);
     new PushService(verified.db, inbox()).paymentVerified("u2", "pay1");

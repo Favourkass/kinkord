@@ -14,6 +14,7 @@ import {
 import { PostsService } from "../posts/posts.service";
 import { ONLINE_WINDOW_SECONDS, PresenceService } from "../presence/presence.service";
 import { StorageService } from "../storage/storage.service";
+import { silverCheck, silverSince } from "../subscriptions/plans";
 import { FollowsService } from "./follows.service";
 
 export type MembersSort = "recent" | "followers" | "name";
@@ -161,6 +162,7 @@ export class MembersService {
         isOnline,
         followers,
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
+        silver: silverCheck(profile.userId),
       })
       .from(profile)
       .innerJoin(user, eq(user.id, profile.userId))
@@ -199,6 +201,7 @@ export class MembersService {
         postsCount: postCounts.get(r.userId) ?? 0,
         followersCount: Number(r.followers ?? 0),
         isFollowing: Boolean(r.isFollowing),
+        silver: Boolean(r.silver),
       })),
     );
 
@@ -219,7 +222,7 @@ export class MembersService {
     const { u, p } = row;
     const isSelf = u.id === viewerId;
     const friendsOnly = p.profileVisibility === "friends" && !isSelf;
-    const [followCounts, mutualFriends, isFollowing, avatarUrl, coverUrl, isFriend] =
+    const [followCounts, mutualFriends, isFollowing, avatarUrl, coverUrl, isFriend, silver] =
       await Promise.all([
         this.follows.counts(u.id),
         isSelf ? Promise.resolve(0) : this.follows.mutualFriendsCount(u.id, viewerId),
@@ -228,6 +231,7 @@ export class MembersService {
         // Covers are full-bleed, so they keep the original.
         p.coverKey ? this.storage.presignDownload(p.coverKey) : Promise.resolve(null),
         friendsOnly ? this.follows.areFriends(viewerId, u.id) : Promise.resolve(true),
+        silverSince(this.db, u.id),
       ]);
     const counts = { ...followCounts, mutualFriends };
     // Friends-only profile seen by a non-friend: what the directory card already shows
@@ -268,6 +272,8 @@ export class MembersService {
       // Only you see your own birth date; everyone else gets the derived age.
       dateOfBirth: isSelf ? p.dateOfBirth : null,
       verification: { email: u.emailVerified, phone: p.phoneVerified },
+      // The Silver check, X-style: shown with the month their Silver began.
+      silver: silver ? { since: silver.toISOString() } : null,
     };
   }
 
@@ -307,6 +313,7 @@ export class MembersService {
         city: profile.city,
         state: profile.state,
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
+        silver: silverCheck(profile.userId),
       })
       .from(profile)
       .innerJoin(user, eq(user.id, profile.userId))
@@ -320,7 +327,11 @@ export class MembersService {
       .offset(offset);
     const [totalRow] = await this.db.select({ total: count() }).from(profile).where(where);
     return {
-      items: rows.map((r) => ({ ...r, isFollowing: Boolean(r.isFollowing) })),
+      items: rows.map((r) => ({
+        ...r,
+        isFollowing: Boolean(r.isFollowing),
+        silver: Boolean(r.silver),
+      })),
       total: Number(totalRow?.total ?? 0),
     };
   }
@@ -341,6 +352,7 @@ export class MembersService {
           displayName: r.displayName,
           avatarUrl: r.avatarKey ? await this.storage.presignDownload(r.avatarKey, "md") : null,
           isFollowing: r.isFollowing,
+          silver: r.silver,
         })),
       ),
       total,
@@ -469,6 +481,7 @@ export class MembersService {
         city: r.city,
         state: r.state,
         isFollowing: r.isFollowing,
+        silver: r.silver,
       })),
     );
     return { items, total: result.total, page, limit };

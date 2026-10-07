@@ -3,6 +3,7 @@
 import Link from "next/link";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import MaskIcon from "@/components/app/MaskIcon";
+import SilverCheck from "@/components/app/SilverCheck";
 import type { CommentVM } from "@/domain/post";
 
 export interface CommentsPanelProps {
@@ -74,12 +75,16 @@ export default function CommentsPanel(p: CommentsPanelProps) {
                     {c.authorHref ? (
                       <Link
                         href={c.authorHref}
-                        className="text-[13px] font-bold text-feed-text hover:underline"
+                        className="inline-flex items-center gap-[3px] text-[13px] font-bold text-feed-text hover:underline"
                       >
                         {c.authorName}
+                        {c.authorSilver ? <SilverCheck size={14} /> : null}
                       </Link>
                     ) : (
-                      <span className="text-[13px] font-bold text-feed-text">{c.authorName}</span>
+                      <span className="inline-flex items-center gap-[3px] text-[13px] font-bold text-feed-text">
+                        {c.authorName}
+                        {c.authorSilver ? <SilverCheck size={14} /> : null}
+                      </span>
                     )}
                     <span className="text-[11px] font-light text-feed-muted">{c.time}</span>
                   </p>

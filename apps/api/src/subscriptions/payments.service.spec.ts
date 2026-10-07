@@ -167,6 +167,10 @@ describe("PaymentsService.verify", () => {
       userId: "u1",
       plan: "silver",
       currentPeriodEnd: new Date("2026-11-06T12:00:00Z"),
+      startedAt: NOW,
+    });
+    expect(after("insert", memberSubscription, "onConflictDoUpdate")).toMatchObject({
+      set: { checkHeldAt: null, checkHoldReason: null, startedAt: NOW },
     });
     expect(after("insert", moderationLog, "values")).toEqual({
       actorId: "a1",
@@ -190,6 +194,22 @@ describe("PaymentsService.verify", () => {
     await expect(service.verify("a1", ID)).resolves.toMatchObject({
       silverUntil: "2027-10-20T08:00:00.000Z",
     });
+  });
+
+  it("keeps a running member's start date, so their \"since\" doesn't move", async () => {
+    const { service, after } = make([
+      [payment()],
+      [{ id: "u1" }],
+      [{ end: new Date("2026-10-20T08:00:00Z") }],
+      undefined,
+      undefined,
+    ]);
+    await service.verify("a1", ID);
+    const upsert = after("insert", memberSubscription, "onConflictDoUpdate") as {
+      set: Record<string, unknown>;
+    };
+    expect(upsert.set).not.toHaveProperty("startedAt");
+    expect(upsert.set).toMatchObject({ checkHeldAt: null });
   });
 
   it("only counts a payment once, however many admins press it", async () => {

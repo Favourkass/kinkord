@@ -151,10 +151,11 @@ describe("toPaymentDto", () => {
 
 describe("SubscriptionsService.status", () => {
   it("is Basic with the design's prices while no account is set", async () => {
-    const { service } = make([[], [], []]);
+    const { service } = make([[], [], [], []]);
     await expect(service.status("u1")).resolves.toEqual({
       plan: "basic",
       silverUntil: null,
+      check: null,
       available: false,
       prices: DEFAULT_PRICES,
       open: null,
@@ -164,16 +165,54 @@ describe("SubscriptionsService.status", () => {
 
   it("shows Silver, and the payment still in play", async () => {
     const end = new Date("2026-11-06T12:00:00Z");
-    const { service } = make([[settingsRow], [{ end }], [payment({ status: "submitted" })]]);
+    // The helpers' queries run as Promise.all builds its list; the payments query last.
+    const { service } = make([
+      [settingsRow],
+      [{ end }],
+      [
+        {
+          heldAt: null,
+          heldFor: null,
+          createdAt: new Date("2026-01-01T00:00:00Z"),
+          avatarKey: "a",
+          coverKey: "c",
+        },
+      ],
+      [payment({ status: "submitted" })],
+    ]);
     const status = await service.status("u1");
     expect(status).toMatchObject({ plan: "silver", silverUntil: end.toISOString() });
     expect(status.available).toBe(true);
     expect(status.open?.status).toBe("submitted");
+    expect(status.check).toEqual({ shown: true, reason: null, heldFor: null, showsFrom: null });
+  });
+
+  it("says why a Silver member's check isn't showing yet", async () => {
+    const end = new Date("2026-11-06T12:00:00Z");
+    const created = new Date("2026-09-20T00:00:00Z");
+    const fresh = make([
+      [settingsRow],
+      [{ end }],
+      [{ heldAt: null, heldFor: null, createdAt: created, avatarKey: "a", coverKey: "c" }],
+      [],
+    ]);
+    await expect(fresh.service.status("u1")).resolves.toMatchObject({
+      check: { shown: false, reason: "new_account", showsFrom: "2026-10-20T00:00:00.000Z" },
+    });
+    const held = make([
+      [settingsRow],
+      [{ end }],
+      [{ heldAt: NOW, heldFor: "name", createdAt: created, avatarKey: "a", coverKey: "c" }],
+      [],
+    ]);
+    await expect(held.service.status("u1")).resolves.toMatchObject({
+      check: { shown: false, reason: "held", heldFor: "name" },
+    });
   });
 
   it("surfaces the last payment when it was rejected", async () => {
     const rejected = payment({ status: "rejected", reviewNote: "No such transfer" });
-    const { service } = make([[settingsRow], [], [rejected, payment({ status: "verified" })]]);
+    const { service } = make([[settingsRow], [], [], [rejected, payment({ status: "verified" })]]);
     const status = await service.status("u1");
     expect(status.rejected?.reviewNote).toBe("No such transfer");
     expect(status.open).toBeNull();

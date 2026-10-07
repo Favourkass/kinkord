@@ -2,6 +2,7 @@ import Link from "next/link";
 import MaskIcon from "@/components/app/MaskIcon";
 import type { PublicProfileVM } from "@/domain/member";
 import ExpandableAvatar from "./ExpandableAvatar";
+import SilverBadge, { type SilverBadgeLabels } from "./SilverBadge";
 
 export interface ProfileHeroLabels {
   follow: string;
@@ -13,6 +14,7 @@ export interface ProfileHeroLabels {
   addToStory: string;
   comingSoon: string;
   stats: { friends: string; followers: string; following: string };
+  silver: SilverBadgeLabels;
 }
 
 export interface ProfileHeroProps {
@@ -22,6 +24,8 @@ export interface ProfileHeroProps {
   labels: ProfileHeroLabels;
   messageHref: string;
   editHref: string;
+  /** Where the Silver check's note leads. */
+  silverHref: string;
   onToggleFollow: () => void;
   followBusy: boolean;
 }
@@ -38,6 +42,7 @@ export default function ProfileHero({
   labels,
   messageHref,
   editHref,
+  silverHref,
   onToggleFollow,
   followBusy,
 }: ProfileHeroProps) {
@@ -83,8 +88,11 @@ export default function ProfileHero({
 
       <div className="flex flex-col items-center gap-[10px] px-[16px] pb-[16px]">
         <p className="flex items-baseline gap-[6px]">
-          <span className="text-[22px] font-bold leading-[27px] text-pf-text">
+          <span className="inline-flex items-center gap-[4px] text-[22px] font-bold leading-[27px] text-pf-text">
             {vm.displayName}
+            {vm.silver ? (
+              <SilverBadge since={vm.silver.since} labels={labels.silver} href={silverHref} />
+            ) : null}
           </span>
           {vm.handle && (
             <span className="text-[16px] leading-[19px] text-pf-muted">· {vm.handle}</span>

@@ -14,6 +14,18 @@ export const SUBSCRIPTION_COPY = {
       silver: {
         title: "You're on Silver Premium",
         body: (until: string) => `Active until ${until}.`,
+        /** Where the member's Silver check stands, under the plan. */
+        check: {
+          shown: "Your Silver check shows on your profile.",
+          held: {
+            name: "Your check is hidden while we look at your new name.",
+            username: "Your check is hidden while we look at your new username.",
+            photo: "Your check is hidden while we look at your new photo.",
+            admin: "Your check is hidden after a review by our team.",
+          },
+          photos: "Add a profile photo and a cover photo to show your check.",
+          newAccount: (date: string) => `Your check shows from ${date}.`,
+        },
       },
       pending: {
         title: "Your payment is waiting",

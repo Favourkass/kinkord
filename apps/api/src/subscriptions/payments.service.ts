@@ -122,14 +122,24 @@ export class PaymentsService {
         .for("update")
         .limit(1);
       const now = new Date();
-      const from = current && current.end > now ? current.end : now;
+      const running = Boolean(current && current.end > now);
+      const from = running && current ? current.end : now;
       const until = addPeriod(from, row.period);
+      // Verifying is an admin looking at the member as they are now, so a check
+      // held after a name or photo change shows again. A lapsed run starts over.
       await tx
         .insert(memberSubscription)
-        .values({ userId: row.userId, plan: row.plan, currentPeriodEnd: until })
+        .values({ userId: row.userId, plan: row.plan, currentPeriodEnd: until, startedAt: now })
         .onConflictDoUpdate({
           target: memberSubscription.userId,
-          set: { plan: row.plan, currentPeriodEnd: until, updatedAt: now },
+          set: {
+            plan: row.plan,
+            currentPeriodEnd: until,
+            checkHeldAt: null,
+            checkHoldReason: null,
+            updatedAt: now,
+            ...(running ? {} : { startedAt: now }),
+          },
         });
       await tx.insert(moderationLog).values({
         actorId,
