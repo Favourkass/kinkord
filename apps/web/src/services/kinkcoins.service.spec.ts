@@ -47,3 +47,10 @@ describe("kinkcoinsService", () => {
     expect(kinkcoinsService.profileBalance().description).toContain("when wallets launch");
   });
 });
+
+it("shows the live available coin balance when supplied by the profile API", () => {
+  expect(kinkcoinsService.profileBalance(2450)).toMatchObject({
+    amount: "2,450",
+    status: "Available",
+  });
+});

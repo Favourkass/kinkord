@@ -4,6 +4,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { Db, DRIZZLE } from "../db/db.module";
 import { notBanned } from "../moderation/admins";
 import {
+  walletBalance,
   follow,
   profile,
   profileMedia,
@@ -212,7 +213,11 @@ export class MembersService {
   async publicProfile(username: string, viewerId: string) {
     const handle = username.replace(/^@/, "").toLowerCase();
     const [row] = await this.db
-      .select({ u: user, p: profile })
+      .select({
+        u: user,
+        p: profile,
+        coins: sql<number>`coalesce((select ${walletBalance.available} from ${walletBalance} where ${walletBalance.userId}=${user.id} and ${walletBalance.currency}='coin'),0)`,
+      })
       .from(user)
       .innerJoin(profile, eq(profile.userId, user.id))
       .where(and(eq(user.username, handle), notBanned(user.id)))
@@ -241,6 +246,7 @@ export class MembersService {
 
     return {
       userId: u.id,
+      coinBalance: Number(row.coins ?? 0),
       username: u.username,
       displayName: p.displayName,
       avatarUrl,

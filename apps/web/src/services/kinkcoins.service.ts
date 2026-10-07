@@ -48,5 +48,13 @@ export const kinkcoinsService = {
     balance: KINKCOINS_COPY.profileBalance,
     purchasesEnabled: false as const,
   }),
-  profileBalance: () => KINKCOINS_COPY.profileBalance,
+  profileBalance: (available?: number) =>
+    available === undefined
+      ? KINKCOINS_COPY.profileBalance
+      : {
+          amount: available.toLocaleString("en-NG"),
+          label: "KinkCoins",
+          status: "Available",
+          description: "Available coins. Coins reserved for withdrawals are excluded.",
+        },
 };

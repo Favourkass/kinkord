@@ -396,7 +396,7 @@ export function useMemberProfilePresenter(
     followBusy,
     messageHref: pm ? Routes.messageWith(pm.userId) : Routes.messages,
     editHref: Routes.profileEdit,
-    coinBalance: kinkcoinsService.profileBalance(),
+    coinBalance: kinkcoinsService.profileBalance(pm?.coinBalance ?? 0),
     silverHref: Routes.subscription,
     heroLabels: {
       follow: copy.follow,

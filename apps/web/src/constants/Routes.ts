@@ -28,6 +28,8 @@ export const Routes = {
   kinkcoins: "/kinkcoins",
   kinkcoinsBuy: "/kinkcoins/buy",
   kinkcoinsHistory: "/kinkcoins/history",
+  kinkcoinsPay: (id: string) => `/kinkcoins/pay/${encodeURIComponent(id)}`,
+  moderationWallet: "/moderation/wallet",
   kinkcoinsBanks: "/kinkcoins/bank-accounts",
   kinkcoinsWithdraw: "/kinkcoins/withdraw",
   settings: "/settings",

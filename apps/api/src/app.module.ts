@@ -1,3 +1,4 @@
+import { WalletModule } from "./wallet/wallet.module";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { AuthModule } from "./auth/auth.module";
@@ -38,6 +39,7 @@ import { SubscriptionsModule } from "./subscriptions/subscriptions.module";
     ChatModule,
     PushModule,
     SubscriptionsModule,
+    WalletModule,
   ],
   controllers: [HealthController],
   providers: [HealthService],

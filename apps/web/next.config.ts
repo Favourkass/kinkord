@@ -9,6 +9,7 @@ const PRIVATE_SECTIONS = [
   "p",
   "profile",
   "settings",
+  "kinkcoins",
   "saved",
   "notifications",
   "moderation",

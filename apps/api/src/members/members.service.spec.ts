@@ -285,6 +285,7 @@ describe("MembersService", () => {
       ]),
     );
     const vm = await service.publicProfile("@Nene", "me");
+    expect(vm.coinBalance).toBe(0);
     expect(vm.isOnline).toBe(false);
     expect(vm.lastSeenAt).toBeNull();
     expect(vm.username).toBe("nene");
