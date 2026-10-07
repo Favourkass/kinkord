@@ -21,7 +21,7 @@ import {
 } from "../db/schema";
 import { StorageService } from "../storage/storage.service";
 import { readSettings } from "../subscriptions/subscriptions.service";
-import { nextWalletStatus, PACKS, walletAmount } from "./rules";
+import { nextWalletStatus, PACKS, walletAmount, walletPaymentReference } from "./rules";
 import {
   walletBankSchema,
   walletDecisionSchema,
@@ -250,6 +250,18 @@ export class WalletService {
           .returning();
         if (!changed.length) throw new ConflictException("Insufficient available balance.");
       }
+      let reference = `KRD-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${randomUUID().slice(0, 8).toUpperCase()}`;
+      if (kind === "purchase") {
+        // Serialize allocation across members and API instances until the insert commits.
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtext('wallet:payment-reference'))`);
+        const at = new Date();
+        const first = walletPaymentReference(at, new Set());
+        const used = await tx
+          .select({ reference: walletOperation.reference })
+          .from(walletOperation)
+          .where(and(eq(walletOperation.kind, "purchase"), gte(walletOperation.reference, first)));
+        reference = walletPaymentReference(at, new Set(used.map((row) => row.reference)));
+      }
       const [row] = await tx
         .insert(walletOperation)
         .values({
@@ -264,7 +276,7 @@ export class WalletService {
             accountName: bank.accountName,
             accountNumber: bank.accountNumber,
           },
-          reference: `KRD-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${randomUUID().slice(0, 8).toUpperCase()}`,
+          reference,
         })
         .returning();
       if (kind === "withdrawal")

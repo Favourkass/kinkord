@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { nextWalletStatus, walletAmount } from "./rules";
+import { nextWalletStatus, walletAmount, walletPaymentReference } from "./rules";
 const rates = {
   coin: { buy: 1000, redeem: 800 },
   star: { buy: 10000, redeem: 8000 },
@@ -28,5 +28,26 @@ describe("wallet monetary rules", () => {
       ["purchase", "submitted", "approve"],
     ] as const)
       expect(() => nextWalletStatus(kind, status, action)).toThrow();
+  });
+});
+
+describe("wallet payment reference", () => {
+  it("matches KIN + year month day hour minute second in Lagos time", () => {
+    expect(walletPaymentReference(new Date("2026-10-07T12:47:20Z"), new Set())).toBe(
+      "KIN20261007134720",
+    );
+  });
+  it("uses the next free second when another payment has the same code", () => {
+    expect(
+      walletPaymentReference(
+        new Date("2026-10-07T12:47:20Z"),
+        new Set(["KIN20261007134720", "KIN20261007134721"]),
+      ),
+    ).toBe("KIN20261007134722");
+  });
+  it("handles date and year rollover without changing the reference format", () => {
+    expect(
+      walletPaymentReference(new Date("2026-12-31T22:59:59Z"), new Set(["KIN20261231235959"])),
+    ).toBe("KIN20270101000000");
   });
 });

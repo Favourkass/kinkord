@@ -14,6 +14,8 @@ Apply the committed Drizzle migration through the normal release process. The AP
 
 **Wallet → Buy KinkCoins → choose a bundle → transfer to the displayed bank → enter sender name and transfer reference → upload receipt → submit.**
 
+New purchase references use `KINYYYYMMDDHHmmss` in Africa/Lagos time, matching Silver payments. When wallet purchases share a second, the allocator uses the next free second under a database transaction lock. Existing references stay unchanged so previously issued bank transfer instructions remain valid.
+
 The purchase saves its NGN price and bank details at creation, so later settings changes do not alter an existing checkout. Receipts upload to private S3 through a presigned URL. The server checks receipt ownership, existence, size and file type before submission. Only admins can obtain a download URL.
 
 An admin finds the submitted purchase in **Moderation → Wallet → Coin purchases**, checks the actual bank statement against the member's receipt, amount and reference, then selects **Verify payment** and enters the actual bank transfer reference. Only this decision credits the wallet. Rejection requires a reason and does not credit coins. A receipt alone does not prove money arrived; there is no automatic bank reconciliation.
