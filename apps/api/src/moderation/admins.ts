@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql, type AnyColumn } from "drizzle-orm";
+import { and, eq, inArray, sql, type AnyColumn, type SQL } from "drizzle-orm";
 import type { Db } from "../db/db.module";
 import { memberBan, staff, user } from "../db/schema";
 
@@ -38,14 +38,22 @@ export async function isAdmin(db: Db, who: AdminCandidate): Promise<boolean> {
   return Boolean(row);
 }
 
+/** SQL: the account is a founder's, a verified email on SUPER_ADMIN_EMAILS. */
+export function founderAccount(u: { email: AnyColumn; emailVerified: AnyColumn }): SQL {
+  return and(inArray(sql`lower(${u.email})`, SUPER_ADMIN_EMAILS), eq(u.emailVerified, true))!;
+}
+
+/** The founders' accounts, with what isSuperAdmin needs. */
+export function founderAccounts(db: Db): Promise<AdminCandidate[]> {
+  return db
+    .select({ id: user.id, email: user.email, emailVerified: user.emailVerified })
+    .from(user)
+    .where(founderAccount(user));
+}
+
 /** Everyone who moderates: the founder's verified accounts, and anyone with a staff row. */
 export async function adminUserIds(db: Db): Promise<string[]> {
-  const founders = await db
-    .select({ id: user.id })
-    .from(user)
-    .where(
-      and(inArray(sql`lower(${user.email})`, SUPER_ADMIN_EMAILS), eq(user.emailVerified, true)),
-    );
+  const founders = await founderAccounts(db);
   const team = await db.select({ id: staff.userId }).from(staff);
   return [...new Set([...founders, ...team].map((r) => r.id))];
 }
