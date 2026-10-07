@@ -281,12 +281,16 @@ describe("notification links and search words", () => {
     expect(notificationUrl("like", "p1", "ada")).toBe("/p/p1");
     expect(notificationUrl("report", null, null)).toBe("/moderation/reports");
     expect(notificationUrl("test", null, null)).toBe("/settings");
+    expect(notificationUrl("payment", null, null)).toBe("/moderation/payments");
+    expect(notificationUrl("payment_verified", "pay1", null)).toBe("/subscription");
+    expect(notificationUrl("payment_rejected", "pay1", null)).toBe("/subscription");
   });
 
   it("finds kinds of activity by the start of their words, ignoring one-letter searches", () => {
     expect(typesMatching("Liked")).toEqual(["like"]);
     expect(typesMatching("rep")).toEqual(["repost", "report"]);
     expect(typesMatching("a")).toEqual([]);
+    expect(typesMatching("silver")).toEqual(["payment_verified", "payment_rejected"]);
   });
 });
 

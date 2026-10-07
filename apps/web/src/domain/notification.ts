@@ -1,5 +1,15 @@
 export type NotificationKind =
-  "message" | "follow" | "comment" | "mention" | "like" | "repost" | "report" | "test";
+  | "message"
+  | "follow"
+  | "comment"
+  | "mention"
+  | "like"
+  | "repost"
+  | "report"
+  | "test"
+  | "payment"
+  | "payment_verified"
+  | "payment_rejected";
 
 /**
  * GET /notifications item. Who did it is looked up when the inbox loads, so a
@@ -52,6 +62,17 @@ const KINDS: Record<
   like: { category: "Like", icon: "heart", action: () => "liked your post." },
   repost: { category: "Repost", icon: "repost", action: () => "reposted your post." },
   report: { category: "Moderation", icon: "shield", action: () => "New report to review." },
+  payment: { category: "Payments", icon: "shield", action: () => "New payment to verify." },
+  payment_verified: {
+    category: "Silver Premium",
+    icon: "bell",
+    action: () => "Your payment is confirmed. Silver Premium is now active.",
+  },
+  payment_rejected: {
+    category: "Payment",
+    icon: "bell",
+    action: () => "We couldn't confirm your payment. Open it to see why.",
+  },
   test: {
     category: "Notifications enabled",
     icon: "bell",
@@ -61,7 +82,20 @@ const KINDS: Record<
 };
 
 /** Kinkord's own notices, shown with the brand mark rather than a member. */
-const OFFICIAL: ReadonlySet<NotificationKind> = new Set(["report", "test"]);
+const OFFICIAL: ReadonlySet<NotificationKind> = new Set([
+  "report",
+  "test",
+  "payment",
+  "payment_verified",
+  "payment_rejected",
+]);
+
+/** A kind this version of the app doesn't know yet still shows, as Kinkord's own. */
+const UNKNOWN_KIND = {
+  category: "Kinkord",
+  icon: "bell",
+  action: () => "Something new for you.",
+} as const;
 
 export function toNotificationVM(item: NotificationPM, now = new Date()): NotificationVM {
   const date = new Date(item.createdAt);
@@ -78,8 +112,8 @@ export function toNotificationVM(item: NotificationPM, now = new Date()): Notifi
               month: "short",
               ...(date.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}),
             });
-  const kind = KINDS[item.type];
-  const official = OFFICIAL.has(item.type);
+  const kind = KINDS[item.type] ?? UNKNOWN_KIND;
+  const official = OFFICIAL.has(item.type) || !(item.type in KINDS);
   const actorName = official ? null : (item.actor?.name ?? "A member");
   const action = kind.action(item.count);
   return {

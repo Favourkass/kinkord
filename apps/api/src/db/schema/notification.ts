@@ -2,7 +2,19 @@ import { index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "dri
 import { user } from "./auth";
 
 export type NotificationType =
-  "message" | "follow" | "comment" | "mention" | "like" | "repost" | "report" | "test";
+  | "message"
+  | "follow"
+  | "comment"
+  | "mention"
+  | "like"
+  | "repost"
+  | "report"
+  | "test"
+  // A member's payment proof, for the admins to check.
+  | "payment"
+  // The member's own payment: confirmed, or not.
+  | "payment_verified"
+  | "payment_rejected";
 
 /**
  * Member inbox, independent of whether any device has enabled browser push.

@@ -12,3 +12,4 @@ export * from "./chat";
 export * from "./push";
 export * from "./safety";
 export * from "./notification";
+export * from "./subscription";

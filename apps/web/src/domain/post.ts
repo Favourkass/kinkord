@@ -83,6 +83,13 @@ export interface SavePM {
 
 /** Matches the API's POST_BODY_MAX / COMMENT_BODY_MAX. */
 export const POST_BODY_MAX = 2000;
+/** Silver's longer posts, matching the API's SILVER_POST_BODY_MAX. */
+export const SILVER_POST_BODY_MAX = 25_000;
+
+/** How long a post this member may write. */
+export function postBodyMax(silver: boolean): number {
+  return silver ? SILVER_POST_BODY_MAX : POST_BODY_MAX;
+}
 export const COMMENT_BODY_MAX = 1000;
 export const POST_MEDIA_MAX = 4;
 
