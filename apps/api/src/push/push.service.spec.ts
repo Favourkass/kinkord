@@ -241,7 +241,7 @@ describe("PushService notifications", () => {
     await flush();
     expect(inboxRecord).toHaveBeenCalledWith("f1", { type: "silver_check" });
     expect(sent()).toMatchObject({
-      body: "A Silver check needs review",
+      body: "A Silver badge needs review",
       url: "/moderation/payments",
       tag: "silver_check",
     });

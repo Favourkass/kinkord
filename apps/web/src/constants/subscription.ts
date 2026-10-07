@@ -14,17 +14,19 @@ export const SUBSCRIPTION_COPY = {
       silver: {
         title: "You're on Silver Premium",
         body: (until: string) => `Active until ${until}.`,
+        /** The founders' Silver, which never runs out. */
+        forGood: "Yours for good, as part of the Kinkord team.",
         /** Where the member's Silver check stands, under the plan. */
         check: {
-          shown: "Your Silver check shows on your profile.",
+          shown: "Your Silver badge shows on your profile.",
           held: {
-            name: "Your check is hidden while we look at your new name.",
-            username: "Your check is hidden while we look at your new username.",
-            photo: "Your check is hidden while we look at your new photo.",
-            admin: "Your check is hidden after a review by our team.",
+            name: "Your badge is hidden while we look at your new name.",
+            username: "Your badge is hidden while we look at your new username.",
+            photo: "Your badge is hidden while we look at your new photo.",
+            admin: "Your badge is hidden after a review by our team.",
           },
-          photos: "Add a profile photo and a cover photo to show your check.",
-          newAccount: (date: string) => `Your check shows from ${date}.`,
+          photos: "Add a profile photo and a cover photo to show your badge.",
+          newAccount: (date: string) => `Your badge shows from ${date}.`,
         },
       },
       pending: {
@@ -76,6 +78,7 @@ export const SUBSCRIPTION_COPY = {
       resume: "Continue your payment",
       review: "Payment under review",
       unavailable: "Payments open soon",
+      forGood: "You're on Silver for good",
       starting: "Starting…",
     },
   },

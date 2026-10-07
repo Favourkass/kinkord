@@ -1,8 +1,9 @@
 import Image from "next/image";
 
 /**
- * The Silver check beside a member's name, the way X shows its check for
- * Premium. Its name is the product's, the same on every screen.
+ * The Silver shield beside a member's name, the way X shows its check for
+ * Premium. Its name is the product's, the same on every screen. (Identity
+ * verification gets a mark of its own.)
  */
 export default function SilverCheck({
   size = 16,
@@ -13,7 +14,7 @@ export default function SilverCheck({
 }) {
   return (
     <Image
-      src="/app/subscription/silver-check.svg"
+      src="/app/subscription/silver-shield.png"
       alt="Silver Premium"
       title="Silver Premium"
       width={size}

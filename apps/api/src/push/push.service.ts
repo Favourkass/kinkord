@@ -245,7 +245,7 @@ export class PushService {
 
   /** A Silver member changed their name, username or photo: their check waits for an admin. */
   silverCheckReview(): void {
-    this.toAdmins("silver_check", "A Silver check needs review");
+    this.toAdmins("silver_check", "A Silver badge needs review");
   }
 
   /** An admin confirmed the member's transfer: Silver is on. */

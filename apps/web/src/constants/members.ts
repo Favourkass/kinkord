@@ -161,7 +161,7 @@ export const MEMBERS_COPY = {
     /** What the Silver check says when tapped, X-style. */
     silver: {
       title: "Silver Premium",
-      body: "This member has the check because they're subscribed to Silver Premium.",
+      body: "This member has the badge because they're subscribed to Silver Premium.",
       since: (when: string) => `Silver since ${when}`,
       get: "Get Silver",
       manage: "Your Silver",
