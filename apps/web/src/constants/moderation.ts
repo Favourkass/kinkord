@@ -64,10 +64,10 @@ export const MODERATION_COPY = {
   },
   /** Silver checks hidden after a member changed their name, username or photo, X-style. */
   silverChecks: {
-    title: "Silver checks to review",
-    hint: "These Silver members changed how they appear. Their check stays hidden until you approve it.",
-    loading: "Loading checks…",
-    empty: "No checks waiting.",
+    title: "Silver badges to review",
+    hint: "These Silver members changed how they appear. Their badge stays hidden until you approve it.",
+    loading: "Loading badges…",
+    empty: "No badges waiting.",
     changes: {
       name: "New name",
       username: "New username",
@@ -76,11 +76,11 @@ export const MODERATION_COPY = {
     },
     approve: "Approve",
     approving: "Approving…",
-    approved: (name: string) => `Approved. ${name}'s check shows again.`,
+    approved: (name: string) => `Approved. ${name}'s badge shows again.`,
   },
   /** One member's Silver check, on their page. */
   memberCheck: {
-    title: "Silver check",
+    title: "Silver badge",
     until: (date: string) => `Silver until ${date}`,
     shown: "Showing on their profile and posts.",
     held: {
@@ -91,15 +91,15 @@ export const MODERATION_COPY = {
     },
     photos: "Hidden until they add a profile photo and a cover photo.",
     newAccount: (date: string) => `Hidden until ${date}, when the account is 30 days old.`,
-    approve: "Approve check",
-    remove: "Remove check",
-    approved: "Approved. Their check shows again.",
-    removed: "Removed. Their check stays hidden until an admin approves it.",
+    approve: "Approve badge",
+    remove: "Remove badge",
+    approved: "Approved. Their badge shows again.",
+    removed: "Removed. Their badge stays hidden until an admin approves it.",
     removeDialog: {
-      title: "Remove this member's Silver check?",
-      body: "Their check hides until an admin approves it again. They keep Silver and everything it unlocks.",
+      title: "Remove this member's Silver badge?",
+      body: "Their badge hides until an admin approves it again. They keep Silver and everything it unlocks.",
       reasonLabel: "Reason (for the log)",
-      confirm: "Remove check",
+      confirm: "Remove badge",
     },
   },
   reports: {

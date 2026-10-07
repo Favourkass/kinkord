@@ -52,7 +52,7 @@ describe("useAdminMemberCheckPresenter", () => {
     act(() => result.current.onApprove());
     await waitFor(() => expect(result.current.vm?.shown).toBe(true));
     expect(approve).toHaveBeenCalledWith("u1");
-    expect(result.current.notice).toBe("Approved. Their check shows again.");
+    expect(result.current.notice).toBe("Approved. Their badge shows again.");
   });
 
   it("removes a check only with a reason for the log", async () => {
@@ -67,7 +67,7 @@ describe("useAdminMemberCheckPresenter", () => {
     await waitFor(() => expect(result.current.dialog).toBeNull());
     expect(remove).toHaveBeenCalledWith("u1", "Impersonating a member");
     expect(result.current.notice).toBe(
-      "Removed. Their check stays hidden until an admin approves it.",
+      "Removed. Their badge stays hidden until an admin approves it.",
     );
   });
 

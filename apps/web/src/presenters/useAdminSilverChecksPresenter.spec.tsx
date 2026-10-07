@@ -57,16 +57,16 @@ describe("useAdminSilverChecksPresenter", () => {
     act(() => result.current.onApprove("u1"));
     await waitFor(() => expect(result.current.rows).toHaveLength(1));
     expect(approve).toHaveBeenCalledWith("u1");
-    expect(result.current.notice).toBe("Approved. Member u1's check shows again.");
+    expect(result.current.notice).toBe("Approved. Member u1's badge shows again.");
   });
 
   it("keeps the row and says why when approving fails", async () => {
-    approve.mockRejectedValue(new Error("This member's check isn't waiting for review."));
+    approve.mockRejectedValue(new Error("This member's badge isn't waiting for review."));
     const { result } = renderHook(() => useAdminSilverChecksPresenter(true));
     await waitFor(() => expect(result.current.rows).toHaveLength(2));
     act(() => result.current.onApprove("u1"));
     await waitFor(() =>
-      expect(result.current.error).toBe("This member's check isn't waiting for review."),
+      expect(result.current.error).toBe("This member's badge isn't waiting for review."),
     );
     expect(result.current.rows).toHaveLength(2);
   });

@@ -98,24 +98,24 @@ describe("planState", () => {
 describe("checkNote", () => {
   const check = { shown: false, reason: null, heldFor: null, showsFrom: null };
 
-  it("says the check shows, or what it waits for", () => {
+  it("says the badge shows, or what it waits for", () => {
     expect(checkNote({ ...check, shown: true })).toEqual({
       shown: true,
-      text: "Your Silver check shows on your profile.",
+      text: "Your Silver badge shows on your profile.",
     });
     expect(checkNote({ ...check, reason: "held", heldFor: "username" })).toEqual({
       shown: false,
-      text: "Your check is hidden while we look at your new username.",
+      text: "Your badge is hidden while we look at your new username.",
     });
     expect(checkNote({ ...check, reason: "held", heldFor: "admin" }).text).toBe(
-      "Your check is hidden after a review by our team.",
+      "Your badge is hidden after a review by our team.",
     );
     expect(checkNote({ ...check, reason: "photos" }).text).toBe(
-      "Add a profile photo and a cover photo to show your check.",
+      "Add a profile photo and a cover photo to show your badge.",
     );
     expect(
       checkNote({ ...check, reason: "new_account", showsFrom: "2026-10-20T00:00:00Z" }).text,
-    ).toBe("Your check shows from 20 Oct 2026.");
+    ).toBe("Your badge shows from 20 Oct 2026.");
   });
 });
 
@@ -182,7 +182,7 @@ describe("useSubscriptionPresenter", () => {
     expect(result.current.planCard).toMatchObject({
       title: "You're on Silver Premium",
       body: "Active until 6 Oct 2027.",
-      check: { shown: false, text: "Your check is hidden while we look at your new name." },
+      check: { shown: false, text: "Your badge is hidden while we look at your new name." },
     });
   });
 

@@ -143,7 +143,7 @@ export class SilverChecksService {
       .set({ checkHeldAt: null, checkHoldReason: null })
       .where(and(eq(memberSubscription.userId, userId), isNotNull(memberSubscription.checkHeldAt)))
       .returning({ userId: memberSubscription.userId });
-    if (!row) throw new ConflictException("This member's check isn't waiting for review.");
+    if (!row) throw new ConflictException("This member's badge isn't waiting for review.");
     await this.db.insert(moderationLog).values({
       actorId,
       action: "silver_check_approved",

@@ -75,8 +75,8 @@ describe("notification presentation", () => {
     });
     expect(toNotificationVM({ ...item, type: "silver_check", actor: null })).toMatchObject({
       official: true,
-      category: "Silver checks",
-      body: "A Silver member changed their name or photo. Review their check.",
+      category: "Silver badges",
+      body: "A Silver member changed their name or photo. Review their badge.",
     });
   });
 
