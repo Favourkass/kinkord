@@ -8,6 +8,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  type OnApplicationBootstrap,
 } from "@nestjs/common";
 import { and, desc, eq, gte, inArray, lt, lte } from "drizzle-orm";
 import { DRIZZLE, type Db } from "../db/db.module";
@@ -17,7 +18,7 @@ import {
   subscriptionPayment,
   type BillingPeriod,
 } from "../db/schema";
-import { isSuperAdmin, type AdminCandidate } from "../moderation/admins";
+import { founderAccounts, isSuperAdmin, type AdminCandidate } from "../moderation/admins";
 import { PushService } from "../push/push.service";
 import { StorageService } from "../storage/storage.service";
 import type {
@@ -145,7 +146,7 @@ export async function expireAbandoned(db: Db, now: Date = new Date()): Promise<v
  * statement before Silver turns on.
  */
 @Injectable()
-export class SubscriptionsService {
+export class SubscriptionsService implements OnApplicationBootstrap {
   private readonly log = new Logger(SubscriptionsService.name);
 
   /** Swapped in specs to pick a known offset. */
@@ -194,6 +195,25 @@ export class SubscriptionsService {
       // Never stop a founder opening the app: they get Silver on a later visit.
       this.log.warn(`putting a founder on Silver failed: ${String(e)}`);
       return until;
+    }
+  }
+
+  /** On start, every founder is on Silver, whether or not they've opened the app since. */
+  async onApplicationBootstrap(): Promise<void> {
+    await this.putFoundersOnSilver();
+  }
+
+  /** Puts every founder on Silver and logs, by id, where each one's check stands. Never throws. */
+  async putFoundersOnSilver(): Promise<void> {
+    try {
+      for (const founder of await founderAccounts(this.db)) {
+        await this.silverUntil(founder);
+        const check = await silverCheckStatus(this.db, founder.id);
+        const state = check ? (check.shown ? "shown" : `hidden (${check.reason})`) : "no Silver";
+        this.log.log(`founder ${founder.id}: check ${state}`);
+      }
+    } catch (e) {
+      this.log.warn(`putting the founders on Silver failed: ${String(e)}`);
     }
   }
 

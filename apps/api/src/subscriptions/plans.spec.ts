@@ -2,6 +2,7 @@ import type { SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 import { post, user } from "../db/schema";
+import { SUPER_ADMIN_EMAILS } from "../moderation/admins";
 import {
   addPeriod,
   CHECK_MIN_ACCOUNT_DAYS,
@@ -115,8 +116,9 @@ describe("silverCheck", () => {
     expect(text).toContain('"check_profile"."avatar_key" is not null');
     expect(text).toContain('"check_profile"."cover_key" is not null');
     expect(text).toContain(
-      `"check_user"."created_at" <= now() - interval '${CHECK_MIN_ACCOUNT_DAYS} days'`,
+      `("check_user"."created_at" <= now() - interval '${CHECK_MIN_ACCOUNT_DAYS} days' or (lower("check_user"."email") in (`,
     );
+    expect(text).toContain('"check_user"."email_verified" = ');
   });
 
   it("reads its own aliases, so it still points at the outer member inside a query on users", () => {
@@ -135,6 +137,8 @@ describe("silverCheckStatus", () => {
     heldAt: null,
     heldFor: null,
     createdAt: new Date("2026-01-01T00:00:00Z"),
+    email: "member@example.test",
+    emailVerified: true,
     avatarKey: "a",
     coverKey: "c",
     ...over,
@@ -169,6 +173,28 @@ describe("silverCheckStatus", () => {
       heldFor: null,
       showsFrom: new Date("2026-10-20T00:00:00Z"),
     });
+  });
+});
+
+describe("silverCheckStatus for a founder", () => {
+  it("doesn't make a founder's new account wait", async () => {
+    const now = new Date("2026-10-07T12:00:00Z");
+    const founderRow = {
+      heldAt: null,
+      heldFor: null,
+      createdAt: new Date("2026-09-20T00:00:00Z"),
+      email: SUPER_ADMIN_EMAILS[0],
+      emailVerified: true,
+      avatarKey: "a",
+      coverKey: "c",
+    };
+    await expect(silverCheckStatus(queuedDb([[founderRow]]), "f1", now)).resolves.toMatchObject({
+      shown: true,
+    });
+    // Unverified, the address proves nothing: the usual wait applies.
+    await expect(
+      silverCheckStatus(queuedDb([[{ ...founderRow, emailVerified: false }]]), "f1", now),
+    ).resolves.toMatchObject({ shown: false, reason: "new_account" });
   });
 });
 
