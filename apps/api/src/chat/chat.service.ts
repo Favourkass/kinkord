@@ -23,6 +23,7 @@ import {
   variantKey,
   type ImageVariant,
 } from "../storage/storage.service";
+import { hasSilver } from "../subscriptions/plans";
 import { chatDay, NEW_CHAT_LIMIT, newChatsPerDay } from "./allowance";
 import type {
   ChatAllowanceDto,
@@ -230,11 +231,10 @@ export class ChatService {
       await this.verifyPhoto(senderId, conversationId, input.photoKey);
     }
 
-    const limit = newChatsPerDay(sender);
-    const saved =
-      limit !== null && !(await this.hasMessages(conversationId))
-        ? await this.startChat(senderId, conversationId, input, limit)
-        : await this.insertMessage(this.db, senderId, conversationId, input);
+    const startsChat = newChatsPerDay(sender) !== null && !(await this.hasMessages(conversationId));
+    const saved = startsChat
+      ? await this.startChat(senderId, conversationId, input, await this.newChatLimit(sender))
+      : await this.insertMessage(this.db, senderId, conversationId, input);
     // Both members' open apps hear of it at once, the sender's other tabs too.
     void this.realtime.notify([peerId, senderId], { type: "message", conversationId });
     // And their phone, if the app isn't open on this thread, and their inbox.
@@ -324,14 +324,19 @@ export class ChatService {
 
   /** Today's new-chat allowance, so the app can say so before anyone types. */
   async allowance(who: Member): Promise<ChatAllowanceDto> {
-    const limit = newChatsPerDay(who);
-    if (limit === null) return { newChatsPerDay: null };
+    if (newChatsPerDay(who) === null) return { newChatsPerDay: null };
+    const limit = await this.newChatLimit(who);
     const day = chatDay(new Date());
     return {
       newChatsPerDay: limit,
       usedToday: await this.chatsStartedSince(this.db, who.id, day.start),
       resetsAt: day.end.toISOString(),
     };
+  }
+
+  /** New chats a member with an allowance may start today: Silver raises it. */
+  private async newChatLimit(who: Member): Promise<number> {
+    return newChatsPerDay(who, await hasSilver(this.db, who.id)) ?? Number.POSITIVE_INFINITY;
   }
 
   /**

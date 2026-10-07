@@ -178,6 +178,7 @@ export const MEMBERS_COPY = {
     profile: "Profile",
     settings: "Settings and Privacy",
     saved: "Saved",
+    subscription: "Silver Premium",
     logout: "Log Out",
   },
   notifications: {

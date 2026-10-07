@@ -1,10 +1,11 @@
 import { isSuperAdmin } from "../moderation/admins";
+import { SILVER_NEW_CHATS_PER_DAY } from "../subscriptions/plans";
 
 /**
  * New chats a member may start per day. A new chat is a first message in a
  * thread nobody has written in yet; replies and follow-ups in chats that
- * already have messages don't count. This is the free allowance: paid plans
- * will raise it here.
+ * already have messages don't count. This is the free allowance; Silver
+ * raises it to SILVER_NEW_CHATS_PER_DAY.
  */
 export const FREE_NEW_CHATS_PER_DAY = 1;
 
@@ -23,6 +24,10 @@ export function chatDay(now: Date): { start: Date; end: Date } {
 }
 
 /** New chats this member may start per day; null means no limit (the super admins). */
-export function newChatsPerDay(who: { email: string; emailVerified: boolean }): number | null {
-  return isSuperAdmin(who) ? null : FREE_NEW_CHATS_PER_DAY;
+export function newChatsPerDay(
+  who: { email: string; emailVerified: boolean },
+  silver = false,
+): number | null {
+  if (isSuperAdmin(who)) return null;
+  return silver ? SILVER_NEW_CHATS_PER_DAY : FREE_NEW_CHATS_PER_DAY;
 }

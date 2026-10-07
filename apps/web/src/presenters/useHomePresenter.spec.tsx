@@ -65,6 +65,15 @@ describe("useHomePresenter", () => {
     expect(result.current.handle).toBe("@tegamaxwell");
     expect(result.current.avatarUrl).toBe("https://s3/avatar.jpg");
     expect(result.current.membersCount).toBe("128");
+    expect(result.current.silver).toBe(false);
+  });
+
+  it("knows a Silver member, for the limits the app shows", async () => {
+    apiGet.mockImplementation((path: unknown) =>
+      path === "/me" ? Promise.resolve({ ...me, plan: "silver" }) : routeGet(path),
+    );
+    const { result } = renderHook(() => useHomePresenter());
+    await waitFor(() => expect(result.current.silver).toBe(true));
   });
 
   it("redirects to login when the session is gone", async () => {

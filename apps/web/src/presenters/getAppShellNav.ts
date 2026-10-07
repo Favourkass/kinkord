@@ -11,6 +11,7 @@ export interface AppShellNavVM {
     profile: string;
     settings: string;
     saved: string;
+    subscription: string;
   };
   labels: {
     home: string;
@@ -20,6 +21,7 @@ export interface AppShellNavVM {
     profile: string;
     settings: string;
     saved: string;
+    subscription: string;
     logout: string;
   };
 }
@@ -35,6 +37,7 @@ export function getAppShellNav(): AppShellNavVM {
       profile: Routes.profile,
       settings: Routes.settings,
       saved: Routes.saved,
+      subscription: Routes.subscription,
     },
     labels: { ...MEMBERS_COPY.nav },
   };

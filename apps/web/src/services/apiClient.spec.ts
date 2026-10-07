@@ -35,6 +35,16 @@ describe("api.request", () => {
     await expect(api.del("/follows/nene")).resolves.toEqual({ ok: true });
     expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: "DELETE" });
   });
+
+  it("sends a JSON body with PUT for api.put", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(okJson({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    await api.put("/admin/payments/settings", { bankName: "UBA" });
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({
+      method: "PUT",
+      body: JSON.stringify({ bankName: "UBA" }),
+    });
+  });
 });
 
 describe("uploadToPresignedUrl", () => {
