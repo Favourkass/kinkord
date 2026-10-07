@@ -8,6 +8,7 @@ import {
   type BillingPeriod,
   type SilverCheckHold,
 } from "../db/schema";
+import { founderAccount, isSuperAdmin } from "../moderation/admins";
 
 /** What Silver costs until the founders change it on the admin screen (Figma 2:179). */
 export const DEFAULT_PRICES: Record<BillingPeriod, { kobo: number; usdCents: number }> = {
@@ -93,7 +94,10 @@ export async function hasSilver(db: Db, userId: string): Promise<boolean> {
   return (await silverUntil(db, userId)) !== null;
 }
 
-/** Days an account must have before its Silver check shows: a new account can't buy one to impersonate. */
+/**
+ * Days an account must have before its Silver check shows: a new account can't
+ * buy one to impersonate. The founders' accounts don't wait.
+ */
 export const CHECK_MIN_ACCOUNT_DAYS = 30;
 
 /**
@@ -115,7 +119,7 @@ const checkProfile = alias(profile, PROFILE);
  * Whether the member with this id shows the Silver check, as an expression to
  * select beside them. The rules are X's: Silver running, the check not held
  * for review since a name or photo change, a profile photo and cover, and an
- * account at least CHECK_MIN_ACCOUNT_DAYS old.
+ * account at least CHECK_MIN_ACCOUNT_DAYS old, unless it's a founder's.
  */
 export function silverCheck(userId: AnyColumn | SQL): SQL<boolean> {
   // An alias renders as its bare name in raw SQL, so each table is named with its alias here.
@@ -128,7 +132,7 @@ export function silverCheck(userId: AnyColumn | SQL): SQL<boolean> {
       and ${checkSub.checkHeldAt} is null
       and ${checkProfile.avatarKey} is not null
       and ${checkProfile.coverKey} is not null
-      and ${checkUser.createdAt} <= now() - ${CHECK_MIN_ACCOUNT_AGE}
+      and (${checkUser.createdAt} <= now() - ${CHECK_MIN_ACCOUNT_AGE} or ${founderAccount(checkUser)})
   )`;
 }
 
@@ -153,6 +157,8 @@ export async function silverCheckStatus(
       heldAt: memberSubscription.checkHeldAt,
       heldFor: memberSubscription.checkHoldReason,
       createdAt: user.createdAt,
+      email: user.email,
+      emailVerified: user.emailVerified,
       avatarKey: profile.avatarKey,
       coverKey: profile.coverKey,
     })
@@ -167,7 +173,9 @@ export async function silverCheckStatus(
   if (!row.avatarKey || !row.coverKey) {
     return { shown: false, reason: "photos", heldFor: null, showsFrom: null };
   }
-  if (showsFrom > now) return { shown: false, reason: "new_account", heldFor: null, showsFrom };
+  if (showsFrom > now && !isSuperAdmin(row)) {
+    return { shown: false, reason: "new_account", heldFor: null, showsFrom };
+  }
   return { shown: true, reason: null, heldFor: null, showsFrom: null };
 }
 

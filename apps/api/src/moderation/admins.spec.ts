@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { PgDialect } from "drizzle-orm/pg-core";
+import { alias, PgDialect } from "drizzle-orm/pg-core";
 import { staff, user } from "../db/schema";
-import { adminUserIds, isAdmin, isBanned, isSuperAdmin, notBanned } from "./admins";
+import { adminUserIds, founderAccount, isAdmin, isBanned, isSuperAdmin, notBanned } from "./admins";
 
 /** A client whose single select resolves to `result`. */
 function answering(result: unknown[]) {
@@ -49,6 +49,17 @@ describe("adminUserIds", () => {
       "tegamaxwell2026@gmail.com",
       true,
     ]);
+  });
+});
+
+describe("founderAccount", () => {
+  it("reads whichever user table it's given, aliases included", () => {
+    const u = alias(user, "check_user");
+    const query = new PgDialect().sqlToQuery(founderAccount(u));
+    expect(query.sql).toBe(
+      '(lower("check_user"."email") in ($1, $2, $3) and "check_user"."email_verified" = $4)',
+    );
+    expect(query.params.at(-1)).toBe(true);
   });
 });
 

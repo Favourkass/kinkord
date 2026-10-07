@@ -201,6 +201,36 @@ describe("SubscriptionsService.silverUntil", () => {
   });
 });
 
+describe("SubscriptionsService.putFoundersOnSilver", () => {
+  const founder = { id: "f1", email: SUPER_ADMIN_EMAILS[0], emailVerified: true };
+  const checkRow = {
+    heldAt: null,
+    heldFor: null,
+    createdAt: new Date("2026-09-20T00:00:00Z"),
+    email: SUPER_ADMIN_EMAILS[0],
+    emailVerified: true,
+    avatarKey: "a",
+    coverKey: "c",
+  };
+
+  it("puts every founder on Silver on start, and logs where each check stands", async () => {
+    const { service, after, left } = make([[founder], [], undefined, [checkRow]]);
+    const log = vi.spyOn((service as unknown as { log: { log: () => void } }).log, "log");
+    await service.onApplicationBootstrap();
+    expect(after("insert", memberSubscription, "values")).toMatchObject({
+      userId: "f1",
+      currentPeriodEnd: FOUNDER_SILVER_UNTIL,
+    });
+    expect(log).toHaveBeenCalledWith("founder f1: check shown");
+    expect(left()).toBe(0);
+  });
+
+  it("never stops the API starting", async () => {
+    const { service } = make([new Error("database starting")]);
+    await expect(service.putFoundersOnSilver()).resolves.toBeUndefined();
+  });
+});
+
 describe("SubscriptionsService.status", () => {
   const member = { id: "u1", email: "member@example.test", emailVerified: true };
 
