@@ -27,6 +27,7 @@ export const Routes = {
   kinkcoins: "/kinkcoins",
   kinkcoinsBuy: "/kinkcoins/buy",
   kinkcoinsHistory: "/kinkcoins/history",
+  kinkcoinsWithdraw: "/kinkcoins/withdraw",
   settings: "/settings",
   /** Password + 2FA moved here from /profile (CEO, 2026-09-12: "we still need to keep the change password and co"). */
   settingsSecurity: "/settings/security",

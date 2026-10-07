@@ -11,7 +11,12 @@ describe("kinkcoinsService", () => {
       status: null,
     });
     const unavailable = vm.actions.filter((action) => action.href === null);
-    expect(unavailable).toHaveLength(3);
+    expect(vm.actions[4]).toMatchObject({
+      kind: "withdraw",
+      href: "/kinkcoins/withdraw",
+      status: null,
+    });
+    expect(unavailable).toHaveLength(2);
     expect(
       unavailable.every((action) => action.href === null && action.status === "Coming soon"),
     ).toBe(true);

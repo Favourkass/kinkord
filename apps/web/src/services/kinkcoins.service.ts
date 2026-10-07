@@ -28,8 +28,13 @@ export const kinkcoinsService = {
           ? Routes.kinkcoinsBuy
           : action.kind === "history"
             ? Routes.kinkcoinsHistory
-            : null,
-      status: action.kind === "buy" || action.kind === "history" ? null : KINKCOINS_COPY.comingSoon,
+            : action.kind === "withdraw"
+              ? Routes.kinkcoinsWithdraw
+              : null,
+      status:
+        action.kind === "buy" || action.kind === "history" || action.kind === "withdraw"
+          ? null
+          : KINKCOINS_COPY.comingSoon,
     })),
   }),
   preview: () => ({

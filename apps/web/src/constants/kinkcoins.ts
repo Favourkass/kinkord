@@ -120,3 +120,62 @@ export const KINKCOINS_HISTORY_COPY = {
     "When wallets launch, your KinkCoin, KinkStar and KinkCrown activity will appear here.",
   browse: "View KinkCoin bundles",
 } as const;
+
+export const KINKCOINS_WITHDRAW_COPY = {
+  titles: {
+    options: "Withdraw / Redeem",
+    confirm: "Confirm Redemption",
+    processing: "Withdrawal Processing",
+  },
+  menu: "Open menu",
+  back: "Back to wallet",
+  backOptions: "Back to redeem options",
+  preview: "Design preview",
+  previewNotice:
+    "Sample balances, rates and bank details only. No withdrawal is submitted and your wallet balance will not change.",
+  heading: "Turn Your KinkCoins Into Cash",
+  description: "Redeem your KinkCoins for cash directly to your bank account. Fast. Safe. Secure.",
+  options: "Redeem Options",
+  optionsHint: "Each currency type can be redeemed separately. Minimum redemption amount is $100.",
+  balance: "Your balance",
+  value: "Estimated value",
+  belowMinimum: "Below minimum ($100)",
+  benefits: ["Secure Bank Transfer", "Fast Processing", "No Withdrawal Fee"],
+  review: "Review your details before confirming.",
+  equivalent: "Equivalent Value",
+  minimum: "Minimum redemption",
+  bankTitle: "Withdraw to",
+  bank: "Access Bank",
+  account: "**** 4587 | Savings Account",
+  saved: "Sample account",
+  redemption: "Redemption Amount",
+  fee: "Withdrawal Fee",
+  receive: "You Will Receive",
+  transfer: "Expected Transfer Time",
+  time: "Within 24 hours",
+  timeHint: "Preview estimate",
+  important: "Important",
+  warning:
+    "Redemptions cannot be cancelled once submitted. Please make sure your details are correct before proceeding.",
+  confirm: "Confirm Withdrawal (Preview)",
+  submitted: "Withdrawal Submitted",
+  submittedHint:
+    "This is a preview of the processing screen. No real withdrawal request has been submitted.",
+  amount: "Withdrawal Amount",
+  method: "Bank Transfer",
+  destination: "Your saved bank account (sample)",
+  expected: "Expected within 24 hours",
+  reference: "Transaction Reference",
+  referenceValue: "KRD-PREVIEW-XXXXXX",
+  processing:
+    "Your withdrawal is currently being processed. You will receive your funds once the transfer is completed.",
+  balanceUpdate: "Your balance will be updated after the transaction has been processed.",
+  processingLabel: "Example processing message",
+  home: "Back to home",
+} as const;
+
+export const KINKCOINS_REDEMPTION_SAMPLES = [
+  { kind: "coin" as const, label: "Coins", balance: 2450, rateCents: 8 },
+  { kind: "star" as const, label: "Stars", balance: 180, rateCents: 80 },
+  { kind: "crown" as const, label: "Crowns", balance: 12, rateCents: 800 },
+];
