@@ -71,3 +71,20 @@ describe("useWalletPresenter", () => {
     expect(buy.mock.calls[2][2]).not.toBe(buy.mock.calls[1][2]);
   });
 });
+
+it("selects a bank from search and refuses a name outside the directory", async () => {
+  vi.spyOn(walletService, "load").mockResolvedValue(data);
+  const add = vi.spyOn(walletService, "addBank");
+  const { result } = renderHook(() => useWalletPresenter("banks"));
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  act(() => result.current.onOpenBankPicker());
+  act(() => result.current.onBankSearch("opay"));
+  expect(result.current.bankOptions[0].name).toContain("OPay");
+  act(() => result.current.onChooseBank(result.current.bankOptions[0].name));
+  expect(result.current.bankPickerOpen).toBe(false);
+  expect(result.current.selectedBankOption?.logo).toBeTruthy();
+  act(() => result.current.onBankField("bankName", "unknown bank"));
+  await act(() => result.current.onSaveBank());
+  expect(add).toHaveBeenCalled();
+  expect(result.current.error).toContain("Choose a bank");
+});

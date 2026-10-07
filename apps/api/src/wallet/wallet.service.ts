@@ -111,8 +111,7 @@ export class WalletService {
     await this.db.transaction(async (tx) => {
       await lock(tx, userId);
       const current = await tx.select().from(walletBank).where(eq(walletBank.userId, userId));
-      if (current.length >= 10)
-        throw new BadRequestException("You can save up to 10 bank accounts.");
+      if (current.length >= 2) throw new BadRequestException("You can save up to 2 bank accounts.");
       if (
         current.some(
           (row) =>

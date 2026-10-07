@@ -156,3 +156,11 @@ describe("WalletService", () => {
     expect(walletOperationDto(row).createdAt).toBe("2026-10-07T10:00:00.000Z");
   });
 });
+
+it("enforces the two-account limit on the server before inserting", async () => {
+  const { service, db } = fixture([[{ id: "one" }, { id: "two" }]]);
+  await expect(
+    service.addBank("user", { bankName: "Kuda", accountName: "Test", accountNumber: "1234567890" }),
+  ).rejects.toThrow(/up to 2/);
+  expect(db.insert).not.toHaveBeenCalled();
+});

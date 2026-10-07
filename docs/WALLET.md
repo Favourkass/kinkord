@@ -22,7 +22,7 @@ An admin finds the submitted purchase in **Moderation → Wallet → Coin purcha
 
 ## Bank accounts
 
-**Wallet → Bank Accounts** saves up to ten accounts per member in PostgreSQL. Accounts have bank name, holder name and a ten-digit Nigerian account number. The first becomes default; the member can choose another default or remove an account. Removing the default promotes another account. Members cannot access or change another member's bank accounts.
+**Wallet → Bank Accounts** saves up to two accounts per member in PostgreSQL. Accounts have bank name, holder name and a ten-digit Nigerian account number. The first becomes default; the member can choose another default or remove an account. Removing the default promotes another account. Members cannot access or change another member's bank accounts.
 
 Numbers are masked in the saved-account list and transaction history. A withdrawal stores a snapshot of the selected account, so later deletion/default changes cannot redirect an existing request. Account ownership is not automatically verified; staff must check destination details before transferring.
 
@@ -52,3 +52,5 @@ Use local PostgreSQL, Mailpit and MinIO as described in ONBOARDING.md. Use a sep
 Test with separate member and admin accounts: buy a bundle, upload a dummy image, verify as admin, check credit, submit a withdrawal, approve, record a dummy transfer reference and check paid status. Also reject a second request and confirm the reservation returns. Repeat decisions and simultaneous withdrawals must fail without changing balances twice. Production rates must be chosen by the lead; local test rates are not committed as defaults.
 
 Unit tests cover validators, amounts, status transitions, ownership, retry behavior and presentation. The manual local integration check also covers receipt upload to MinIO and simultaneous PostgreSQL withdrawals. Existing Silver subscription tests remain passing.
+
+The bank picker uses the pinned Nigerian Bank Logos directory (660 institutions, including OPay and Kuda). The source and MIT license are in `apps/web/public/banks`. It is a maintained directory snapshot, not live account-name resolution or proof that every listed institution currently accepts transfers. Refresh the snapshot when bank coverage changes.

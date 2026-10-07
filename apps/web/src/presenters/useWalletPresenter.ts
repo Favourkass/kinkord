@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Routes } from "@/constants/Routes";
 import { walletOperationVM, type WalletMode, type WalletOperationPM } from "@/domain/wallet";
 import type { KinkCurrency } from "@/domain/kinkcoins";
+import { banksService } from "@/services/banks.service";
 import { walletService, type WalletDataPM } from "@/services/wallet.service";
 export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
   const router = useRouter();
@@ -20,6 +21,8 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
   const [bankForm, setBankForm] = useState({ bankName: "", accountName: "", accountNumber: "" }),
     [proof, setProof] = useState({ senderAccountName: "", senderReference: "" }),
     [file, setFile] = useState<File | null>(null);
+  const [bankPickerOpen, setBankPickerOpen] = useState(false),
+    [bankSearch, setBankSearch] = useState("");
   const running = useRef(false),
     keys = useRef(new Map<string, string>());
   const keyFor = (value: string) => {
@@ -95,6 +98,22 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     notice,
     busy,
     bankForm,
+    bankPickerOpen,
+    bankSearch,
+    bankOptions: banksService.options(bankSearch),
+    selectedBankOption: banksService.find(bankForm.bankName),
+    bankDirectoryCount: banksService.count,
+    onOpenBankPicker: () => {
+      setBankPickerOpen(true);
+      setBankSearch("");
+    },
+    onCloseBankPicker: () => setBankPickerOpen(false),
+    onBankSearch: setBankSearch,
+    onChooseBank: (name: string) => {
+      setBankForm((previous) => ({ ...previous, bankName: name }));
+      setBankPickerOpen(false);
+      setBankSearch("");
+    },
     proof,
     fileName: file?.name ?? null,
     currency,

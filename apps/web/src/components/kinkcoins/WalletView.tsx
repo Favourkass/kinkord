@@ -11,6 +11,7 @@ import {
   Wallet,
 } from "lucide-react";
 import type { useWalletPresenter } from "@/presenters/useWalletPresenter";
+import BankAccountsView from "./BankAccountsView";
 import CoinMedallion from "./CoinMedallion";
 interface Props {
   vm: ReturnType<typeof useWalletPresenter>;
@@ -177,103 +178,7 @@ export default function WalletView({ vm }: Props) {
           ))}
         </>
       )}
-      {vm.mode === "banks" && (
-        <>
-          <p className="text-xs leading-relaxed text-app-subtle">{copy.bankNotice}</p>
-          {!vm.banks.length && !vm.loading && (
-            <section className={`${card} text-center`}>
-              <Landmark className="mx-auto mb-3 text-app-members-count" />
-              <h2 className="font-bold">{copy.noBanks}</h2>
-            </section>
-          )}
-          {vm.banks.map((bank) => (
-            <article key={bank.id} className={card}>
-              <div className="flex items-start gap-3">
-                <Landmark className="text-app-members-count" />
-                <div className="min-w-0 flex-1 break-words">
-                  <h2 className="text-sm font-bold">{bank.bankName}</h2>
-                  <p className="mt-1 text-xs text-app-subtle">{bank.accountName}</p>
-                  <p className="mt-1 text-xs text-app-subtle">{bank.maskedNumber}</p>
-                </div>
-                {bank.default && (
-                  <span className="text-[10px] text-app-members-count">{copy.default}</span>
-                )}
-              </div>
-              <div className="mt-4 flex justify-end gap-4 border-t border-app-card-border pt-3">
-                {!bank.default && (
-                  <button
-                    disabled={vm.busy}
-                    type="button"
-                    onClick={() => vm.onDefaultBank(bank.id)}
-                    className="text-xs text-app-members-count"
-                  >
-                    {copy.makeDefault}
-                  </button>
-                )}
-                <button
-                  disabled={vm.busy}
-                  type="button"
-                  onClick={() => vm.onRemoveBank(bank.id)}
-                  className="text-xs text-app-subtle"
-                  aria-label={`${copy.remove} ${bank.bankName} ${bank.maskedNumber}`}
-                >
-                  {copy.remove}
-                </button>
-              </div>
-            </article>
-          ))}
-          <form
-            className={`${card} space-y-4`}
-            onSubmit={(event) => {
-              event.preventDefault();
-              vm.onSaveBank();
-            }}
-          >
-            <h2 className="font-bold">{copy.addBank}</h2>
-            <label className="block text-xs">
-              {copy.bank}
-              <input
-                required
-                minLength={2}
-                maxLength={60}
-                disabled={vm.loading || vm.busy}
-                value={vm.bankForm.bankName}
-                onChange={(event) => vm.onBankField("bankName", event.target.value)}
-                className={input}
-              />
-            </label>
-            <label className="block text-xs">
-              {copy.holder}
-              <input
-                required
-                minLength={2}
-                maxLength={100}
-                disabled={vm.loading || vm.busy}
-                value={vm.bankForm.accountName}
-                onChange={(event) => vm.onBankField("accountName", event.target.value)}
-                className={input}
-              />
-            </label>
-            <label className="block text-xs">
-              {copy.number}
-              <input
-                required
-                inputMode="numeric"
-                pattern="[0-9]{10}"
-                maxLength={10}
-                autoComplete="off"
-                disabled={vm.loading || vm.busy}
-                value={vm.bankForm.accountNumber}
-                onChange={(event) => vm.onBankField("accountNumber", event.target.value)}
-                className={input}
-              />
-            </label>
-            <button disabled={vm.loading || vm.busy} className={`${button} w-full`}>
-              {copy.saveBank}
-            </button>
-          </form>
-        </>
-      )}
+      {vm.mode === "banks" && <BankAccountsView vm={vm} />}
       {vm.mode === "history" && (
         <>
           <p className="text-xs text-app-subtle">{copy.historyHint}</p>
@@ -373,9 +278,9 @@ export default function WalletView({ vm }: Props) {
                 />
               </label>
               <label className="block text-xs">
-                {copy.chooseBank}
+                {copy.chooseWithdrawalBank}
                 <select
-                  aria-label={copy.chooseBank}
+                  aria-label={copy.chooseWithdrawalBank}
                   value={vm.bankId}
                   onChange={(event) => vm.onBank(event.target.value)}
                   required

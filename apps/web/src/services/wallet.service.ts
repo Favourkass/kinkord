@@ -1,3 +1,4 @@
+import { banksService } from "./banks.service";
 import { Routes } from "@/constants/Routes";
 import { WALLET_COPY } from "@/constants/wallet";
 import type { KinkCurrency } from "@/domain/kinkcoins";
@@ -33,8 +34,10 @@ export const walletService = {
     api.post<WalletOperationPM>("/wallet/purchases", { currency, quantity, requestKey }),
   withdraw: (currency: KinkCurrency, quantity: number, bankId: string, requestKey: string) =>
     api.post<WalletOperationPM>("/wallet/withdrawals", { currency, quantity, bankId, requestKey }),
-  addBank: (input: { bankName: string; accountName: string; accountNumber: string }) =>
-    api.post<WalletBankPM[]>("/wallet/banks", input),
+  addBank: (input: { bankName: string; accountName: string; accountNumber: string }) => {
+    if (!banksService.find(input.bankName)) throw new Error("Choose a bank from the list.");
+    return api.post<WalletBankPM[]>("/wallet/banks", input);
+  },
   defaultBank: (id: string) =>
     api.put<WalletBankPM[]>(`/wallet/banks/${encodeURIComponent(id)}/default`, {}),
   removeBank: (id: string) => api.del<WalletBankPM[]>(`/wallet/banks/${encodeURIComponent(id)}`),
@@ -76,11 +79,17 @@ export const walletService = {
         withdraw: Routes.kinkcoinsWithdraw,
       }[a.key],
     })),
+    bankLimit: 2,
+    bankLimitReached: (data?.banks.length ?? 0) >= 2,
     enabled: data?.summary.settings.enabled ?? false,
     minimum: data?.summary.settings.minimumKobo
       ? walletMoney(data.summary.settings.minimumKobo)
       : "—",
-    banks: data?.banks.map(walletBankVM) ?? [],
+    banks:
+      data?.banks.map((bank) => ({
+        ...walletBankVM(bank),
+        logo: banksService.find(bank.bankName)?.logo ?? null,
+      })) ?? [],
     history:
       data?.history.map((row) => ({
         ...walletOperationVM(row),
