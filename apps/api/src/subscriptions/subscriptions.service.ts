@@ -34,6 +34,7 @@ import {
   PAYMENT_WINDOW_MS,
   PROOF_GRACE_MS,
   freeOffset,
+  silverForGood,
   paymentReference,
   silverCheckStatus,
   silverUntil,
@@ -207,7 +208,18 @@ export class SubscriptionsService implements OnApplicationBootstrap {
   async putFoundersOnSilver(): Promise<void> {
     try {
       for (const founder of await founderAccounts(this.db)) {
-        await this.silverUntil(founder);
+        if (silverForGood(await this.silverUntil(founder))) {
+          // Nothing to pay: a checkout they started, to try it say, is let go.
+          await this.db
+            .update(subscriptionPayment)
+            .set({ status: "expired" })
+            .where(
+              and(
+                eq(subscriptionPayment.userId, founder.id),
+                eq(subscriptionPayment.status, "pending"),
+              ),
+            );
+        }
         const check = await silverCheckStatus(this.db, founder.id);
         const state = check ? (check.shown ? "shown" : `hidden (${check.reason})`) : "no Silver";
         this.log.log(`founder ${founder.id}: check ${state}`);
@@ -238,6 +250,7 @@ export class SubscriptionsService implements OnApplicationBootstrap {
     const payments = recent.map((row) => toPaymentDto(row, now));
     const open = payments.find((p) => p.status === "pending" || p.status === "submitted") ?? null;
     const latest = payments[0];
+    const forGood = silverForGood(until);
     return {
       plan: until ? "silver" : "basic",
       silverUntil: until?.toISOString() ?? null,
@@ -249,10 +262,12 @@ export class SubscriptionsService implements OnApplicationBootstrap {
             showsFrom: check.showsFrom?.toISOString() ?? null,
           }
         : null,
+      forGood,
       available: settings.bank !== null,
       prices: settings.prices,
-      open,
-      rejected: latest?.status === "rejected" ? latest : null,
+      // Silver for good has nothing to pay: no payment to finish, nor one to retry.
+      open: forGood ? null : open,
+      rejected: !forGood && latest?.status === "rejected" ? latest : null,
     };
   }
 
@@ -262,6 +277,9 @@ export class SubscriptionsService implements OnApplicationBootstrap {
    * never holds two amounts.
    */
   async checkout(userId: string, period: BillingPeriod): Promise<PaymentDto> {
+    if (silverForGood(await silverUntil(this.db, userId))) {
+      throw new ConflictException("You're on Silver for good, so there's nothing to pay.");
+    }
     const settings = await readSettings(this.db);
     if (!settings.bank) {
       throw new ConflictException("Silver isn't open for payment yet. Check back soon.");

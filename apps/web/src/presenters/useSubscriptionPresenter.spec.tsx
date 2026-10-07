@@ -186,6 +186,22 @@ describe("useSubscriptionPresenter", () => {
     });
   });
 
+  it("has nothing to sell to Silver for good, the founders'", async () => {
+    status.mockResolvedValue({
+      ...basic,
+      plan: "silver",
+      silverUntil: "2099-12-31T12:00:00Z",
+      forGood: true,
+    });
+    const { result } = renderHook(() => useSubscriptionPresenter());
+    await waitFor(() => expect(result.current.cta.label).toBe("You're on Silver for good"));
+    expect(result.current.cta.disabled).toBe(true);
+    expect(result.current.planCard).toMatchObject({
+      title: "You're on Silver Premium",
+      body: "Yours for good, as part of the Kinkord team.",
+    });
+  });
+
   it("shows why the last payment was rejected", async () => {
     status.mockResolvedValue({
       ...basic,
