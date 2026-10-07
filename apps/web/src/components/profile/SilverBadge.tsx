@@ -22,7 +22,7 @@ export interface SilverBadgeProps {
 }
 
 /**
- * The profile's Silver check, which explains itself when tapped, the way X's
+ * The profile's Silver badge, which explains itself when tapped, the way X's
  * check opens a note on what it means and since when.
  */
 export default function SilverBadge({ since, labels, href, size = 20 }: SilverBadgeProps) {
