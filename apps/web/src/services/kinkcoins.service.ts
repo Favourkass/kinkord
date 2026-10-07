@@ -1,9 +1,19 @@
 import { Routes } from "@/constants/Routes";
-import { KINKCOINS_COPY, KINKCOINS_OVERVIEW_COPY, KINK_CURRENCIES } from "@/constants/kinkcoins";
+import {
+  KINKCOINS_COPY,
+  KINKCOINS_OVERVIEW_COPY,
+  KINKCOINS_HISTORY_COPY,
+  KINK_CURRENCIES,
+} from "@/constants/kinkcoins";
 import { currencyToVM } from "@/domain/kinkcoins";
 
 /** UI-only catalogue: no checkout, credits or device-local spendable balances. */
 export const kinkcoinsService = {
+  history: () => ({
+    copy: KINKCOINS_HISTORY_COPY,
+    walletHref: Routes.kinkcoins,
+    buyHref: Routes.kinkcoinsBuy,
+  }),
   overview: () => ({
     copy: KINKCOINS_OVERVIEW_COPY,
     balances: [
@@ -13,8 +23,13 @@ export const kinkcoinsService = {
     ],
     actions: KINKCOINS_OVERVIEW_COPY.actions.map((action) => ({
       ...action,
-      href: action.kind === "buy" ? Routes.kinkcoinsBuy : null,
-      status: action.kind === "buy" ? null : KINKCOINS_COPY.comingSoon,
+      href:
+        action.kind === "buy"
+          ? Routes.kinkcoinsBuy
+          : action.kind === "history"
+            ? Routes.kinkcoinsHistory
+            : null,
+      status: action.kind === "buy" || action.kind === "history" ? null : KINKCOINS_COPY.comingSoon,
     })),
   }),
   preview: () => ({

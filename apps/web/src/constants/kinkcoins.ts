@@ -104,3 +104,19 @@ export const KINKCOINS_OVERVIEW_COPY = {
     },
   ],
 } as const;
+
+export const KINKCOINS_HISTORY_COPY = {
+  title: "Transaction History",
+  menu: "Open menu",
+  back: "Back to wallet",
+  heading: "Your wallet activity",
+  description: "Track your purchases, gifts, rewards, conversions and redemptions in one place.",
+  preview: "Wallet preview",
+  notice:
+    "Transactions are coming soon. No purchases, gifts or rewards have been recorded in this preview.",
+  total: "0 transactions",
+  emptyTitle: "No transactions yet",
+  emptyDescription:
+    "When wallets launch, your KinkCoin, KinkStar and KinkCrown activity will appear here.",
+  browse: "View KinkCoin bundles",
+} as const;

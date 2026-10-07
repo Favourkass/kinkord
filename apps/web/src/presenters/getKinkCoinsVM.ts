@@ -7,3 +7,7 @@ export function getKinkCoinsVM() {
 export function getKinkCoinsOverviewVM() {
   return kinkcoinsService.overview();
 }
+
+export function getKinkCoinsHistoryVM() {
+  return kinkcoinsService.history();
+}

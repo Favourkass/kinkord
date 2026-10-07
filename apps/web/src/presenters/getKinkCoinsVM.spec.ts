@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { getKinkCoinsVM, getKinkCoinsOverviewVM } from "./getKinkCoinsVM";
+import { getKinkCoinsVM, getKinkCoinsOverviewVM, getKinkCoinsHistoryVM } from "./getKinkCoinsVM";
 
 describe("getKinkCoinsVM", () => {
+  it("prepares the history page with empty-state copy and navigation", () => {
+    const vm = getKinkCoinsHistoryVM();
+    expect(vm.copy.title).toBe("Transaction History");
+    expect(vm.copy.emptyTitle).toBe("No transactions yet");
+    expect(vm.walletHref).toBe("/kinkcoins");
+  });
   it("prepares the wallet landing screen and its purchase link", () => {
     const vm = getKinkCoinsOverviewVM();
     expect(vm.copy.heading).toBe("KinkCoins");
