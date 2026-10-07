@@ -214,13 +214,15 @@ describe("SubscriptionsService.putFoundersOnSilver", () => {
   };
 
   it("puts every founder on Silver on start, and logs where each check stands", async () => {
-    const { service, after, left } = make([[founder], [], undefined, [checkRow]]);
+    const { service, after, left } = make([[founder], [], undefined, undefined, [checkRow]]);
     const log = vi.spyOn((service as unknown as { log: { log: () => void } }).log, "log");
     await service.onApplicationBootstrap();
     expect(after("insert", memberSubscription, "values")).toMatchObject({
       userId: "f1",
       currentPeriodEnd: FOUNDER_SILVER_UNTIL,
     });
+    // A checkout they started to try it is let go: there's nothing to pay.
+    expect(after("update", subscriptionPayment, "set")).toEqual({ status: "expired" });
     expect(log).toHaveBeenCalledWith("founder f1: check shown");
     expect(left()).toBe(0);
   });
@@ -240,6 +242,7 @@ describe("SubscriptionsService.status", () => {
       plan: "basic",
       silverUntil: null,
       check: null,
+      forGood: false,
       available: false,
       prices: DEFAULT_PRICES,
       open: null,
@@ -302,6 +305,21 @@ describe("SubscriptionsService.status", () => {
     expect(status.open).toBeNull();
   });
 
+  it("shows no payment to finish or retry on Silver for good", async () => {
+    const { service } = make([
+      [{ end: FOUNDER_SILVER_UNTIL }],
+      [settingsRow],
+      [],
+      [payment({ status: "pending" }), payment({ status: "rejected" })],
+    ]);
+    await expect(service.status(member)).resolves.toMatchObject({
+      plan: "silver",
+      forGood: true,
+      open: null,
+      rejected: null,
+    });
+  });
+
   it("shows a founder on Silver the first time they look", async () => {
     const founder = { id: "f1", email: SUPER_ADMIN_EMAILS[0], emailVerified: true };
     const { service } = make([[], undefined, [settingsRow], [], []]);
@@ -313,19 +331,25 @@ describe("SubscriptionsService.status", () => {
 });
 
 describe("SubscriptionsService.checkout", () => {
+  it("has nothing to sell to Silver for good", async () => {
+    const { service, left } = make([[{ end: FOUNDER_SILVER_UNTIL }]]);
+    await expect(service.checkout("f1", "monthly")).rejects.toThrow(/Silver for good/);
+    expect(left()).toBe(0);
+  });
+
   it("stays closed until there's an account to pay into", async () => {
-    const { service } = make([[]]);
+    const { service } = make([[], []]);
     await expect(service.checkout("u1", "yearly")).rejects.toBeInstanceOf(ConflictException);
   });
 
   it("won't start another payment while one is being checked", async () => {
-    const { service } = make([[settingsRow], [payment({ status: "submitted" })]]);
+    const { service } = make([[], [settingsRow], [payment({ status: "submitted" })]]);
     await expect(service.checkout("u1", "monthly")).rejects.toThrow(/still checking/);
   });
 
   it("picks up the running checkout for the same plan", async () => {
     const running = payment();
-    const { service, left } = make([[settingsRow], [running]]);
+    const { service, left } = make([[], [settingsRow], [running]]);
     await expect(service.checkout("u1", "yearly")).resolves.toMatchObject({
       id: ID,
       amountKobo: 3_364_700,
@@ -335,6 +359,7 @@ describe("SubscriptionsService.checkout", () => {
 
   it("makes an amount nobody else is paying, with a reference and a one-hour window", async () => {
     const { service, after } = make([
+      [], // not on Silver for good
       [settingsRow],
       [], // nothing open for this member
       undefined, // abandoned checkouts let go
@@ -360,6 +385,7 @@ describe("SubscriptionsService.checkout", () => {
 
   it("lets go of the member's other checkout when they switch plans", async () => {
     const { service, calls } = make([
+      [],
       [settingsRow],
       [payment({ period: "monthly", amountKobo: 564_700 })],
       undefined, // their monthly checkout expired
@@ -374,6 +400,7 @@ describe("SubscriptionsService.checkout", () => {
   it("tries again when another member takes the same amount or second", async () => {
     const clash = Object.assign(new Error("duplicate key"), { code: "23505" });
     const { service, after, left } = make([
+      [],
       [settingsRow],
       [],
       undefined,
@@ -390,7 +417,7 @@ describe("SubscriptionsService.checkout", () => {
   });
 
   it("passes on any other database failure", async () => {
-    const { service } = make([[settingsRow], [], undefined, [], new Error("connection lost")]);
+    const { service } = make([[], [settingsRow], [], undefined, [], new Error("connection lost")]);
     await expect(service.checkout("u1", "yearly")).rejects.toThrow("connection lost");
   });
 });

@@ -65,6 +65,8 @@ export interface SubscriptionStatusPM {
   silverUntil: string | null;
   /** Null on Basic. */
   check: SilverCheckPM | null;
+  /** Silver that never runs out (the founders'): nothing to pay. Absent from an older API. */
+  forGood?: boolean;
   available: boolean;
   prices: PlanPricesPM;
   open: PaymentPM | null;

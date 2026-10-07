@@ -14,6 +14,8 @@ export const SUBSCRIPTION_COPY = {
       silver: {
         title: "You're on Silver Premium",
         body: (until: string) => `Active until ${until}.`,
+        /** The founders' Silver, which never runs out. */
+        forGood: "Yours for good, as part of the Kinkord team.",
         /** Where the member's Silver check stands, under the plan. */
         check: {
           shown: "Your Silver check shows on your profile.",
@@ -76,6 +78,7 @@ export const SUBSCRIPTION_COPY = {
       resume: "Continue your payment",
       review: "Payment under review",
       unavailable: "Payments open soon",
+      forGood: "You're on Silver for good",
       starting: "Starting…",
     },
   },

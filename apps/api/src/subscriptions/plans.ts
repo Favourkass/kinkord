@@ -105,6 +105,11 @@ export const CHECK_MIN_ACCOUNT_DAYS = 30;
  * shows. Midday, so it reads 31 Dec 2099 in Lagos and everywhere else.
  */
 export const FOUNDER_SILVER_UNTIL = new Date("2099-12-31T12:00:00.000Z");
+
+/** Silver that doesn't run out, the founders': nothing to pay for or renew. */
+export function silverForGood(until: Date | null): boolean {
+  return until !== null && until >= FOUNDER_SILVER_UNTIL;
+}
 const CHECK_MIN_ACCOUNT_AGE = sql.raw(`interval '${CHECK_MIN_ACCOUNT_DAYS} days'`);
 
 // Aliased so the check can sit inside any query, even one that already reads `user` or `profile`.
