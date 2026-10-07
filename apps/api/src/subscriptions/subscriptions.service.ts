@@ -6,11 +6,18 @@ import {
   HttpStatus,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import { and, desc, eq, gte, inArray, lt, lte } from "drizzle-orm";
 import { DRIZZLE, type Db } from "../db/db.module";
-import { paymentSettings, subscriptionPayment, type BillingPeriod } from "../db/schema";
+import {
+  memberSubscription,
+  paymentSettings,
+  subscriptionPayment,
+  type BillingPeriod,
+} from "../db/schema";
+import { isSuperAdmin, type AdminCandidate } from "../moderation/admins";
 import { PushService } from "../push/push.service";
 import { StorageService } from "../storage/storage.service";
 import type {
@@ -22,10 +29,12 @@ import type {
 } from "./dto";
 import {
   DEFAULT_PRICES,
+  FOUNDER_SILVER_UNTIL,
   PAYMENT_WINDOW_MS,
   PROOF_GRACE_MS,
   freeOffset,
   paymentReference,
+  silverCheckStatus,
   silverUntil,
   usdCentsFor,
 } from "./plans";
@@ -137,6 +146,8 @@ export async function expireAbandoned(db: Db, now: Date = new Date()): Promise<v
  */
 @Injectable()
 export class SubscriptionsService {
+  private readonly log = new Logger(SubscriptionsService.name);
+
   /** Swapped in specs to pick a known offset. */
   random: () => number = Math.random;
 
@@ -146,23 +157,63 @@ export class SubscriptionsService {
     private readonly push: PushService,
   ) {}
 
-  /** When this member's Silver runs out, or null on Basic. */
-  silverUntil(userId: string): Promise<Date | null> {
-    return silverUntil(this.db, userId);
+  /**
+   * When this member's Silver runs out, or null on Basic. The founders (the
+   * verified emails in SUPER_ADMIN_EMAILS) have Silver without paying, by their
+   * email like their admin rights: the first time they open the app without
+   * it, they're put on it, so nobody has to add them by hand.
+   */
+  async silverUntil(
+    who: Pick<AdminCandidate, "id" | "email" | "emailVerified">,
+  ): Promise<Date | null> {
+    const until = await silverUntil(this.db, who.id);
+    if (!isSuperAdmin(who) || (until && until >= FOUNDER_SILVER_UNTIL)) return until;
+    const now = new Date();
+    try {
+      await this.db
+        .insert(memberSubscription)
+        .values({
+          userId: who.id,
+          plan: "silver",
+          currentPeriodEnd: FOUNDER_SILVER_UNTIL,
+          startedAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: memberSubscription.userId,
+          // A founder who was already paying keeps the date their Silver began.
+          set: {
+            plan: "silver",
+            currentPeriodEnd: FOUNDER_SILVER_UNTIL,
+            updatedAt: now,
+            ...(until ? {} : { startedAt: now }),
+          },
+        });
+      return FOUNDER_SILVER_UNTIL;
+    } catch (e) {
+      // Never stop a founder opening the app: they get Silver on a later visit.
+      this.log.warn(`putting a founder on Silver failed: ${String(e)}`);
+      return until;
+    }
   }
 
   /** The member's plan, the prices, and the payment they're in the middle of, if any. */
-  async status(userId: string): Promise<SubscriptionStatusDto> {
+  async status(
+    who: Pick<AdminCandidate, "id" | "email" | "emailVerified">,
+  ): Promise<SubscriptionStatusDto> {
+    const userId = who.id;
     const now = new Date();
-    const [settings, until, recent] = await Promise.all([
+    // First, so a founder put on Silver here sees it in this same answer.
+    const until = await this.silverUntil(who);
+    const [settings, recent, check] = await Promise.all([
       readSettings(this.db),
-      silverUntil(this.db, userId),
       this.db
         .select()
         .from(subscriptionPayment)
         .where(eq(subscriptionPayment.userId, userId))
         .orderBy(desc(subscriptionPayment.createdAt))
         .limit(5),
+      silverCheckStatus(this.db, userId, now),
     ]);
     const payments = recent.map((row) => toPaymentDto(row, now));
     const open = payments.find((p) => p.status === "pending" || p.status === "submitted") ?? null;
@@ -170,6 +221,14 @@ export class SubscriptionsService {
     return {
       plan: until ? "silver" : "basic",
       silverUntil: until?.toISOString() ?? null,
+      check: check
+        ? {
+            shown: check.shown,
+            reason: check.reason,
+            heldFor: check.heldFor,
+            showsFrom: check.showsFrom?.toISOString() ?? null,
+          }
+        : null,
       available: settings.bank !== null,
       prices: settings.prices,
       open,

@@ -346,10 +346,16 @@ describe("PostsService.byId", () => {
       savedByMe: true,
       repostedBy: null,
       mine: false,
-      author: { username: "tega", displayName: "Sir T" },
+      author: { username: "tega", displayName: "Sir T", silver: false },
     });
     expect(vm?.media[0].thumbUrl).toContain("v=md");
     expect(storage.presignDownload).toHaveBeenCalledWith("avatars/u2/a.jpg", "sm");
+  });
+
+  it("shows the Silver check on an author who has it", async () => {
+    const db = makeDb([[{ ...row, silver: true }], ...decorated({})]);
+    const vm = await service(db, makeStorage()).byId("p1", "u1");
+    expect(vm?.author.silver).toBe(true);
   });
 
   it("marks a member's own post so the delete menu can appear", async () => {

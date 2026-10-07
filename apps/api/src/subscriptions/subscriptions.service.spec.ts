@@ -1,9 +1,10 @@
 import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { subscriptionPayment } from "../db/schema";
+import { memberSubscription, subscriptionPayment } from "../db/schema";
+import { SUPER_ADMIN_EMAILS } from "../moderation/admins";
 import type { PushService } from "../push/push.service";
 import type { StorageService } from "../storage/storage.service";
-import { DEFAULT_PRICES, PAYMENT_WINDOW_MS, PROOF_GRACE_MS } from "./plans";
+import { DEFAULT_PRICES, FOUNDER_SILVER_UNTIL, PAYMENT_WINDOW_MS, PROOF_GRACE_MS } from "./plans";
 import {
   RECEIPT_MAX_MB,
   SubscriptionsService,
@@ -149,12 +150,66 @@ describe("toPaymentDto", () => {
   });
 });
 
+describe("SubscriptionsService.silverUntil", () => {
+  const founder = { id: "f1", email: SUPER_ADMIN_EMAILS[0], emailVerified: true };
+  const member = { id: "u1", email: "member@example.test", emailVerified: true };
+
+  it("is the end of a member's Silver, or null on Basic, and never writes", async () => {
+    const end = new Date("2027-01-01T00:00:00Z");
+    const paying = make([[{ end }]]);
+    await expect(paying.service.silverUntil(member)).resolves.toEqual(end);
+    const basic = make([[]]);
+    await expect(basic.service.silverUntil(member)).resolves.toBeNull();
+    expect(basic.calls.some((c) => c.op === "insert")).toBe(false);
+  });
+
+  it("puts a founder on Silver the first time they come without it", async () => {
+    const { service, after, left } = make([[], undefined]);
+    await expect(service.silverUntil(founder)).resolves.toEqual(FOUNDER_SILVER_UNTIL);
+    expect(after("insert", memberSubscription, "values")).toMatchObject({
+      userId: "f1",
+      plan: "silver",
+      currentPeriodEnd: FOUNDER_SILVER_UNTIL,
+    });
+    expect(after("insert", memberSubscription, "onConflictDoUpdate")).toMatchObject({
+      set: { currentPeriodEnd: FOUNDER_SILVER_UNTIL, startedAt: expect.any(Date) },
+    });
+    expect(left()).toBe(0);
+  });
+
+  it("keeps when a founder who was already paying began, and leaves founder Silver alone", async () => {
+    const paying = make([[{ end: new Date("2027-01-01T00:00:00Z") }], undefined]);
+    await paying.service.silverUntil(founder);
+    const set = (
+      paying.after("insert", memberSubscription, "onConflictDoUpdate") as { set: object }
+    ).set;
+    expect(set).not.toHaveProperty("startedAt");
+    const settled = make([[{ end: FOUNDER_SILVER_UNTIL }]]);
+    await expect(settled.service.silverUntil(founder)).resolves.toEqual(FOUNDER_SILVER_UNTIL);
+    expect(settled.calls.some((c) => c.op === "insert")).toBe(false);
+  });
+
+  it("needs the founder's email verified, like their admin rights", async () => {
+    const { service, calls } = make([[]]);
+    await expect(service.silverUntil({ ...founder, emailVerified: false })).resolves.toBeNull();
+    expect(calls.some((c) => c.op === "insert")).toBe(false);
+  });
+
+  it("never stops a founder opening the app when the write fails", async () => {
+    const { service } = make([[], new Error("connection lost")]);
+    await expect(service.silverUntil(founder)).resolves.toBeNull();
+  });
+});
+
 describe("SubscriptionsService.status", () => {
+  const member = { id: "u1", email: "member@example.test", emailVerified: true };
+
   it("is Basic with the design's prices while no account is set", async () => {
-    const { service } = make([[], [], []]);
-    await expect(service.status("u1")).resolves.toEqual({
+    const { service } = make([[], [], [], []]);
+    await expect(service.status(member)).resolves.toEqual({
       plan: "basic",
       silverUntil: null,
+      check: null,
       available: false,
       prices: DEFAULT_PRICES,
       open: null,
@@ -164,19 +219,66 @@ describe("SubscriptionsService.status", () => {
 
   it("shows Silver, and the payment still in play", async () => {
     const end = new Date("2026-11-06T12:00:00Z");
-    const { service } = make([[settingsRow], [{ end }], [payment({ status: "submitted" })]]);
-    const status = await service.status("u1");
+    // The plan first; then the helpers' queries as Promise.all builds its list, payments last.
+    const { service } = make([
+      [{ end }],
+      [settingsRow],
+      [
+        {
+          heldAt: null,
+          heldFor: null,
+          createdAt: new Date("2026-01-01T00:00:00Z"),
+          avatarKey: "a",
+          coverKey: "c",
+        },
+      ],
+      [payment({ status: "submitted" })],
+    ]);
+    const status = await service.status(member);
     expect(status).toMatchObject({ plan: "silver", silverUntil: end.toISOString() });
     expect(status.available).toBe(true);
     expect(status.open?.status).toBe("submitted");
+    expect(status.check).toEqual({ shown: true, reason: null, heldFor: null, showsFrom: null });
+  });
+
+  it("says why a Silver member's check isn't showing yet", async () => {
+    const end = new Date("2026-11-06T12:00:00Z");
+    const created = new Date("2026-09-20T00:00:00Z");
+    const fresh = make([
+      [{ end }],
+      [settingsRow],
+      [{ heldAt: null, heldFor: null, createdAt: created, avatarKey: "a", coverKey: "c" }],
+      [],
+    ]);
+    await expect(fresh.service.status(member)).resolves.toMatchObject({
+      check: { shown: false, reason: "new_account", showsFrom: "2026-10-20T00:00:00.000Z" },
+    });
+    const held = make([
+      [{ end }],
+      [settingsRow],
+      [{ heldAt: NOW, heldFor: "name", createdAt: created, avatarKey: "a", coverKey: "c" }],
+      [],
+    ]);
+    await expect(held.service.status(member)).resolves.toMatchObject({
+      check: { shown: false, reason: "held", heldFor: "name" },
+    });
   });
 
   it("surfaces the last payment when it was rejected", async () => {
     const rejected = payment({ status: "rejected", reviewNote: "No such transfer" });
-    const { service } = make([[settingsRow], [], [rejected, payment({ status: "verified" })]]);
-    const status = await service.status("u1");
+    const { service } = make([[], [settingsRow], [], [rejected, payment({ status: "verified" })]]);
+    const status = await service.status(member);
     expect(status.rejected?.reviewNote).toBe("No such transfer");
     expect(status.open).toBeNull();
+  });
+
+  it("shows a founder on Silver the first time they look", async () => {
+    const founder = { id: "f1", email: SUPER_ADMIN_EMAILS[0], emailVerified: true };
+    const { service } = make([[], undefined, [settingsRow], [], []]);
+    await expect(service.status(founder)).resolves.toMatchObject({
+      plan: "silver",
+      silverUntil: FOUNDER_SILVER_UNTIL.toISOString(),
+    });
   });
 });
 

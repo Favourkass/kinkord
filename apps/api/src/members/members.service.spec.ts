@@ -63,7 +63,8 @@ const orderRecordingChain = (result: unknown, orders: SQL[][]) => {
 const renderOrder = (args: SQL[]) => new PgDialect().sqlToQuery(sql.join(args, sql`, `));
 
 const makeService = () => {
-  const select = vi.fn();
+  // Queries a test doesn't set up find nothing (a member without Silver, say).
+  const select = vi.fn(() => chain([]));
   const db = { select } as unknown as Db;
   const presignDownload = vi.fn(async (key: string) => `https://s3/${key}`);
   const storage = { presignDownload } as unknown as StorageService;
@@ -297,6 +298,23 @@ describe("MembersService", () => {
     // Another member never receives the birth date, only the derived age.
     expect(vm.dateOfBirth).toBeNull();
     expect(isFollowing).toHaveBeenCalledWith("me", "u2");
+    expect(vm.silver).toBeNull();
+  });
+
+  it("shows the Silver check on a profile, with the date their Silver began", async () => {
+    const { service, select } = makeService();
+    select
+      .mockReturnValueOnce(
+        chain([
+          {
+            u: { id: "u2", username: "nene", createdAt: new Date("2023-03-10T09:00:00Z") },
+            p: { displayName: "Neze", avatarKey: "a", coverKey: "c", dateOfBirth: null },
+          },
+        ]),
+      )
+      .mockReturnValueOnce(chain([{ since: new Date("2026-10-06T12:00:00Z") }]));
+    const vm = await service.publicProfile("nene", "me");
+    expect(vm.silver).toEqual({ since: "2026-10-06T12:00:00.000Z" });
   });
 
   it("marks your own profile as self and skips the follow lookup", async () => {
@@ -494,6 +512,7 @@ describe("MembersService people tabs + media (profile rebuild, 2026-09-12)", () 
       city: null,
       state: null,
       isFollowing: false,
+      silver: false,
     });
     const { params } = renderWhere(wheres[0]);
     expect(params).toEqual(["Delta", "u2", "me", "NG"]);
@@ -719,6 +738,7 @@ describe("MembersService.suggestedForFeed", () => {
       displayName: "Kay",
       avatarUrl: "https://s3/avatars/kay.jpg",
       isFollowing: false,
+      silver: false,
     });
     expect(result.total).toBe(1);
   });

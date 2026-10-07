@@ -81,6 +81,9 @@ export const subscriptionPayment = pgTable(
   ],
 );
 
+/** Why a Silver member's check is hidden until an admin looks again. */
+export type SilverCheckHold = "name" | "username" | "photo" | "admin";
+
 /** A member's paid plan, good until `currentPeriodEnd`. No row is Kinkord Basic. */
 export const memberSubscription = pgTable("member_subscription", {
   userId: text("user_id")
@@ -88,5 +91,14 @@ export const memberSubscription = pgTable("member_subscription", {
     .references(() => user.id, { onDelete: "cascade" }),
   plan: text("plan").$type<SubscriptionPlan>().notNull(),
   currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }).notNull(),
+  /** When this unbroken run of Silver began: "Silver since" on the profile. */
+  startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+  /**
+   * Set when the member changes their name, username or photo (or an admin
+   * takes the check away): the check stays hidden until an admin approves it,
+   * so it can't be bought and then used to impersonate someone.
+   */
+  checkHeldAt: timestamp("check_held_at", { withTimezone: true }),
+  checkHoldReason: text("check_hold_reason").$type<SilverCheckHold>(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

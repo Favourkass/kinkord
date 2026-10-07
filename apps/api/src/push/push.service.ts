@@ -243,6 +243,11 @@ export class PushService {
     this.toAdmins("payment", "New payment to verify");
   }
 
+  /** A Silver member changed their name, username or photo: their check waits for an admin. */
+  silverCheckReview(): void {
+    this.toAdmins("silver_check", "A Silver check needs review");
+  }
+
   /** An admin confirmed the member's transfer: Silver is on. */
   paymentVerified(userId: string, paymentId: string): void {
     this.toMember(userId, "payment_verified", paymentId, "Your Silver Premium is active");
@@ -253,7 +258,7 @@ export class PushService {
     this.toMember(userId, "payment_rejected", paymentId, "We couldn't confirm your payment");
   }
 
-  private toAdmins(type: "report" | "payment", body: string): void {
+  private toAdmins(type: "report" | "payment" | "silver_check", body: string): void {
     void adminUserIds(this.db)
       .then((ids) =>
         Promise.all(

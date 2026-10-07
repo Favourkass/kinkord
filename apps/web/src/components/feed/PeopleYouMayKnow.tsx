@@ -1,5 +1,6 @@
 import Link from "next/link";
 import MaskIcon from "@/components/app/MaskIcon";
+import SilverCheck from "@/components/app/SilverCheck";
 import type { FeedSuggestionVM } from "@/domain/post";
 
 export interface PeopleYouMayKnowProps {
@@ -72,7 +73,10 @@ export default function PeopleYouMayKnow({
           >
             <PersonPhoto person={person} column={column} />
             <div className="px-[10px] pb-[12px] pt-[8px]">
-              <p className="truncate text-[16px] font-bold text-feed-text">{person.displayName}</p>
+              <p className="flex min-w-0 items-center gap-[4px] text-[16px] font-bold text-feed-text">
+                <span className="truncate">{person.displayName}</span>
+                {person.silver ? <SilverCheck size={15} /> : null}
+              </p>
               <div className="flex items-center gap-[13px] pt-[8px]">
                 <button
                   type="button"

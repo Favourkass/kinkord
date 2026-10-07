@@ -12,6 +12,7 @@ import {
   yearlyListPrice,
   type PlanPeriod,
   type PlanPricesPM,
+  type SilverCheckPM,
   type SubscriptionStatusPM,
 } from "@/domain/subscription";
 import { subscriptionService } from "@/services/subscription.service";
@@ -50,6 +51,21 @@ export function planOptions(prices: PlanPricesPM, selected: PlanPeriod): PlanOpt
     save: period === "yearly" && save > 0 ? SUBSCRIPTION_COPY.upgrade.save(save) : null,
     selected: period === selected,
   }));
+}
+
+/** Where a Silver member's check stands, in a line: showing, or what it waits for. */
+export function checkNote(check: SilverCheckPM): { shown: boolean; text: string } {
+  const copy = SUBSCRIPTION_COPY.upgrade.plan.silver.check;
+  if (check.shown) return { shown: true, text: copy.shown };
+  const text =
+    check.reason === "held"
+      ? copy.held[check.heldFor ?? "admin"]
+      : check.reason === "photos"
+        ? copy.photos
+        : check.reason === "new_account" && check.showsFrom
+          ? copy.newAccount(planDate(check.showsFrom))
+          : copy.held.admin;
+  return { shown: false, text };
 }
 
 /** Which story the "current plan" card tells: an open payment comes first. */
@@ -148,6 +164,7 @@ export function useSubscriptionPresenter() {
       // Blank until the plan is known, so a Silver member never sees "Basic" first.
       title: status ? plan.title : "",
       body: status ? plan.body : "",
+      check: state === "silver" && status?.check ? checkNote(status.check) : null,
       /** An open payment opens; otherwise the card points at the plans below. */
       href: open ? Routes.subscriptionPay(open.id) : "#silver-plans",
     },

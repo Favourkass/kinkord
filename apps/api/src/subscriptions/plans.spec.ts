@@ -1,10 +1,17 @@
+import type { SQL } from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
+import { post, user } from "../db/schema";
 import {
   addPeriod,
+  CHECK_MIN_ACCOUNT_DAYS,
   DEFAULT_PRICES,
   freeOffset,
   hasSilver,
   paymentReference,
+  silverCheck,
+  silverCheckStatus,
+  silverSince,
   silverUntil,
   usdCentsFor,
 } from "./plans";
@@ -93,5 +100,82 @@ describe("silverUntil", () => {
   it("is null on Basic", async () => {
     await expect(silverUntil(queuedDb([[]]), "u1")).resolves.toBeNull();
     await expect(hasSilver(queuedDb([[]]), "u1")).resolves.toBe(false);
+  });
+});
+
+describe("silverCheck", () => {
+  const render = (expr: SQL) => new PgDialect().sqlToQuery(expr).sql.replace(/\s+/g, " ");
+
+  it("asks for running Silver, no hold, photos and a 30-day-old account", () => {
+    const text = render(silverCheck(post.authorId));
+    expect(text).toContain('from "member_subscription" "check_sub"');
+    expect(text).toContain('"check_sub"."user_id" = "post"."author_id"');
+    expect(text).toContain('"check_sub"."current_period_end" > now()');
+    expect(text).toContain('"check_sub"."check_held_at" is null');
+    expect(text).toContain('"check_profile"."avatar_key" is not null');
+    expect(text).toContain('"check_profile"."cover_key" is not null');
+    expect(text).toContain(
+      `"check_user"."created_at" <= now() - interval '${CHECK_MIN_ACCOUNT_DAYS} days'`,
+    );
+  });
+
+  it("reads its own aliases, so it still points at the outer member inside a query on users", () => {
+    // Were the subquery to read "user" itself, "user"."id" below would mean its own row.
+    const text = render(silverCheck(user.id));
+    expect(text).toContain(
+      'inner join "user" "check_user" on "check_user"."id" = "check_sub"."user_id"',
+    );
+    expect(text).toContain('"check_sub"."user_id" = "user"."id"');
+  });
+});
+
+describe("silverCheckStatus", () => {
+  const now = new Date("2026-10-07T12:00:00Z");
+  const row = (over: Record<string, unknown> = {}) => ({
+    heldAt: null,
+    heldFor: null,
+    createdAt: new Date("2026-01-01T00:00:00Z"),
+    avatarKey: "a",
+    coverKey: "c",
+    ...over,
+  });
+
+  it("is null without Silver, and shown when every rule is met", async () => {
+    await expect(silverCheckStatus(queuedDb([[]]), "u1", now)).resolves.toBeNull();
+    await expect(silverCheckStatus(queuedDb([[row()]]), "u1", now)).resolves.toEqual({
+      shown: true,
+      reason: null,
+      heldFor: null,
+      showsFrom: null,
+    });
+  });
+
+  it("says what's missing: a review, photos, or time", async () => {
+    await expect(
+      silverCheckStatus(queuedDb([[row({ heldAt: now, heldFor: "username" })]]), "u1", now),
+    ).resolves.toMatchObject({ shown: false, reason: "held", heldFor: "username" });
+    await expect(
+      silverCheckStatus(queuedDb([[row({ coverKey: null })]]), "u1", now),
+    ).resolves.toMatchObject({ shown: false, reason: "photos" });
+    await expect(
+      silverCheckStatus(
+        queuedDb([[row({ createdAt: new Date("2026-09-20T00:00:00Z") })]]),
+        "u1",
+        now,
+      ),
+    ).resolves.toEqual({
+      shown: false,
+      reason: "new_account",
+      heldFor: null,
+      showsFrom: new Date("2026-10-20T00:00:00Z"),
+    });
+  });
+});
+
+describe("silverSince", () => {
+  it("is when a member showing the check began, or null", async () => {
+    const since = new Date("2026-10-06T12:00:00Z");
+    await expect(silverSince(queuedDb([[{ since }]]), "u1")).resolves.toEqual(since);
+    await expect(silverSince(queuedDb([[]]), "u1")).resolves.toBeNull();
   });
 });

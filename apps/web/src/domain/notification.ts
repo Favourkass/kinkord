@@ -9,7 +9,8 @@ export type NotificationKind =
   | "test"
   | "payment"
   | "payment_verified"
-  | "payment_rejected";
+  | "payment_rejected"
+  | "silver_check";
 
 /**
  * GET /notifications item. Who did it is looked up when the inbox loads, so a
@@ -18,7 +19,13 @@ export type NotificationKind =
 export interface NotificationPM {
   id: string;
   type: NotificationKind;
-  actor: { name: string; username: string | null; avatarUrl: string | null } | null;
+  actor: {
+    name: string;
+    username: string | null;
+    avatarUrl: string | null;
+    /** Shows the Silver check; absent from an older API. */
+    silver?: boolean;
+  } | null;
   url: string;
   /** Messages in a chat since its row was last read; 1 otherwise. */
   count: number;
@@ -37,6 +44,8 @@ export interface NotificationVM {
   body: string;
   category: string;
   actorName: string | null;
+  /** The Silver check beside the actor's name. */
+  actorSilver: boolean;
   avatarUrl: string | null;
   action: string;
   official: boolean;
@@ -73,6 +82,11 @@ const KINDS: Record<
     icon: "bell",
     action: () => "We couldn't confirm your payment. Open it to see why.",
   },
+  silver_check: {
+    category: "Silver checks",
+    icon: "shield",
+    action: () => "A Silver member changed their name or photo. Review their check.",
+  },
   test: {
     category: "Notifications enabled",
     icon: "bell",
@@ -88,6 +102,7 @@ const OFFICIAL: ReadonlySet<NotificationKind> = new Set([
   "payment",
   "payment_verified",
   "payment_rejected",
+  "silver_check",
 ]);
 
 /** A kind this version of the app doesn't know yet still shows, as Kinkord's own. */
@@ -121,6 +136,7 @@ export function toNotificationVM(item: NotificationPM, now = new Date()): Notifi
     body: actorName ? `${actorName} ${action}` : action,
     category: kind.category,
     actorName,
+    actorSilver: !official && Boolean(item.actor?.silver),
     avatarUrl: official ? null : (item.actor?.avatarUrl ?? null),
     action,
     official,

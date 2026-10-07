@@ -1,5 +1,6 @@
 import Link from "next/link";
 import MaskIcon from "@/components/app/MaskIcon";
+import SilverCheck from "@/components/app/SilverCheck";
 import type { MemberCardVM } from "@/domain/member";
 
 export interface MemberCardLabels {
@@ -47,9 +48,10 @@ export default function MemberCard({ vm, href, labels, onToggleFollow, busy }: M
         <Link
           href={href}
           aria-label={labels.openProfile}
-          className="block truncate text-[13px] font-semibold leading-[16px] text-mem-list-text after:absolute after:inset-0 after:content-[''] lg:text-[20px] lg:leading-[24px]"
+          className="flex min-w-0 items-center gap-[4px] text-[13px] font-semibold leading-[16px] text-mem-list-text after:absolute after:inset-0 after:content-[''] lg:gap-[6px] lg:text-[20px] lg:leading-[24px]"
         >
-          {vm.title}
+          <span className="truncate">{vm.title}</span>
+          {vm.silver ? <SilverCheck size={13} className="lg:!size-[18px]" /> : null}
         </Link>
         <p className="flex items-center pt-[4px] text-[10px] font-medium leading-[12px] text-mem-list-muted lg:pt-[8px] lg:text-[16px] lg:leading-[19px]">
           {vm.ageTag && <span>{vm.ageTag}</span>}

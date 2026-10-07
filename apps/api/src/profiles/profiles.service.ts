@@ -17,6 +17,7 @@ import {
   variantKey,
   type ImageVariant,
 } from "../storage/storage.service";
+import { SilverChecksService } from "../subscriptions/silver-checks.service";
 import {
   ACCEPTED_KINK_ROLES,
   GENDERS,
@@ -156,6 +157,7 @@ export class ProfilesService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Db,
     private readonly storage: StorageService,
+    private readonly checks: SilverChecksService,
   ) {}
 
   async getOwn(userId: string, fallbackName: string) {
@@ -203,6 +205,11 @@ export class ProfilesService {
         key: input[field] as string,
       }));
     if (uploads.length > 0) await this.db.insert(profileMedia).values(uploads);
+    // A Silver member who now looks like someone else waits for an admin before their check returns.
+    if (changes.displayNameChangedAt) await this.checks.hold(userId, "name");
+    else if (input.avatarKey && input.avatarKey !== current.avatarKey) {
+      await this.checks.hold(userId, "photo");
+    }
     return this.toVM(row);
   }
 
@@ -273,6 +280,7 @@ export class ProfilesService {
       }
       throw e;
     }
+    await this.checks.hold(userId, "username");
     return this.usernameVM(username, displayUsername, now, now);
   }
 

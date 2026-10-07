@@ -127,6 +127,13 @@
       "when": 1791308671393,
       "tag": "0017_subscriptions",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791360571068,
+      "tag": "0018_silver_check",
+      "breakpoints": true
     }
   ]
 }

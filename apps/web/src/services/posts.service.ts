@@ -23,6 +23,8 @@ export interface SuggestedPersonPM {
   displayName: string;
   avatarUrl: string | null;
   isFollowing: boolean;
+  /** Shows the Silver check; absent from an older API. */
+  silver?: boolean;
 }
 
 export interface SuggestedPM {

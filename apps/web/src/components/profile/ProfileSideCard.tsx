@@ -2,6 +2,7 @@ import Link from "next/link";
 import MaskIcon from "@/components/app/MaskIcon";
 import type { PublicProfileVM } from "@/domain/member";
 import ExpandableAvatar from "./ExpandableAvatar";
+import SilverBadge, { type SilverBadgeLabels } from "./SilverBadge";
 
 export interface ProfileSideCardLabels {
   follow: string;
@@ -11,6 +12,7 @@ export interface ProfileSideCardLabels {
   editProfile: string;
   tagsHeading: string;
   stats: { friends: string; followers: string; following: string };
+  silver: SilverBadgeLabels;
 }
 
 export interface ProfileSideCardProps {
@@ -19,6 +21,7 @@ export interface ProfileSideCardProps {
   labels: ProfileSideCardLabels;
   messageHref: string;
   editHref: string;
+  silverHref: string;
   onToggleFollow: () => void;
   followBusy: boolean;
 }
@@ -30,6 +33,7 @@ export default function ProfileSideCard({
   labels,
   messageHref,
   editHref,
+  silverHref,
   onToggleFollow,
   followBusy,
 }: ProfileSideCardProps) {
@@ -80,8 +84,11 @@ export default function ProfileSideCard({
       <div className="flex flex-col gap-[16px] px-[24px] pb-[24px]">
         <div className="flex flex-col gap-[4px]">
           <p className="flex items-baseline gap-[6px]">
-            <span className="text-[22px] font-bold leading-[27px] text-pf-text">
+            <span className="inline-flex items-center gap-[4px] text-[22px] font-bold leading-[27px] text-pf-text">
               {vm.displayName}
+              {vm.silver ? (
+                <SilverBadge since={vm.silver.since} labels={labels.silver} href={silverHref} />
+              ) : null}
             </span>
             {vm.handle && (
               <span className="text-[15px] leading-[18px] text-pf-muted">{vm.handle}</span>

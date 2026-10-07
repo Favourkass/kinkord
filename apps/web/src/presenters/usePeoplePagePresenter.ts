@@ -178,6 +178,7 @@ export function usePeoplePagePresenter(usernameParam: string, tabParam?: string 
     location: locationOf(f.city, f.state),
     isFollowing: f.isFollowing,
     busy: busy.has(f.userId),
+    silver: Boolean(f.silver),
     href: Routes.member(f.username ?? f.userId),
     pill: Boolean(pm?.isSelf) && tab === "all",
   }));

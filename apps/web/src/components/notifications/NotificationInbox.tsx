@@ -13,6 +13,7 @@ import {
 import type { LucideProps } from "lucide-react";
 import type { NotificationVM } from "@/domain/notification";
 import AvatarCircle from "../app/AvatarCircle";
+import SilverCheck from "../app/SilverCheck";
 
 const ICONS = {
   message: MessageCircleMore,
@@ -257,7 +258,10 @@ export default function NotificationInbox(p: NotificationInboxProps) {
                     <span className="block break-words text-[13px] font-medium leading-[19px] min-[420px]:text-[14px] lg:text-[16px]">
                       {item.actorName && (
                         <>
-                          <strong className="font-extrabold">{item.actorName}</strong>{" "}
+                          <strong className="font-extrabold">{item.actorName}</strong>
+                          {item.actorSilver ? (
+                            <SilverCheck size={14} className="ml-[3px] align-[-2px]" />
+                          ) : null}{" "}
                         </>
                       )}
                       <span>{item.action}</span>

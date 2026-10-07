@@ -48,9 +48,23 @@ export interface PaymentPM {
   createdAt: string;
 }
 
+/** What hid a Silver check: a change to how the member appears, or an admin. */
+export type SilverCheckHold = "name" | "username" | "photo" | "admin";
+
+/** Whether a Silver member's check shows and, when it doesn't, why. */
+export interface SilverCheckPM {
+  shown: boolean;
+  reason: "held" | "new_account" | "photos" | null;
+  heldFor: SilverCheckHold | null;
+  /** When a new account's check appears. */
+  showsFrom: string | null;
+}
+
 export interface SubscriptionStatusPM {
   plan: "basic" | "silver";
   silverUntil: string | null;
+  /** Null on Basic. */
+  check: SilverCheckPM | null;
   available: boolean;
   prices: PlanPricesPM;
   open: PaymentPM | null;
@@ -222,5 +236,88 @@ export function toAdminPaymentVM(
     reviewNote: pm.reviewNote,
     canVerify: pm.status !== "verified",
     canReject: pm.status === "submitted" || pm.status === "pending",
+  };
+}
+
+/** A Silver check hidden until an admin has looked: the admins' review list. */
+export interface HeldCheckPM {
+  userId: string;
+  username: string | null;
+  displayName: string;
+  avatarUrl: string | null;
+  reason: SilverCheckHold | null;
+  heldAt: string;
+  silverUntil: string;
+}
+
+/** One member's Silver check, on their page in the admin area. */
+export interface MemberCheckPM extends SilverCheckPM {
+  silverUntil: string;
+}
+
+export interface HeldCheckVM {
+  userId: string;
+  name: string;
+  handle: string | null;
+  avatarUrl: string | null;
+  href: string;
+  /** What they changed: "New name". */
+  change: string;
+  /** How long it has waited: "3h ago". */
+  waiting: string;
+}
+
+export function toHeldCheckVM(
+  pm: HeldCheckPM,
+  memberHref: (id: string) => string,
+  changes: Record<SilverCheckHold, string>,
+  now = new Date(),
+): HeldCheckVM {
+  return {
+    userId: pm.userId,
+    name: pm.displayName,
+    handle: pm.username ? `@${pm.username}` : null,
+    avatarUrl: pm.avatarUrl,
+    href: memberHref(pm.userId),
+    change: changes[pm.reason ?? "admin"],
+    waiting: timeAgo(pm.heldAt, now) ?? "",
+  };
+}
+
+export interface MemberCheckVM {
+  /** "Silver until 6 Oct 2027" */
+  until: string;
+  shown: boolean;
+  /** Where the check stands, in a sentence. */
+  status: string;
+  /** Only a hidden-for-review check can be approved. */
+  canApprove: boolean;
+  /** Not when an admin has already removed it. */
+  canRemove: boolean;
+}
+
+export function toMemberCheckVM(
+  pm: MemberCheckPM,
+  labels: {
+    until: (date: string) => string;
+    shown: string;
+    held: Record<SilverCheckHold, string>;
+    photos: string;
+    newAccount: (date: string) => string;
+  },
+): MemberCheckVM {
+  const held = pm.reason === "held";
+  return {
+    until: labels.until(planDate(pm.silverUntil)),
+    shown: pm.shown,
+    status: pm.shown
+      ? labels.shown
+      : held
+        ? labels.held[pm.heldFor ?? "admin"]
+        : pm.reason === "photos"
+          ? labels.photos
+          : labels.newAccount(pm.showsFrom ? planDate(pm.showsFrom) : ""),
+    canApprove: held,
+    canRemove: !(held && pm.heldFor === "admin"),
   };
 }

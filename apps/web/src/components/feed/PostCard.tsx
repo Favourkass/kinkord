@@ -1,6 +1,7 @@
 import Link from "next/link";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import MaskIcon from "@/components/app/MaskIcon";
+import SilverCheck from "@/components/app/SilverCheck";
 import type { PostMediaVM, PostVM } from "@/domain/post";
 import PostActions, { type PostActionLabels } from "./PostActions";
 import PostMediaGrid from "./PostMediaGrid";
@@ -50,7 +51,10 @@ export default function PostCard({
   onOpenMedia,
 }: PostCardProps) {
   const name = (
-    <span className="text-[14px] font-bold leading-[17px] text-feed-text">{post.authorName}</span>
+    <span className="inline-flex items-center gap-[3px] text-[14px] font-bold leading-[17px] text-feed-text">
+      {post.authorName}
+      {post.authorSilver ? <SilverCheck size={15} /> : null}
+    </span>
   );
   return (
     <article className="border-b border-feed-line px-[25px] py-[18px]">

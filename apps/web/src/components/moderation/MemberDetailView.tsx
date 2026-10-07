@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import type { AdminMemberDetailVM } from "@/domain/moderation";
 import type { AdminDialogVM } from "@/presenters/useAdminMemberPresenter";
@@ -33,6 +34,8 @@ export interface MemberDetailViewProps {
   onDeletePosts: () => void;
   onDeleteAccount: () => void;
   onDeletePost: (postId: string) => void;
+  /** Their Silver check, when they have Silver. */
+  silverCheck?: ReactNode;
 }
 
 const outline =
@@ -51,6 +54,7 @@ export default function MemberDetailView({
   onDeletePosts,
   onDeleteAccount,
   onDeletePost,
+  silverCheck,
 }: MemberDetailViewProps) {
   return (
     <div>
@@ -134,6 +138,8 @@ export default function MemberDetailView({
               </button>
             </div>
           )}
+
+          {silverCheck}
 
           <h2 className="pt-[28px] pb-[10px] text-[14px] font-bold text-app-text">
             {labels.posts} · {vm.postCount}
