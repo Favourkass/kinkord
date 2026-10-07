@@ -35,7 +35,7 @@ export class SubscriptionsController {
 
   @Get()
   status(@Req() req: AuthedRequest) {
-    return this.subscriptions.status(req.user.id);
+    return this.subscriptions.status(req.user);
   }
 
   @Post("checkout")

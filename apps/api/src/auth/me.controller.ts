@@ -17,7 +17,7 @@ export class MeController {
       twoFactorEnabled?: boolean | null;
     };
     // The plan decides limits the app shows before asking, like a post's length.
-    const silver = await this.subscriptions.silverUntil(id);
+    const silver = await this.subscriptions.silverUntil(req.user);
     return {
       id,
       email,

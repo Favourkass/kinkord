@@ -95,6 +95,12 @@ export async function hasSilver(db: Db, userId: string): Promise<boolean> {
 
 /** Days an account must have before its Silver check shows: a new account can't buy one to impersonate. */
 export const CHECK_MIN_ACCOUNT_DAYS = 30;
+
+/**
+ * The founders' Silver doesn't run out: as good as never, for the dates the app
+ * shows. Midday, so it reads 31 Dec 2099 in Lagos and everywhere else.
+ */
+export const FOUNDER_SILVER_UNTIL = new Date("2099-12-31T12:00:00.000Z");
 const CHECK_MIN_ACCOUNT_AGE = sql.raw(`interval '${CHECK_MIN_ACCOUNT_DAYS} days'`);
 
 // Aliased so the check can sit inside any query, even one that already reads `user` or `profile`.
