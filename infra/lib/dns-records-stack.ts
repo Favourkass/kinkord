@@ -28,7 +28,24 @@ export class DnsRecordsStack extends cdk.Stack {
     // any other apex TXT value (SPF, say) belongs in this same list.
     new route53.TxtRecord(this, "ApexTxt", {
       zone,
-      values: ["google-site-verification=2UIOUMvhuYPsRbVCoc5hPHTi_6foL_h_Q-vxQKf_VKs"],
+      values: [
+        "google-site-verification=2UIOUMvhuYPsRbVCoc5hPHTi_6foL_h_Q-vxQKf_VKs",
+        // SPF: the @kinkord.com mailboxes send through Namecheap Private Email.
+        // The app's own emails (Resend) go out as send.kinkord.com, which has its
+        // own SPF, so they aren't listed here. One SPF policy only: add to this one.
+        "v=spf1 include:spf.privateemail.com ~all",
+      ],
+    });
+
+    // The @kinkord.com mailboxes (Namecheap Private Email). Without an MX, mail
+    // sent to the domain bounces.
+    new route53.MxRecord(this, "ApexMx", {
+      zone,
+      values: [
+        { priority: 10, hostName: "mx1.privateemail.com" },
+        { priority: 10, hostName: "mx2.privateemail.com" },
+      ],
+      ttl: cdk.Duration.minutes(5),
     });
 
     // DMARC: tells Gmail, Yahoo and Outlook what to do with mail claiming to be
