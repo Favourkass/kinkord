@@ -48,6 +48,19 @@ export class DnsRecordsStack extends cdk.Stack {
       ttl: cdk.Duration.minutes(5),
     });
 
+    // DKIM for those mailboxes: Namecheap signs what they send with the private
+    // half of this key (Private Email -> Manage -> Show DKIM). A public key, there
+    // for any mail server to check. Longer than a TXT string's 255 characters, so
+    // CDK splits it into two strings in the one record.
+    new route53.TxtRecord(this, "PrivateEmailDkim", {
+      zone,
+      recordName: "privateemail._domainkey",
+      values: [
+        "v=DKIM1;k=rsa;p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0iinZxXGRaXfIdsQEWUXmWesr6AIvFNGcMcOD8SsxjfhNLEPPMKNZUXK//M/84A0DCvIYRSsSA77ZrFm/5E/SvVsV4moPp1Kh/ILR0igAzrxJFau7yzXXZsjYTLIzG/RBUcnh+Xdw3sdvofpK/u0Dnea3cSS4eIPr9n4RofXbol7MZOWUgTl7zXdclPfKs3JLRIpZyP9KNq1EqmZ5lCWgMj398HU9npUn0Ho++31jU0uihPZ9u9gmtzO9I3Mg2QV10RH6JWRLViNE8QakVjjx/1aDnnZYgGd0ldVkUHIM3lt7J1utl1Cykh3DapMCtjBGhrtkTUjpybhu2VksVsTLwIDAQAB",
+      ],
+      ttl: cdk.Duration.minutes(5),
+    });
+
     // DMARC: tells Gmail, Yahoo and Outlook what to do with mail claiming to be
     // from kinkord.com that fails its checks. Without one they trust our mail
     // (sign-up codes above all) less and file more of it as spam. `p=none` only
