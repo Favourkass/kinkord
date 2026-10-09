@@ -86,7 +86,7 @@ function makeStorage() {
   };
 }
 
-const push = { newRepost: vi.fn() };
+const push = { newRepost: vi.fn(), newMention: vi.fn() };
 
 const service = (db = makeDb(), storage = makeStorage()) =>
   new PostsService(db as never, storage as never, push as never);
@@ -149,6 +149,43 @@ describe("PostsService.presignMediaUpload", () => {
     await expect(
       service().presignMediaUpload("u1", "image/jpeg", 11 * 1024 * 1024),
     ).rejects.toThrow(/too large/i);
+  });
+});
+
+describe("PostsService.notifyMentions", () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it("tells mentioned members who can see the post, never the writer or the excepted", async () => {
+    push.newMention.mockClear();
+    const svc = service(
+      makeDb([
+        [
+          { username: "self", id: "u1" },
+          { username: "two", id: "u2" },
+          { username: "three", id: "u3" },
+          { username: "four", id: "u4" },
+        ],
+      ]),
+    );
+    // u3 can't see this friends-only post: a link would only say "not found".
+    vi.spyOn(svc, "canSee").mockImplementation(async (_post, viewer) => viewer !== "u3");
+    svc.notifyMentions("p1", "u1", "@self @two @three @four @ghost", ["u4"]);
+    await settle();
+    expect(push.newMention.mock.calls).toEqual([["p1", "u2", "u1"]]);
+  });
+
+  it("asks nothing when nobody is mentioned, and never fails the post", async () => {
+    const db = makeDb();
+    service(db).notifyMentions("p1", "u1", "no handles here");
+    expect(db.select).not.toHaveBeenCalled();
+    const broken = {
+      ...makeDb(),
+      select: vi.fn(() => {
+        throw new Error("db down");
+      }),
+    };
+    expect(() => service(broken).notifyMentions("p1", "u1", "@ada hi")).not.toThrow();
+    await settle();
   });
 });
 
@@ -350,6 +387,16 @@ describe("PostsService.byId", () => {
     });
     expect(vm?.media[0].thumbUrl).toContain("v=md");
     expect(storage.presignDownload).toHaveBeenCalledWith("avatars/u2/a.jpg", "sm");
+  });
+
+  it("links only the @handles that are members", async () => {
+    const db = makeDb([
+      [{ ...row, body: "brunch with @Tega and @ghost" }],
+      ...decorated(),
+      [{ username: "tega" }],
+    ]);
+    const vm = await service(db, makeStorage()).byId("p1", "u1");
+    expect(vm?.mentions).toEqual([{ handle: "tega", username: "tega" }]);
   });
 
   it("shows the Silver check on an author who has it", async () => {

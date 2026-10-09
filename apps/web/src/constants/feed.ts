@@ -42,6 +42,8 @@ export const FEED_COPY = {
   comments: "Comments",
   commentsEmpty: "No comments yet. Be the first.",
   commentPlaceholder: "Write a comment…",
+  /** The list of members to mention, while "@" is typed. */
+  mentionSuggestions: "Members to mention",
   commentSubmit: "Send",
   commentDelete: "Delete comment",
   commentsMore: "Load more comments",

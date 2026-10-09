@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import { and, count, desc, eq, ilike, inArray, isNull, lt, or, sql } from "drizzle-orm";
@@ -27,6 +28,13 @@ import {
   type PostMediaKind,
   type PostVisibility,
 } from "../db/schema";
+import {
+  knownHandles,
+  membersToTell,
+  mentionCandidates,
+  mentionsIn,
+  type Mention,
+} from "./mentions";
 import {
   IMAGE_VARIANTS,
   StorageService,
@@ -138,6 +146,8 @@ export interface PostVM {
   repostedBy: Pick<PostAuthorVM, "userId" | "username" | "displayName"> | null;
   /** Whether the viewer may delete this row — their own post or their own repost. */
   mine: boolean;
+  /** Each @handle in the body that names a member, and whom: the ones the app links. */
+  mentions: Mention[];
 }
 
 export interface RepostVM {
@@ -169,6 +179,8 @@ export interface FeedVM {
  */
 @Injectable()
 export class PostsService {
+  private readonly log = new Logger(PostsService.name);
+
   constructor(
     @Inject(DRIZZLE) private readonly db: Db,
     private readonly storage: StorageService,
@@ -231,9 +243,40 @@ export class PostsService {
         })),
       );
     }
+    this.notifyMentions(row.id, userId, input.body);
     const vm = await this.byId(row.id, userId);
     if (!vm) throw new NotFoundException("Post not found");
     return vm;
+  }
+
+  /** Whether the viewer can read this post, by the feed's own rules. */
+  async canSee(postId: string, viewerId: string): Promise<boolean> {
+    return (await this.selectPosts(viewerId, [eq(post.id, postId)], 1)).length > 0;
+  }
+
+  /**
+   * Tells the members a post or a comment on it mentions, once each and ten at
+   * most: members who exist, can see the post (a friends-only post's link would
+   * only say "not found"), and aren't the writer or `except` (a post's author
+   * already hears of a comment). A block is honoured where the inbox records it.
+   * Never fails the post or comment.
+   */
+  notifyMentions(
+    postId: string,
+    actorId: string,
+    text: string | null | undefined,
+    except: string[] = [],
+  ): void {
+    const names = mentionCandidates(text);
+    if (!names.length) return;
+    void (async () => {
+      const members = await knownHandles(this.db, names);
+      for (const name of membersToTell(mentionsIn(text, members))) {
+        const id = members.get(name) as string;
+        if (id === actorId || except.includes(id)) continue;
+        if (await this.canSee(postId, id)) this.push.newMention(postId, id, actorId);
+      }
+    })().catch((e: unknown) => this.log.warn(`mention notifications failed: ${String(e)}`));
   }
 
   /** The home feed, or one member's posts when `authorId` is given. */
@@ -644,6 +687,11 @@ export class PostsService {
     // Post headers are 36px circles — the small size is a few KB.
     const avatar = (key: string | null) =>
       key ? this.storage.presignDownload(key, "sm") : Promise.resolve(null);
+    // One lookup for every @handle on the page; none when nobody is mentioned.
+    const members = await knownHandles(
+      this.db,
+      pairs.flatMap(({ content }) => mentionCandidates(content.body)),
+    );
 
     return Promise.all(
       pairs.map(async ({ row, content }) => ({
@@ -676,6 +724,7 @@ export class PostsService {
                 displayName: row.displayName ?? row.username ?? "Member",
               },
         mine: row.authorId === viewerId,
+        mentions: mentionsIn(content.body, members),
       })),
     );
   }

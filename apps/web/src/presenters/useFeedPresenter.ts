@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { FEED_COPY, FEED_PHOTO_LIMIT, FEED_SUGGESTION_LIMIT } from "@/constants/feed";
 import { Routes } from "@/constants/Routes";
 import {
+  COMMENT_BODY_MAX,
   handleOf,
+  postBodyMax,
   toCommentVM,
   toPostVM,
   type CommentPM,
@@ -19,6 +21,7 @@ import {
   type PostVisibility,
 } from "@/domain/post";
 import { ApiError } from "@/services/apiClient";
+import { useMentionSuggestions, type MentionField } from "./useMentionSuggestions";
 import {
   applyLike,
   applyRepost,
@@ -59,6 +62,8 @@ export interface FeedOptions {
   saved?: boolean;
   /** Search: the posts whose text contains this. */
   search?: string | null;
+  /** The composer's limit (Silver writes longer posts), which a picked @mention mustn't pass. */
+  postMaxLength?: number;
   /**
    * False while the author is still being resolved. /profile has to ask the API
    * who you are before it can ask for your posts, and without this the first
@@ -82,6 +87,7 @@ export function useFeedPresenter({
   postId = null,
   saved = false,
   search = null,
+  postMaxLength = postBodyMax(false),
   ready = true,
 }: FeedOptions = {}) {
   const router = useRouter();
@@ -131,6 +137,33 @@ export function useFeedPresenter({
   const [commentsCursor, setCommentsCursor] = useState<string | null>(null);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentDraft, setCommentDraft] = useState("");
+
+  // "@" and a few letters in either box suggests members to mention.
+  const {
+    track: trackMention,
+    picker: mentionPicker,
+    close: closeMention,
+  } = useMentionSuggestions(
+    useCallback((field: MentionField, text: string) => {
+      if (field === "post") setDraft(text);
+      else setCommentDraft(text);
+    }, []),
+  );
+  /** A box's text changed, or its caret moved: where it is decides the suggestions. */
+  const typeDraft = useCallback(
+    (value: string, caret?: number) => {
+      setDraft(value);
+      trackMention("post", value, caret ?? value.length);
+    },
+    [trackMention],
+  );
+  const typeCommentDraft = useCallback(
+    (value: string, caret?: number) => {
+      setCommentDraft(value);
+      trackMention("comment", value, caret ?? value.length);
+    },
+    [trackMention],
+  );
   const [commentSending, setCommentSending] = useState(false);
   const [commentsError, setCommentsError] = useState<string | null>(null);
 
@@ -274,10 +307,11 @@ export function useFeedPresenter({
     setComposerOpen(false);
     setAutoPickPhoto(false);
     setDraft("");
+    closeMention("post");
     setVisibility("public");
     setComposerError(null);
     discardPhotos();
-  }, [discardPhotos]);
+  }, [discardPhotos, closeMention]);
 
   const addPhotos = useCallback(
     (files: File[]) => {
@@ -455,6 +489,7 @@ export function useFeedPresenter({
       setComments([]);
       setCommentsCursor(null);
       setCommentDraft("");
+      closeMention("comment");
       setCommentsError(null);
       setCommentsLoading(true);
       try {
@@ -468,7 +503,7 @@ export function useFeedPresenter({
         setCommentsLoading(false);
       }
     },
-    [onUnauthorized],
+    [onUnauthorized, closeMention],
   );
 
   const closeComments = useCallback(() => {
@@ -476,8 +511,9 @@ export function useFeedPresenter({
     setComments([]);
     setCommentsCursor(null);
     setCommentDraft("");
+    closeMention("comment");
     setCommentsError(null);
-  }, []);
+  }, [closeMention]);
 
   const loadMoreComments = useCallback(async () => {
     if (!commentsFor || !commentsCursor || commentsLoading) return;
@@ -503,6 +539,7 @@ export function useFeedPresenter({
       setComments((prev) => [created, ...prev]);
       setPosts((prev) => applyToPost(prev, postId, (p) => withCommentDelta(p, 1)));
       setCommentDraft("");
+      closeMention("comment");
     } catch (e) {
       if (onUnauthorized(e)) return;
       setCommentsError(
@@ -511,7 +548,7 @@ export function useFeedPresenter({
     } finally {
       setCommentSending(false);
     }
-  }, [commentsFor, commentDraft, commentSending, onUnauthorized]);
+  }, [commentsFor, commentDraft, commentSending, onUnauthorized, closeMention]);
 
   const deleteComment = useCallback(
     async (id: string) => {
@@ -643,7 +680,8 @@ export function useFeedPresenter({
     openComposerWithPhoto,
     closeComposer,
     draft,
-    setDraft,
+    setDraft: typeDraft,
+    postMentions: mentionPicker("post", postMaxLength),
     visibility,
     setVisibility,
     photos: photoVMs,
@@ -672,7 +710,8 @@ export function useFeedPresenter({
     openComments,
     closeComments,
     commentDraft,
-    setCommentDraft,
+    setCommentDraft: typeCommentDraft,
+    commentMentions: mentionPicker("comment", COMMENT_BODY_MAX),
     commentSending,
     canComment: canSubmitComment(commentDraft) && !commentSending,
     submitComment,

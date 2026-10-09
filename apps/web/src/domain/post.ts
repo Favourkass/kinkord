@@ -4,6 +4,7 @@
  * on a long body.
  */
 import { compactNumber, shortTimeAgo } from "@/util/format";
+import { bodyParts, clipParts, type BodyPart, type MentionPM } from "./mentions";
 
 export type PostVisibility = "public" | "friends";
 
@@ -44,6 +45,8 @@ export interface PostPM {
   /** Set when this row is somebody's repost of the post above. */
   repostedBy: Pick<PostAuthorPM, "userId" | "username" | "displayName"> | null;
   mine: boolean;
+  /** Each @handle in the body that names a member, and whom. Absent from an older API. */
+  mentions?: MentionPM[];
 }
 
 export interface FeedPM {
@@ -57,6 +60,8 @@ export interface CommentPM {
   createdAt: string;
   author: PostAuthorPM;
   canDelete: boolean;
+  /** Each @handle in the body that names a member, and whom. Absent from an older API. */
+  mentions?: MentionPM[];
 }
 
 export interface CommentsPM {
@@ -132,6 +137,8 @@ export interface PostVM {
   time: string;
   /** Already clamped when `canExpand` is true and the reader hasn't expanded it. */
   body: string | null;
+  /** The body as text and @mention links. */
+  bodyParts: BodyPart[];
   /** Offer the "more" affordance. */
   canExpand: boolean;
   expanded: boolean;
@@ -177,6 +184,8 @@ export interface CommentVM {
   avatarUrl: string | null;
   time: string;
   body: string;
+  /** The body as text and @mention links. */
+  bodyParts: BodyPart[];
   canDelete: boolean;
 }
 
@@ -193,11 +202,16 @@ export function needsClamp(body: string | null): boolean {
   return (body?.length ?? 0) > POST_PREVIEW_CHARS;
 }
 
-/** The clamped body, cut on a word boundary so it doesn't end mid-word. */
-export function clampBody(body: string): string {
+/** How much of a long body the card shows: up to a word boundary, so it doesn't end mid-word. */
+function clampLength(body: string): number {
   const cut = body.slice(0, POST_PREVIEW_CHARS);
   const space = cut.lastIndexOf(" ");
-  return `${(space > POST_PREVIEW_CHARS * 0.6 ? cut.slice(0, space) : cut).trimEnd()}…`;
+  return (space > POST_PREVIEW_CHARS * 0.6 ? cut.slice(0, space) : cut).trimEnd().length;
+}
+
+/** The clamped body, cut on a word boundary so it doesn't end mid-word. */
+export function clampBody(body: string): string {
+  return `${body.slice(0, clampLength(body))}…`;
 }
 
 export function toPostVM(
@@ -207,6 +221,12 @@ export function toPostVM(
   now = new Date(),
 ): PostVM {
   const canExpand = needsClamp(pm.body);
+  // How much of the body shows: all of it, or what fits before "more".
+  const shown = pm.body && canExpand && !expanded ? clampLength(pm.body) : null;
+  const body = pm.body && shown !== null ? clampBody(pm.body) : pm.body;
+  // Mentions are read on the whole text, then cut: a handle the clamp cuts
+  // short reads as text until "more", never as whoever its first letters name.
+  const parts = pm.body ? bodyParts(pm.body, pm.mentions, (u) => hrefFor(u) ?? "") : [];
   return {
     id: pm.id,
     postId: pm.postId,
@@ -218,7 +238,8 @@ export function toPostVM(
     authorHref: hrefFor(pm.author.username),
     avatarUrl: pm.author.avatarUrl,
     time: shortTimeAgo(pm.createdAt, now) ?? "",
-    body: pm.body && canExpand && !expanded ? clampBody(pm.body) : pm.body,
+    body,
+    bodyParts: shown === null ? parts : [...clipParts(parts, shown), { text: "…" }],
     canExpand,
     expanded,
     media: pm.media.map((m, i) => ({
@@ -249,6 +270,7 @@ export function toCommentVM(pm: CommentPM, hrefFor: HrefFor, now = new Date()): 
     avatarUrl: pm.author.avatarUrl,
     time: shortTimeAgo(pm.createdAt, now) ?? "",
     body: pm.body,
+    bodyParts: bodyParts(pm.body, pm.mentions, (u) => hrefFor(u) ?? ""),
     canDelete: pm.canDelete,
   };
 }

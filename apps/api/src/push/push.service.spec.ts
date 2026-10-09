@@ -202,6 +202,22 @@ describe("PushService notifications", () => {
     expect(sent()).toMatchObject({ body: "Ada commented on your post", url: "/p/p1" });
   });
 
+  it("tells a member they were mentioned, who by, and never themselves", async () => {
+    const own = queuedDb([]);
+    new PushService(own.db, inbox()).newMention("p1", "u1", "u1");
+    await flush();
+    expect(own.calls).toHaveLength(0);
+
+    const { db } = queuedDb([
+      [{ username: "ada", name: "Adaeze", displayName: "Ada" }],
+      [sub("s1")],
+      [KEYS],
+    ]);
+    new PushService(db, inbox()).newMention("p1", "u2", "u1");
+    await flush();
+    expect(sent()).toMatchObject({ body: "Ada mentioned you", url: "/p/p1" });
+  });
+
   it("pings every moderator about a new report, saying nothing about who or why", async () => {
     const { db } = queuedDb([
       [{ id: "f1" }], // the founder's verified account
