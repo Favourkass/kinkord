@@ -89,15 +89,22 @@ export function useFeedPresenter({
   const [posts, setPosts] = useState<PostPM[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   /**
-   * Which author the loaded posts belong to. Deriving `loading` from it rather
-   * than flipping a flag means walking from one member's profile to another
-   * shows a load instead of a flash of the previous member's posts — the page
-   * component stays mounted across that navigation.
+   * Which list the loaded posts belong to, and which round of it (each first
+   * page starts a round). Deriving `loading` from it rather than flipping a
+   * flag means walking from one member's profile to another shows a load
+   * instead of a flash of the previous member's posts — the page component
+   * stays mounted across that navigation.
    */
-  const [loadedFor, setLoadedFor] = useState<string | undefined>(undefined);
+  const [loadedFor, setLoadedFor] = useState<{ list: string; round: number } | undefined>(
+    undefined,
+  );
   const surface = `${postId ?? ""}|${author ?? ""}|${saved}|${search ?? ""}`;
-  const loading = !ready || loadedFor !== surface;
-  const [loadingMore, setLoadingMore] = useState(false);
+  const loading = !ready || loadedFor?.list !== surface;
+  // The next page loading, for which round of the list: an earlier round's
+  // never holds this one up, and only the request that set it may clear it.
+  const [loadingMoreFor, setLoadingMoreFor] = useState<{ round: number; ask: number } | null>(null);
+  const loadingMore = !loading && loadingMoreFor?.round === loadedFor?.round;
+  const asks = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string[]>([]);
 
@@ -159,7 +166,7 @@ export function useFeedPresenter({
   const listRound = useRef(0);
 
   useEffect(() => {
-    listRound.current += 1;
+    const round = ++listRound.current;
     if (!ready) return;
     let cancelled = false;
     void (async () => {
@@ -168,11 +175,15 @@ export function useFeedPresenter({
         if (cancelled) return;
         setPosts(page.items);
         setCursor(page.nextCursor);
+        setError(null);
       } catch (e) {
         if (cancelled || onUnauthorized(e)) return;
+        // Nothing of the list before belongs under this one's error.
+        setPosts([]);
+        setCursor(null);
         setError(FEED_COPY.feedError);
       } finally {
-        if (!cancelled) setLoadedFor(surface);
+        if (!cancelled) setLoadedFor({ list: surface, round });
       }
     })();
     return () => {
@@ -210,7 +221,8 @@ export function useFeedPresenter({
     // Until a new list's first page is in, the cursor is still the old list's.
     if (!cursor || loadingMore || loading) return;
     const round = listRound.current;
-    setLoadingMore(true);
+    const ask = ++asks.current;
+    setLoadingMoreFor({ round, ask });
     try {
       const page = await loadPage(cursor);
       if (listRound.current !== round) return;
@@ -219,7 +231,7 @@ export function useFeedPresenter({
     } catch (e) {
       if (listRound.current === round && !onUnauthorized(e)) setError(FEED_COPY.feedError);
     } finally {
-      setLoadingMore(false);
+      setLoadingMoreFor((current) => (current?.ask === ask ? null : current));
     }
   }, [cursor, loadPage, loading, loadingMore, onUnauthorized]);
 

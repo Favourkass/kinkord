@@ -581,6 +581,85 @@ describe("searching (the search page's Posts)", () => {
     expect(hook.result.current.hasMore).toBe(true);
   });
 
+  it("shows a failed search's error without the last search's posts, and clears it after", async () => {
+    feed.mockImplementation(
+      async (_cursor: unknown, _limit: unknown, _author: unknown, search: string) => {
+        if (search === "lunch") throw new Error("offline");
+        return { items: [pm({ id: search })], nextCursor: "next" };
+      },
+    );
+    const hook = renderHook(({ search }: { search: string }) => useFeedPresenter({ search }), {
+      initialProps: { search: "brunch" },
+    });
+    await waitFor(() => expect(hook.result.current.posts.map((p) => p.id)).toEqual(["brunch"]));
+    hook.rerender({ search: "lunch" });
+    await waitFor(() => expect(hook.result.current.error).not.toBeNull());
+    expect(hook.result.current.posts).toEqual([]);
+    expect(hook.result.current.hasMore).toBe(false);
+    hook.rerender({ search: "dinner" });
+    await waitFor(() => expect(hook.result.current.posts.map((p) => p.id)).toEqual(["dinner"]));
+    expect(hook.result.current.error).toBeNull();
+  });
+
+  it("never lets another search's slow next page hold up this one's", async () => {
+    feed.mockImplementation(
+      async (cursor: string | null, _limit: unknown, _author: unknown, search: string) => {
+        if (search === "brunch" && cursor) return new Promise(() => undefined);
+        return { items: [pm({ id: `${search}-1` })], nextCursor: `${search}-c1` };
+      },
+    );
+    const hook = renderHook(({ search }: { search: string }) => useFeedPresenter({ search }), {
+      initialProps: { search: "brunch" },
+    });
+    await waitFor(() => expect(hook.result.current.hasMore).toBe(true));
+    act(() => {
+      void hook.result.current.loadMore();
+    });
+    expect(hook.result.current.loadingMore).toBe(true);
+    hook.rerender({ search: "lunch" });
+    await waitFor(() => expect(hook.result.current.posts.map((p) => p.id)).toEqual(["lunch-1"]));
+    expect(hook.result.current.loadingMore).toBe(false);
+    await act(async () => {
+      await hook.result.current.loadMore();
+    });
+    expect(feed).toHaveBeenLastCalledWith("lunch-c1", undefined, null, "lunch");
+  });
+
+  it("lets only the request that is loading the next page unlock it", async () => {
+    const pending: Array<(page: unknown) => void> = [];
+    feed.mockImplementation(
+      async (cursor: string | null, _limit: unknown, _author: unknown, search: string) =>
+        cursor
+          ? new Promise((resolve) => pending.push(resolve))
+          : { items: [pm({ id: `${search}-1` })], nextCursor: `${search}-c1` },
+    );
+    const hook = renderHook(({ search }: { search: string }) => useFeedPresenter({ search }), {
+      initialProps: { search: "brunch" },
+    });
+    await waitFor(() => expect(hook.result.current.hasMore).toBe(true));
+    act(() => {
+      void hook.result.current.loadMore();
+    });
+    // Away to another search and back, then the next page again.
+    hook.rerender({ search: "lunch" });
+    await waitFor(() => expect(hook.result.current.posts.map((p) => p.id)).toEqual(["lunch-1"]));
+    hook.rerender({ search: "brunch" });
+    await waitFor(() => expect(hook.result.current.posts.map((p) => p.id)).toEqual(["brunch-1"]));
+    act(() => {
+      void hook.result.current.loadMore();
+    });
+    expect(pending).toHaveLength(2);
+    // The first, stale request settles: it must not unlock the second.
+    await act(async () => pending[0]({ items: [pm({ id: "stale" })], nextCursor: null }));
+    expect(hook.result.current.loadingMore).toBe(true);
+    act(() => {
+      void hook.result.current.loadMore();
+    });
+    expect(pending).toHaveLength(2);
+    await act(async () => pending[1]({ items: [pm({ id: "brunch-2" })], nextCursor: null }));
+    expect(hook.result.current.posts.map((p) => p.id)).toEqual(["brunch-1", "brunch-2"]);
+  });
+
   it("reads again for each new search", async () => {
     const hook = renderHook(({ search }: { search: string }) => useFeedPresenter({ search }), {
       initialProps: { search: "brunch" },
