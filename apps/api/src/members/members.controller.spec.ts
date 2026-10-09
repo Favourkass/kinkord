@@ -40,6 +40,23 @@ describe("MembersController", () => {
     );
   });
 
+  it("searches by name or @username, and ignores an empty search", async () => {
+    const { controller, list } = makeController();
+    await controller.list(req, { country: "ng", q: "  @ada " });
+    expect(list).toHaveBeenLastCalledWith(
+      { country: "NG", q: "ada", sort: "recent", page: 1, limit: 20 },
+      "me",
+    );
+    await controller.list(req, { country: "ng", q: " @ " });
+    expect(list).toHaveBeenLastCalledWith(
+      { country: "NG", q: undefined, sort: "recent", page: 1, limit: 20 },
+      "me",
+    );
+    expect(() => controller.list(req, { country: "ng", q: "x".repeat(51) })).toThrow(
+      BadRequestException,
+    );
+  });
+
   it("lists a whole country when no state is given, but an LGA alone is rejected", async () => {
     const { controller, list } = makeController();
     await controller.list(req, { country: "ng" });

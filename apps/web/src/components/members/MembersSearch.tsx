@@ -7,6 +7,8 @@ export interface MembersSearchProps {
   label: string;
   /** Figma draws the search glyph at 24px on the country page and 26px on the state page. */
   iconSize?: 24 | 26;
+  /** The longest search the list takes. */
+  maxLength?: number;
 }
 
 /** Figma search field: 43px tall (64px on desktop), radius 8 (12), glyph 16px (38px) in. */
@@ -16,6 +18,7 @@ export default function MembersSearch({
   placeholder,
   label,
   iconSize = 24,
+  maxLength,
 }: MembersSearchProps) {
   return (
     <label className="relative block h-[43px] lg:h-[64px]">
@@ -33,6 +36,7 @@ export default function MembersSearch({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={label}
+        maxLength={maxLength}
         autoComplete="off"
         className="h-full w-full rounded-[8px] border border-mem-card-border bg-mem-card pl-[51px] pr-[14px] text-[14px] font-medium text-mem-text outline-none placeholder:text-mem-placeholder lg:rounded-[12px] lg:pl-[89px] lg:text-[24px]"
       />

@@ -1,5 +1,18 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, asc, count, desc, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNotNull,
+  ne,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { Db, DRIZZLE } from "../db/db.module";
 import { notBanned } from "../moderation/admins";
@@ -12,6 +25,7 @@ import {
   type ProfileMediaKind,
 } from "../db/schema";
 import { PostsService } from "../posts/posts.service";
+import { containsPattern } from "../push/notifications.service";
 import { ONLINE_WINDOW_SECONDS, PresenceService } from "../presence/presence.service";
 import { StorageService } from "../storage/storage.service";
 import { silverCheck, silverSince } from "../subscriptions/plans";
@@ -47,8 +61,16 @@ export interface ListMembersParams {
   /** Only meaningful together with `state`. */
   lga?: string | null;
   sort: MembersSort;
+  /** Name or username to look for, anywhere in either. */
+  q?: string | null;
   page?: number;
   limit?: number;
+}
+
+/** A member whose display name or username contains `term`, case aside. Reads `profile` and `user`. */
+export function memberMatches(term: string): SQL {
+  const pattern = containsPattern(term);
+  return or(ilike(profile.displayName, pattern), ilike(user.username, pattern))!;
 }
 
 /** Countries the directory serves today; the client renders the rest as "coming soon". */
@@ -126,6 +148,7 @@ export class MembersService {
     ];
     if (params.state) conditions.push(eq(profile.state, params.state));
     if (params.state && params.lga) conditions.push(eq(profile.city, params.lga));
+    if (params.q) conditions.push(memberMatches(params.q));
     const where = and(...conditions);
 
     const followerCounts = this.db
@@ -176,7 +199,12 @@ export class MembersService {
       .limit(limit)
       .offset(offset);
 
-    const [totalRow] = await this.db.select({ total: count() }).from(profile).where(where);
+    // Joined like the page, since a search reads the username.
+    const [totalRow] = await this.db
+      .select({ total: count() })
+      .from(profile)
+      .innerJoin(user, eq(user.id, profile.userId))
+      .where(where);
 
     // One grouped query for the page rather than a count per card.
     const postCounts = await this.posts.postCountsFor(

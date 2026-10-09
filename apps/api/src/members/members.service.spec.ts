@@ -244,6 +244,11 @@ describe("MembersService", () => {
     // An LGA without a state cannot narrow anything, so it is ignored rather than applied.
     const orphanLga = await run({ country: "ng", lga: "Abraka", sort: "recent" });
     expect(orphanLga.params).toEqual(["NG", "me"]);
+
+    // A search reads the name and the username, anywhere in either, wildcards taken literally.
+    const search = await run({ country: "ng", state: "Delta", q: "ada_o", sort: "recent" });
+    expect(search.params).toEqual(["NG", "me", "Delta", "%ada\\_o%", "%ada\\_o%"]);
+    expect(search.sql).toMatch(/"display_name" ilike \$\d+ or "user"\."username" ilike/);
   });
 
   it("404s an unknown public profile", async () => {
