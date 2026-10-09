@@ -3,11 +3,13 @@ import AppMobileHeader from "@/components/app/AppMobileHeader";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import DesktopSidebar from "@/components/app/DesktopSidebar";
 import MobileTabBar from "@/components/app/MobileTabBar";
-import type { AppNavLabels, AppNavLinks, AppTab } from "@/components/app/nav";
+import type { AppNav, AppNavLabels, AppNavLinks, AppTab } from "@/components/app/nav";
 import SidebarDrawer from "@/components/app/SidebarDrawer";
 
 export interface FeedShellProps {
   activeTab?: AppTab;
+  /** The desktop sidebar's current page; the feed's own by default. */
+  active?: AppNav;
   brand: string;
   greeting: string;
   name: string;
@@ -40,6 +42,7 @@ export interface FeedShellProps {
  */
 export default function FeedShell({
   activeTab,
+  active = "home",
   brand,
   greeting,
   name,
@@ -60,14 +63,18 @@ export default function FeedShell({
   return (
     <div className="min-h-dvh bg-app-page">
       <div className="lg:hidden">
-        <AppMobileHeader brand={brand} onMenu={onMenu} />
+        <AppMobileHeader
+          brand={brand}
+          onMenu={onMenu}
+          search={{ href: links.search, label: labels.search }}
+        />
       </div>
 
       <div className="flex min-h-dvh">
         <div className="hidden lg:block">
           <DesktopSidebar
             brand={brand}
-            active="home"
+            active={active}
             notificationsUnread={notificationsUnread}
             notificationsCount={notificationsCount}
             messagesCount={messagesCount}

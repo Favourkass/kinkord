@@ -41,6 +41,9 @@ export const Routes = {
   profile: "/profile",
   // Members directory: country -> state -> members in that state.
   members: "/members",
+  /** The app's search: people and posts. */
+  search: "/search",
+  searchFor: (q: string) => `/search?q=${encodeURIComponent(q)}`,
   membersCountry: (country: string) => `/members/${country.toLowerCase()}`,
   membersState: (country: string, state: string) =>
     `/members/${country.toLowerCase()}/${encodeURIComponent(state)}`,

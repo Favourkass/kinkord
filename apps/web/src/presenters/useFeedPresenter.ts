@@ -57,6 +57,8 @@ export interface FeedOptions {
   postId?: string | null;
   /** The viewer's saved posts instead of the feed. */
   saved?: boolean;
+  /** Search: the posts whose text contains this. */
+  search?: string | null;
   /**
    * False while the author is still being resolved. /profile has to ask the API
    * who you are before it can ask for your posts, and without this the first
@@ -79,6 +81,7 @@ export function useFeedPresenter({
   author = null,
   postId = null,
   saved = false,
+  search = null,
   ready = true,
 }: FeedOptions = {}) {
   const router = useRouter();
@@ -92,7 +95,7 @@ export function useFeedPresenter({
    * component stays mounted across that navigation.
    */
   const [loadedFor, setLoadedFor] = useState<string | undefined>(undefined);
-  const surface = `${postId ?? ""}|${author ?? ""}|${saved}`;
+  const surface = `${postId ?? ""}|${author ?? ""}|${saved}|${search ?? ""}`;
   const loading = !ready || loadedFor !== surface;
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -129,14 +132,14 @@ export function useFeedPresenter({
   /** Object URLs outlive React state, so they are revoked by hand. */
   const previewUrls = useRef<string[]>([]);
 
-  /** Which page of which list to read — the four surfaces differ only here. */
+  /** Which page of which list to read — the five surfaces differ only here. */
   const loadPage = useCallback(
     async (cursor: string | null): Promise<FeedPagePM> => {
       if (postId) return { items: [await postsApi.byId(postId)], nextCursor: null };
       if (saved) return postsApi.saved(cursor);
-      return postsApi.feed(cursor, undefined, author);
+      return postsApi.feed(cursor, undefined, author, search);
     },
-    [author, postId, saved],
+    [author, postId, saved, search],
   );
 
   const onUnauthorized = useCallback(
@@ -173,7 +176,7 @@ export function useFeedPresenter({
 
   useEffect(() => {
     // Only the home feed carries the suggestions strip.
-    if (author || postId || saved || !ready) return;
+    if (author || postId || saved || search || !ready) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -186,7 +189,7 @@ export function useFeedPresenter({
     return () => {
       cancelled = true;
     };
-  }, [author, postId, saved, ready]);
+  }, [author, postId, saved, search, ready]);
 
   // Revoke every preview on unmount so a long session doesn't leak blobs.
   useEffect(

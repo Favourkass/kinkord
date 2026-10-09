@@ -495,12 +495,30 @@ describe("people you may know", () => {
   });
 });
 
+describe("searching (the search page's Posts)", () => {
+  it("asks for the posts that contain the words, without the suggestions strip", async () => {
+    const hook = renderHook(() => useFeedPresenter({ search: "brunch" }));
+    await waitFor(() => expect(hook.result.current.loading).toBe(false));
+    expect(feed).toHaveBeenCalledWith(null, undefined, null, "brunch");
+    expect(suggested).not.toHaveBeenCalled();
+  });
+
+  it("reads again for each new search", async () => {
+    const hook = renderHook(({ search }: { search: string }) => useFeedPresenter({ search }), {
+      initialProps: { search: "brunch" },
+    });
+    await waitFor(() => expect(hook.result.current.loading).toBe(false));
+    hook.rerender({ search: "lunch" });
+    await waitFor(() => expect(feed).toHaveBeenLastCalledWith(null, undefined, null, "lunch"));
+  });
+});
+
 describe("pointed at one member (the profile Posts tab)", () => {
   it("asks for that member's posts, not the whole feed", async () => {
     const hook = renderHook(() => useFeedPresenter({ author: "tega" }));
     await waitFor(() => expect(hook.result.current.loading).toBe(false));
 
-    expect(feed).toHaveBeenCalledWith(null, undefined, "tega");
+    expect(feed).toHaveBeenCalledWith(null, undefined, "tega", null);
   });
 
   it("leaves the suggestions strip to the home feed", async () => {
@@ -525,7 +543,7 @@ describe("pointed at one member (the profile Posts tab)", () => {
     rerender({ author: "favour" });
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(feed).toHaveBeenCalledTimes(1);
-    expect(feed).toHaveBeenCalledWith(null, undefined, "favour");
+    expect(feed).toHaveBeenCalledWith(null, undefined, "favour", null);
   });
 
   it("shows a load, not the last member's posts, when you walk to another profile", async () => {
@@ -556,7 +574,7 @@ describe("pointed at one member (the profile Posts tab)", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     await act(async () => result.current.loadMore());
-    expect(feed).toHaveBeenLastCalledWith("2026-09-18T11:00:00.000Z", undefined, "tega");
+    expect(feed).toHaveBeenLastCalledWith("2026-09-18T11:00:00.000Z", undefined, "tega", null);
   });
 });
 

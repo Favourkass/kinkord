@@ -32,6 +32,13 @@ beforeEach(() => {
   apiDel.mockReset().mockResolvedValue({});
 });
 
+describe("membersApi.search", () => {
+  it("searches everyone by name or @username, page by page", async () => {
+    await membersApi.search("@ada o", 2, 20);
+    expect(apiGet).toHaveBeenCalledWith("/members/search?q=%40ada+o&page=2&limit=20");
+  });
+});
+
 describe("membersApi", () => {
   it("builds the directory endpoints", async () => {
     await membersApi.countries();

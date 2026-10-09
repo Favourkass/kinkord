@@ -37,6 +37,25 @@ describe("PostsController", () => {
       cursor: undefined,
       limit: 5,
       author: "tega",
+      q: undefined,
+    });
+  });
+
+  it("passes a search term to the feed, and drops an empty one", async () => {
+    const posts = postsService();
+    await controller(posts).feed(req("u1"), { q: "  brunch " });
+    expect(posts.feed).toHaveBeenLastCalledWith("u1", {
+      cursor: undefined,
+      limit: undefined,
+      author: undefined,
+      q: "brunch",
+    });
+    await controller(posts).feed(req("u1"), { q: "   " });
+    expect(posts.feed).toHaveBeenLastCalledWith("u1", {
+      cursor: undefined,
+      limit: undefined,
+      author: undefined,
+      q: undefined,
     });
   });
 

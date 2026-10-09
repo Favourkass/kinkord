@@ -10,6 +10,7 @@ const PRIVATE_SECTIONS = [
   "profile",
   "settings",
   "saved",
+  "search",
   "notifications",
   "moderation",
   "offline",

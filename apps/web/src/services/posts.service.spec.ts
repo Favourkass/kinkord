@@ -154,6 +154,11 @@ describe("postsApi", () => {
     expect(get).toHaveBeenCalledWith("/posts/feed?cursor=2026-09-18T09%3A00%3A00.000Z&limit=5");
   });
 
+  it("asks for the posts that contain a search", async () => {
+    await postsApi.feed(null, undefined, null, "brunch & tea");
+    expect(get).toHaveBeenCalledWith("/posts/feed?q=brunch+%26+tea");
+  });
+
   it("sends media as keys and drops an empty body rather than posting a blank", async () => {
     await postsApi.create({ body: "  ", visibility: "friends", mediaKeys: ["posts/u1/a.jpg"] });
     expect(post).toHaveBeenCalledWith("/posts", {
