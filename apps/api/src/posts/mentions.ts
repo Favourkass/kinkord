@@ -27,6 +27,13 @@ export interface Mention {
  */
 export const MAX_HANDLES = 30;
 
+/**
+ * The most full stops after a handle tried one at a time as the sentence's,
+ * between taking none and taking them all: room for "." and "...", and few
+ * names to look up per handle.
+ */
+const MAX_STOPS = 3;
+
 /** Long enough and short enough for a username: 3–30 characters (USERNAME_RE). */
 const usernameLength = (name: string) => name.length >= 3 && name.length <= 30;
 
@@ -41,27 +48,37 @@ function withoutFullStop(handle: string): string {
 }
 
 /**
+ * The usernames a written handle could be, longest first. A username may end
+ * in dots of its own, so the dots after it may be its own or the sentence's:
+ * as written, then with each of up to three taken as the sentence's, then with
+ * all of them taken so ("@ada.." is "ada." or "ada"). Only a username's length
+ * counts.
+ */
+function usernamesFor(word: string): string[] {
+  const names = [word];
+  let cut = word;
+  for (let stops = 0; stops < MAX_STOPS && cut.endsWith("."); stops++) {
+    cut = cut.slice(0, -1);
+    names.push(cut);
+  }
+  names.push(withoutFullStop(word));
+  return [...new Set(names)].filter(usernameLength);
+}
+
+/**
  * Each different @handle, the first thirty: the word written, lowercased
- * (usernames are stored so), and as a username: as written and without a
- * trailing full stop, each only when it's a username's length. A word no
+ * (usernames are stored so), and the usernames it could be. A word no
  * username could be isn't a handle.
  */
-function handlesIn(
-  text: string | null | undefined,
-): Array<{ word: string; full: string | null; short: string | null }> {
+function handlesIn(text: string | null | undefined): Array<{ word: string; names: string[] }> {
   if (!text) return [];
-  const handles = new Map<string, { word: string; full: string | null; short: string | null }>();
+  const handles = new Map<string, { word: string; names: string[] }>();
   for (const m of text.matchAll(MENTION)) {
     const word = m[2].toLowerCase();
     if (handles.has(word)) continue;
-    const short = withoutFullStop(word);
-    const handle = {
-      word,
-      full: usernameLength(word) ? word : null,
-      short: usernameLength(short) ? short : null,
-    };
-    if (!handle.full && !handle.short) continue;
-    handles.set(word, handle);
+    const names = usernamesFor(word);
+    if (!names.length) continue;
+    handles.set(word, { word, names });
     if (handles.size === MAX_HANDLES) break;
   }
   return [...handles.values()];
@@ -69,27 +86,22 @@ function handlesIn(
 
 /** Every username a text could be mentioning: what to look up. */
 export function mentionCandidates(text: string | null | undefined): string[] {
-  const names = new Set<string>();
-  for (const { full, short } of handlesIn(text)) {
-    if (full) names.add(full);
-    if (short) names.add(short);
-  }
-  return [...names];
+  return [...new Set(handlesIn(text).flatMap((h) => h.names))];
 }
 
 /**
  * Whom each handle in a text names, given which usernames are members: the
- * handle as written when that's a member (a username may end in a dot), else
- * without the full stop that ended the sentence. Every handle looked at, so a
- * reader links each exactly as here and never has to guess at one.
+ * longest username it could be that's a member, so "@ada.." names "ada." when
+ * there is one, the sentence's full stop left over. Every handle looked at, so
+ * a reader links each exactly as here and never has to guess at one.
  */
 export function mentionsIn(
   text: string | null | undefined,
   members: { has(name: string): boolean },
 ): Mention[] {
   const found: Mention[] = [];
-  for (const { word, full, short } of handlesIn(text)) {
-    const username = full && members.has(full) ? full : short && members.has(short) ? short : null;
+  for (const { word, names } of handlesIn(text)) {
+    const username = names.find((name) => members.has(name));
     if (username) found.push({ handle: word, username });
   }
   return found;
