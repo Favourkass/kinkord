@@ -24,6 +24,14 @@ describe("bodyParts", () => {
     ]);
   });
 
+  it("links a dotted username the API named, the sentence's full stop left as text", () => {
+    expect(bodyParts("Thanks @ada..", [names("ada..", "ada.")], href)).toEqual([
+      { text: "Thanks " },
+      { mention: "@ada.", href: "/u/ada." },
+      { text: "." },
+    ]);
+  });
+
   it("links a username that ends in a dot in full when that's the member", () => {
     expect(bodyParts("hi @ada.", [names("ada.")], href)).toEqual([
       { text: "hi " },

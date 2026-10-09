@@ -23,6 +23,17 @@ describe("mentionCandidates", () => {
     expect(mentionCandidates("thanks @tega.")).toEqual(["tega.", "tega"]);
   });
 
+  it("tries each of a few trailing dots as the sentence's, and all of them", () => {
+    expect(mentionCandidates("thanks @ada..")).toEqual(["ada..", "ada.", "ada"]);
+    expect(mentionCandidates("so @tega.....")).toEqual([
+      "tega.....",
+      "tega....",
+      "tega...",
+      "tega..",
+      "tega",
+    ]);
+  });
+
   it("takes the whole word: a longer one isn't a username, whatever its first 30 characters are", () => {
     const thirty = "a".repeat(30);
     expect(mentionCandidates(`@${thirty}b`)).toEqual([]);
@@ -64,6 +75,18 @@ describe("mentionsIn", () => {
       { handle: "ada.", username: "ada." },
     ]);
     expect(mentionsIn("hi @ghost", new Set(["ada"]))).toEqual([]);
+  });
+
+  it("names the longest member a handle could be, a username's own dot included", () => {
+    expect(mentionsIn("Thanks @ada..", new Set(["ada.", "ada"]))).toEqual([
+      { handle: "ada..", username: "ada." },
+    ]);
+    expect(mentionsIn("Thanks @ada..", new Set(["ada"]))).toEqual([
+      { handle: "ada..", username: "ada" },
+    ]);
+    expect(mentionsIn("so @tega.....", new Set(["tega"]))).toEqual([
+      { handle: "tega.....", username: "tega" },
+    ]);
   });
 
   it("mentions nobody for a word longer than a username", () => {
