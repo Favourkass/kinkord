@@ -377,6 +377,23 @@ describe("useSearchPresenter", () => {
     act(() => result.current.people.onLoadMore());
     await waitFor(() => expect(result.current.people.rows).toHaveLength(25));
     expect(new Set(result.current.people.rows.map((r) => r.userId)).size).toBe(25);
+    expect(result.current.people.hasMore).toBe(false);
+  });
+
+  it("stops asking once the pages run out, even when a repeat was skipped", async () => {
+    search.mockImplementation(async (_q: string, page: number) => ({
+      // Page two is the end, but its first person was already on page one.
+      items: page === 1 ? people(1, 20) : people(20, 5),
+      total: 24,
+      page,
+      limit: 20,
+    }));
+    const { result } = renderHook(() => useSearchPresenter("ada"));
+    await waitFor(() => expect(result.current.people.seeAll).not.toBeNull());
+    act(() => result.current.people.seeAll?.onClick());
+    act(() => result.current.people.onLoadMore());
+    await waitFor(() => expect(result.current.people.rows).toHaveLength(24));
+    expect(result.current.people.hasMore).toBe(false);
   });
 
   it("never searches more than the API takes", async () => {

@@ -154,7 +154,8 @@ export function useSearchPresenter(initialQuery: string | null) {
 
   const current = term && people?.round === round ? people : null;
   const loadingMore = current !== null && loadingMoreRound === current.round;
-  const morePeople = current ? current.items.length < current.total : false;
+  // From the pages served, not the people shown: a page can repeat someone (skipped).
+  const morePeople = current ? current.page * PEOPLE_PAGE_SIZE < current.total : false;
 
   const loadMorePeople = useCallback(() => {
     if (!current || loadingMore || !morePeople) return;
