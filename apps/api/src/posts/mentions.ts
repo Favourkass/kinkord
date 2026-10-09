@@ -14,6 +14,12 @@ const MENTION = /(^|[^A-Za-z0-9_.@])@([A-Za-z0-9_.]{3,})/g;
 /** The most members one post or comment tells it mentioned them. */
 export const MAX_MENTIONS = 10;
 
+/** An @handle as written (lowercased, without the @) and the member it names. */
+export interface Mention {
+  handle: string;
+  username: string;
+}
+
 /**
  * The most different @handles looked at in one post or comment: room for ten
  * members among other words. It bounds the lookup, which a long post full of
@@ -35,20 +41,22 @@ function withoutFullStop(handle: string): string {
 }
 
 /**
- * Each different @handle, the first thirty: as written, lowercased (usernames
- * are stored so), and without a trailing full stop; each only when it's a
- * username's length. A word no username could be isn't a handle.
+ * Each different @handle, the first thirty: the word written, lowercased
+ * (usernames are stored so), and as a username: as written and without a
+ * trailing full stop, each only when it's a username's length. A word no
+ * username could be isn't a handle.
  */
 function handlesIn(
   text: string | null | undefined,
-): Array<{ full: string | null; short: string | null }> {
+): Array<{ word: string; full: string | null; short: string | null }> {
   if (!text) return [];
-  const handles = new Map<string, { full: string | null; short: string | null }>();
+  const handles = new Map<string, { word: string; full: string | null; short: string | null }>();
   for (const m of text.matchAll(MENTION)) {
     const word = m[2].toLowerCase();
     if (handles.has(word)) continue;
     const short = withoutFullStop(word);
     const handle = {
+      word,
       full: usernameLength(word) ? word : null,
       short: usernameLength(short) ? short : null,
     };
@@ -70,21 +78,26 @@ export function mentionCandidates(text: string | null | undefined): string[] {
 }
 
 /**
- * The members a text mentions, given which usernames are members: each handle
- * as written when that's a member (a username may end in a dot), else without
- * the full stop that ended the sentence. Once each, the first ten.
+ * Whom each handle in a text names, given which usernames are members: the
+ * handle as written when that's a member (a username may end in a dot), else
+ * without the full stop that ended the sentence. Every handle looked at, so a
+ * reader links each exactly as here and never has to guess at one.
  */
 export function mentionsIn(
   text: string | null | undefined,
   members: { has(name: string): boolean },
-): string[] {
-  const found = new Set<string>();
-  for (const { full, short } of handlesIn(text)) {
-    const name = full && members.has(full) ? full : short && members.has(short) ? short : null;
-    if (name) found.add(name);
-    if (found.size === MAX_MENTIONS) break;
+): Mention[] {
+  const found: Mention[] = [];
+  for (const { word, full, short } of handlesIn(text)) {
+    const username = full && members.has(full) ? full : short && members.has(short) ? short : null;
+    if (username) found.push({ handle: word, username });
   }
-  return [...found];
+  return found;
+}
+
+/** The members to tell they were mentioned: each once, the first ten. */
+export function membersToTell(mentions: Mention[]): string[] {
+  return [...new Set(mentions.map((m) => m.username))].slice(0, MAX_MENTIONS);
 }
 
 /** Which of these usernames belong to members who can be shown, with their ids. No query for none. */

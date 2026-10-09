@@ -153,7 +153,12 @@ describe("toPostVM", () => {
   });
 
   it("links the @mentions the API confirmed", () => {
-    const vm = toPostVM(post({ body: "brunch with @tega", mentions: ["tega"] }), false, href, NOW);
+    const vm = toPostVM(
+      post({ body: "brunch with @tega", mentions: [{ handle: "tega", username: "tega" }] }),
+      false,
+      href,
+      NOW,
+    );
     expect(vm.bodyParts).toEqual([{ text: "brunch with " }, { mention: "@tega", href: "/u/tega" }]);
     expect(toPostVM(post({ body: null }), false, href, NOW).bodyParts).toEqual([]);
   });
@@ -161,7 +166,10 @@ describe("toPostVM", () => {
   it("never links a handle the clamp cut short to whoever its first letters name", () => {
     // No space to cut on near the end, so the clamp cuts "@adabelle" to "@ada".
     const body = `@ada ${"w".repeat(POST_PREVIEW_CHARS - 10)},@adabelle and more`;
-    const mentions = ["ada", "adabelle"];
+    const mentions = [
+      { handle: "ada", username: "ada" },
+      { handle: "adabelle", username: "adabelle" },
+    ];
     const links = (expanded: boolean) =>
       toPostVM(post({ body, mentions }), expanded, href, NOW).bodyParts.filter(
         (p) => "mention" in p,

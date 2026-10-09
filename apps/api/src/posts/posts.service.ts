@@ -28,7 +28,13 @@ import {
   type PostMediaKind,
   type PostVisibility,
 } from "../db/schema";
-import { knownHandles, mentionCandidates, mentionsIn } from "./mentions";
+import {
+  knownHandles,
+  membersToTell,
+  mentionCandidates,
+  mentionsIn,
+  type Mention,
+} from "./mentions";
 import {
   IMAGE_VARIANTS,
   StorageService,
@@ -140,8 +146,8 @@ export interface PostVM {
   repostedBy: Pick<PostAuthorVM, "userId" | "username" | "displayName"> | null;
   /** Whether the viewer may delete this row — their own post or their own repost. */
   mine: boolean;
-  /** The @handles in the body that are members, lowercased: the ones the app links. */
-  mentions: string[];
+  /** Each @handle in the body that names a member, and whom: the ones the app links. */
+  mentions: Mention[];
 }
 
 export interface RepostVM {
@@ -265,7 +271,7 @@ export class PostsService {
     if (!names.length) return;
     void (async () => {
       const members = await knownHandles(this.db, names);
-      for (const name of mentionsIn(text, members)) {
+      for (const name of membersToTell(mentionsIn(text, members))) {
         const id = members.get(name) as string;
         if (id === actorId || except.includes(id)) continue;
         if (await this.canSee(postId, id)) this.push.newMention(postId, id, actorId);

@@ -12,44 +12,37 @@ const TYPING = /(^|[^A-Za-z0-9_.@])@([A-Za-z0-9_.]{0,30})$/;
 
 export type BodyPart = { text: string } | { mention: string; href: string };
 
-/**
- * Without the full stops that may have ended the sentence. A loop, not
- * /\.+$/: that pattern takes quadratic time on a long run of dots.
- */
-function withoutFullStop(handle: string): string {
-  let end = handle.length;
-  while (end > 0 && handle[end - 1] === ".") end--;
-  return handle.slice(0, end);
+/** An @handle as written (lowercased, without the @) and the member the API says it names. */
+export interface MentionPM {
+  handle: string;
+  username: string;
 }
 
 /**
- * A post's or comment's text as plain text and links: each @handle the API
- * confirmed is a member links to their profile, as typed; the rest is text.
- * Like the API, a handle as written wins when it's a member (a username may
- * end in a dot); otherwise a full stop ending the sentence isn't part of it.
+ * A post's or comment's text as plain text and links: each @handle links to
+ * the member the API says it names, exactly as the API read it; the rest is
+ * text. A member named without the full stop that ended the sentence links
+ * without it.
  */
 export function bodyParts(
   body: string,
-  mentions: string[] | undefined,
+  mentions: MentionPM[] | undefined,
   memberHref: (username: string) => string,
 ): BodyPart[] {
-  const known = new Set((mentions ?? []).map((m) => m.toLowerCase()));
   if (!body) return [];
-  if (!known.size) return [{ text: body }];
+  const named = new Map((mentions ?? []).map((m) => [m.handle, m.username]));
+  if (!named.size) return [{ text: body }];
   const parts: BodyPart[] = [];
   let shown = 0;
   for (const match of body.matchAll(MENTION)) {
-    const full = match[2];
-    const short = withoutFullStop(full);
-    const handle = known.has(full.toLowerCase())
-      ? full
-      : known.has(short.toLowerCase())
-        ? short
-        : null;
-    if (!handle) continue;
+    const written = match[2];
+    const username = named.get(written.toLowerCase());
+    // The member's name is the handle, or its start (before a full stop).
+    if (!username || !written.toLowerCase().startsWith(username)) continue;
     const at = (match.index ?? 0) + match[1].length;
     if (at > shown) parts.push({ text: body.slice(shown, at) });
-    parts.push({ mention: `@${handle}`, href: memberHref(handle.toLowerCase()) });
+    const handle = written.slice(0, username.length);
+    parts.push({ mention: `@${handle}`, href: memberHref(username) });
     shown = at + 1 + handle.length;
   }
   if (shown < body.length) parts.push({ text: body.slice(shown) });

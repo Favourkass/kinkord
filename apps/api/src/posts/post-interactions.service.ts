@@ -12,7 +12,7 @@ import {
   user,
   COMMENT_BODY_MAX,
 } from "../db/schema";
-import { knownHandles, mentionCandidates, mentionsIn } from "./mentions";
+import { knownHandles, mentionCandidates, mentionsIn, type Mention } from "./mentions";
 import { StorageService } from "../storage/storage.service";
 import { silverCheck } from "../subscriptions/plans";
 import {
@@ -40,8 +40,8 @@ export interface CommentVM {
     /** Shows the Silver check beside their name. */
     silver: boolean;
   };
-  /** The @handles in the body that are members, lowercased: the ones the app links. */
-  mentions: string[];
+  /** Each @handle in the body that names a member, and whom: the ones the app links. */
+  mentions: Mention[];
   /** Whether the viewer may delete it: their own comment, or any comment on their post. */
   canDelete: boolean;
 }

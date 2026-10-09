@@ -4,7 +4,7 @@
  * on a long body.
  */
 import { compactNumber, shortTimeAgo } from "@/util/format";
-import { bodyParts, clipParts, type BodyPart } from "./mentions";
+import { bodyParts, clipParts, type BodyPart, type MentionPM } from "./mentions";
 
 export type PostVisibility = "public" | "friends";
 
@@ -45,8 +45,8 @@ export interface PostPM {
   /** Set when this row is somebody's repost of the post above. */
   repostedBy: Pick<PostAuthorPM, "userId" | "username" | "displayName"> | null;
   mine: boolean;
-  /** The @handles in the body that are members, lowercased. Absent from an older API. */
-  mentions?: string[];
+  /** Each @handle in the body that names a member, and whom. Absent from an older API. */
+  mentions?: MentionPM[];
 }
 
 export interface FeedPM {
@@ -60,8 +60,8 @@ export interface CommentPM {
   createdAt: string;
   author: PostAuthorPM;
   canDelete: boolean;
-  /** The @handles in the body that are members, lowercased. Absent from an older API. */
-  mentions?: string[];
+  /** Each @handle in the body that names a member, and whom. Absent from an older API. */
+  mentions?: MentionPM[];
 }
 
 export interface CommentsPM {

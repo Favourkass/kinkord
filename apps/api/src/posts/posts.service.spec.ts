@@ -396,7 +396,7 @@ describe("PostsService.byId", () => {
       [{ username: "tega" }],
     ]);
     const vm = await service(db, makeStorage()).byId("p1", "u1");
-    expect(vm?.mentions).toEqual(["tega"]);
+    expect(vm?.mentions).toEqual([{ handle: "tega", username: "tega" }]);
   });
 
   it("shows the Silver check on an author who has it", async () => {

@@ -1,7 +1,14 @@
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { SQL } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
-import { knownHandles, MAX_HANDLES, MAX_MENTIONS, mentionCandidates, mentionsIn } from "./mentions";
+import {
+  knownHandles,
+  MAX_HANDLES,
+  MAX_MENTIONS,
+  membersToTell,
+  mentionCandidates,
+  mentionsIn,
+} from "./mentions";
 
 describe("mentionCandidates", () => {
   it("finds @handles at the start, after spaces and after punctuation, lowercased", () => {
@@ -50,22 +57,44 @@ describe("mentionCandidates", () => {
 
 describe("mentionsIn", () => {
   it("takes a handle as written when that's a member, else without the sentence's full stop", () => {
-    expect(mentionsIn("thanks @tega.", new Set(["tega"]))).toEqual(["tega"]);
-    expect(mentionsIn("hi @ada.", new Set(["ada.", "ada"]))).toEqual(["ada."]);
+    expect(mentionsIn("thanks @tega.", new Set(["tega"]))).toEqual([
+      { handle: "tega.", username: "tega" },
+    ]);
+    expect(mentionsIn("hi @ada.", new Set(["ada.", "ada"]))).toEqual([
+      { handle: "ada.", username: "ada." },
+    ]);
     expect(mentionsIn("hi @ghost", new Set(["ada"]))).toEqual([]);
   });
 
   it("mentions nobody for a word longer than a username", () => {
     const thirty = "a".repeat(30);
     expect(mentionsIn(`@${thirty}bc`, new Set([thirty]))).toEqual([]);
-    expect(mentionsIn(`see @${thirty}.`, new Set([thirty]))).toEqual([thirty]);
+    expect(mentionsIn(`see @${thirty}.`, new Set([thirty]))).toEqual([
+      { handle: `${thirty}.`, username: thirty },
+    ]);
   });
 
-  it("names each member once, and ten at most", () => {
+  it("says whom every handle names, past the tenth too, so none is left to guess at", () => {
+    const others = Array.from({ length: 9 }, (_, i) => `member${i}`);
+    const text = `@ada ${others.map((n) => `@${n}`).join(" ")} @ada.`;
+    const found = mentionsIn(text, new Set(["ada", "ada.", ...others]));
+    expect(found).toHaveLength(11);
+    expect(found.at(-1)).toEqual({ handle: "ada.", username: "ada." });
+    expect(mentionsIn("@ada @Ada", new Set(["ada"]))).toEqual([{ handle: "ada", username: "ada" }]);
+  });
+});
+
+describe("membersToTell", () => {
+  it("tells each member once, and ten at most", () => {
     const names = Array.from({ length: 15 }, (_, i) => `member${i}`);
-    const text = names.map((n) => `@${n} @${n}`).join(" ");
-    expect(mentionsIn(text, new Set(names))).toHaveLength(MAX_MENTIONS);
-    expect(mentionsIn("@ada @Ada", new Set(["ada"]))).toEqual(["ada"]);
+    const found = names.map((n) => ({ handle: n, username: n }));
+    expect(membersToTell(found)).toEqual(names.slice(0, MAX_MENTIONS));
+    expect(
+      membersToTell([
+        { handle: "ada", username: "ada" },
+        { handle: "ada.", username: "ada" },
+      ]),
+    ).toEqual(["ada"]);
   });
 });
 

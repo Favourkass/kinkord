@@ -81,7 +81,7 @@ describe("visibility", () => {
     ]);
     const vm = await service(db, p).comment("p1", "u1", "ask @Ada or @ghost");
     expect(p.notifyMentions).toHaveBeenCalledWith("p1", "u1", "ask @Ada or @ghost", ["u2"]);
-    expect(vm.mentions).toEqual(["ada"]);
+    expect(vm.mentions).toEqual([{ handle: "ada", username: "ada" }]);
   });
 
   it("will not list comments on a post they cannot read", async () => {
