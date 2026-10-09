@@ -16,6 +16,12 @@ export class BronzeService {
     private readonly storage: StorageService, private readonly profileMatch: ProfileMatchService,
     private readonly kycIngestion: KycIngestionService) {}
 
+  /** A live KYC flow must never silently fall back to a sandbox provider. */
+  private get smileFallbackConfigured() {
+    return this.smile.configured &&
+      (this.didit.mode !== "live" || this.smile.environment === "live");
+  }
+
   private reviewer(user: { id: string; email: string; twoFactorEnabled?: boolean | null }) {
     const allowlist = (process.env.BRONZE_REVIEWER_EMAILS ?? "").split(",")
       .map((email) => email.trim().toLowerCase()).filter(Boolean);
@@ -81,8 +87,8 @@ export class BronzeService {
       consented: consent,
       policyVersion: BRONZE_POLICY_VERSION,
       missing,
-      providerAvailable: this.didit.configured || this.smile.configured,
-      provider: this.didit.configured ? "didit" : this.smile.configured ? "smile" : null,
+      providerAvailable: this.didit.configured || this.smileFallbackConfigured,
+      provider: this.didit.configured ? "didit" : this.smileFallbackConfigured ? "smile" : null,
       policyUrl: this.didit.policyUrl || this.smile.policyUrl || null,
       // The private provider result does not leave this endpoint.
     };
@@ -92,7 +98,7 @@ export class BronzeService {
     if (accepted !== true || version !== BRONZE_POLICY_VERSION) {
       throw new BadRequestException("The current Bronze verification consent is required.");
     }
-    if (!this.didit.configured && !this.smile.configured) {
+    if (!this.didit.configured && !this.smileFallbackConfigured) {
       throw new ServiceUnavailableException("Bronze verification is not available until its approved privacy notice and provider are configured.");
     }
     await this.repo.consent(userId);
@@ -122,12 +128,15 @@ export class BronzeService {
         jobId = `didit:${session.sessionId}`;
         launch = { provider: "didit", url: session.url };
       } catch (error) {
-        if (!this.smile.configured) throw error;
+        if (!this.smileFallbackConfigured) throw error;
         this.logger.warn("Didit session unavailable; using configured Smile ID fallback.");
         jobId = randomUUID();
         launch = await this.smileLaunch(userId, jobId);
       }
     } else {
+      if (!this.smileFallbackConfigured) {
+        throw new ServiceUnavailableException("Live identity verification is not configured.");
+      }
       jobId = randomUUID();
       launch = await this.smileLaunch(userId, jobId);
     }

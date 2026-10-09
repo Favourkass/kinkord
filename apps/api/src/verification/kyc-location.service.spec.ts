@@ -18,7 +18,7 @@ describe("KycLocationService", () => {
     } });
     const service = new KycLocationService(
       { hasActiveConsent, latestDiditResidenceAttempt, upsertDerivedStageResult } as unknown as KycRepository,
-      { configured: true, decision } as unknown as DiditService,
+      { configured: true, residenceEnabled: true, decision } as unknown as DiditService,
     );
     await expect(service.capture("member-1", { latitude: 6.5245, longitude: 3.3793, accuracyMetres: 15 }))
       .resolves.toEqual({ status: "passed" });

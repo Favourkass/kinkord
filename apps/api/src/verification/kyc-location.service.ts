@@ -18,7 +18,9 @@ export function kilometreDistance(a: { latitude: number; longitude: number }, b:
 export class KycLocationService {
   constructor(private readonly repository: KycRepository, private readonly didit: DiditService) {}
 
-  get enabled() { return process.env.KYC_LOCATION_ENABLED === "true" && this.didit.configured; }
+  get enabled() {
+    return process.env.KYC_LOCATION_ENABLED === "true" && this.didit.residenceEnabled;
+  }
   get maximumDistanceKm() {
     const configured = Number(process.env.KYC_GPS_RESIDENCE_DISTANCE_KM ?? "50");
     return Number.isFinite(configured) && configured >= 1 && configured <= 250 ? configured : 50;

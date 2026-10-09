@@ -13,4 +13,3 @@ export const bronzeReviewApi = {
   decide: (id: string, input: BronzeReviewDecisionInput) =>
     api.post<BronzeReviewDecisionPM>(`/verification/bronze/reviews/${encodeURIComponent(id)}/decision`, input),
 };
-

@@ -78,6 +78,7 @@ export class ApiBaseStack extends cdk.Stack {
           secretArn("kinkord/smile-id"),
           secretArn("kinkord/didit-api-key"),
           secretArn("kinkord/didit-webhook-secret"),
+          secretArn("kinkord/kyc-identity-binding-secret"),
         ],
       }),
     );
@@ -126,11 +127,18 @@ export class ApiStack extends cdk.Stack {
               ...(process.env.SMILE_ID_PARTNER_ID ? [{ name: "SMILE_ID_PARTNER_ID", value: process.env.SMILE_ID_PARTNER_ID }] : []),
               ...(process.env.DIDIT_LIVE_WORKFLOW_ID ? [{ name: "DIDIT_LIVE_WORKFLOW_ID", value: process.env.DIDIT_LIVE_WORKFLOW_ID }] : []),
               { name: "DIDIT_MODE", value: "live" },
-              { name: "DIDIT_PROFILE_FACE_MATCH_ENABLED", value: process.env.DIDIT_PROFILE_FACE_MATCH_ENABLED ?? "false" },
+              { name: "DIDIT_PROFILE_FACE_MATCH_ENABLED", value: "true" },
               { name: "DIDIT_PROFILE_FACE_MATCH_THRESHOLD", value: process.env.DIDIT_PROFILE_FACE_MATCH_THRESHOLD ?? "90" },
-              { name: "BRONZE_POLICY_URL", value: process.env.BRONZE_POLICY_URL ?? "https://kinkord.com/privacy/verification" },
-              { name: "DIDIT_RETURN_URL", value: "https://kinkord.com/settings/verification/bronze" },
+              { name: "BRONZE_POLICY_URL", value: process.env.BRONZE_POLICY_URL ?? "https://kinkord.com/privacy/kyc" },
+              { name: "DIDIT_RETURN_URL", value: "https://kinkord.com/settings/kyc" },
+              { name: "KYC_RESIDENCE_ENABLED", value: "true" },
+              { name: "KYC_LOCATION_ENABLED", value: "true" },
+              { name: "KYC_GPS_RESIDENCE_DISTANCE_KM", value: process.env.KYC_GPS_RESIDENCE_DISTANCE_KM ?? "50" },
+              { name: "KYC_POA_MAX_AGE_DAYS", value: process.env.KYC_POA_MAX_AGE_DAYS ?? "90" },
+              // Financial KYC is outside the active Kinkord KYC contract for this release.
+              { name: "MONO_FINANCIAL_KYC_ENABLED", value: "false" },
               ...(process.env.BRONZE_REVIEWER_EMAILS ? [{ name: "BRONZE_REVIEWER_EMAILS", value: process.env.BRONZE_REVIEWER_EMAILS }] : []),
+              ...(process.env.KYC_REVIEWER_EMAILS ? [{ name: "KYC_REVIEWER_EMAILS", value: process.env.KYC_REVIEWER_EMAILS }] : []),
             ],
             // Full suffixed ARNs, resolved by the deploy script; falls back
             // to name-based ARNs which Secrets Manager also accepts.
@@ -162,12 +170,24 @@ export class ApiStack extends cdk.Stack {
               ...(process.env.ARN_SMILE_ID_API_KEY ? [{
                 name: "SMILE_ID_API_KEY", value: process.env.ARN_SMILE_ID_API_KEY,
               }] : []),
-              ...(process.env.ARN_DIDIT_API_KEY ? [{
-                name: "DIDIT_API_KEY", value: process.env.ARN_DIDIT_API_KEY,
-              }] : []),
-              ...(process.env.ARN_DIDIT_WEBHOOK_SECRET ? [{
-                name: "DIDIT_WEBHOOK_SECRET", value: process.env.ARN_DIDIT_WEBHOOK_SECRET,
-              }] : []),
+              {
+                name: "DIDIT_API_KEY",
+                value:
+                  process.env.ARN_DIDIT_API_KEY ??
+                  `arn:aws:secretsmanager:${region}:${account}:secret:kinkord/didit-api-key`,
+              },
+              {
+                name: "DIDIT_WEBHOOK_SECRET",
+                value:
+                  process.env.ARN_DIDIT_WEBHOOK_SECRET ??
+                  `arn:aws:secretsmanager:${region}:${account}:secret:kinkord/didit-webhook-secret`,
+              },
+              {
+                name: "KYC_IDENTITY_BINDING_SECRET",
+                value:
+                  process.env.ARN_KYC_IDENTITY_BINDING_SECRET ??
+                  `arn:aws:secretsmanager:${region}:${account}:secret:kinkord/kyc-identity-binding-secret`,
+              },
             ],
           },
         },

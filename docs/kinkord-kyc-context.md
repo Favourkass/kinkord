@@ -4,13 +4,15 @@
 
 Kinkord has one verification product: **Kinkord KYC**. Do not introduce Bronze, Gold, or tiered KYC labels in member-facing copy, routes, badges, policy pages, or staff interfaces.
 
-Kinkord KYC is only awarded after the approved policy verifies all required domains:
+The current Kinkord KYC release is awarded only after the approved policy verifies all active domains:
 
 1. live biometric/liveness;
 2. government ID and identity-detail match;
 3. consented live-location evidence;
-4. residence/proof-of-address evidence; and
-5. licensed financial KYC/account-ownership evidence.
+4. residence/proof-of-address evidence.
+
+Financial/account verification is paused. The dormant Mono adapter is not displayed, cannot be
+started through the member KYC API, and does not contribute to or block the KYC seal.
 
 Profile-photo comparison is an anti-impersonation signal. It is not a substitute for government ID and must not silently become the sole KYC criterion.
 
@@ -20,13 +22,13 @@ Profile-photo comparison is an anti-impersonation signal. It is not a substitute
 
 - Introduced the `/settings/kyc`, `/settings/kyc/reviews`, and `/privacy/kyc` public routes.
 - Preserve old verification paths as redirects, because audit records, bookmarks and provider return URLs may still reference them.
-- Keep existing `bronze_*` database structures as **legacy identity-verification data**. Never automatically promote a legacy approved record to `Kinkord KYC Verified`: it lacks location, address and financial checks.
+- Keep existing `bronze_*` database structures as **legacy identity-verification data**. Never automatically promote a legacy approved record to `Kinkord KYC Verified`: it lacks location and address checks.
 - Official KYC seal: `/brand/kinkord-kyc-verified-badge-v1.png`. It is a transparent, isolated version of the user-supplied artwork. Use it only for a genuinely KYC-verified public state.
 
 ### Phase 2 — KYC domain and identity foundation (completed)
 
 - Added KYC case, attempt, provider-session, derived-evidence, separate-consent and audit-event tables in migration `0010_cold_quicksilver.sql`, alongside legacy tables.
-- Added a fail-closed KYC policy: the official seal requires passed identity, location, residence and financial stages; the identity stage itself requires government ID, liveness, ID-face, profile-face and identity-detail checks.
+- Added a fail-closed KYC policy: the official seal requires passed identity, location and residence stages; the identity stage itself requires national/government ID, liveness, ID-face, profile-face and identity-detail checks.
 - Next: move the existing Didit identity/liveness/profile-photo logic behind a KYC identity-provider adapter without deleting legacy records.
 - The authenticated `GET /verification/kyc/status` endpoint and `/settings/kyc` progress display now expose all KYC safeguards. A verified legacy identity result may complete **only** the identity safeguard and can never award the official seal by itself.
 - Keep raw IDs, selfies, videos, images, provider callback bodies and bank details out of Kinkord storage unless separately approved by law, security and retention policy.
@@ -40,11 +42,12 @@ Profile-photo comparison is an anti-impersonation signal. It is not a substitute
 - Didit evidence mapping is implemented for Proof of Address and Device/IP Analysis. The IP result is anti-fraud evidence only; it can never pass the live-location safeguard because an IP-derived coordinate is not consented GPS.
 - Completed Didit decisions are now ingested idempotently into derived KYC stage records. Provider addresses, document links, IP addresses and coordinates are explicitly excluded from the stored evidence and audit metadata.
 - Residence consent is persisted and shown after reload. If consent is recorded after a completed identity session, the API can re-fetch the authenticated Didit decision and recover only the redacted proof-of-address outcome; raw address data is never persisted. The stage stays unavailable until `KYC_RESIDENCE_ENABLED=true` explicitly confirms that the approved Didit workflow and privacy controls include Proof of Address.
-- A browser-GPS-to-proof-of-address comparison is implemented behind `KYC_LOCATION_ENABLED=false`. It records separate location consent first, uses the submitted GPS and Didit PoA coordinates only in memory, then stores only the distance-threshold/accuracy outcome. It must remain disabled until the KYC privacy notice is formally approved for this data category and the workflow has Proof of Address plus Device/IP Analysis enabled.
+- A browser-GPS-to-proof-of-address comparison records separate location consent first, uses submitted GPS and Didit PoA coordinates only in memory, then stores only the distance-threshold/accuracy outcome. Production configuration enables it only with the approved KYC privacy notice and a live Didit workflow containing Proof of Address plus Device/IP Analysis.
 
 ### Phase 4 — financial KYC
 
-- Select and contract a licensed provider for each market before connecting any bank/account data.
+- The current release does not request or require bank/account verification.
+- Select and contract a licensed provider for each market before reactivating any bank/account data flow.
 - Never collect bank passwords. Persist only the minimized ownership/identity-consistency outcome required for KYC policy and audit.
 - **Gate:** a licensed provider and country-specific legal/compliance approval are required before enabling this stage.
 
@@ -59,13 +62,13 @@ Profile-photo comparison is an anti-impersonation signal. It is not a substitute
 
 - Didit remains the current identity/liveness provider until a documented provider scorecard changes that decision.
 - Do not label an account KYC verified because a sandbox or a partial provider result approved.
-- Any missing required evidence, uncertain result, provider review result, changed profile photo, location mismatch, address mismatch or financial mismatch must fail closed or route to authorised manual review according to the KYC policy.
+- Any missing required evidence, uncertain result, provider review result, changed profile photo, location mismatch or address mismatch must fail closed or route to authorised manual review according to the KYC policy.
 - Any material change to consented data categories requires a new consent version and legal/privacy approval.
 
-# Mono financial KYC provision (2026-09-22)
+# Dormant Mono financial KYC provision (paused 2026-10-09)
 
-- Mono Connect is now the provisioned financial-stage provider. It is deliberately disabled by default and needs `MONO_FINANCIAL_KYC_ENABLED=true`, a server-only `MONO_SECRET_KEY`, `MONO_WEBHOOK_SECRET`, and `MONO_REDIRECT_URL` before it appears to members.
-- The member is redirected to a Mono-hosted link. Kinkord never receives bank credentials, and does not persist Mono account IDs, account numbers, BVNs, balances, statements, transactions or raw financial identity fields.
-- `POST /verification/kyc/financial/attempts` requires separately versioned financial consent. `POST /webhooks/mono` validates `mono-webhook-secret`, only accepts a Kinkord-issued reference, fetches the minimal identity response in memory, and stores derived pass/review flags only.
+- Mono Connect code is retained for possible future use, but `MONO_FINANCIAL_KYC_ENABLED=false` is enforced in production infrastructure and no member start route is exposed by the active KYC controller.
+- If this feature is reactivated later, its hosted-link flow must remain provider-owned; Kinkord must not receive bank credentials or persist account IDs, account numbers, BVNs, balances, statements, transactions or raw financial identity fields.
+- The dormant Mono webhook implementation remains for future work, but the active member controller exposes no endpoint that can start a financial attempt.
 - An account link plus available Mono identity data must have date of birth and gender consistent with the attributes that already passed Kinkord's identity stage. Any unavailable data or mismatch becomes `under_review`, never a pass.
 - Configure Mono dashboard webhook to `https://<api-host>/webhooks/mono`; use the exact generated webhook secret in `MONO_WEBHOOK_SECRET`. Configure Mono redirect URL to `https://<web-host>/settings/kyc`.

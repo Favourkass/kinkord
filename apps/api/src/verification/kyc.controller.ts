@@ -7,7 +7,7 @@ import { KycReviewService } from "./kyc-review.service";
 import { KycLocationService } from "./kyc-location.service";
 
 const consentSchema = z.object({
-  category: z.enum(["location", "residence", "financial"]),
+  category: z.enum(["location", "residence"]),
   policyVersion: z.string().trim().min(1).max(128),
 });
 
@@ -19,8 +19,10 @@ const locationSchema = z.object({
 @Controller("verification/kyc")
 @UseGuards(AuthGuard)
 export class KycController {
-  constructor(private readonly kyc: KycService, private readonly location: KycLocationService,
-    private readonly financial: KycFinancialService) {}
+  constructor(
+    private readonly kyc: KycService,
+    private readonly location: KycLocationService,
+  ) {}
 
   @Get("status") status(@Req() req: AuthedRequest) { return this.kyc.status(req.user.id); }
 
@@ -40,9 +42,6 @@ export class KycController {
     return this.kyc.refreshResidence(req.user.id);
   }
 
-  @Post("financial/attempts") financialAttempt(@Req() req: AuthedRequest) {
-    return this.financial.start(req.user);
-  }
 }
 
 @Controller("webhooks/mono")

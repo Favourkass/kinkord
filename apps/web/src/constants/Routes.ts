@@ -29,7 +29,6 @@ export const Routes = {
   /** Opens (or reuses) the 1:1 thread with a member, then lands in it. */
   messageWith: (userId: string) => `/messages/with/${encodeURIComponent(userId)}`,
   kinkCoins: "/coming-soon/kinkcoins-payment",
-  subscription: "/coming-soon/subscription",
   marketplace: "/coming-soon/marketplace",
   settings: "/settings",
   settingsData: "/coming-soon/your-data",

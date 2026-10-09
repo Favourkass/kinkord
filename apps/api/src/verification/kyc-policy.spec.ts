@@ -7,7 +7,6 @@ const allPassed = (): KycStageDecision[] => [
   { stage: "identity", status: "passed", environment, checks: { governmentId: true, liveness: true, idFace: true, profileFace: true, identityDetails: true } },
   { stage: "location", status: "passed", environment },
   { stage: "residence", status: "passed", environment },
-  { stage: "financial", status: "passed", environment },
 ];
 
 describe("Kinkord KYC policy", () => {
@@ -23,7 +22,7 @@ describe("Kinkord KYC policy", () => {
     expect(nextRequiredKycStage(decisions)).toBe("identity");
   });
 
-  it("refuses an expired stage and otherwise requires all four stages", () => {
+  it("refuses an expired stage and otherwise requires all three active stages", () => {
     const decisions = allPassed();
     expect(canAwardKinkordKyc(decisions)).toBe(true);
     decisions[2] = { ...decisions[2], expiresAt: new Date("2026-01-01T00:00:00.000Z") };
@@ -39,7 +38,7 @@ describe("Kinkord KYC policy", () => {
     decisions[1] = { ...decisions[1], environment: null };
     expect(canAwardKinkordKyc(decisions)).toBe(false);
     decisions[1] = { ...decisions[1], environment };
-    decisions[3] = { ...decisions[3], environment: undefined };
+    decisions[2] = { ...decisions[2], environment: undefined };
     expect(canAwardKinkordKyc(decisions)).toBe(false);
   });
 });

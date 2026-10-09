@@ -15,10 +15,10 @@ export default function KycPage() {
   const presenter = useBronzeVerificationPresenter();
   const kyc = useKycPresenter();
   return <AppShell {...appShellProps(shell, getAppShellNav())} activeNav="settings">
-    <Script src="https://cdn.smileidentity.com/inline/v1/js/script.min.js" strategy="afterInteractive" onReady={presenter.onScriptReady} onError={presenter.onScriptError} />
+    {presenter.needsSmileScript ? <Script src="https://cdn.smileidentity.com/inline/v1/js/script.min.js" strategy="afterInteractive" onReady={presenter.onScriptReady} onError={presenter.onScriptError} /> : null}
     <div className="mx-auto w-full max-w-[720px] px-[18px] pb-8 pt-5 lg:px-0">
       {kyc.loading ? <p className="text-app-subtle">Loading KYC progress…</p> : null}
-      {kyc.view ? <KycProgressView {...kyc.view} onLocationConsentChange={kyc.setLocationConsentAccepted} onCaptureLocation={kyc.captureLocation} onResidenceConsentChange={kyc.setResidenceConsentAccepted} onRecordResidenceConsent={kyc.recordResidenceConsent} onFinancialConsentChange={kyc.setFinancialConsentAccepted} onStartFinancial={kyc.startFinancial} onRefresh={kyc.refresh} /> : null}
+      {kyc.view ? <KycProgressView {...kyc.view} onLocationConsentChange={kyc.setLocationConsentAccepted} onCaptureLocation={kyc.captureLocation} onResidenceConsentChange={kyc.setResidenceConsentAccepted} onRecordResidenceConsent={kyc.recordResidenceConsent} onRefresh={kyc.refresh} /> : null}
       {kyc.error ? <p role="status" className="mt-4 text-sm text-app-subtle">{kyc.error}</p> : null}
       {presenter.loading ? <p className="text-app-subtle">Loading…</p> : null}
       {presenter.view ? <BronzeVerificationView {...presenter.view} /> : null}

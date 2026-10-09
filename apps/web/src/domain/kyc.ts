@@ -1,4 +1,4 @@
-export type KycStageKey = "identity" | "location" | "residence" | "financial";
+export type KycStageKey = "identity" | "location" | "residence";
 export type KycStageStatus = "not_started" | "pending" | "passed" | "failed" | "under_review" | "unavailable" | "expired";
 
 export interface KycStagePM {
@@ -15,11 +15,9 @@ export interface KycProgressPM {
   fullKycVerified: boolean;
   locationPolicyVersion: string | null;
   residencePolicyVersion: string | null;
-  financialPolicyVersion: string | null;
   consents: {
     location: boolean;
     residence: boolean;
-    financial: boolean;
   };
   stages: KycStagePM[];
 }

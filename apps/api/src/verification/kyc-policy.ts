@@ -1,4 +1,8 @@
-export const KYC_REQUIRED_STAGES = ["identity", "location", "residence", "financial"] as const;
+/**
+ * The active Kinkord KYC contract. Financial verification is intentionally
+ * paused and therefore cannot block or contribute to the verification seal.
+ */
+export const KYC_REQUIRED_STAGES = ["identity", "location", "residence"] as const;
 
 /** Consent version a member must accept before proof-of-address evidence is stored. */
 export const KYC_RESIDENCE_POLICY_VERSION = "kyc-residence-2026-09-22-v1";
@@ -43,7 +47,7 @@ function stageSeals(decision: KycStageDecision | undefined, now: Date): boolean 
 /**
  * A Kinkord KYC seal is fail-closed: every required stage must pass, be
  * unexpired, and carry the current provider environment stamp. This prevents a
- * provider's partial identity decision or sandbox evidence from becoming a
+ * provider's partial identity decision or non-live evidence from becoming a
  * full KYC approval.
  */
 export function canAwardKinkordKyc(decisions: KycStageDecision[], now = new Date()): boolean {

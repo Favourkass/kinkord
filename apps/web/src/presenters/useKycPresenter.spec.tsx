@@ -2,15 +2,14 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { status, consent, submitLocation, refreshResidence, startFinancial } = vi.hoisted(() => ({
+const { status, consent, submitLocation, refreshResidence } = vi.hoisted(() => ({
   status: vi.fn(),
   consent: vi.fn(),
   submitLocation: vi.fn(),
   refreshResidence: vi.fn(),
-  startFinancial: vi.fn(),
 }));
 vi.mock("@/services/kyc.service", () => ({
-  kycApi: { status, consent, submitLocation, refreshResidence, startFinancial },
+  kycApi: { status, consent, submitLocation, refreshResidence },
 }));
 
 import { useKycPresenter } from "./useKycPresenter";
@@ -20,8 +19,7 @@ const progress = {
   fullKycVerified: false,
   locationPolicyVersion: "location-v1",
   residencePolicyVersion: "residence-v1",
-  financialPolicyVersion: "financial-v1",
-  consents: { location: false, residence: false, financial: false },
+  consents: { location: false, residence: false },
   stages: [
     {
       key: "identity" as const,
@@ -40,7 +38,6 @@ describe("useKycPresenter", () => {
     consent.mockReset().mockResolvedValue({});
     submitLocation.mockReset().mockResolvedValue({ status: "passed" });
     refreshResidence.mockReset().mockResolvedValue({ status: "passed" });
-    startFinancial.mockReset().mockResolvedValue({ url: "https://mono.example/connect" });
   });
 
   it("maps stage status and requires explicit location consent", async () => {

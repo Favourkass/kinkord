@@ -16,20 +16,15 @@ export interface KycProgressViewProps {
   locationBusy: boolean;
   residenceConsentAccepted: boolean;
   residenceBusy: boolean;
-  financialConsentAccepted: boolean;
-  financialBusy: boolean;
   consents: {
     location: boolean;
     residence: boolean;
-    financial: boolean;
   };
   residenceEvidenceReady: boolean;
   onLocationConsentChange: (accepted: boolean) => void;
   onCaptureLocation: () => void;
   onResidenceConsentChange: (accepted: boolean) => void;
   onRecordResidenceConsent: () => void;
-  onFinancialConsentChange: (accepted: boolean) => void;
-  onStartFinancial: () => void;
   onRefresh: () => void;
 }
 
@@ -51,16 +46,12 @@ export default function KycProgressView({
   locationBusy,
   residenceConsentAccepted,
   residenceBusy,
-  financialConsentAccepted,
-  financialBusy,
   consents,
   residenceEvidenceReady,
   onLocationConsentChange,
   onCaptureLocation,
   onResidenceConsentChange,
   onRecordResidenceConsent,
-  onFinancialConsentChange,
-  onStartFinancial,
   onRefresh,
 }: KycProgressViewProps) {
   return (
@@ -72,7 +63,7 @@ export default function KycProgressView({
             <h1 className="text-2xl font-black text-kink-gold-bright">Kinkord KYC</h1>
           </div>
           <p className="mt-2 text-sm leading-6 text-app-subtle">
-            Complete all four safeguards to receive Kinkord KYC verified status. Identity completion
+            Complete all three safeguards to receive Kinkord KYC verified status. Identity completion
             alone is not full KYC.
           </p>
         </div>
@@ -160,37 +151,6 @@ export default function KycProgressView({
                   className="mt-3 rounded-lg bg-kink-amber px-3 py-2 text-xs font-black text-black disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {locationBusy ? "Checking location…" : "Confirm live location"}
-                </button>
-              </div>
-            ) : null}
-            {stage.key === "financial" &&
-            stage.available &&
-            stage.status !== "passed" &&
-            stage.status !== "pending" ? (
-              <div className="mt-3 rounded-lg border border-kink-amber/30 bg-kink-amber/5 p-3">
-                <label className="flex items-start gap-2 text-xs leading-5 text-app-subtle">
-                  <input
-                    type="checkbox"
-                    checked={financialConsentAccepted}
-                    disabled={consents.financial}
-                    onChange={(event) => onFinancialConsentChange(event.target.checked)}
-                    className="mt-1 accent-kink-amber"
-                  />
-                  <span>
-                    I consent to Kinkord and Mono verifying that I control a connected bank account
-                    and comparing the bank identity information with my KYC details. Kinkord does
-                    not request or store my bank password, BVN, account number, balance, or
-                    transactions.
-                    {consents.financial ? " Consent recorded." : ""}
-                  </span>
-                </label>
-                <button
-                  type="button"
-                  disabled={!financialConsentAccepted || financialBusy}
-                  onClick={onStartFinancial}
-                  className="mt-3 rounded-lg bg-kink-amber px-3 py-2 text-xs font-black text-black disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {financialBusy ? "Opening secure bank connection…" : "Connect bank securely"}
                 </button>
               </div>
             ) : null}

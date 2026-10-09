@@ -95,7 +95,10 @@ export function useBronzeVerificationPresenter() {
   };
 
   return {
-    loading, error, onScriptReady: () => setWidgetReady(true),
+    loading,
+    error,
+    needsSmileScript: state?.provider === "smile",
+    onScriptReady: () => setWidgetReady(true),
     onScriptError: () => {
       if (state?.provider === "smile") setError("The verification camera could not load.");
     },

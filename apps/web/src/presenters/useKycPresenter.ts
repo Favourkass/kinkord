@@ -23,8 +23,6 @@ export function useKycPresenter() {
   const [locationBusy, setLocationBusy] = useState(false);
   const [residenceConsentAccepted, setResidenceConsentAccepted] = useState(false);
   const [residenceBusy, setResidenceBusy] = useState(false);
-  const [financialConsentAccepted, setFinancialConsentAccepted] = useState(false);
-  const [financialBusy, setFinancialBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -32,7 +30,6 @@ export function useKycPresenter() {
       setProgress(next);
       setLocationConsentAccepted(next.consents.location);
       setResidenceConsentAccepted(next.consents.residence);
-      setFinancialConsentAccepted(next.consents.financial);
       setError(null);
     } catch (failure) {
       if (failure instanceof ApiError && failure.status === 401)
@@ -124,26 +121,6 @@ export function useKycPresenter() {
     }
   };
 
-  const startFinancial = async () => {
-    if (!progress?.financialPolicyVersion || !financialConsentAccepted) {
-      setError("Confirm the financial-verification consent before connecting a bank account.");
-      return;
-    }
-    setFinancialBusy(true);
-    setError(null);
-    try {
-      if (!progress.consents.financial) {
-        await kycApi.consent("financial", progress.financialPolicyVersion);
-      }
-      const launch = await kycApi.startFinancial();
-      // Mono owns this hosted page; no banking credential is requested by Kinkord.
-      window.location.assign(launch.url);
-    } catch (failure) {
-      setError(failure instanceof Error ? failure.message : "Financial KYC could not be started.");
-      setFinancialBusy(false);
-    }
-  };
-
   return {
     loading,
     error,
@@ -155,8 +132,6 @@ export function useKycPresenter() {
           locationBusy,
           residenceConsentAccepted,
           residenceBusy,
-          financialConsentAccepted,
-          financialBusy,
           consents: progress.consents,
           residenceEvidenceReady:
             progress.stages.find((stage) => stage.key === "identity")?.status === "passed",
@@ -172,10 +147,6 @@ export function useKycPresenter() {
     setResidenceConsentAccepted,
     recordResidenceConsent: () => {
       void recordResidenceConsent();
-    },
-    setFinancialConsentAccepted,
-    startFinancial: () => {
-      void startFinancial();
     },
   };
 }

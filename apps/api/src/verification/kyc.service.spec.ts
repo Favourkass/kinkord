@@ -4,7 +4,6 @@ import { KycRepository } from "./kyc.repository";
 import { KycService } from "./kyc.service";
 import { BronzeRepository } from "./bronze.repository";
 import { KycLocationService } from "./kyc-location.service";
-import { KycFinancialService } from "./kyc-financial.service";
 import { DiditService } from "./didit.service";
 import { KycIngestionService } from "./kyc-ingestion.service";
 
@@ -22,7 +21,6 @@ function subject(input: { legacyStatus?: string; results?: unknown[] } = {}) {
     repository,
     legacy,
     { enabled: false } as unknown as KycLocationService,
-    { enabled: false } as unknown as KycFinancialService,
     { configured: false, residenceEnabled: false } as unknown as DiditService,
     {} as KycIngestionService,
   );
@@ -33,8 +31,8 @@ describe("KycService", () => {
     const view = await subject({ legacyStatus: "verified" }).status("member-1");
     expect(view.fullKycVerified).toBe(false);
     expect(view.stages.find((stage) => stage.key === "identity")?.status).toBe("passed");
-    expect(view.stages.find((stage) => stage.key === "financial")?.status).toBe("not_started");
-    expect(view.consents).toEqual({ location: false, residence: false, financial: false });
+    expect(view.stages.map((stage) => stage.key)).toEqual(["identity", "location", "residence"]);
+    expect(view.consents).toEqual({ location: false, residence: false });
     expect(await subject({ legacyStatus: "verified" }).isFullyVerified("member-1")).toBe(false);
   });
 
@@ -42,12 +40,11 @@ describe("KycService", () => {
     const view = await subject().status("member-1");
     expect(view.stages.find((stage) => stage.key === "location")?.available).toBe(false);
     expect(view.stages.find((stage) => stage.key === "residence")?.available).toBe(false);
-    expect(view.stages.find((stage) => stage.key === "financial")?.available).toBe(false);
   });
 
   it("never reports verified for a revoked case even when stages passed", async () => {
     const environment = process.env.DIDIT_MODE?.trim() === "sandbox" ? "sandbox" : "live";
-    const results = (["identity", "location", "residence", "financial"] as const).map((stage) => ({
+    const results = (["identity", "location", "residence"] as const).map((stage) => ({
       stage,
       status: "passed",
       expiresAt: null,
@@ -79,7 +76,6 @@ describe("KycService", () => {
       repository,
       legacy,
       { enabled: false } as unknown as import("./kyc-location.service").KycLocationService,
-      { enabled: false } as unknown as import("./kyc-financial.service").KycFinancialService,
       {
         configured: false,
         residenceEnabled: false,
@@ -127,7 +123,6 @@ describe("KycService", () => {
       repository,
       {} as BronzeRepository,
       {} as KycLocationService,
-      {} as KycFinancialService,
       didit,
       ingestion,
     );

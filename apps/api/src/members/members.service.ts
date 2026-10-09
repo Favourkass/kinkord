@@ -307,11 +307,11 @@ export class MembersService {
       verification: {
         email: u.emailVerified,
         phone: p.phoneVerified,
-        // Unified seal comes only from the policy service (all four stages,
+        // Unified seal comes only from the policy service (all three active stages,
         // environment stamp, unexpired, not revoked) — never from legacy Bronze.
         ...(fullKyc ? { kyc: true as const } : {}),
-        // Legacy identity approval has not completed the new location, residence
-        // and financial KYC stages, so it must never be promoted automatically.
+        // Legacy identity approval has not completed the new location and residence
+        // KYC stages, so it must never be promoted automatically.
         ...(row.bronze?.status === "verified" && row.bronze.verifiedAvatarKey === p.avatarKey
           ? { legacyIdentity: true as const }
           : {}),

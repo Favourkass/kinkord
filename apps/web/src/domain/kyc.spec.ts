@@ -8,8 +8,7 @@ describe("KYC progress contract", () => {
       fullKycVerified: false,
       locationPolicyVersion: "location-v1",
       residencePolicyVersion: null,
-      financialPolicyVersion: null,
-      consents: { location: true, residence: false, financial: false },
+      consents: { location: true, residence: false },
       stages: [
         {
           key: "identity",

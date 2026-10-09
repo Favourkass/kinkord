@@ -1,1 +1,0 @@
-CREATE UNIQUE INDEX "kyc_stage_result_attempt_stage_unique" ON "kyc_stage_result" USING btree ("attempt_id","stage");

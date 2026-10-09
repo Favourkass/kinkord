@@ -16,17 +16,15 @@ import {
   type KycStageDecision,
 } from "./kyc-policy";
 import { KycRepository } from "./kyc.repository";
-import { KYC_FINANCIAL_POLICY_VERSION, KycFinancialService } from "./kyc-financial.service";
 import { KYC_LOCATION_POLICY_VERSION, KycLocationService } from "./kyc-location.service";
 import { DiditService } from "./didit.service";
 import { KycIngestionService } from "./kyc-ingestion.service";
 
-type KycStageConsentCategory = "location" | "residence" | "financial";
+type KycStageConsentCategory = "location" | "residence";
 
 const consentPolicyVersions: Record<KycStageConsentCategory, string> = {
   location: KYC_LOCATION_POLICY_VERSION,
   residence: KYC_RESIDENCE_POLICY_VERSION,
-  financial: KYC_FINANCIAL_POLICY_VERSION,
 };
 
 const stageDetails: Record<
@@ -34,8 +32,9 @@ const stageDetails: Record<
   { title: string; description: string; available: boolean }
 > = {
   identity: {
-    title: "Identity & live biometrics",
-    description: "Government ID, live liveness, face match and profile-photo match.",
+    title: "National ID & facial verification",
+    description:
+      "Government-issued national ID, live liveness, ID-to-face match and profile-photo match.",
     available: true,
   },
   location: {
@@ -48,11 +47,6 @@ const stageDetails: Record<
     description:
       "Proof-of-address verification. Submit a recent document through the identity session.",
     available: true,
-  },
-  financial: {
-    title: "Financial KYC",
-    description: "Consent-based bank-account ownership and identity-consistency verification.",
-    available: false,
   },
 };
 
@@ -70,16 +64,14 @@ export class KycService {
     private readonly repository: KycRepository,
     private readonly legacyIdentity: BronzeRepository,
     private readonly location: KycLocationService,
-    private readonly financial: KycFinancialService,
     private readonly didit: DiditService,
     private readonly ingestion: KycIngestionService,
   ) {}
 
   private async buildDecisions(userId: string) {
-    const [{ caseRow, results }, legacy, financialAttempt] = await Promise.all([
+    const [{ caseRow, results }, legacy] = await Promise.all([
       this.repository.snapshot(userId),
       this.legacyIdentity.status(userId),
-      this.repository.latestStageAttempt(userId, "financial"),
     ]);
     const newest = new Map<KycRequiredStage, (typeof results)[number]>();
     for (const result of results) {
@@ -119,20 +111,17 @@ export class KycService {
           environment: null,
         };
       }
-      if (stage === "financial" && financialAttempt?.status === "pending")
-        return { stage, status: "pending" };
       return { stage, status: "not_started" };
     });
     return { caseRow, decisions };
   }
 
   async status(userId: string) {
-    const [{ caseRow, decisions }, locationConsented, residenceConsented, financialConsented] =
+    const [{ caseRow, decisions }, locationConsented, residenceConsented] =
       await Promise.all([
         this.buildDecisions(userId),
         this.repository.hasActiveConsent(userId, "location", KYC_LOCATION_POLICY_VERSION),
         this.repository.hasActiveConsent(userId, "residence", KYC_RESIDENCE_POLICY_VERSION),
-        this.repository.hasActiveConsent(userId, "financial", KYC_FINANCIAL_POLICY_VERSION),
       ]);
     // A revoked or expired case never reports verified, regardless of stage rows.
     const caseActive =
@@ -151,19 +140,15 @@ export class KycService {
             ? this.location.enabled
             : decision.stage === "residence"
               ? this.didit.residenceEnabled
-              : decision.stage === "financial"
-                ? this.financial.enabled
-                : stageDetails[decision.stage].available,
+              : stageDetails[decision.stage].available,
         status: decision.status,
         expiresAt: decision.expiresAt?.toISOString() ?? null,
       })),
       locationPolicyVersion: this.location.enabled ? KYC_LOCATION_POLICY_VERSION : null,
       residencePolicyVersion: this.didit.residenceEnabled ? KYC_RESIDENCE_POLICY_VERSION : null,
-      financialPolicyVersion: this.financial.enabled ? KYC_FINANCIAL_POLICY_VERSION : null,
       consents: {
         location: locationConsented,
         residence: residenceConsented,
-        financial: financialConsented,
       },
     };
   }
