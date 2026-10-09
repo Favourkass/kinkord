@@ -1,0 +1,19 @@
+/** Copy for the app's search: people and posts. */
+export const SEARCH_COPY = {
+  placeholder: "Search people and posts",
+  label: "Search Kinkord",
+  clear: "Clear search",
+  hint: "Find people by name or @username, and posts by what they say.",
+  tabs: { all: "All", people: "People", posts: "Posts" },
+  people: "People",
+  posts: "Posts",
+  seeAllPeople: "See all people",
+  morePeople: "Show more people",
+  searching: "Searching…",
+  loadMore: "Show more posts",
+  noPeople: (q: string) => `No people match “${q}”.`,
+  noPosts: (q: string) => `No posts contain “${q}”.`,
+  follow: "Follow",
+  following: "Following",
+  error: "Search isn’t working right now. Try again.",
+};

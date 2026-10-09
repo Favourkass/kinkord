@@ -5,6 +5,7 @@ import SilverCheck from "@/components/app/SilverCheck";
 import type { PostMediaVM, PostVM } from "@/domain/post";
 import PostActions, { type PostActionLabels } from "./PostActions";
 import PostMediaGrid from "./PostMediaGrid";
+import BodyText from "./BodyText";
 
 export interface PostCardProps {
   post: PostVM;
@@ -117,7 +118,7 @@ export default function PostCard({
 
       {post.body && (
         <p className="whitespace-pre-wrap pt-[12px] text-[14px] font-medium leading-[20px] text-feed-text">
-          {post.body}{" "}
+          <BodyText parts={post.bodyParts} />{" "}
           {post.canExpand && (
             <button
               type="button"

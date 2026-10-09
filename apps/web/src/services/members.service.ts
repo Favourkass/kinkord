@@ -73,6 +73,8 @@ export interface MembersPageParams {
   state?: string | null;
   /** LGA / area filter within `state`; omit to list the whole state (CEO, 2026-09-08). */
   region?: string | null;
+  /** A name or @username to look for. */
+  q?: string | null;
   page: number;
   limit: number;
   sort?: MembersSort;
@@ -86,10 +88,16 @@ export const membersApi = {
     const qs = new URLSearchParams({ country: p.country.toUpperCase() });
     if (p.state) qs.set("state", p.state);
     if (p.state && p.region) qs.set("lga", p.region);
+    if (p.q) qs.set("q", p.q);
     qs.set("page", String(p.page));
     qs.set("limit", String(p.limit));
     if (p.sort) qs.set("sort", p.sort);
     return api.get<MembersPagePM>(`/members?${qs.toString()}`);
+  },
+  /** The app's search: everyone matching a name or @username, best matches first. */
+  search: (q: string, page: number, limit: number) => {
+    const qs = new URLSearchParams({ q, page: String(page), limit: String(limit) });
+    return api.get<MembersPagePM>(`/members/search?${qs.toString()}`);
   },
   profile: (username: string) =>
     api.get<PublicProfilePM>(`/profiles/${encodeURIComponent(username.replace(/^@/, ""))}`),

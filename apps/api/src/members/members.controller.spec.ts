@@ -40,6 +40,33 @@ describe("MembersController", () => {
     );
   });
 
+  it("searches everyone by name or @username, and needs something to look for", async () => {
+    const { controller } = makeController();
+    const search = vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, limit: 20 });
+    (controller as unknown as { members: { search: typeof search } }).members.search = search;
+    await controller.search(req, { q: " @tega ", page: "2" });
+    expect(search).toHaveBeenCalledWith("me", "tega", 2, 20);
+    expect(() => controller.search(req, { q: " @ " })).toThrow(BadRequestException);
+    expect(() => controller.search(req, {})).toThrow(BadRequestException);
+  });
+
+  it("searches by name or @username, and ignores an empty search", async () => {
+    const { controller, list } = makeController();
+    await controller.list(req, { country: "ng", q: "  @ada " });
+    expect(list).toHaveBeenLastCalledWith(
+      { country: "NG", q: "ada", sort: "recent", page: 1, limit: 20 },
+      "me",
+    );
+    await controller.list(req, { country: "ng", q: " @ " });
+    expect(list).toHaveBeenLastCalledWith(
+      { country: "NG", q: undefined, sort: "recent", page: 1, limit: 20 },
+      "me",
+    );
+    expect(() => controller.list(req, { country: "ng", q: "x".repeat(51) })).toThrow(
+      BadRequestException,
+    );
+  });
+
   it("lists a whole country when no state is given, but an LGA alone is rejected", async () => {
     const { controller, list } = makeController();
     await controller.list(req, { country: "ng" });

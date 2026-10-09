@@ -495,12 +495,237 @@ describe("people you may know", () => {
   });
 });
 
+describe("searching (the search page's Posts)", () => {
+  it("asks for the posts that contain the words, without the suggestions strip", async () => {
+    const hook = renderHook(() => useFeedPresenter({ search: "brunch" }));
+    await waitFor(() => expect(hook.result.current.loading).toBe(false));
+    expect(feed).toHaveBeenCalledWith(null, undefined, null, "brunch");
+    expect(suggested).not.toHaveBeenCalled();
+  });
+
+  it("drops a next page that arrives after the search changed", async () => {
+    let release: (page: unknown) => void = () => undefined;
+    feed.mockImplementation(
+      async (cursor: string | null, _limit: unknown, _author: unknown, search: string) => {
+        if (search === "lunch") return { items: [pm({ id: "b1" })], nextCursor: null };
+        if (cursor === null) return { items: [pm({ id: "a1" })], nextCursor: "c1" };
+        return new Promise((resolve) => {
+          release = resolve;
+        });
+      },
+    );
+    const hook = renderHook(({ search }: { search: string }) => useFeedPresenter({ search }), {
+      initialProps: { search: "brunch" },
+    });
+    await waitFor(() => expect(hook.result.current.hasMore).toBe(true));
+    act(() => {
+      void hook.result.current.loadMore();
+    });
+    hook.rerender({ search: "lunch" });
+    await waitFor(() => expect(hook.result.current.posts.map((p) => p.id)).toEqual(["b1"]));
+    await act(async () => release({ items: [pm({ id: "a2" })], nextCursor: "c2" }));
+    // "brunch"'s second page belongs to "brunch": it never joins "lunch".
+    expect(hook.result.current.posts.map((p) => p.id)).toEqual(["b1"]);
+    expect(hook.result.current.hasMore).toBe(false);
+  });
+
+  it("offers no next page while a new search's first page loads", async () => {
+    let release: (page: unknown) => void = () => undefined;
+    feed.mockImplementation(
+      async (_cursor: unknown, _limit: unknown, _author: unknown, search: string) =>
+        search === "brunch"
+          ? { items: [pm({ id: "a1" })], nextCursor: "c1" }
+          : new Promise((resolve) => {
+              release = resolve;
+            }),
+    );
+    const hook = renderHook(({ search }: { search: string }) => useFeedPresenter({ search }), {
+      initialProps: { search: "brunch" },
+    });
+    await waitFor(() => expect(hook.result.current.hasMore).toBe(true));
+    hook.rerender({ search: "lunch" });
+    expect(hook.result.current.loading).toBe(true);
+    // "brunch"'s cursor would page "lunch" from the wrong place.
+    expect(hook.result.current.hasMore).toBe(false);
+    await act(async () => {
+      await hook.result.current.loadMore();
+    });
+    expect(feed).not.toHaveBeenCalledWith("c1", undefined, null, "lunch");
+    await act(async () => release({ items: [pm({ id: "b1" })], nextCursor: null }));
+    expect(hook.result.current.posts.map((p) => p.id)).toEqual(["b1"]);
+  });
+
+  it("drops a next page asked for before the same list started again", async () => {
+    let release: (page: unknown) => void = () => undefined;
+    feed.mockImplementation(async (cursor: string | null) =>
+      cursor === null
+        ? { items: [pm({ id: "a1" })], nextCursor: "c1" }
+        : new Promise((resolve) => {
+            release = resolve;
+          }),
+    );
+    const hook = renderHook(
+      ({ ready }: { ready: boolean }) => useFeedPresenter({ search: "brunch", ready }),
+      { initialProps: { ready: true } },
+    );
+    await waitFor(() => expect(hook.result.current.hasMore).toBe(true));
+    act(() => {
+      void hook.result.current.loadMore();
+    });
+    hook.rerender({ ready: false });
+    hook.rerender({ ready: true });
+    await waitFor(() => expect(hook.result.current.loading).toBe(false));
+    await act(async () => release({ items: [pm({ id: "a3" })], nextCursor: "c3" }));
+    // Its first page again, with page two still to come, not page three after page one.
+    expect(hook.result.current.posts.map((p) => p.id)).toEqual(["a1"]);
+    expect(hook.result.current.hasMore).toBe(true);
+  });
+
+  it("shows a failed search's error without the last search's posts, and clears it after", async () => {
+    feed.mockImplementation(
+      async (_cursor: unknown, _limit: unknown, _author: unknown, search: string) => {
+        if (search === "lunch") throw new Error("offline");
+        return { items: [pm({ id: search })], nextCursor: "next" };
+      },
+    );
+    const hook = renderHook(({ search }: { search: string }) => useFeedPresenter({ search }), {
+      initialProps: { search: "brunch" },
+    });
+    await waitFor(() => expect(hook.result.current.posts.map((p) => p.id)).toEqual(["brunch"]));
+    hook.rerender({ search: "lunch" });
+    await waitFor(() => expect(hook.result.current.error).not.toBeNull());
+    expect(hook.result.current.posts).toEqual([]);
+    expect(hook.result.current.hasMore).toBe(false);
+    hook.rerender({ search: "dinner" });
+    await waitFor(() => expect(hook.result.current.posts.map((p) => p.id)).toEqual(["dinner"]));
+    expect(hook.result.current.error).toBeNull();
+  });
+
+  it("never lets another search's slow next page hold up this one's", async () => {
+    feed.mockImplementation(
+      async (cursor: string | null, _limit: unknown, _author: unknown, search: string) => {
+        if (search === "brunch" && cursor) return new Promise(() => undefined);
+        return { items: [pm({ id: `${search}-1` })], nextCursor: `${search}-c1` };
+      },
+    );
+    const hook = renderHook(({ search }: { search: string }) => useFeedPresenter({ search }), {
+      initialProps: { search: "brunch" },
+    });
+    await waitFor(() => expect(hook.result.current.hasMore).toBe(true));
+    act(() => {
+      void hook.result.current.loadMore();
+    });
+    expect(hook.result.current.loadingMore).toBe(true);
+    hook.rerender({ search: "lunch" });
+    await waitFor(() => expect(hook.result.current.posts.map((p) => p.id)).toEqual(["lunch-1"]));
+    expect(hook.result.current.loadingMore).toBe(false);
+    await act(async () => {
+      await hook.result.current.loadMore();
+    });
+    expect(feed).toHaveBeenLastCalledWith("lunch-c1", undefined, null, "lunch");
+  });
+
+  it("lets only the request that is loading the next page unlock it", async () => {
+    const pending: Array<(page: unknown) => void> = [];
+    feed.mockImplementation(
+      async (cursor: string | null, _limit: unknown, _author: unknown, search: string) =>
+        cursor
+          ? new Promise((resolve) => pending.push(resolve))
+          : { items: [pm({ id: `${search}-1` })], nextCursor: `${search}-c1` },
+    );
+    const hook = renderHook(({ search }: { search: string }) => useFeedPresenter({ search }), {
+      initialProps: { search: "brunch" },
+    });
+    await waitFor(() => expect(hook.result.current.hasMore).toBe(true));
+    act(() => {
+      void hook.result.current.loadMore();
+    });
+    // Away to another search and back, then the next page again.
+    hook.rerender({ search: "lunch" });
+    await waitFor(() => expect(hook.result.current.posts.map((p) => p.id)).toEqual(["lunch-1"]));
+    hook.rerender({ search: "brunch" });
+    await waitFor(() => expect(hook.result.current.posts.map((p) => p.id)).toEqual(["brunch-1"]));
+    act(() => {
+      void hook.result.current.loadMore();
+    });
+    expect(pending).toHaveLength(2);
+    // The first, stale request settles: it must not unlock the second.
+    await act(async () => pending[0]({ items: [pm({ id: "stale" })], nextCursor: null }));
+    expect(hook.result.current.loadingMore).toBe(true);
+    act(() => {
+      void hook.result.current.loadMore();
+    });
+    expect(pending).toHaveLength(2);
+    await act(async () => pending[1]({ items: [pm({ id: "brunch-2" })], nextCursor: null }));
+    expect(hook.result.current.posts.map((p) => p.id)).toEqual(["brunch-1", "brunch-2"]);
+  });
+
+  it("can't page the same search typed again until its fresh first page is in", async () => {
+    const firsts: Array<(page: unknown) => void> = [];
+    let firstCalls = 0;
+    feed.mockImplementation(async (cursor: string | null) => {
+      if (cursor) return { items: [pm({ id: "p2" })], nextCursor: null };
+      firstCalls += 1;
+      if (firstCalls === 1) return { items: [pm({ id: "p1" })], nextCursor: "c1" };
+      return new Promise((resolve) => firsts.push(resolve));
+    });
+    const hook = renderHook(
+      ({ search, ready }: { search: string; ready: boolean }) =>
+        useFeedPresenter({ search, ready }),
+      { initialProps: { search: "brunch", ready: true } },
+    );
+    await waitFor(() => expect(hook.result.current.hasMore).toBe(true));
+    // Cleared, then the same words again: a fresh first page is on its way.
+    hook.rerender({ search: "", ready: false });
+    hook.rerender({ search: "brunch", ready: true });
+    expect(hook.result.current.loading).toBe(true);
+    expect(hook.result.current.hasMore).toBe(false);
+    await act(async () => {
+      await hook.result.current.loadMore();
+      await hook.result.current.loadMore();
+    });
+    expect(feed).not.toHaveBeenCalledWith("c1", undefined, null, "brunch");
+    await act(async () => firsts[0]({ items: [pm({ id: "p1" })], nextCursor: "c1" }));
+    expect(hook.result.current.posts.map((p) => p.id)).toEqual(["p1"]);
+  });
+
+  it("loads a search gone back to before the one in between loaded", async () => {
+    const pendingFirsts: Array<(page: unknown) => void> = [];
+    let brunchFirsts = 0;
+    feed.mockImplementation(
+      async (cursor: string | null, _limit: unknown, _author: unknown, search: string) => {
+        if (search === "lunch" || (search === "brunch" && !cursor && ++brunchFirsts > 1))
+          return new Promise((resolve) => pendingFirsts.push(resolve));
+        return { items: [pm({ id: "p1" })], nextCursor: "c1" };
+      },
+    );
+    const hook = renderHook(({ search }: { search: string }) => useFeedPresenter({ search }), {
+      initialProps: { search: "brunch" },
+    });
+    await waitFor(() => expect(hook.result.current.hasMore).toBe(true));
+    hook.rerender({ search: "lunch" });
+    hook.rerender({ search: "brunch" });
+    // Back to brunch before lunch loaded: brunch is loading again, not paging.
+    expect(hook.result.current.loading).toBe(true);
+    expect(hook.result.current.hasMore).toBe(false);
+  });
+
+  it("reads again for each new search", async () => {
+    const hook = renderHook(({ search }: { search: string }) => useFeedPresenter({ search }), {
+      initialProps: { search: "brunch" },
+    });
+    await waitFor(() => expect(hook.result.current.loading).toBe(false));
+    hook.rerender({ search: "lunch" });
+    await waitFor(() => expect(feed).toHaveBeenLastCalledWith(null, undefined, null, "lunch"));
+  });
+});
+
 describe("pointed at one member (the profile Posts tab)", () => {
   it("asks for that member's posts, not the whole feed", async () => {
     const hook = renderHook(() => useFeedPresenter({ author: "tega" }));
     await waitFor(() => expect(hook.result.current.loading).toBe(false));
 
-    expect(feed).toHaveBeenCalledWith(null, undefined, "tega");
+    expect(feed).toHaveBeenCalledWith(null, undefined, "tega", null);
   });
 
   it("leaves the suggestions strip to the home feed", async () => {
@@ -525,7 +750,7 @@ describe("pointed at one member (the profile Posts tab)", () => {
     rerender({ author: "favour" });
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(feed).toHaveBeenCalledTimes(1);
-    expect(feed).toHaveBeenCalledWith(null, undefined, "favour");
+    expect(feed).toHaveBeenCalledWith(null, undefined, "favour", null);
   });
 
   it("shows a load, not the last member's posts, when you walk to another profile", async () => {
@@ -556,7 +781,7 @@ describe("pointed at one member (the profile Posts tab)", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     await act(async () => result.current.loadMore());
-    expect(feed).toHaveBeenLastCalledWith("2026-09-18T11:00:00.000Z", undefined, "tega");
+    expect(feed).toHaveBeenLastCalledWith("2026-09-18T11:00:00.000Z", undefined, "tega", null);
   });
 });
 

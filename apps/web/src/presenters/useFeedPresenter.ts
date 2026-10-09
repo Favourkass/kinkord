@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { FEED_COPY, FEED_PHOTO_LIMIT, FEED_SUGGESTION_LIMIT } from "@/constants/feed";
 import { Routes } from "@/constants/Routes";
 import {
+  COMMENT_BODY_MAX,
   handleOf,
+  postBodyMax,
   toCommentVM,
   toPostVM,
   type CommentPM,
@@ -19,6 +21,7 @@ import {
   type PostVisibility,
 } from "@/domain/post";
 import { ApiError } from "@/services/apiClient";
+import { useMentionSuggestions, type MentionField } from "./useMentionSuggestions";
 import {
   applyLike,
   applyRepost,
@@ -57,6 +60,10 @@ export interface FeedOptions {
   postId?: string | null;
   /** The viewer's saved posts instead of the feed. */
   saved?: boolean;
+  /** Search: the posts whose text contains this. */
+  search?: string | null;
+  /** The composer's limit (Silver writes longer posts), which a picked @mention mustn't pass. */
+  postMaxLength?: number;
   /**
    * False while the author is still being resolved. /profile has to ask the API
    * who you are before it can ask for your posts, and without this the first
@@ -79,22 +86,41 @@ export function useFeedPresenter({
   author = null,
   postId = null,
   saved = false,
+  search = null,
+  postMaxLength = postBodyMax(false),
   ready = true,
 }: FeedOptions = {}) {
   const router = useRouter();
 
   const [posts, setPosts] = useState<PostPM[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
+  const surface = `${postId ?? ""}|${author ?? ""}|${saved}|${search ?? ""}`;
   /**
-   * Which author the loaded posts belong to. Deriving `loading` from it rather
-   * than flipping a flag means walking from one member's profile to another
-   * shows a load instead of a flash of the previous member's posts — the page
-   * component stays mounted across that navigation.
+   * Each first page starts a round of the list: another list, the same list
+   * switched off and on again (a search cleared and typed again), or one gone
+   * back to. Until the round's first page is in, the list is loading: it can't
+   * page, and a next page asked for in an earlier round is dropped. Deriving
+   * `loading` from the round rather than flipping a flag means walking from
+   * one member's profile to another shows a load instead of a flash of the
+   * previous member's posts — the page component stays mounted across that.
    */
-  const [loadedFor, setLoadedFor] = useState<string | undefined>(undefined);
-  const surface = `${postId ?? ""}|${author ?? ""}|${saved}`;
-  const loading = !ready || loadedFor !== surface;
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [requested, setRequested] = useState({ surface, ready, round: 1 });
+  if (requested.surface !== surface || requested.ready !== ready) {
+    setRequested({ surface, ready, round: requested.round + 1 });
+  }
+  const round = requested.round;
+  const [loadedRound, setLoadedRound] = useState(0);
+  const loading = !ready || loadedRound !== round;
+  // The round on screen, for the next pages still out when it changes.
+  const shownRound = useRef(round);
+  useEffect(() => {
+    shownRound.current = round;
+  }, [round]);
+  // The next page loading, for which round: an earlier round's never holds
+  // this one up, and only the request that set it may clear it.
+  const [loadingMoreFor, setLoadingMoreFor] = useState<{ round: number; ask: number } | null>(null);
+  const loadingMore = !loading && loadingMoreFor?.round === round;
+  const asks = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string[]>([]);
 
@@ -111,6 +137,33 @@ export function useFeedPresenter({
   const [commentsCursor, setCommentsCursor] = useState<string | null>(null);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentDraft, setCommentDraft] = useState("");
+
+  // "@" and a few letters in either box suggests members to mention.
+  const {
+    track: trackMention,
+    picker: mentionPicker,
+    close: closeMention,
+  } = useMentionSuggestions(
+    useCallback((field: MentionField, text: string) => {
+      if (field === "post") setDraft(text);
+      else setCommentDraft(text);
+    }, []),
+  );
+  /** A box's text changed, or its caret moved: where it is decides the suggestions. */
+  const typeDraft = useCallback(
+    (value: string, caret?: number) => {
+      setDraft(value);
+      trackMention("post", value, caret ?? value.length);
+    },
+    [trackMention],
+  );
+  const typeCommentDraft = useCallback(
+    (value: string, caret?: number) => {
+      setCommentDraft(value);
+      trackMention("comment", value, caret ?? value.length);
+    },
+    [trackMention],
+  );
   const [commentSending, setCommentSending] = useState(false);
   const [commentsError, setCommentsError] = useState<string | null>(null);
 
@@ -129,14 +182,14 @@ export function useFeedPresenter({
   /** Object URLs outlive React state, so they are revoked by hand. */
   const previewUrls = useRef<string[]>([]);
 
-  /** Which page of which list to read — the four surfaces differ only here. */
+  /** Which page of which list to read — the five surfaces differ only here. */
   const loadPage = useCallback(
     async (cursor: string | null): Promise<FeedPagePM> => {
       if (postId) return { items: [await postsApi.byId(postId)], nextCursor: null };
       if (saved) return postsApi.saved(cursor);
-      return postsApi.feed(cursor, undefined, author);
+      return postsApi.feed(cursor, undefined, author, search);
     },
-    [author, postId, saved],
+    [author, postId, saved, search],
   );
 
   const onUnauthorized = useCallback(
@@ -159,21 +212,25 @@ export function useFeedPresenter({
         if (cancelled) return;
         setPosts(page.items);
         setCursor(page.nextCursor);
+        setError(null);
       } catch (e) {
         if (cancelled || onUnauthorized(e)) return;
+        // Nothing of the list before belongs under this one's error.
+        setPosts([]);
+        setCursor(null);
         setError(FEED_COPY.feedError);
       } finally {
-        if (!cancelled) setLoadedFor(surface);
+        if (!cancelled) setLoadedRound(round);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [surface, loadPage, ready, onUnauthorized]);
+  }, [round, loadPage, ready, onUnauthorized]);
 
   useEffect(() => {
     // Only the home feed carries the suggestions strip.
-    if (author || postId || saved || !ready) return;
+    if (author || postId || saved || search || !ready) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -186,7 +243,7 @@ export function useFeedPresenter({
     return () => {
       cancelled = true;
     };
-  }, [author, postId, saved, ready]);
+  }, [author, postId, saved, search, ready]);
 
   // Revoke every preview on unmount so a long session doesn't leak blobs.
   useEffect(
@@ -198,18 +255,21 @@ export function useFeedPresenter({
   );
 
   const loadMore = useCallback(async () => {
-    if (!cursor || loadingMore) return;
-    setLoadingMore(true);
+    // Until a new list's first page is in, the cursor is still the old list's.
+    if (!cursor || loadingMore || loading) return;
+    const ask = ++asks.current;
+    setLoadingMoreFor({ round, ask });
     try {
       const page = await loadPage(cursor);
+      if (shownRound.current !== round) return;
       setPosts((prev) => [...prev, ...page.items]);
       setCursor(page.nextCursor);
     } catch (e) {
-      if (!onUnauthorized(e)) setError(FEED_COPY.feedError);
+      if (shownRound.current === round && !onUnauthorized(e)) setError(FEED_COPY.feedError);
     } finally {
-      setLoadingMore(false);
+      setLoadingMoreFor((current) => (current?.ask === ask ? null : current));
     }
-  }, [cursor, loadPage, loadingMore, onUnauthorized]);
+  }, [cursor, loadPage, loading, loadingMore, onUnauthorized, round]);
 
   const openMedia = useCallback((media: PostMediaVM) => setLightbox(media), []);
   const closeMedia = useCallback(() => setLightbox(null), []);
@@ -247,10 +307,11 @@ export function useFeedPresenter({
     setComposerOpen(false);
     setAutoPickPhoto(false);
     setDraft("");
+    closeMention("post");
     setVisibility("public");
     setComposerError(null);
     discardPhotos();
-  }, [discardPhotos]);
+  }, [discardPhotos, closeMention]);
 
   const addPhotos = useCallback(
     (files: File[]) => {
@@ -428,6 +489,7 @@ export function useFeedPresenter({
       setComments([]);
       setCommentsCursor(null);
       setCommentDraft("");
+      closeMention("comment");
       setCommentsError(null);
       setCommentsLoading(true);
       try {
@@ -441,7 +503,7 @@ export function useFeedPresenter({
         setCommentsLoading(false);
       }
     },
-    [onUnauthorized],
+    [onUnauthorized, closeMention],
   );
 
   const closeComments = useCallback(() => {
@@ -449,8 +511,9 @@ export function useFeedPresenter({
     setComments([]);
     setCommentsCursor(null);
     setCommentDraft("");
+    closeMention("comment");
     setCommentsError(null);
-  }, []);
+  }, [closeMention]);
 
   const loadMoreComments = useCallback(async () => {
     if (!commentsFor || !commentsCursor || commentsLoading) return;
@@ -476,6 +539,7 @@ export function useFeedPresenter({
       setComments((prev) => [created, ...prev]);
       setPosts((prev) => applyToPost(prev, postId, (p) => withCommentDelta(p, 1)));
       setCommentDraft("");
+      closeMention("comment");
     } catch (e) {
       if (onUnauthorized(e)) return;
       setCommentsError(
@@ -484,7 +548,7 @@ export function useFeedPresenter({
     } finally {
       setCommentSending(false);
     }
-  }, [commentsFor, commentDraft, commentSending, onUnauthorized]);
+  }, [commentsFor, commentDraft, commentSending, onUnauthorized, closeMention]);
 
   const deleteComment = useCallback(
     async (id: string) => {
@@ -602,7 +666,7 @@ export function useFeedPresenter({
     loading,
     error,
     posts: postVMs,
-    hasMore: Boolean(cursor),
+    hasMore: !loading && Boolean(cursor),
     loadingMore,
     loadMore,
     toggleExpanded,
@@ -616,7 +680,8 @@ export function useFeedPresenter({
     openComposerWithPhoto,
     closeComposer,
     draft,
-    setDraft,
+    setDraft: typeDraft,
+    postMentions: mentionPicker("post", postMaxLength),
     visibility,
     setVisibility,
     photos: photoVMs,
@@ -645,7 +710,8 @@ export function useFeedPresenter({
     openComments,
     closeComments,
     commentDraft,
-    setCommentDraft,
+    setCommentDraft: typeCommentDraft,
+    commentMentions: mentionPicker("comment", COMMENT_BODY_MAX),
     commentSending,
     canComment: canSubmitComment(commentDraft) && !commentSending,
     submitComment,

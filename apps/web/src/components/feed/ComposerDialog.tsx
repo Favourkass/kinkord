@@ -1,9 +1,14 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import MaskIcon from "@/components/app/MaskIcon";
 import type { DraftPhotoVM } from "@/domain/post";
+import MentionSuggestions, {
+  activeMentionId,
+  composing,
+  type MentionPickerProps,
+} from "./MentionSuggestions";
 
 export interface ComposerDialogProps {
   open: boolean;
@@ -12,7 +17,9 @@ export interface ComposerDialogProps {
   authorName: string;
   avatarUrl: string | null;
   draft: string;
-  onDraftChange: (value: string) => void;
+  /** The text, and where the caret is: "@" right before it suggests members. */
+  onDraftChange: (value: string, caret?: number) => void;
+  mentions: MentionPickerProps;
   maxLength: number;
   visibility: string;
   visibilities: readonly { value: string; label: string }[];
@@ -35,6 +42,7 @@ export interface ComposerDialogProps {
     removePhoto: string;
     placeholder: string;
     visibilityLabel: string;
+    mentions: string;
   };
 }
 
@@ -46,12 +54,22 @@ export interface ComposerDialogProps {
 export default function ComposerDialog(p: ComposerDialogProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
+  const mentionListId = useId();
 
   useEffect(() => {
     if (!p.open) return;
     if (p.autoPickPhoto) fileRef.current?.click();
     else textRef.current?.focus();
   }, [p.open, p.autoPickPhoto]);
+
+  // After a mention is picked, the caret goes after it.
+  const caretAt = p.mentions.caret?.at;
+  const caretPick = p.mentions.caret?.pick;
+  useEffect(() => {
+    if (caretAt === undefined || !textRef.current) return;
+    textRef.current.focus();
+    textRef.current.setSelectionRange(caretAt, caretAt);
+  }, [caretAt, caretPick]);
 
   if (!p.open) return null;
 
@@ -98,15 +116,34 @@ export default function ComposerDialog(p: ComposerDialogProps) {
             </div>
           </div>
 
-          <textarea
-            ref={textRef}
-            value={p.draft}
-            maxLength={p.maxLength}
-            onChange={(e) => p.onDraftChange(e.target.value)}
-            placeholder={p.labels.placeholder}
-            rows={5}
-            className="mt-[16px] w-full resize-none bg-transparent text-[15px] leading-[22px] text-feed-text outline-none placeholder:text-feed-muted"
-          />
+          <div className="relative mt-[16px]">
+            <textarea
+              ref={textRef}
+              // A many-line box stays a textbox (a combobox is one line, and only it has an
+              // expanded state); it names the list it controls and the highlighted member.
+              aria-autocomplete="list"
+              aria-controls={mentionListId}
+              aria-activedescendant={activeMentionId(mentionListId, p.mentions)}
+              value={p.draft}
+              maxLength={p.maxLength}
+              onChange={(e) => p.onDraftChange(e.target.value, e.target.selectionStart)}
+              onSelect={(e) =>
+                p.onDraftChange(e.currentTarget.value, e.currentTarget.selectionStart)
+              }
+              onKeyDown={(e) => {
+                if (!composing(e) && p.mentions.onKey(e.key)) e.preventDefault();
+              }}
+              placeholder={p.labels.placeholder}
+              rows={5}
+              className="w-full resize-none bg-transparent text-[15px] leading-[22px] text-feed-text outline-none placeholder:text-feed-muted"
+            />
+            <MentionSuggestions
+              {...p.mentions}
+              id={mentionListId}
+              label={p.labels.mentions}
+              className="mt-[8px]"
+            />
+          </div>
 
           {p.photos.length > 0 && (
             <ul className="grid grid-cols-2 gap-[8px] pt-[8px]">

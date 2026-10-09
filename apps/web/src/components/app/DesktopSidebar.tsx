@@ -34,8 +34,13 @@ export default function DesktopSidebar({
   labels,
   onLogout,
 }: DesktopSidebarProps) {
-  const unread = { home: 0, chat: messagesCount, notifications: notificationsCount ?? 0 };
-  const unreadLabel = (key: "home" | "chat" | "notifications") =>
+  const unread = {
+    home: 0,
+    search: 0,
+    chat: messagesCount,
+    notifications: notificationsCount ?? 0,
+  };
+  const unreadLabel = (key: "home" | "search" | "chat" | "notifications") =>
     key === "chat" && messagesCount > 0
       ? `${labels.chat}, ${messagesCount} unread messages`
       : key === "notifications" && (unread.notifications > 0 || notificationsUnread)
@@ -44,11 +49,12 @@ export default function DesktopSidebar({
           : `${labels.notifications}, unread notifications`
         : undefined;
   const items: Array<{
-    key: "home" | "chat" | "notifications";
+    key: "home" | "search" | "chat" | "notifications";
     icon: MaskIconName;
     iconClass: string;
   }> = [
     { key: "home", icon: "home-solid", iconClass: "text-kink-amber" },
+    { key: "search", icon: "search", iconClass: "text-side-text" },
     { key: "chat", icon: "chat", iconClass: "text-side-text" },
     { key: "notifications", icon: "bell-outline", iconClass: "text-side-text" },
   ];

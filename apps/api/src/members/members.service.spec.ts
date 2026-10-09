@@ -244,6 +244,65 @@ describe("MembersService", () => {
     // An LGA without a state cannot narrow anything, so it is ignored rather than applied.
     const orphanLga = await run({ country: "ng", lga: "Abraka", sort: "recent" });
     expect(orphanLga.params).toEqual(["NG", "me"]);
+
+    // A search reads the name and the username, anywhere in either, wildcards taken literally.
+    const search = await run({ country: "ng", state: "Delta", q: "ada_o", sort: "recent" });
+    expect(search.params).toEqual(["NG", "me", "Delta", "%ada\\_o%", "%ada\\_o%"]);
+    expect(search.sql).toMatch(/"display_name" ilike \$\d+ or "user"\."username" ilike/);
+  });
+
+  it("searches everyone, whatever their country, with nobody on either side of a block", async () => {
+    const { service, select } = makeService();
+    const wheres: SQL[] = [];
+    const orders: SQL[][] = [];
+    // Records the filter and the order of the page query.
+    const pageQuery = (): unknown => {
+      const p: unknown = new Proxy(() => p, {
+        get: (_t, prop) => {
+          if (prop === "then")
+            return (res: (v: unknown) => unknown) => Promise.resolve([]).then(res);
+          if (prop === "where")
+            return (w: SQL) => {
+              wheres.push(w);
+              return p;
+            };
+          if (prop === "orderBy")
+            return (...args: SQL[]) => {
+              orders.push(args);
+              return p;
+            };
+          return () => p;
+        },
+        apply: () => p,
+      });
+      return p;
+    };
+    select
+      .mockReturnValueOnce(chain(undefined))
+      .mockReturnValueOnce(pageQuery())
+      .mockReturnValueOnce(recordingChain([{ total: 0 }], wheres));
+    await service.search("me", "Ada", 2, 10);
+    const { sql, params } = renderWhere(wheres[0]);
+    expect(sql).not.toMatch(/"country"/);
+    expect(params).toContain("%Ada%");
+    // Neither the members who blocked the viewer nor those the viewer blocked.
+    expect(sql).toMatch(
+      /not exists \(select 1 from "member_block" where "member_block"\."blocker_id" = "profile"\."user_id"/,
+    );
+    expect(sql).toMatch(
+      /not exists \(select 1 from "member_block" where "member_block"\."blocker_id" = \$\d+ and "member_block"\."blocked_id" = "profile"\."user_id"/,
+    );
+    expect(renderWhere(wheres[1])).toEqual(renderWhere(wheres[0]));
+    // Exact, then starts-with, then anywhere.
+    const rank = renderWhere(orders[0][0] as SQL);
+    expect(rank.sql).toMatch(
+      /case\s+when "user"\."username" = \$1 or lower\("profile"\."display_name"\) = \$2 then 0/,
+    );
+    expect(rank.params.slice(0, 4)).toEqual(["ada", "ada", "Ada%", "Ada%"]);
+    // Then the handle and the id: nothing a follow or a login moves between pages.
+    expect(orders[0]).toHaveLength(3);
+    expect(renderWhere(orders[0][1] as SQL).sql).toBe('"user"."username" asc nulls last');
+    expect(renderWhere(orders[0][2] as SQL).sql).toBe('"profile"."user_id" asc');
   });
 
   it("404s an unknown public profile", async () => {

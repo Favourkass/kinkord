@@ -6,6 +6,7 @@ describe("getAppShellNav", () => {
     const nav = getAppShellNav();
     expect(nav.links).toEqual({
       home: "/home",
+      search: "/search",
       members: "/members",
       chat: "/messages",
       notifications: "/notifications",
@@ -16,6 +17,7 @@ describe("getAppShellNav", () => {
     });
     expect(nav.labels).toEqual({
       home: "Home",
+      search: "Search",
       members: "Members",
       chat: "Chat",
       notifications: "Notifications",

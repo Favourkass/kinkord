@@ -3,10 +3,19 @@
 export type AppTab = "home" | "chat" | "notifications" | "profile";
 
 export type AppNav =
-  "home" | "members" | "chat" | "notifications" | "profile" | "settings" | "saved" | "edit-profile";
+  | "home"
+  | "search"
+  | "members"
+  | "chat"
+  | "notifications"
+  | "profile"
+  | "settings"
+  | "saved"
+  | "edit-profile";
 
 export interface AppNavLinks {
   home: string;
+  search: string;
   members: string;
   chat: string;
   notifications: string;
@@ -18,6 +27,7 @@ export interface AppNavLinks {
 
 export interface AppNavLabels {
   home: string;
+  search: string;
   members: string;
   chat: string;
   notifications: string;

@@ -53,12 +53,15 @@ export const MEMBERS_COPY = {
     loadingMore: "Loading more members…",
     end: "You’ve met everyone here — for now.",
     empty: (place: string) => `No members in ${place} yet. Be the first.`,
+    searchPlaceholder: "Search by name or @username",
+    searchLabel: "Search members",
+    noMatch: (query: string, place: string) => `No one in ${place} matches “${query}”.`,
     openProfile: (name: string) => `Open ${name}’s profile`,
     unknownState: "We don’t know that state yet.",
   },
   profile: {
     brand: "KINKORD",
-    actions: { search: "Search members", more: "More options", share: "Share profile" },
+    actions: { search: "Search", more: "More options", share: "Share profile" },
     tabs: { posts: "Posts", about: "About", media: "Media", people: "People" },
     follow: "Follow",
     following: "Following",
@@ -168,7 +171,7 @@ export const MEMBERS_COPY = {
     },
     /** Desktop-only chrome (Figma desktop-profile-* frames). */
     desktop: {
-      searchPlaceholder: "Search friends, kinks, groups...",
+      searchPlaceholder: "Search people and posts",
       account: "My Account",
       tagsHeading: "Profile Bio & Tags",
       friendsList: "Friends List",
@@ -180,6 +183,7 @@ export const MEMBERS_COPY = {
   },
   nav: {
     home: "Home",
+    search: "Search",
     members: "Members",
     chat: "Chat",
     notifications: "Notifications",

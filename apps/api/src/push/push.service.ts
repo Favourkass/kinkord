@@ -198,6 +198,24 @@ export class PushService {
     });
   }
 
+  /** A post or a comment mentioned them: who, not what. */
+  newMention(postId: string, mentionedId: string, actorId: string): void {
+    if (mentionedId === actorId) return;
+    this.notify(async () => {
+      const who = await this.member(actorId);
+      return {
+        to: mentionedId,
+        event: { type: "mention", actorId, subjectId: postId },
+        message: {
+          title: "Kinkord",
+          body: `${who.name} mentioned you`,
+          url: notificationUrl("mention", postId, null),
+          tag: `mention-${postId}`,
+        },
+      };
+    });
+  }
+
   newLike(postId: string, authorId: string, actorId: string): void {
     this.postActivity("like", "liked", postId, authorId, actorId);
   }

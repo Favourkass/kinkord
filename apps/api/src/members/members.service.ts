@@ -1,5 +1,18 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, asc, count, desc, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNotNull,
+  ne,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { Db, DRIZZLE } from "../db/db.module";
 import { notBanned } from "../moderation/admins";
@@ -12,12 +25,15 @@ import {
   type ProfileMediaKind,
 } from "../db/schema";
 import { PostsService } from "../posts/posts.service";
+import { blockedBy, notBlocking } from "../safety/blocks";
+import { containsPattern } from "../push/notifications.service";
 import { ONLINE_WINDOW_SECONDS, PresenceService } from "../presence/presence.service";
 import { StorageService } from "../storage/storage.service";
 import { silverCheck, silverSince } from "../subscriptions/plans";
 import { FollowsService } from "./follows.service";
 
-export type MembersSort = "recent" | "followers" | "name";
+/** "match" ranks a search: exact name or username, then starts-with, then anywhere. */
+export type MembersSort = "recent" | "followers" | "name" | "match";
 /** People tab (Figma 1321:14): Friends · Followers · Following · Suggested (+ mutual for the viewer). */
 export type FriendsTab = "all" | "mutual" | "followers" | "following" | "suggested";
 /** Media tab pills (Figma 1524:1786): All · Profile Photo · Photos · Videos. */
@@ -41,14 +57,35 @@ const POST_MEDIA_KINDS: Record<MediaFilter, PostMediaKind[]> = {
 };
 
 export interface ListMembersParams {
-  country: string;
+  /** Omit to look across every country: search does. */
+  country?: string | null;
   /** Omit to list the whole country (CEO, 2026-09-12: "click Nigeria → everyone in Nigeria"). */
   state?: string | null;
   /** Only meaningful together with `state`. */
   lga?: string | null;
   sort: MembersSort;
+  /** Name or username to look for, anywhere in either. */
+  q?: string | null;
+  /** Leave out members who blocked the viewer or whom the viewer blocked, as search does. */
+  hideBlocked?: boolean;
   page?: number;
   limit?: number;
+}
+
+/** A member whose display name or username contains `term`, case aside. Reads `profile` and `user`. */
+export function memberMatches(term: string): SQL {
+  const pattern = containsPattern(term);
+  return or(ilike(profile.displayName, pattern), ilike(user.username, pattern))!;
+}
+
+/** 0 for an exact name or username, 1 when either starts with `term`, else 2: best matches first. */
+export function matchRank(term: string): SQL<number> {
+  const exact = term.toLowerCase();
+  const prefix = `${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+  return sql<number>`case
+    when ${user.username} = ${exact} or lower(${profile.displayName}) = ${exact} then 0
+    when ${ilike(user.username, prefix)} or ${ilike(profile.displayName, prefix)} then 1
+    else 2 end`;
 }
 
 /** Countries the directory serves today; the client renders the rest as "coming soon". */
@@ -117,15 +154,27 @@ export class MembersService {
    * Abraka → everyone in Abraka. Newest first by default, with the viewer's follow
    * state on each card. The viewer is excluded.
    */
+  /**
+   * Everyone matching a name or username, whatever their country: the app's
+   * search. Best matches first, and nobody on either side of a block.
+   */
+  search(viewerId: string, q: string, page?: number, limit?: number) {
+    return this.list({ q, sort: "match", hideBlocked: true, page, limit }, viewerId);
+  }
+
   async list(params: ListMembersParams, viewerId: string) {
     const { page, limit, offset } = normalizePaging(params.page, params.limit);
-    const conditions = [
-      eq(profile.country, params.country.toUpperCase()),
-      ne(profile.userId, viewerId),
-      notBanned(profile.userId),
-    ];
+    const conditions: SQL[] = [ne(profile.userId, viewerId), notBanned(profile.userId)];
+    if (params.country) conditions.unshift(eq(profile.country, params.country.toUpperCase()));
     if (params.state) conditions.push(eq(profile.state, params.state));
     if (params.state && params.lga) conditions.push(eq(profile.city, params.lga));
+    if (params.q) conditions.push(memberMatches(params.q));
+    if (params.hideBlocked) {
+      conditions.push(
+        notBlocking(profile.userId, viewerId),
+        sql`not ${blockedBy(viewerId, profile.userId)}`,
+      );
+    }
     const where = and(...conditions);
 
     const followerCounts = this.db
@@ -146,6 +195,13 @@ export class MembersService {
         : params.sort === "name"
           ? asc(profile.displayName)
           : desc(profile.createdAt);
+    // A search's best matches lead, then the handle: nothing a follow or a
+    // login moves, so its pages never repeat or skip anyone. The directory
+    // keeps who's online first. The id settles any tie.
+    const order =
+      params.sort === "match" && params.q
+        ? [asc(matchRank(params.q)), sql`${user.username} asc nulls last`, asc(profile.userId)]
+        : [desc(isOnline), secondary, asc(profile.userId)];
 
     const rows = await this.db
       .select({
@@ -172,11 +228,16 @@ export class MembersService {
         and(eq(viewerFollow.followingId, profile.userId), eq(viewerFollow.followerId, viewerId)),
       )
       .where(where)
-      .orderBy(desc(isOnline), secondary)
+      .orderBy(...order)
       .limit(limit)
       .offset(offset);
 
-    const [totalRow] = await this.db.select({ total: count() }).from(profile).where(where);
+    // Joined like the page, since a search reads the username.
+    const [totalRow] = await this.db
+      .select({ total: count() })
+      .from(profile)
+      .innerJoin(user, eq(user.id, profile.userId))
+      .where(where);
 
     // One grouped query for the page rather than a count per card.
     const postCounts = await this.posts.postCountsFor(
