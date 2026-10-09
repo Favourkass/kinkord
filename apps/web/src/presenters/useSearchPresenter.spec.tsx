@@ -339,6 +339,46 @@ describe("useSearchPresenter", () => {
     expect(result.current.people.rows[0].isFollowing).toBe(false);
   });
 
+  it("can't page the same words typed again until their fresh people are in", async () => {
+    const { result } = renderHook(() => useSearchPresenter("ada"));
+    await waitFor(() => expect(result.current.people.seeAll).not.toBeNull());
+    act(() => result.current.people.seeAll?.onClick());
+    let respond: (page: unknown) => void = () => undefined;
+    search.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          respond = resolve;
+        }),
+    );
+    act(() => result.current.clear());
+    await waitFor(() => expect(result.current.term).toBe(""));
+    act(() => result.current.setQuery("ada"));
+    await waitFor(() => expect(result.current.term).toBe("ada"));
+    expect(result.current.people.loading).toBe(true);
+    expect(result.current.people.hasMore).toBe(false);
+    act(() => result.current.people.onLoadMore());
+    expect(search).not.toHaveBeenCalledWith("ada", 2, 20);
+    await act(async () => respond({ items: people(1, 20), total: 25, page: 1, limit: 20 }));
+    expect(result.current.people.rows).toHaveLength(20);
+    expect(result.current.people.hasMore).toBe(true);
+  });
+
+  it("never shows anyone twice when the list shifts between pages", async () => {
+    search.mockImplementation(async (_q: string, page: number) => ({
+      // Page two starts with the last of page one: someone moved across the boundary.
+      items: page === 1 ? people(1, 20) : people(20, 6),
+      total: 25,
+      page,
+      limit: 20,
+    }));
+    const { result } = renderHook(() => useSearchPresenter("ada"));
+    await waitFor(() => expect(result.current.people.seeAll).not.toBeNull());
+    act(() => result.current.people.seeAll?.onClick());
+    act(() => result.current.people.onLoadMore());
+    await waitFor(() => expect(result.current.people.rows).toHaveLength(25));
+    expect(new Set(result.current.people.rows.map((r) => r.userId)).size).toBe(25);
+  });
+
   it("never searches more than the API takes", async () => {
     const { result } = renderHook(() => useSearchPresenter(null));
     act(() => result.current.setQuery("a".repeat(80)));

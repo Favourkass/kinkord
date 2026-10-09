@@ -195,11 +195,12 @@ export class MembersService {
         : params.sort === "name"
           ? asc(profile.displayName)
           : desc(profile.createdAt);
-    // A search's best matches lead; then, as everywhere, who's online and who's followed.
-    // The id settles ties, so the pages of an offset list never repeat or skip anyone.
+    // A search's best matches lead, then the handle: nothing a follow or a
+    // login moves, so its pages never repeat or skip anyone. The directory
+    // keeps who's online first. The id settles any tie.
     const order =
       params.sort === "match" && params.q
-        ? [asc(matchRank(params.q)), desc(isOnline), desc(followers), asc(profile.userId)]
+        ? [asc(matchRank(params.q)), sql`${user.username} asc nulls last`, asc(profile.userId)]
         : [desc(isOnline), secondary, asc(profile.userId)];
 
     const rows = await this.db

@@ -660,6 +660,56 @@ describe("searching (the search page's Posts)", () => {
     expect(hook.result.current.posts.map((p) => p.id)).toEqual(["brunch-1", "brunch-2"]);
   });
 
+  it("can't page the same search typed again until its fresh first page is in", async () => {
+    const firsts: Array<(page: unknown) => void> = [];
+    let firstCalls = 0;
+    feed.mockImplementation(async (cursor: string | null) => {
+      if (cursor) return { items: [pm({ id: "p2" })], nextCursor: null };
+      firstCalls += 1;
+      if (firstCalls === 1) return { items: [pm({ id: "p1" })], nextCursor: "c1" };
+      return new Promise((resolve) => firsts.push(resolve));
+    });
+    const hook = renderHook(
+      ({ search, ready }: { search: string; ready: boolean }) =>
+        useFeedPresenter({ search, ready }),
+      { initialProps: { search: "brunch", ready: true } },
+    );
+    await waitFor(() => expect(hook.result.current.hasMore).toBe(true));
+    // Cleared, then the same words again: a fresh first page is on its way.
+    hook.rerender({ search: "", ready: false });
+    hook.rerender({ search: "brunch", ready: true });
+    expect(hook.result.current.loading).toBe(true);
+    expect(hook.result.current.hasMore).toBe(false);
+    await act(async () => {
+      await hook.result.current.loadMore();
+      await hook.result.current.loadMore();
+    });
+    expect(feed).not.toHaveBeenCalledWith("c1", undefined, null, "brunch");
+    await act(async () => firsts[0]({ items: [pm({ id: "p1" })], nextCursor: "c1" }));
+    expect(hook.result.current.posts.map((p) => p.id)).toEqual(["p1"]);
+  });
+
+  it("loads a search gone back to before the one in between loaded", async () => {
+    const pendingFirsts: Array<(page: unknown) => void> = [];
+    let brunchFirsts = 0;
+    feed.mockImplementation(
+      async (cursor: string | null, _limit: unknown, _author: unknown, search: string) => {
+        if (search === "lunch" || (search === "brunch" && !cursor && ++brunchFirsts > 1))
+          return new Promise((resolve) => pendingFirsts.push(resolve));
+        return { items: [pm({ id: "p1" })], nextCursor: "c1" };
+      },
+    );
+    const hook = renderHook(({ search }: { search: string }) => useFeedPresenter({ search }), {
+      initialProps: { search: "brunch" },
+    });
+    await waitFor(() => expect(hook.result.current.hasMore).toBe(true));
+    hook.rerender({ search: "lunch" });
+    hook.rerender({ search: "brunch" });
+    // Back to brunch before lunch loaded: brunch is loading again, not paging.
+    expect(hook.result.current.loading).toBe(true);
+    expect(hook.result.current.hasMore).toBe(false);
+  });
+
   it("reads again for each new search", async () => {
     const hook = renderHook(({ search }: { search: string }) => useFeedPresenter({ search }), {
       initialProps: { search: "brunch" },

@@ -88,22 +88,32 @@ export function useFeedPresenter({
 
   const [posts, setPosts] = useState<PostPM[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
-  /**
-   * Which list the loaded posts belong to, and which round of it (each first
-   * page starts a round). Deriving `loading` from it rather than flipping a
-   * flag means walking from one member's profile to another shows a load
-   * instead of a flash of the previous member's posts — the page component
-   * stays mounted across that navigation.
-   */
-  const [loadedFor, setLoadedFor] = useState<{ list: string; round: number } | undefined>(
-    undefined,
-  );
   const surface = `${postId ?? ""}|${author ?? ""}|${saved}|${search ?? ""}`;
-  const loading = !ready || loadedFor?.list !== surface;
-  // The next page loading, for which round of the list: an earlier round's
-  // never holds this one up, and only the request that set it may clear it.
+  /**
+   * Each first page starts a round of the list: another list, the same list
+   * switched off and on again (a search cleared and typed again), or one gone
+   * back to. Until the round's first page is in, the list is loading: it can't
+   * page, and a next page asked for in an earlier round is dropped. Deriving
+   * `loading` from the round rather than flipping a flag means walking from
+   * one member's profile to another shows a load instead of a flash of the
+   * previous member's posts — the page component stays mounted across that.
+   */
+  const [requested, setRequested] = useState({ surface, ready, round: 1 });
+  if (requested.surface !== surface || requested.ready !== ready) {
+    setRequested({ surface, ready, round: requested.round + 1 });
+  }
+  const round = requested.round;
+  const [loadedRound, setLoadedRound] = useState(0);
+  const loading = !ready || loadedRound !== round;
+  // The round on screen, for the next pages still out when it changes.
+  const shownRound = useRef(round);
+  useEffect(() => {
+    shownRound.current = round;
+  }, [round]);
+  // The next page loading, for which round: an earlier round's never holds
+  // this one up, and only the request that set it may clear it.
   const [loadingMoreFor, setLoadingMoreFor] = useState<{ round: number; ask: number } | null>(null);
-  const loadingMore = !loading && loadingMoreFor?.round === loadedFor?.round;
+  const loadingMore = !loading && loadingMoreFor?.round === round;
   const asks = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string[]>([]);
@@ -160,13 +170,7 @@ export function useFeedPresenter({
     [router],
   );
 
-  // Each first page starts the list again. A next page asked for before that
-  // (another search, another member, the same list restarted) arrives too late
-  // to belong, and is dropped.
-  const listRound = useRef(0);
-
   useEffect(() => {
-    const round = ++listRound.current;
     if (!ready) return;
     let cancelled = false;
     void (async () => {
@@ -183,13 +187,13 @@ export function useFeedPresenter({
         setCursor(null);
         setError(FEED_COPY.feedError);
       } finally {
-        if (!cancelled) setLoadedFor({ list: surface, round });
+        if (!cancelled) setLoadedRound(round);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [surface, loadPage, ready, onUnauthorized]);
+  }, [round, loadPage, ready, onUnauthorized]);
 
   useEffect(() => {
     // Only the home feed carries the suggestions strip.
@@ -220,20 +224,19 @@ export function useFeedPresenter({
   const loadMore = useCallback(async () => {
     // Until a new list's first page is in, the cursor is still the old list's.
     if (!cursor || loadingMore || loading) return;
-    const round = listRound.current;
     const ask = ++asks.current;
     setLoadingMoreFor({ round, ask });
     try {
       const page = await loadPage(cursor);
-      if (listRound.current !== round) return;
+      if (shownRound.current !== round) return;
       setPosts((prev) => [...prev, ...page.items]);
       setCursor(page.nextCursor);
     } catch (e) {
-      if (listRound.current === round && !onUnauthorized(e)) setError(FEED_COPY.feedError);
+      if (shownRound.current === round && !onUnauthorized(e)) setError(FEED_COPY.feedError);
     } finally {
       setLoadingMoreFor((current) => (current?.ask === ask ? null : current));
     }
-  }, [cursor, loadPage, loading, loadingMore, onUnauthorized]);
+  }, [cursor, loadPage, loading, loadingMore, onUnauthorized, round]);
 
   const openMedia = useCallback((media: PostMediaVM) => setLightbox(media), []);
   const closeMedia = useCallback(() => setLightbox(null), []);

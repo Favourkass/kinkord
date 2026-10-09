@@ -299,9 +299,10 @@ describe("MembersService", () => {
       /case\s+when "user"\."username" = \$1 or lower\("profile"\."display_name"\) = \$2 then 0/,
     );
     expect(rank.params.slice(0, 4)).toEqual(["ada", "ada", "Ada%", "Ada%"]);
-    // The id settles ties, so "Show more people" never repeats or skips anyone.
-    expect(orders[0]).toHaveLength(4);
-    expect(renderWhere(orders[0][3] as SQL).sql).toBe('"profile"."user_id" asc');
+    // Then the handle and the id: nothing a follow or a login moves between pages.
+    expect(orders[0]).toHaveLength(3);
+    expect(renderWhere(orders[0][1] as SQL).sql).toBe('"user"."username" asc nulls last');
+    expect(renderWhere(orders[0][2] as SQL).sql).toBe('"profile"."user_id" asc');
   });
 
   it("404s an unknown public profile", async () => {

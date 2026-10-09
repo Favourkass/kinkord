@@ -68,7 +68,7 @@ export function useSearchPresenter(initialQuery: string | null) {
   // The round whose next page is loading, so another search's never blocks this one's.
   const [loadingMoreRound, setLoadingMoreRound] = useState<number | null>(null);
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
-  const rounds = useRef(0);
+
   // Orders requests and follows. A search asked for before a follow settled
   // can't know about it, so the row shows the follow; one asked for after it
   // settled is the truth (they may have unfollowed in another tab since).
@@ -120,10 +120,15 @@ export function useSearchPresenter(initialQuery: string | null) {
     [router],
   );
 
+  // Each new term starts a round, even the same words cleared and typed again.
+  // Until its first page is in, the people are loading and can't page.
+  const [requested, setRequested] = useState({ term, round: 1 });
+  if (requested.term !== term) setRequested({ term, round: requested.round + 1 });
+  const round = requested.round;
+
   useEffect(() => {
     if (!term) return;
     let live = true;
-    const round = ++rounds.current;
     const askedAt = ++clock.current;
     membersApi.search(term, 1, PEOPLE_PAGE_SIZE).then(
       (res) => {
@@ -145,9 +150,9 @@ export function useSearchPresenter(initialQuery: string | null) {
     return () => {
       live = false;
     };
-  }, [term, onError, copy.error, withFollows]);
+  }, [term, round, onError, copy.error, withFollows]);
 
-  const current = term && people?.term === term ? people : null;
+  const current = term && people?.round === round ? people : null;
   const loadingMore = current !== null && loadingMoreRound === current.round;
   const morePeople = current ? current.items.length < current.total : false;
 
@@ -164,7 +169,13 @@ export function useSearchPresenter(initialQuery: string | null) {
           prev && prev.round === round
             ? {
                 ...prev,
-                items: [...prev.items, ...withFollows(res.items, askedAt)],
+                // A page never repeats anyone already shown.
+                items: [
+                  ...prev.items,
+                  ...withFollows(res.items, askedAt).filter(
+                    (p) => !prev.items.some((shown) => shown.userId === p.userId),
+                  ),
+                ],
                 total: res.total,
                 page: next,
                 error: null,
