@@ -153,7 +153,13 @@ export function useFeedPresenter({
     [router],
   );
 
+  // Each first page starts the list again. A next page asked for before that
+  // (another search, another member, the same list restarted) arrives too late
+  // to belong, and is dropped.
+  const listRound = useRef(0);
+
   useEffect(() => {
+    listRound.current += 1;
     if (!ready) return;
     let cancelled = false;
     void (async () => {
@@ -200,29 +206,22 @@ export function useFeedPresenter({
     [],
   );
 
-  // The list on screen now. A next page asked for by another list (an earlier
-  // search, another member's posts) arrives too late to belong, and is dropped.
-  const shownSurface = useRef(surface);
-  useEffect(() => {
-    shownSurface.current = surface;
-  }, [surface]);
-
   const loadMore = useCallback(async () => {
     // Until a new list's first page is in, the cursor is still the old list's.
     if (!cursor || loadingMore || loading) return;
-    const askedFor = surface;
+    const round = listRound.current;
     setLoadingMore(true);
     try {
       const page = await loadPage(cursor);
-      if (shownSurface.current !== askedFor) return;
+      if (listRound.current !== round) return;
       setPosts((prev) => [...prev, ...page.items]);
       setCursor(page.nextCursor);
     } catch (e) {
-      if (shownSurface.current === askedFor && !onUnauthorized(e)) setError(FEED_COPY.feedError);
+      if (listRound.current === round && !onUnauthorized(e)) setError(FEED_COPY.feedError);
     } finally {
       setLoadingMore(false);
     }
-  }, [cursor, loadPage, loading, loadingMore, onUnauthorized, surface]);
+  }, [cursor, loadPage, loading, loadingMore, onUnauthorized]);
 
   const openMedia = useCallback((media: PostMediaVM) => setLightbox(media), []);
   const closeMedia = useCallback(() => setLightbox(null), []);

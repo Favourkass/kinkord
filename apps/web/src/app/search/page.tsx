@@ -17,7 +17,7 @@ function Search() {
   const nav = getAppShellNav();
   const s = useSearchPresenter(params.get("q"));
   // Posts are the feed's own, so a post found behaves exactly as in the feed.
-  const feed = useFeedPresenter({ search: s.term, ready: s.postsShown });
+  const feed = useFeedPresenter({ search: s.term, ready: s.postsReady });
   const { commentsPanel, lightbox, confirm, toast, ...posts } = getPostList(feed, home.avatarUrl);
 
   return (

@@ -31,7 +31,24 @@ interface PeoplePage {
   error: string | null;
 }
 
-const clean = (raw: string) => raw.trim().slice(0, SEARCH_MAX_LENGTH);
+/**
+ * The first `max` UTF-16 units (what the API counts), never half an emoji:
+ * a lone surrogate would make the address unencodable.
+ */
+export function clip(text: string, max = SEARCH_MAX_LENGTH): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const last = cut.charCodeAt(cut.length - 1);
+  return last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut;
+}
+
+const clean = (raw: string) => clip(raw.trim());
+
+/** A follow set on this page: what it set, and when it settled (null while it's out). */
+interface FollowSet {
+  following: boolean;
+  settledAt: number | null;
+}
 
 /**
  * The app's search, Facebook's way: one box for people and posts, with All,
@@ -48,9 +65,25 @@ export function useSearchPresenter(initialQuery: string | null) {
   const [term, setTerm] = useState(clean(initialQuery ?? ""));
   const [tab, setTab] = useState<SearchTab>("all");
   const [people, setPeople] = useState<PeoplePage | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
+  // The round whose next page is loading, so another search's never blocks this one's.
+  const [loadingMoreRound, setLoadingMoreRound] = useState<number | null>(null);
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
   const rounds = useRef(0);
+  // Orders requests and follows. A search asked for before a follow settled
+  // can't know about it, so the row shows the follow; one asked for after it
+  // settled is the truth (they may have unfollowed in another tab since).
+  const clock = useRef(0);
+  const follows = useRef(new Map<string, FollowSet>());
+  const withFollows = useCallback(
+    (items: MemberCardPM[], askedAt: number) =>
+      items.map((p) => {
+        const set = follows.current.get(p.userId);
+        return set && (set.settledAt === null || askedAt < set.settledAt)
+          ? { ...p, isFollowing: set.following }
+          : p;
+      }),
+    [],
+  );
 
   // The address can change under the page without remounting it: the header's
   // Search link back to an empty search, or Back and Forward between searches.
@@ -91,10 +124,18 @@ export function useSearchPresenter(initialQuery: string | null) {
     if (!term) return;
     let live = true;
     const round = ++rounds.current;
+    const askedAt = ++clock.current;
     membersApi.search(term, 1, PEOPLE_PAGE_SIZE).then(
       (res) => {
         if (live)
-          setPeople({ term, round, items: res.items, total: res.total, page: 1, error: null });
+          setPeople({
+            term,
+            round,
+            items: withFollows(res.items, askedAt),
+            total: res.total,
+            page: 1,
+            error: null,
+          });
       },
       (e: unknown) => {
         if (!live || onError(e)) return;
@@ -104,23 +145,26 @@ export function useSearchPresenter(initialQuery: string | null) {
     return () => {
       live = false;
     };
-  }, [term, onError, copy.error]);
+  }, [term, onError, copy.error, withFollows]);
 
   const current = term && people?.term === term ? people : null;
+  const loadingMore = current !== null && loadingMoreRound === current.round;
   const morePeople = current ? current.items.length < current.total : false;
 
   const loadMorePeople = useCallback(() => {
     if (!current || loadingMore || !morePeople) return;
     const next = current.page + 1;
-    setLoadingMore(true);
+    const { round } = current;
+    const askedAt = ++clock.current;
+    setLoadingMoreRound(round);
     membersApi
       .search(current.term, next, PEOPLE_PAGE_SIZE)
       .then((res) =>
         setPeople((prev) =>
-          prev && prev.round === current.round
+          prev && prev.round === round
             ? {
                 ...prev,
-                items: [...prev.items, ...res.items],
+                items: [...prev.items, ...withFollows(res.items, askedAt)],
                 total: res.total,
                 page: next,
                 error: null,
@@ -130,14 +174,12 @@ export function useSearchPresenter(initialQuery: string | null) {
       )
       .catch((e: unknown) => {
         if (onError(e)) return;
-        setPeople((prev) =>
-          prev && prev.round === current.round ? { ...prev, error: copy.error } : prev,
-        );
+        setPeople((prev) => (prev && prev.round === round ? { ...prev, error: copy.error } : prev));
       })
-      .finally(() => setLoadingMore(false));
-  }, [current, loadingMore, morePeople, onError, copy.error]);
+      .finally(() => setLoadingMoreRound((r) => (r === round ? null : r)));
+  }, [current, loadingMore, morePeople, onError, copy.error, withFollows]);
 
-  /** Optimistic, like the directory: flips at once and flips back if the API says no. */
+  /** Optimistic: flips at once, holds once the API agrees, and goes back if it refuses. */
   const toggleFollow = useCallback(
     (userId: string) => {
       const pm = current?.items.find((p) => p.userId === userId);
@@ -145,20 +187,25 @@ export function useSearchPresenter(initialQuery: string | null) {
       const apply = (to: (p: MemberCardPM) => MemberCardPM) => (prev: PeoplePage | null) =>
         prev ? { ...prev, items: prev.items.map((p) => (p.userId === userId ? to(p) : p)) } : prev;
       setBusy((prev) => new Set(prev).add(userId));
+      follows.current.set(userId, { following: !pm.isFollowing, settledAt: null });
       setPeople(apply(toggleFollowOnCard));
       void (pm.isFollowing ? membersApi.unfollow(pm.username) : membersApi.follow(pm.username))
         // Done: whatever the rows have been refreshed to since, this is now true.
-        .then(() => setPeople(apply((p) => ({ ...p, isFollowing: !pm.isFollowing }))))
+        .then(() => {
+          follows.current.set(userId, { following: !pm.isFollowing, settledAt: ++clock.current });
+          setPeople(apply((p) => ({ ...p, isFollowing: !pm.isFollowing })));
+        })
         // Back to exactly how it was, even if a newer search has refreshed the row since.
-        .catch(() =>
+        .catch(() => {
+          follows.current.set(userId, { following: pm.isFollowing, settledAt: ++clock.current });
           setPeople(
             apply((p) => ({
               ...p,
               isFollowing: pm.isFollowing,
               followersCount: pm.followersCount,
             })),
-          ),
-        )
+          );
+        })
         .finally(() =>
           setBusy((prev) => {
             const next = new Set(prev);
@@ -182,7 +229,7 @@ export function useSearchPresenter(initialQuery: string | null) {
   const onAll = tab === "all";
   return {
     query,
-    setQuery: (value: string) => setQuery(value.slice(0, SEARCH_MAX_LENGTH)),
+    setQuery: (value: string) => setQuery(clip(value)),
     clear: () => setQuery(""),
     /** What the posts are searched for; the page hands it to the feed presenter. */
     term,
@@ -205,8 +252,13 @@ export function useSearchPresenter(initialQuery: string | null) {
       onLoadMore: loadMorePeople,
       onToggleFollow: toggleFollow,
     },
-    /** Whether the posts are on screen, so the feed presenter only reads them then. */
+    /** Whether the posts are on screen. */
     postsShown: term !== "" && tab !== "people",
+    /**
+     * Whether the feed presenter reads posts: whenever there's a search, so
+     * going to People and back keeps the posts (and their paging) as they were.
+     */
+    postsReady: term !== "",
     postsHeading: onAll ? copy.posts : null,
     postsEmpty: copy.noPosts(term),
     labels: {

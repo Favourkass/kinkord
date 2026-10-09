@@ -2,7 +2,7 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MemberCardPM } from "@/domain/member";
-import { useSearchPresenter } from "./useSearchPresenter";
+import { clip, useSearchPresenter } from "./useSearchPresenter";
 
 const router = { replace: vi.fn(), push: vi.fn() };
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
@@ -152,11 +152,45 @@ describe("useSearchPresenter", () => {
     act(() => result.current.people.onToggleFollow("u1"));
     rerender({ q: "zed" });
     rerender({ q: "ada" });
-    // The fresh rows were read before the follow landed.
-    await waitFor(() => expect(result.current.people.rows[0].isFollowing).toBe(false));
+    // The fresh rows were read before the follow landed, yet still show it.
+    await waitFor(() => expect(search).toHaveBeenLastCalledWith("ada", 1, 20));
+    await waitFor(() => expect(result.current.people.rows).toHaveLength(5));
+    expect(result.current.people.rows[0].isFollowing).toBe(true);
     await act(async () => accept({}));
     await waitFor(() => expect(result.current.people.rows[0].busy).toBe(false));
     expect(result.current.people.rows[0].isFollowing).toBe(true);
+  });
+
+  it("keeps a follow that landed before an older search's results arrived", async () => {
+    let accept: (v: unknown) => void = () => undefined;
+    follow.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          accept = resolve;
+        }),
+    );
+    const { result, rerender } = renderHook(
+      ({ q }: { q: string | null }) => useSearchPresenter(q),
+      {
+        initialProps: { q: "ada" as string | null },
+      },
+    );
+    await waitFor(() => expect(result.current.people.rows).toHaveLength(5));
+    // Follow, then refine the search while the follow is still out.
+    act(() => result.current.people.onToggleFollow("u1"));
+    let respond: (page: unknown) => void = () => undefined;
+    search.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          respond = resolve;
+        }),
+    );
+    rerender({ q: "ada1" });
+    await waitFor(() => expect(search).toHaveBeenLastCalledWith("ada1", 1, 20));
+    // The follow lands first; the refined search was read before it did.
+    await act(async () => accept({}));
+    await act(async () => respond({ items: [person(1)], total: 1, page: 1, limit: 20 }));
+    expect(result.current.people.rows[0]).toMatchObject({ handle: "@ada1", isFollowing: true });
   });
 
   it("shows only the posts on the Posts tab", async () => {
@@ -252,6 +286,56 @@ describe("useSearchPresenter", () => {
     await waitFor(() => expect(result.current.people.rows).toHaveLength(5));
     await act(async () => refuse(new Error("offline")));
     await waitFor(() => expect(result.current.people.rows[0].busy).toBe(false));
+    expect(result.current.people.rows[0].isFollowing).toBe(false);
+  });
+
+  it("never cuts an emoji in half at the limit, so the address stays valid", async () => {
+    const q = `${"a".repeat(49)}😀`;
+    expect(clip(q)).toBe("a".repeat(49));
+    expect(clip("hi 😀")).toBe("hi 😀");
+    const { result } = renderHook(() => useSearchPresenter(q));
+    expect(result.current.term).toBe("a".repeat(49));
+    await waitFor(() =>
+      expect(router.replace).toHaveBeenLastCalledWith(`/search?q=${"a".repeat(49)}`, {
+        scroll: false,
+      }),
+    );
+  });
+
+  it("never lets another search's slow page hold up this one's", async () => {
+    const { result, rerender } = renderHook(
+      ({ q }: { q: string | null }) => useSearchPresenter(q),
+      {
+        initialProps: { q: "ada" as string | null },
+      },
+    );
+    await waitFor(() => expect(result.current.people.seeAll).not.toBeNull());
+    act(() => result.current.people.seeAll?.onClick());
+    search.mockImplementationOnce(() => new Promise(() => undefined));
+    act(() => result.current.people.onLoadMore());
+    expect(result.current.people.loadingMore).toBe(true);
+    rerender({ q: "bob" });
+    await waitFor(() => expect(result.current.people.rows).toHaveLength(20));
+    expect(result.current.people.loadingMore).toBe(false);
+    act(() => result.current.people.onLoadMore());
+    await waitFor(() => expect(search).toHaveBeenLastCalledWith("bob", 2, 20));
+  });
+
+  it("trusts a search asked for after a follow settled", async () => {
+    const { result, rerender } = renderHook(
+      ({ q }: { q: string | null }) => useSearchPresenter(q),
+      {
+        initialProps: { q: "ada" as string | null },
+      },
+    );
+    await waitFor(() => expect(result.current.people.rows).toHaveLength(5));
+    act(() => result.current.people.onToggleFollow("u1"));
+    await waitFor(() => expect(result.current.people.rows[0].busy).toBe(false));
+    expect(result.current.people.rows[0].isFollowing).toBe(true);
+    // Unfollowed in another tab since: a fresh search says so, and wins.
+    rerender({ q: "ada1" });
+    await waitFor(() => expect(search).toHaveBeenLastCalledWith("ada1", 1, 20));
+    await waitFor(() => expect(result.current.people.rows[0]?.handle).toBe("@ada1"));
     expect(result.current.people.rows[0].isFollowing).toBe(false);
   });
 

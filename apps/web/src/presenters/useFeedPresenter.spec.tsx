@@ -555,6 +555,32 @@ describe("searching (the search page's Posts)", () => {
     expect(hook.result.current.posts.map((p) => p.id)).toEqual(["b1"]);
   });
 
+  it("drops a next page asked for before the same list started again", async () => {
+    let release: (page: unknown) => void = () => undefined;
+    feed.mockImplementation(async (cursor: string | null) =>
+      cursor === null
+        ? { items: [pm({ id: "a1" })], nextCursor: "c1" }
+        : new Promise((resolve) => {
+            release = resolve;
+          }),
+    );
+    const hook = renderHook(
+      ({ ready }: { ready: boolean }) => useFeedPresenter({ search: "brunch", ready }),
+      { initialProps: { ready: true } },
+    );
+    await waitFor(() => expect(hook.result.current.hasMore).toBe(true));
+    act(() => {
+      void hook.result.current.loadMore();
+    });
+    hook.rerender({ ready: false });
+    hook.rerender({ ready: true });
+    await waitFor(() => expect(hook.result.current.loading).toBe(false));
+    await act(async () => release({ items: [pm({ id: "a3" })], nextCursor: "c3" }));
+    // Its first page again, with page two still to come, not page three after page one.
+    expect(hook.result.current.posts.map((p) => p.id)).toEqual(["a1"]);
+    expect(hook.result.current.hasMore).toBe(true);
+  });
+
   it("reads again for each new search", async () => {
     const hook = renderHook(({ search }: { search: string }) => useFeedPresenter({ search }), {
       initialProps: { search: "brunch" },
