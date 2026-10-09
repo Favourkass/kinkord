@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MEMBERS_COPY } from "@/constants/members";
 import { Routes } from "@/constants/Routes";
+import { kinkcoinsService } from "@/services/kinkcoins.service";
 import {
   ageTagOf,
   locationOf,
@@ -395,6 +396,7 @@ export function useMemberProfilePresenter(
     followBusy,
     messageHref: pm ? Routes.messageWith(pm.userId) : Routes.messages,
     editHref: Routes.profileEdit,
+    coinBalance: kinkcoinsService.profileBalance(pm?.coinBalance ?? 0),
     silverHref: Routes.subscription,
     heroLabels: {
       follow: copy.follow,

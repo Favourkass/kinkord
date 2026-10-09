@@ -91,6 +91,7 @@ export function toMemberCardVM(pm: MemberCardPM): MemberCardVM {
 }
 
 export interface PublicProfilePM {
+  coinBalance?: number;
   userId: string;
   username: string | null;
   displayName: string;

@@ -33,6 +33,7 @@ export const post = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     body: text("body"),
+    shares: integer("shares").notNull().default(0),
     visibility: text("visibility").$type<PostVisibility>().notNull().default("public"),
     /**
      * Set when this row is a repost: it carries no words or photos of its own

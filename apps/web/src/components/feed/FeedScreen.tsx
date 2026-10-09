@@ -7,6 +7,7 @@ import FeedShell, { type FeedShellProps } from "./FeedShell";
 import MediaLightbox, { type MediaLightboxProps } from "./MediaLightbox";
 import PeopleYouMayKnow, { type PeopleYouMayKnowProps } from "./PeopleYouMayKnow";
 import PostCard, { type PostCardProps } from "./PostCard";
+import GiftDialog, { type GiftDialogProps } from "./GiftDialog";
 import Toast, { type ToastProps } from "./Toast";
 
 export interface FeedScreenProps {
@@ -26,6 +27,7 @@ export interface FeedScreenProps {
   onComment: (postId: string) => void;
   onSave: (postId: string) => void;
   onShare: (postId: string) => void;
+  onGift: (postId: string, currency?: "coin" | "star" | "crown") => void;
   onOpenMedia: (media: PostMediaVM) => void;
   hasMore: boolean;
   loadingMore: boolean;
@@ -37,6 +39,7 @@ export interface FeedScreenProps {
   lightbox: MediaLightboxProps;
   confirm: ConfirmDialogProps;
   toast: ToastProps;
+  giftDialog: GiftDialogProps;
   copy: {
     emptyTitle: string;
     emptyBody: string;
@@ -70,6 +73,7 @@ export default function FeedScreen(p: FeedScreenProps) {
       onComment={() => p.onComment(post.postId)}
       onSave={() => p.onSave(post.postId)}
       onShare={() => p.onShare(post.postId)}
+      onGift={(currency) => p.onGift(post.postId, currency)}
       onOpenMedia={p.onOpenMedia}
     />
   );
@@ -137,6 +141,7 @@ export default function FeedScreen(p: FeedScreenProps) {
       <MediaLightbox {...p.lightbox} />
       <ConfirmDialog {...p.confirm} />
       <Toast {...p.toast} />
+      <GiftDialog {...p.giftDialog} />
     </>
   );
 }

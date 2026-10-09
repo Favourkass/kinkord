@@ -11,7 +11,8 @@ export type AppNav =
   | "profile"
   | "settings"
   | "saved"
-  | "edit-profile";
+  | "edit-profile"
+  | "kinkcoins";
 
 export interface AppNavLinks {
   home: string;
@@ -22,6 +23,7 @@ export interface AppNavLinks {
   profile: string;
   settings: string;
   saved: string;
+  kinkcoins?: string;
   subscription: string;
 }
 
@@ -34,6 +36,7 @@ export interface AppNavLabels {
   profile: string;
   settings: string;
   saved: string;
+  kinkcoins?: string;
   subscription: string;
   logout: string;
 }

@@ -13,6 +13,7 @@ describe("getAppShellNav", () => {
       profile: "/profile",
       settings: "/settings",
       saved: "/saved",
+      kinkcoins: "/kinkcoins",
       subscription: "/subscription",
     });
     expect(nav.labels).toEqual({
@@ -24,6 +25,7 @@ describe("getAppShellNav", () => {
       profile: "Profile",
       settings: "Settings and Privacy",
       saved: "Saved",
+      kinkcoins: "KinkCoins & Payment",
       subscription: "Silver Premium",
       logout: "Log Out",
     });
@@ -48,7 +50,7 @@ describe("appShellProps", () => {
       },
       nav,
     );
-    expect(props).toMatchObject({ brand: "KINKORD", greeting: "Hi Tega", membersCount: "128" });
+    expect(props).toMatchObject({ brand: "Kinkord", greeting: "Hi Tega", membersCount: "128" });
     expect(props.onMenu).toBe(openDrawer);
     expect(props.links).toBe(nav.links);
   });

@@ -28,6 +28,7 @@ export interface PostCardProps {
   onComment: () => void;
   onSave: () => void;
   onShare: () => void;
+  onGift: (currency?: "coin" | "star" | "crown") => void;
   onOpenMedia: (media: PostMediaVM) => void;
 }
 
@@ -49,16 +50,17 @@ export default function PostCard({
   onComment,
   onSave,
   onShare,
+  onGift,
   onOpenMedia,
 }: PostCardProps) {
   const name = (
     <span className="inline-flex items-center gap-[3px] text-[14px] font-bold leading-[17px] text-feed-text">
       {post.authorName}
-      {post.authorSilver ? <SilverCheck size={15} /> : null}
+      {post.authorSilver || post.authorSubscribed ? <SilverCheck size={15} /> : null}
     </span>
   );
   return (
-    <article className="border-b border-feed-line px-[25px] py-[18px]">
+    <article className="mx-2 mb-3 rounded-[20px] border border-kink-gold-bright/15 px-4 py-[18px]">
       {post.repostedByName && (
         <p className="flex items-center gap-[8px] pb-[10px] pl-[2px] text-[12px] font-medium text-feed-muted">
           <MaskIcon src="/app/feed/icon-repost.svg" width={14} />
@@ -66,7 +68,7 @@ export default function PostCard({
         </p>
       )}
       <header className="flex items-start gap-[12px]">
-        <AvatarCircle src={post.avatarUrl} alt="" size={35} ringClassName="bg-[#4285f4]" />
+        <AvatarCircle src={post.avatarUrl} alt="" size={35} ringClassName="bg-kink-gold-bright" />
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-baseline gap-x-[8px]">
             {post.authorHref ? (
@@ -134,7 +136,10 @@ export default function PostCard({
       <PostMediaGrid media={post.media} onOpen={onOpenMedia} />
 
       <PostActions
+        canReceiveGift={post.authorSubscribed}
         likes={post.likes}
+        shares={post.shares}
+        gifts={post.gifts}
         comments={post.comments}
         reposts={post.reposts}
         likedByMe={post.likedByMe}
@@ -145,6 +150,7 @@ export default function PostCard({
         onComment={onComment}
         onSave={onSave}
         onShare={onShare}
+        onGift={onGift}
         labels={labels}
       />
     </article>

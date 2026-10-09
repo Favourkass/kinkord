@@ -12,6 +12,7 @@ export interface AppShellNavVM {
     profile: string;
     settings: string;
     saved: string;
+    kinkcoins: string;
     subscription: string;
   };
   labels: {
@@ -23,6 +24,7 @@ export interface AppShellNavVM {
     profile: string;
     settings: string;
     saved: string;
+    kinkcoins: string;
     subscription: string;
     logout: string;
   };
@@ -40,6 +42,7 @@ export function getAppShellNav(): AppShellNavVM {
       profile: Routes.profile,
       settings: Routes.settings,
       saved: Routes.saved,
+      kinkcoins: Routes.kinkcoins,
       subscription: Routes.subscription,
     },
     labels: { ...MEMBERS_COPY.nav },
@@ -64,7 +67,7 @@ export interface ShellSource {
 
 export function appShellProps(home: ShellSource, nav: ReturnType<typeof getAppShellNav>) {
   return {
-    brand: "KINKORD",
+    brand: "Kinkord",
     tagline: "THE WORLD'S KINK COMMUNITY",
     greeting: home.greeting,
     name: home.name,

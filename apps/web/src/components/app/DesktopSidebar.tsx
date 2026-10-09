@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { Coins } from "lucide-react";
 import AvatarCircle from "./AvatarCircle";
 import MaskIcon, { type MaskIconName } from "./MaskIcon";
 import type { AppNav, AppNavLabels, AppNavLinks } from "./nav";
@@ -105,6 +106,18 @@ export default function DesktopSidebar({
           </span>
           {labels.profile}
         </Link>
+        {links.kinkcoins && labels.kinkcoins && (
+          <Link
+            href={links.kinkcoins}
+            aria-current={active === "kinkcoins" ? "page" : undefined}
+            className={row(active === "kinkcoins")}
+          >
+            <span className="grid size-[29px] place-items-center">
+              <Coins size={27} />
+            </span>
+            <span className="text-[18px]">{labels.kinkcoins}</span>
+          </Link>
+        )}
       </nav>
       <div className="mt-auto">
         <div className="ml-[7px] w-[307px] border-t-[1.5px] border-side-divider" />

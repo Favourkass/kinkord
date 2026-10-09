@@ -1,3 +1,4 @@
+import GiftDialog, { type GiftDialogProps } from "@/components/feed/GiftDialog";
 import CommentsPanel, { type CommentsPanelProps } from "@/components/feed/CommentsPanel";
 import ConfirmDialog, { type ConfirmDialogProps } from "@/components/feed/ConfirmDialog";
 import FeedShell, { type FeedShellProps } from "@/components/feed/FeedShell";
@@ -21,6 +22,7 @@ export interface SearchScreenProps {
   postsShown: boolean;
   postsHeading: string | null;
   posts: PostListProps;
+  giftDialog: GiftDialogProps;
   commentsPanel: CommentsPanelProps;
   lightbox: MediaLightboxProps;
   confirm: ConfirmDialogProps;
@@ -103,6 +105,7 @@ export default function SearchScreen(p: SearchScreenProps) {
         ) : null}
       </FeedShell>
 
+      <GiftDialog {...p.giftDialog} />
       <CommentsPanel {...p.commentsPanel} />
       <MediaLightbox {...p.lightbox} />
       <ConfirmDialog {...p.confirm} />

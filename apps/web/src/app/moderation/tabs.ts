@@ -3,9 +3,10 @@ import { Routes } from "@/constants/Routes";
 import type { ModerationTab } from "@/components/moderation/ModerationFrame";
 
 export function moderationTabs(
-  active: "members" | "reports" | "payments" | "blocklist",
+  active: "members" | "reports" | "payments" | "wallet" | "blocklist",
 ): ModerationTab[] {
   return [
+    { label: "Wallet", href: Routes.moderationWallet, active: active === "wallet" },
     { label: MODERATION_COPY.tabs.members, href: Routes.moderation, active: active === "members" },
     {
       label: MODERATION_COPY.tabs.reports,

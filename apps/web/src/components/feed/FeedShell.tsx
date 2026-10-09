@@ -1,5 +1,7 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 import AppMobileHeader from "@/components/app/AppMobileHeader";
+import MaskIcon from "@/components/app/MaskIcon";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import DesktopSidebar from "@/components/app/DesktopSidebar";
 import MobileTabBar from "@/components/app/MobileTabBar";
@@ -86,7 +88,7 @@ export default function FeedShell({
         </div>
 
         <main className="flex min-h-dvh min-w-0 flex-1 flex-col bg-app-surface pb-[calc(57px+env(safe-area-inset-bottom))] lg:pb-[64px]">
-          <div className="hidden items-center gap-[23px] pl-[21px] pt-[17px] lg:flex">
+          <div className="hidden items-center gap-[23px] pl-[21px] pr-[30px] pt-[17px] lg:flex">
             <AvatarCircle
               src={avatarUrl}
               alt={name}
@@ -94,6 +96,13 @@ export default function FeedShell({
               ringClassName="bg-kink-gold-bright"
             />
             <p className="text-[24px] font-normal text-app-text">{greeting}</p>
+            <Link
+              href={links.search}
+              aria-label={labels.search}
+              className="ml-auto flex size-11 shrink-0 items-center justify-center text-kink-gold-bright"
+            >
+              <MaskIcon name="search" width={28} />
+            </Link>
           </div>
 
           <div className="flex w-full justify-center gap-[32px] lg:px-[30px] lg:pt-[28px]">
