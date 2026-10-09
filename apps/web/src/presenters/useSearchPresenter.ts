@@ -6,6 +6,7 @@ import { Routes } from "@/constants/Routes";
 import { SEARCH_COPY } from "@/constants/search";
 import type { MemberCardPM } from "@/domain/member";
 import {
+  peopleQuery,
   SEARCH_PEOPLE_PREVIEW,
   SEARCH_TABS,
   toSearchPersonVM,
@@ -125,12 +126,14 @@ export function useSearchPresenter(initialQuery: string | null) {
   const [requested, setRequested] = useState({ term, round: 1 });
   if (requested.term !== term) setRequested({ term, round: requested.round + 1 });
   const round = requested.round;
+  // Who to look for: "@" alone is no one's name, so nobody is asked for, or found.
+  const who = peopleQuery(term);
 
   useEffect(() => {
-    if (!term) return;
+    if (!who) return;
     let live = true;
     const askedAt = ++clock.current;
-    membersApi.search(term, 1, PEOPLE_PAGE_SIZE).then(
+    membersApi.search(who, 1, PEOPLE_PAGE_SIZE).then(
       (res) => {
         if (live)
           setPeople({
@@ -150,9 +153,9 @@ export function useSearchPresenter(initialQuery: string | null) {
     return () => {
       live = false;
     };
-  }, [term, round, onError, copy.error, withFollows]);
+  }, [term, who, round, onError, copy.error, withFollows]);
 
-  const current = term && people?.round === round ? people : null;
+  const current = who && people?.round === round ? people : null;
   const loadingMore = current !== null && loadingMoreRound === current.round;
   // From the pages served, not the people shown: a page can repeat someone (skipped).
   const morePeople = current ? current.page * PEOPLE_PAGE_SIZE < current.total : false;
@@ -164,7 +167,7 @@ export function useSearchPresenter(initialQuery: string | null) {
     const askedAt = ++clock.current;
     setLoadingMoreRound(round);
     membersApi
-      .search(current.term, next, PEOPLE_PAGE_SIZE)
+      .search(peopleQuery(current.term), next, PEOPLE_PAGE_SIZE)
       .then((res) =>
         setPeople((prev) =>
           prev && prev.round === round
@@ -252,9 +255,12 @@ export function useSearchPresenter(initialQuery: string | null) {
       shown: term !== "" && tab !== "posts",
       heading: onAll ? copy.people : null,
       rows: onAll ? rows.slice(0, SEARCH_PEOPLE_PREVIEW) : rows,
-      loading: term !== "" && current === null,
+      loading: who !== "" && current === null,
       error: current?.error ?? null,
-      empty: current && !current.error && current.items.length === 0 ? copy.noPeople(term) : null,
+      empty:
+        term && (!who || (current && !current.error && current.items.length === 0))
+          ? copy.noPeople(term)
+          : null,
       seeAll:
         onAll && (current?.total ?? 0) > SEARCH_PEOPLE_PREVIEW
           ? { label: copy.seeAllPeople, onClick: () => setTab("people") }

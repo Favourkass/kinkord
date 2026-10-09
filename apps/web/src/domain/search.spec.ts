@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MemberCardPM } from "./member";
-import { isSearchTab, toSearchPersonVM } from "./search";
+import { isSearchTab, peopleQuery, toSearchPersonVM } from "./search";
 
 const pm = (over: Partial<MemberCardPM> = {}): MemberCardPM => ({
   userId: "u1",
@@ -51,5 +51,18 @@ describe("isSearchTab", () => {
   it("knows the three tabs and nothing else", () => {
     expect(["all", "people", "posts"].every(isSearchTab)).toBe(true);
     expect(isSearchTab("groups")).toBe(false);
+  });
+});
+
+describe("peopleQuery", () => {
+  it("looks people up without the @, as the API does", () => {
+    expect(peopleQuery("@ada")).toBe("ada");
+    expect(peopleQuery("@@ ada")).toBe("ada");
+    expect(peopleQuery("Ada Okafor")).toBe("Ada Okafor");
+  });
+
+  it("is nothing for an @ alone", () => {
+    expect(peopleQuery("@")).toBe("");
+    expect(peopleQuery("@@")).toBe("");
   });
 });

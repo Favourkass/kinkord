@@ -208,6 +208,26 @@ describe("useSearchPresenter", () => {
     expect(result.current.people.seeAll).toBeNull();
   });
 
+  it("asks for nobody when the search is only an @, and still searches the posts for it", async () => {
+    const { result } = renderHook(() => useSearchPresenter("@"));
+    expect(result.current.term).toBe("@");
+    expect(result.current.people.loading).toBe(false);
+    expect(result.current.people.error).toBeNull();
+    expect(result.current.people.empty).toBe("No people match “@”.");
+    expect(result.current.postsReady).toBe(true);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(search).not.toHaveBeenCalled();
+  });
+
+  it("looks people up by the name after the @", async () => {
+    const { result } = renderHook(() => useSearchPresenter("@ada"));
+    await waitFor(() => expect(result.current.people.rows).toHaveLength(5));
+    expect(search).toHaveBeenCalledWith("ada", 1, 20);
+    act(() => result.current.setTab("people"));
+    act(() => result.current.people.onLoadMore());
+    await waitFor(() => expect(search).toHaveBeenCalledWith("ada", 2, 20));
+  });
+
   it("follows at once, and takes it back when the API refuses", async () => {
     follow.mockRejectedValueOnce(new Error("offline"));
     const { result } = renderHook(() => useSearchPresenter("ada"));

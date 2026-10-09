@@ -12,6 +12,14 @@ export function isSearchTab(value: string): value is SearchTab {
   return (SEARCH_TABS as string[]).includes(value);
 }
 
+/**
+ * What people are looked up by. The API reads "@ada" as "ada", so a search of
+ * only "@" is no one's name: nobody to ask for (the API would refuse it).
+ */
+export function peopleQuery(term: string): string {
+  return term.replace(/^@+/, "").trim();
+}
+
 /** People the All tab shows before "See all people". */
 export const SEARCH_PEOPLE_PREVIEW = 5;
 
