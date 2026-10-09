@@ -375,14 +375,14 @@ export function useMemberProfilePresenter(
     activeTab: pm?.isSelf ? ("profile" as const) : undefined,
     nav: {
       brand: copy.brand,
-      searchHref: Routes.members,
+      searchHref: Routes.search,
       labels: copy.actions,
       onMore: () => undefined,
       onShare: share,
     },
     topNav: {
       brand: copy.brand,
-      searchHref: Routes.members,
+      searchHref: Routes.search,
       searchPlaceholder: copy.desktop.searchPlaceholder,
       accountLabel: copy.desktop.account,
     },

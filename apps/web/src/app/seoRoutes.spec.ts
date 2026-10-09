@@ -22,6 +22,7 @@ describe("sitemap.xml", () => {
       "https://kinkord.com/contact",
       "https://kinkord.com/invest",
     ]);
-    for (const url of urls) expect(url).not.toMatch(/\/(home|messages|members|u|p|profile)(\/|$)/);
+    for (const url of urls)
+      expect(url).not.toMatch(/\/(home|messages|members|u|p|profile|search)(\/|$)/);
   });
 });

@@ -5,6 +5,7 @@ import { Routes } from "@/constants/Routes";
 export interface AppShellNavVM {
   links: {
     home: string;
+    search: string;
     members: string;
     chat: string;
     notifications: string;
@@ -15,6 +16,7 @@ export interface AppShellNavVM {
   };
   labels: {
     home: string;
+    search: string;
     members: string;
     chat: string;
     notifications: string;
@@ -31,6 +33,7 @@ export function getAppShellNav(): AppShellNavVM {
   return {
     links: {
       home: Routes.appHome,
+      search: Routes.search,
       members: Routes.members,
       chat: Routes.messages,
       notifications: Routes.notifications,

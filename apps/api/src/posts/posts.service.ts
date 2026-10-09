@@ -5,12 +5,13 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { and, count, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, ilike, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { Db, DRIZZLE } from "../db/db.module";
 import { notBanned } from "../moderation/admins";
+import { containsPattern } from "../push/notifications.service";
 import { PushService } from "../push/push.service";
 import {
   follow,
@@ -91,6 +92,8 @@ export interface FeedParams {
   limit?: number;
   /** Narrows the feed to one member's posts — this is the profile Posts tab. */
   author?: string | null;
+  /** Search: only posts whose text contains this. Reposts carry no text, so originals only. */
+  q?: string | null;
 }
 
 export interface PostMediaVM {
@@ -243,6 +246,7 @@ export class PostsService {
       [
         ...(cursor ? [lt(post.createdAt, cursor)] : []),
         ...(authorId ? [eq(post.authorId, authorId)] : []),
+        ...(params.q ? [ilike(post.body, containsPattern(params.q))] : []),
       ],
       limit + 1,
     );

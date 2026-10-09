@@ -94,6 +94,11 @@ export const membersApi = {
     if (p.sort) qs.set("sort", p.sort);
     return api.get<MembersPagePM>(`/members?${qs.toString()}`);
   },
+  /** The app's search: everyone matching a name or @username, best matches first. */
+  search: (q: string, page: number, limit: number) => {
+    const qs = new URLSearchParams({ q, page: String(page), limit: String(limit) });
+    return api.get<MembersPagePM>(`/members/search?${qs.toString()}`);
+  },
   profile: (username: string) =>
     api.get<PublicProfilePM>(`/profiles/${encodeURIComponent(username.replace(/^@/, ""))}`),
   friends: (username: string, tab: FriendsTab, page: number, limit: number) =>

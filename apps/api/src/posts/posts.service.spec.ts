@@ -457,6 +457,13 @@ describe("the feed's visibility rules", () => {
     expect(params[3]).toBe("2026-09-18T09:00:00.000Z");
   });
 
+  it("searches post text within the same visibility rules, wildcards taken literally", async () => {
+    const { sql, params } = await feedSql({ q: "50%_off" });
+    expect(sql).toContain('"post"."visibility" = $1 or "post"."author_id" = $2');
+    expect(sql).toContain('"post"."body" ilike $4');
+    expect(params[3]).toBe("%50\\%\\_off%");
+  });
+
   it("leaves the cursor out of the query on the first page", async () => {
     const { sql } = await feedSql();
     expect(sql).not.toContain('"post"."created_at" <');

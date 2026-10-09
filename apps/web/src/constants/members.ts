@@ -61,7 +61,7 @@ export const MEMBERS_COPY = {
   },
   profile: {
     brand: "KINKORD",
-    actions: { search: "Search members", more: "More options", share: "Share profile" },
+    actions: { search: "Search", more: "More options", share: "Share profile" },
     tabs: { posts: "Posts", about: "About", media: "Media", people: "People" },
     follow: "Follow",
     following: "Following",
@@ -171,7 +171,7 @@ export const MEMBERS_COPY = {
     },
     /** Desktop-only chrome (Figma desktop-profile-* frames). */
     desktop: {
-      searchPlaceholder: "Search friends, kinks, groups...",
+      searchPlaceholder: "Search people and posts",
       account: "My Account",
       tagsHeading: "Profile Bio & Tags",
       friendsList: "Friends List",
@@ -183,6 +183,7 @@ export const MEMBERS_COPY = {
   },
   nav: {
     home: "Home",
+    search: "Search",
     members: "Members",
     chat: "Chat",
     notifications: "Notifications",
