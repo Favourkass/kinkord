@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import MaskIcon from "@/components/app/MaskIcon";
 import type { DraftPhotoVM } from "@/domain/post";
-import MentionSuggestions, { type MentionPickerProps } from "./MentionSuggestions";
+import MentionSuggestions, {
+  activeMentionId,
+  composing,
+  type MentionPickerProps,
+} from "./MentionSuggestions";
 
 export interface ComposerDialogProps {
   open: boolean;
@@ -50,6 +54,7 @@ export interface ComposerDialogProps {
 export default function ComposerDialog(p: ComposerDialogProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
+  const mentionListId = useId();
 
   useEffect(() => {
     if (!p.open) return;
@@ -114,6 +119,11 @@ export default function ComposerDialog(p: ComposerDialogProps) {
           <div className="relative mt-[16px]">
             <textarea
               ref={textRef}
+              // A many-line box stays a textbox (a combobox is one line, and only it has an
+              // expanded state); it names the list it controls and the highlighted member.
+              aria-autocomplete="list"
+              aria-controls={mentionListId}
+              aria-activedescendant={activeMentionId(mentionListId, p.mentions)}
               value={p.draft}
               maxLength={p.maxLength}
               onChange={(e) => p.onDraftChange(e.target.value, e.target.selectionStart)}
@@ -121,13 +131,18 @@ export default function ComposerDialog(p: ComposerDialogProps) {
                 p.onDraftChange(e.currentTarget.value, e.currentTarget.selectionStart)
               }
               onKeyDown={(e) => {
-                if (p.mentions.onKey(e.key)) e.preventDefault();
+                if (!composing(e) && p.mentions.onKey(e.key)) e.preventDefault();
               }}
               placeholder={p.labels.placeholder}
               rows={5}
               className="w-full resize-none bg-transparent text-[15px] leading-[22px] text-feed-text outline-none placeholder:text-feed-muted"
             />
-            <MentionSuggestions {...p.mentions} label={p.labels.mentions} className="mt-[8px]" />
+            <MentionSuggestions
+              {...p.mentions}
+              id={mentionListId}
+              label={p.labels.mentions}
+              className="mt-[8px]"
+            />
           </div>
 
           {p.photos.length > 0 && (

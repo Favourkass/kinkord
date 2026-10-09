@@ -1,13 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import MaskIcon from "@/components/app/MaskIcon";
 import SilverCheck from "@/components/app/SilverCheck";
 import type { CommentVM } from "@/domain/post";
 import BodyText from "./BodyText";
-import MentionSuggestions, { type MentionPickerProps } from "./MentionSuggestions";
+import MentionSuggestions, {
+  activeMentionId,
+  composing,
+  type MentionPickerProps,
+} from "./MentionSuggestions";
 
 export interface CommentsPanelProps {
   open: boolean;
@@ -47,6 +51,7 @@ export interface CommentsPanelProps {
  */
 export default function CommentsPanel(p: CommentsPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const mentionListId = useId();
   // After a mention is picked, the caret goes after it.
   const caretAt = p.mentions.caret?.at;
   const caretPick = p.mentions.caret?.pick;
@@ -137,7 +142,12 @@ export default function CommentsPanel(p: CommentsPanelProps) {
 
         <footer className="border-t border-feed-line px-[20px] py-[12px]">
           {/* Above the box, in the footer's own flow: the sheet grows to fit it, never clips it. */}
-          <MentionSuggestions {...p.mentions} label={p.labels.mentions} className="mb-[10px]" />
+          <MentionSuggestions
+            {...p.mentions}
+            id={mentionListId}
+            label={p.labels.mentions}
+            className="mb-[10px]"
+          />
           <div className="flex items-center gap-[10px]">
             <AvatarCircle
               src={p.viewerAvatarUrl}
@@ -147,6 +157,11 @@ export default function CommentsPanel(p: CommentsPanelProps) {
             />
             <input
               ref={inputRef}
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={p.mentions.open}
+              aria-controls={mentionListId}
+              aria-activedescendant={activeMentionId(mentionListId, p.mentions)}
               value={p.draft}
               maxLength={p.maxLength}
               onChange={(e) =>
@@ -156,6 +171,7 @@ export default function CommentsPanel(p: CommentsPanelProps) {
                 p.onDraftChange(e.currentTarget.value, e.currentTarget.selectionStart ?? undefined)
               }
               onKeyDown={(e) => {
+                if (composing(e)) return;
                 // An open list of members takes Enter to pick one, not to send.
                 if (p.mentions.onKey(e.key)) {
                   e.preventDefault();

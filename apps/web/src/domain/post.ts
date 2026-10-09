@@ -4,7 +4,7 @@
  * on a long body.
  */
 import { compactNumber, shortTimeAgo } from "@/util/format";
-import { bodyParts, type BodyPart } from "./mentions";
+import { bodyParts, clipParts, type BodyPart } from "./mentions";
 
 export type PostVisibility = "public" | "friends";
 
@@ -202,11 +202,16 @@ export function needsClamp(body: string | null): boolean {
   return (body?.length ?? 0) > POST_PREVIEW_CHARS;
 }
 
-/** The clamped body, cut on a word boundary so it doesn't end mid-word. */
-export function clampBody(body: string): string {
+/** How much of a long body the card shows: up to a word boundary, so it doesn't end mid-word. */
+function clampLength(body: string): number {
   const cut = body.slice(0, POST_PREVIEW_CHARS);
   const space = cut.lastIndexOf(" ");
-  return `${(space > POST_PREVIEW_CHARS * 0.6 ? cut.slice(0, space) : cut).trimEnd()}…`;
+  return (space > POST_PREVIEW_CHARS * 0.6 ? cut.slice(0, space) : cut).trimEnd().length;
+}
+
+/** The clamped body, cut on a word boundary so it doesn't end mid-word. */
+export function clampBody(body: string): string {
+  return `${body.slice(0, clampLength(body))}…`;
 }
 
 export function toPostVM(
@@ -216,7 +221,12 @@ export function toPostVM(
   now = new Date(),
 ): PostVM {
   const canExpand = needsClamp(pm.body);
-  const body = pm.body && canExpand && !expanded ? clampBody(pm.body) : pm.body;
+  // How much of the body shows: all of it, or what fits before "more".
+  const shown = pm.body && canExpand && !expanded ? clampLength(pm.body) : null;
+  const body = pm.body && shown !== null ? clampBody(pm.body) : pm.body;
+  // Mentions are read on the whole text, then cut: a handle the clamp cuts
+  // short reads as text until "more", never as whoever its first letters name.
+  const parts = pm.body ? bodyParts(pm.body, pm.mentions, (u) => hrefFor(u) ?? "") : [];
   return {
     id: pm.id,
     postId: pm.postId,
@@ -229,8 +239,7 @@ export function toPostVM(
     avatarUrl: pm.author.avatarUrl,
     time: shortTimeAgo(pm.createdAt, now) ?? "",
     body,
-    // A mention the clamp cut in half reads as text until "more".
-    bodyParts: body ? bodyParts(body, pm.mentions, (u) => hrefFor(u) ?? "") : [],
+    bodyParts: shown === null ? parts : [...clipParts(parts, shown), { text: "…" }],
     canExpand,
     expanded,
     media: pm.media.map((m, i) => ({

@@ -56,6 +56,22 @@ export function bodyParts(
   return parts;
 }
 
+/**
+ * The parts within the text's first `length` characters. A mention cut short
+ * there is text: what's left of it may be someone else's handle.
+ */
+export function clipParts(parts: BodyPart[], length: number): BodyPart[] {
+  const clipped: BodyPart[] = [];
+  let room = length;
+  for (const part of parts) {
+    if (room <= 0) break;
+    const text = "mention" in part ? part.mention : part.text;
+    clipped.push(text.length <= room ? part : { text: text.slice(0, room) });
+    room -= text.length;
+  }
+  return clipped;
+}
+
 export interface MentionAt {
   /** Where the "@" is. */
   start: number;

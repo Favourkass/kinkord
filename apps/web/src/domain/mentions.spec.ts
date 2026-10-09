@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MemberCardPM } from "./member";
-import { bodyParts, insertMention, mentionAt, toMentionSuggestionVM } from "./mentions";
+import { bodyParts, clipParts, insertMention, mentionAt, toMentionSuggestionVM } from "./mentions";
 
 const href = (u: string) => `/u/${u}`;
 
@@ -41,6 +41,24 @@ describe("bodyParts", () => {
   it("is plain text when nobody is confirmed, and nothing for no body", () => {
     expect(bodyParts("hi @ada", undefined, href)).toEqual([{ text: "hi @ada" }]);
     expect(bodyParts("", ["ada"], href)).toEqual([]);
+  });
+});
+
+describe("clipParts", () => {
+  const parts = bodyParts("hi @ada and @adabelle!", ["ada", "adabelle"], href);
+
+  it("keeps what fits, and a mention cut short as text", () => {
+    expect(clipParts(parts, 16)).toEqual([
+      { text: "hi " },
+      { mention: "@ada", href: "/u/ada" },
+      { text: " and " },
+      { text: "@ada" },
+    ]);
+  });
+
+  it("keeps everything that fits whole", () => {
+    expect(clipParts(parts, 100)).toEqual(parts);
+    expect(clipParts(parts, 0)).toEqual([]);
   });
 });
 
