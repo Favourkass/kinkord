@@ -23,6 +23,25 @@ export interface SearchPeopleProps {
   };
 }
 
+function PersonSummary({ person: r }: { person: SearchPersonVM }) {
+  return (
+    <>
+      <AvatarCircle src={r.avatarUrl} alt={r.name} size={48} />
+      <span className="min-w-0">
+        <span className="flex min-w-0 items-center gap-[4px] text-[15px] font-bold text-feed-text">
+          <span className="truncate">{r.name}</span>
+          {r.silver ? <SilverCheck size={15} /> : null}
+        </span>
+        {r.handle || r.details ? (
+          <span className="block truncate text-[13px] text-feed-muted">
+            {[r.handle, r.details].filter(Boolean).join(" · ")}
+          </span>
+        ) : null}
+      </span>
+    </>
+  );
+}
+
 /** The people a search found: photo, name and Silver badge, handle and place, and Follow. */
 export default function SearchPeople(p: SearchPeopleProps) {
   const l = p.labels;
@@ -46,20 +65,15 @@ export default function SearchPeople(p: SearchPeopleProps) {
         <ul>
           {p.rows.map((r) => (
             <li key={r.userId} className="flex items-center gap-[12px] px-[18px] py-[10px]">
-              <Link href={r.href} className="flex min-w-0 flex-1 items-center gap-[12px]">
-                <AvatarCircle src={r.avatarUrl} alt={r.name} size={48} />
-                <span className="min-w-0">
-                  <span className="flex min-w-0 items-center gap-[4px] text-[15px] font-bold text-feed-text">
-                    <span className="truncate">{r.name}</span>
-                    {r.silver ? <SilverCheck size={15} /> : null}
-                  </span>
-                  {r.handle || r.details ? (
-                    <span className="block truncate text-[13px] text-feed-muted">
-                      {[r.handle, r.details].filter(Boolean).join(" · ")}
-                    </span>
-                  ) : null}
+              {r.href ? (
+                <Link href={r.href} className="flex min-w-0 flex-1 items-center gap-[12px]">
+                  <PersonSummary person={r} />
+                </Link>
+              ) : (
+                <span className="flex min-w-0 flex-1 items-center gap-[12px]">
+                  <PersonSummary person={r} />
                 </span>
-              </Link>
+              )}
               {r.canFollow ? (
                 <button
                   type="button"

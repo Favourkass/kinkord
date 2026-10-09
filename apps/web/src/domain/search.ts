@@ -25,14 +25,14 @@ export interface SearchPersonVM {
   avatarUrl: string | null;
   silver: boolean;
   isFollowing: boolean;
-  href: string;
-  /** Following goes by username, so a member without one has no button. */
+  /** Profiles open by username, so a member without one has no link (and no Follow). */
+  href: string | null;
   canFollow: boolean;
 }
 
 export function toSearchPersonVM(
   pm: MemberCardPM,
-  memberHref: (usernameOrId: string) => string,
+  memberHref: (username: string) => string,
 ): SearchPersonVM {
   return {
     userId: pm.userId,
@@ -44,7 +44,7 @@ export function toSearchPersonVM(
     avatarUrl: pm.avatarUrl,
     silver: Boolean(pm.silver),
     isFollowing: pm.isFollowing,
-    href: memberHref(pm.username ?? pm.userId),
+    href: pm.username ? memberHref(pm.username) : null,
     canFollow: Boolean(pm.username),
   };
 }

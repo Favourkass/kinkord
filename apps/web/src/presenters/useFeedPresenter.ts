@@ -200,19 +200,29 @@ export function useFeedPresenter({
     [],
   );
 
+  // The list on screen now. A next page asked for by another list (an earlier
+  // search, another member's posts) arrives too late to belong, and is dropped.
+  const shownSurface = useRef(surface);
+  useEffect(() => {
+    shownSurface.current = surface;
+  }, [surface]);
+
   const loadMore = useCallback(async () => {
-    if (!cursor || loadingMore) return;
+    // Until a new list's first page is in, the cursor is still the old list's.
+    if (!cursor || loadingMore || loading) return;
+    const askedFor = surface;
     setLoadingMore(true);
     try {
       const page = await loadPage(cursor);
+      if (shownSurface.current !== askedFor) return;
       setPosts((prev) => [...prev, ...page.items]);
       setCursor(page.nextCursor);
     } catch (e) {
-      if (!onUnauthorized(e)) setError(FEED_COPY.feedError);
+      if (shownSurface.current === askedFor && !onUnauthorized(e)) setError(FEED_COPY.feedError);
     } finally {
       setLoadingMore(false);
     }
-  }, [cursor, loadPage, loadingMore, onUnauthorized]);
+  }, [cursor, loadPage, loading, loadingMore, onUnauthorized, surface]);
 
   const openMedia = useCallback((media: PostMediaVM) => setLightbox(media), []);
   const closeMedia = useCallback(() => setLightbox(null), []);
@@ -605,7 +615,7 @@ export function useFeedPresenter({
     loading,
     error,
     posts: postVMs,
-    hasMore: Boolean(cursor),
+    hasMore: !loading && Boolean(cursor),
     loadingMore,
     loadMore,
     toggleExpanded,

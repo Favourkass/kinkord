@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Routes } from "@/constants/Routes";
 import { SEARCH_COPY } from "@/constants/search";
@@ -23,6 +23,8 @@ const PEOPLE_PAGE_SIZE = 20;
 /** People found for one search; another search means "loading". */
 interface PeoplePage {
   term: string;
+  /** Which first load this is; a later page asked for an earlier one is dropped. */
+  round: number;
   items: MemberCardPM[];
   total: number;
   page: number;
@@ -48,6 +50,7 @@ export function useSearchPresenter(initialQuery: string | null) {
   const [people, setPeople] = useState<PeoplePage | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
+  const rounds = useRef(0);
 
   // The address can change under the page without remounting it: the header's
   // Search link back to an empty search, or Back and Forward between searches.
@@ -87,13 +90,15 @@ export function useSearchPresenter(initialQuery: string | null) {
   useEffect(() => {
     if (!term) return;
     let live = true;
+    const round = ++rounds.current;
     membersApi.search(term, 1, PEOPLE_PAGE_SIZE).then(
       (res) => {
-        if (live) setPeople({ term, items: res.items, total: res.total, page: 1, error: null });
+        if (live)
+          setPeople({ term, round, items: res.items, total: res.total, page: 1, error: null });
       },
       (e: unknown) => {
         if (!live || onError(e)) return;
-        setPeople({ term, items: [], total: 0, page: 1, error: copy.error });
+        setPeople({ term, round, items: [], total: 0, page: 1, error: copy.error });
       },
     );
     return () => {
@@ -112,15 +117,21 @@ export function useSearchPresenter(initialQuery: string | null) {
       .search(current.term, next, PEOPLE_PAGE_SIZE)
       .then((res) =>
         setPeople((prev) =>
-          prev && prev.term === current.term
-            ? { ...prev, items: [...prev.items, ...res.items], total: res.total, page: next }
+          prev && prev.round === current.round
+            ? {
+                ...prev,
+                items: [...prev.items, ...res.items],
+                total: res.total,
+                page: next,
+                error: null,
+              }
             : prev,
         ),
       )
       .catch((e: unknown) => {
         if (onError(e)) return;
         setPeople((prev) =>
-          prev && prev.term === current.term ? { ...prev, error: copy.error } : prev,
+          prev && prev.round === current.round ? { ...prev, error: copy.error } : prev,
         );
       })
       .finally(() => setLoadingMore(false));
@@ -136,6 +147,8 @@ export function useSearchPresenter(initialQuery: string | null) {
       setBusy((prev) => new Set(prev).add(userId));
       setPeople(apply(toggleFollowOnCard));
       void (pm.isFollowing ? membersApi.unfollow(pm.username) : membersApi.follow(pm.username))
+        // Done: whatever the rows have been refreshed to since, this is now true.
+        .then(() => setPeople(apply((p) => ({ ...p, isFollowing: !pm.isFollowing }))))
         // Back to exactly how it was, even if a newer search has refreshed the row since.
         .catch(() =>
           setPeople(

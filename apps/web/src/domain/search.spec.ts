@@ -37,12 +37,12 @@ describe("toSearchPersonVM", () => {
     });
   });
 
-  it("has no Follow button and links by id for a member without a username", () => {
+  it("has no link and no Follow button for a member without a username", () => {
     const vm = toSearchPersonVM(
       pm({ username: null, age: null, city: null, state: null, silver: undefined }),
       href,
     );
-    expect(vm).toMatchObject({ handle: null, details: null, href: "/u/u1", canFollow: false });
+    expect(vm).toMatchObject({ handle: null, details: null, href: null, canFollow: false });
     expect(vm.silver).toBe(false);
   });
 });

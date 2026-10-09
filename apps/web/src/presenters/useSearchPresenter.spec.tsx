@@ -92,6 +92,73 @@ describe("useSearchPresenter", () => {
     expect(result.current.people.hasMore).toBe(false);
   });
 
+  it("clears the error once a retried page of people arrives", async () => {
+    const { result } = renderHook(() => useSearchPresenter("ada"));
+    await waitFor(() => expect(result.current.people.seeAll).not.toBeNull());
+    act(() => result.current.people.seeAll?.onClick());
+    search.mockRejectedValueOnce(new Error("offline"));
+    act(() => result.current.people.onLoadMore());
+    await waitFor(() =>
+      expect(result.current.people.error).toBe("Search isn’t working right now. Try again."),
+    );
+    act(() => result.current.people.onLoadMore());
+    await waitFor(() => expect(result.current.people.rows).toHaveLength(25));
+    expect(result.current.people.error).toBeNull();
+  });
+
+  it("drops a page of an earlier round of the same search", async () => {
+    let release: (page: unknown) => void = () => undefined;
+    const { result, rerender } = renderHook(
+      ({ q }: { q: string | null }) => useSearchPresenter(q),
+      {
+        initialProps: { q: "ada" as string | null },
+      },
+    );
+    await waitFor(() => expect(result.current.people.seeAll).not.toBeNull());
+    act(() => result.current.people.seeAll?.onClick());
+    search.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
+    act(() => result.current.people.onLoadMore());
+    // Away and back: a fresh first page of the same words.
+    rerender({ q: "zed" });
+    rerender({ q: "ada" });
+    await waitFor(() => expect(result.current.people.rows).toHaveLength(20));
+    await act(async () => release({ items: people(21, 5), total: 25, page: 2, limit: 20 }));
+    expect(result.current.people.rows).toHaveLength(20);
+    // The next page asked for is still page 2, not one past the dropped page.
+    act(() => result.current.people.onLoadMore());
+    await waitFor(() => expect(search).toHaveBeenLastCalledWith("ada", 2, 20));
+  });
+
+  it("keeps a follow that went through, even after the rows refreshed", async () => {
+    let accept: (v: unknown) => void = () => undefined;
+    follow.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          accept = resolve;
+        }),
+    );
+    const { result, rerender } = renderHook(
+      ({ q }: { q: string | null }) => useSearchPresenter(q),
+      {
+        initialProps: { q: "ada" as string | null },
+      },
+    );
+    await waitFor(() => expect(result.current.people.rows).toHaveLength(5));
+    act(() => result.current.people.onToggleFollow("u1"));
+    rerender({ q: "zed" });
+    rerender({ q: "ada" });
+    // The fresh rows were read before the follow landed.
+    await waitFor(() => expect(result.current.people.rows[0].isFollowing).toBe(false));
+    await act(async () => accept({}));
+    await waitFor(() => expect(result.current.people.rows[0].busy).toBe(false));
+    expect(result.current.people.rows[0].isFollowing).toBe(true);
+  });
+
   it("shows only the posts on the Posts tab", async () => {
     const { result } = renderHook(() => useSearchPresenter("ada"));
     act(() => result.current.setTab("posts"));

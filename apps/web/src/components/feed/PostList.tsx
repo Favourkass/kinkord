@@ -43,24 +43,26 @@ export default function PostList(p: PostListProps) {
         </p>
       )}
 
-      {p.posts.map((post) => (
-        <PostCard
-          key={post.id}
-          post={post}
-          labels={p.postLabels}
-          menuOpen={p.menuFor === post.id}
-          onMenu={() => p.onOpenMenu(post.id)}
-          onCloseMenu={p.onCloseMenu}
-          onDelete={() => p.onAskDelete(post.id)}
-          onToggleBody={() => p.onToggleBody(post.id)}
-          onLike={() => p.onLike(post.postId)}
-          onRepost={() => p.onRepost(post.postId)}
-          onComment={() => p.onComment(post.postId)}
-          onSave={() => p.onSave(post.postId)}
-          onShare={() => p.onShare(post.postId)}
-          onOpenMedia={p.onOpenMedia}
-        />
-      ))}
+      {/* While another list loads, the old one's posts don't belong on screen. */}
+      {!p.loading &&
+        p.posts.map((post) => (
+          <PostCard
+            key={post.id}
+            post={post}
+            labels={p.postLabels}
+            menuOpen={p.menuFor === post.id}
+            onMenu={() => p.onOpenMenu(post.id)}
+            onCloseMenu={p.onCloseMenu}
+            onDelete={() => p.onAskDelete(post.id)}
+            onToggleBody={() => p.onToggleBody(post.id)}
+            onLike={() => p.onLike(post.postId)}
+            onRepost={() => p.onRepost(post.postId)}
+            onComment={() => p.onComment(post.postId)}
+            onSave={() => p.onSave(post.postId)}
+            onShare={() => p.onShare(post.postId)}
+            onOpenMedia={p.onOpenMedia}
+          />
+        ))}
 
       {p.hasMore && (
         <div className="px-[25px] py-[20px] text-center">
