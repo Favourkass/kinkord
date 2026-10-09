@@ -1,15 +1,26 @@
 /**
  * @mentions in posts and comments, with the API's own handle rule: "@ada" at
  * the start, or after anything that can't be part of a handle (so an email
- * address mentions nobody); 3–30 letters, digits, underscores and dots.
+ * address mentions nobody), the whole word; usernames are 3–30 letters,
+ * digits, underscores and dots.
  */
 import type { MemberCardPM } from "./member";
 
-const MENTION = /(^|[^A-Za-z0-9_.@])@([A-Za-z0-9_.]{3,30})/g;
+const MENTION = /(^|[^A-Za-z0-9_.@])@([A-Za-z0-9_.]{3,})/g;
 /** "@que" being typed right up to the caret; the query may still be empty. */
 const TYPING = /(^|[^A-Za-z0-9_.@])@([A-Za-z0-9_.]{0,30})$/;
 
 export type BodyPart = { text: string } | { mention: string; href: string };
+
+/**
+ * Without the full stops that may have ended the sentence. A loop, not
+ * /\.+$/: that pattern takes quadratic time on a long run of dots.
+ */
+function withoutFullStop(handle: string): string {
+  let end = handle.length;
+  while (end > 0 && handle[end - 1] === ".") end--;
+  return handle.slice(0, end);
+}
 
 /**
  * A post's or comment's text as plain text and links: each @handle the API
@@ -29,7 +40,7 @@ export function bodyParts(
   let shown = 0;
   for (const match of body.matchAll(MENTION)) {
     const full = match[2];
-    const short = full.replace(/\.+$/, "");
+    const short = withoutFullStop(full);
     const handle = known.has(full.toLowerCase())
       ? full
       : known.has(short.toLowerCase())
@@ -59,14 +70,21 @@ export function mentionAt(text: string, caret: number): MentionAt | null {
   return { start: caret - match[2].length - 1, query: match[2] };
 }
 
-/** The text with the "@que" being typed swapped for "@username ", and the caret after it. */
+/**
+ * The text with the handle being typed swapped for "@username ", and the caret
+ * after it. The whole handle goes, even the part past the caret (picking at
+ * "@ad|rian" leaves no "rian").
+ */
 export function insertMention(
   text: string,
   at: MentionAt,
   username: string,
 ): { text: string; caret: number } {
   const inserted = `@${username} `;
-  const rest = text.slice(at.start + 1 + at.query.length).replace(/^ /, "");
+  const rest = text
+    .slice(at.start + 1 + at.query.length)
+    .replace(/^[A-Za-z0-9_.]*/, "")
+    .replace(/^ /, "");
   return { text: text.slice(0, at.start) + inserted + rest, caret: at.start + inserted.length };
 }
 

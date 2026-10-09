@@ -135,14 +135,16 @@ export default function CommentsPanel(p: CommentsPanelProps) {
           )}
         </div>
 
-        <footer className="flex items-center gap-[10px] border-t border-feed-line px-[20px] py-[12px]">
-          <AvatarCircle
-            src={p.viewerAvatarUrl}
-            alt=""
-            size={32}
-            ringClassName="bg-kink-gold-bright"
-          />
-          <div className="relative flex-1">
+        <footer className="border-t border-feed-line px-[20px] py-[12px]">
+          {/* Above the box, in the footer's own flow: the sheet grows to fit it, never clips it. */}
+          <MentionSuggestions {...p.mentions} label={p.labels.mentions} className="mb-[10px]" />
+          <div className="flex items-center gap-[10px]">
+            <AvatarCircle
+              src={p.viewerAvatarUrl}
+              alt=""
+              size={32}
+              ringClassName="bg-kink-gold-bright"
+            />
             <input
               ref={inputRef}
               value={p.draft}
@@ -165,18 +167,17 @@ export default function CommentsPanel(p: CommentsPanelProps) {
                 }
               }}
               placeholder={p.labels.placeholder}
-              className="h-[36px] w-full rounded-[18px] border border-feed-line bg-feed-field px-[14px] text-[14px] text-feed-text outline-none placeholder:text-feed-muted"
+              className="h-[36px] flex-1 rounded-[18px] border border-feed-line bg-feed-field px-[14px] text-[14px] text-feed-text outline-none placeholder:text-feed-muted"
             />
-            <MentionSuggestions {...p.mentions} placement="above" label={p.labels.mentions} />
+            <button
+              type="button"
+              onClick={p.onSubmit}
+              disabled={!p.canSubmit}
+              className="rounded-[8px] bg-kink-gold-bright px-[16px] py-[7px] text-[13px] font-bold text-kink-ink disabled:opacity-40"
+            >
+              {p.labels.submit}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={p.onSubmit}
-            disabled={!p.canSubmit}
-            className="rounded-[8px] bg-kink-gold-bright px-[16px] py-[7px] text-[13px] font-bold text-kink-ink disabled:opacity-40"
-          >
-            {p.labels.submit}
-          </button>
         </footer>
       </div>
     </div>

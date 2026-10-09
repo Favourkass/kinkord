@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { MemberCardPM } from "@/domain/member";
 import {
   insertMention,
   mentionAt,
@@ -39,7 +40,8 @@ export function useMentionSuggestions(setText: (field: MentionField, text: strin
   const [typing, setTyping] = useState<(MentionAt & { field: MentionField; text: string }) | null>(
     null,
   );
-  const [found, setFound] = useState<{ query: string; items: MentionSuggestionVM[] } | null>(null);
+  // The members found (PMs, as fetched); the list's rows are made from them.
+  const [found, setFound] = useState<{ query: string; members: MemberCardPM[] } | null>(null);
   const [highlighted, setHighlighted] = useState(0);
   const [caret, setCaret] = useState<{ field: MentionField; at: number; pick: number } | null>(
     null,
@@ -52,11 +54,7 @@ export function useMentionSuggestions(setText: (field: MentionField, text: strin
     const t = setTimeout(() => {
       membersApi.search(query, 1, SUGGESTIONS).then(
         (res) => {
-          if (!live) return;
-          const items = res.items
-            .map(toMentionSuggestionVM)
-            .filter((s): s is MentionSuggestionVM => s !== null);
-          setFound({ query, items });
+          if (live) setFound({ query, members: res.items });
         },
         // Suggestions are a help, not a must: without them the handle is typed out.
         () => undefined,
@@ -69,9 +67,16 @@ export function useMentionSuggestions(setText: (field: MentionField, text: strin
   }, [query]);
 
   const items = useMemo(
-    () => (typing && found?.query === typing.query ? found.items : []),
+    () =>
+      typing && found?.query === typing.query
+        ? found.members
+            .map(toMentionSuggestionVM)
+            .filter((s): s is MentionSuggestionVM => s !== null)
+        : [],
     [typing, found],
   );
+  // A fresh list can be shorter than the one the highlight was on.
+  const current = items.length ? Math.min(highlighted, items.length - 1) : 0;
 
   /** Follows the box as it's typed in or its caret moves. */
   const track = useCallback((field: MentionField, text: string, at: number) => {
@@ -100,14 +105,14 @@ export function useMentionSuggestions(setText: (field: MentionField, text: strin
       return {
         open,
         items: open ? items : [],
-        highlighted,
+        highlighted: current,
         onPick: (username) => pick(field, username, maxLength),
         onKey: (key) => {
           if (!open) return false;
-          if (key === "ArrowDown") setHighlighted((h) => (h + 1) % items.length);
-          else if (key === "ArrowUp") setHighlighted((h) => (h - 1 + items.length) % items.length);
+          if (key === "ArrowDown") setHighlighted((current + 1) % items.length);
+          else if (key === "ArrowUp") setHighlighted((current - 1 + items.length) % items.length);
           else if (key === "Enter" || key === "Tab")
-            pick(field, items[highlighted].username, maxLength);
+            pick(field, items[current].username, maxLength);
           else if (key === "Escape") setTyping(null);
           else return false;
           return true;
@@ -115,7 +120,7 @@ export function useMentionSuggestions(setText: (field: MentionField, text: strin
         caret: caret?.field === field ? { at: caret.at, pick: caret.pick } : null,
       };
     },
-    [typing, items, highlighted, pick, caret],
+    [typing, items, current, pick, caret],
   );
 
   /** The box's draft was cleared (sent, or its sheet closed): nothing of it is left to pick into. */

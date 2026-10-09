@@ -28,6 +28,16 @@ describe("bodyParts", () => {
     ]);
   });
 
+  it("links nobody from a word longer than a username, whatever it starts with", () => {
+    const thirty = "a".repeat(30);
+    expect(bodyParts(`hi @${thirty}bc`, [thirty], href)).toEqual([{ text: `hi @${thirty}bc` }]);
+    expect(bodyParts(`hi @${thirty}.`, [thirty], href)).toEqual([
+      { text: "hi " },
+      { mention: `@${thirty}`, href: `/u/${thirty}` },
+      { text: "." },
+    ]);
+  });
+
   it("is plain text when nobody is confirmed, and nothing for no body", () => {
     expect(bodyParts("hi @ada", undefined, href)).toEqual([{ text: "hi @ada" }]);
     expect(bodyParts("", ["ada"], href)).toEqual([]);
@@ -53,6 +63,13 @@ describe("insertMention", () => {
     expect(insertMention("hi @ad", { start: 3, query: "ad" }, "ada_o")).toEqual({
       text: "hi @ada_o ",
       caret: 10,
+    });
+  });
+
+  it("replaces the whole handle when the caret is inside it", () => {
+    expect(insertMention("hello @adrian today", { start: 6, query: "ad" }, "ada")).toEqual({
+      text: "hello @ada today",
+      caret: 11,
     });
   });
 

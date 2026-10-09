@@ -12,16 +12,13 @@ export interface MentionSuggestionsProps {
   }>;
   highlighted: number;
   onPick: (username: string) => void;
-  /**
-   * Above the box (a comment box at the foot of the screen), or inline under it
-   * (the composer, a scrolling sheet that would clip a list floating over it).
-   */
-  placement: "above" | "inline";
   label: string;
+  /** Spacing from the box: the list sits in the page's flow, where no sheet can clip it. */
+  className?: string;
 }
 
 /** "@" suggestions for a box: shown by MentionSuggestions, keys offered first, caret after a pick. */
-export type MentionPickerProps = Omit<MentionSuggestionsProps, "placement" | "label"> & {
+export type MentionPickerProps = Omit<MentionSuggestionsProps, "label" | "className"> & {
   /** True when the key was the list's: the box leaves it alone then. */
   onKey: (key: string) => boolean;
   /** Where the caret goes after a pick; a new `pick` each time. */
@@ -35,21 +32,16 @@ export default function MentionSuggestions(p: MentionSuggestionsProps) {
     <ul
       role="listbox"
       aria-label={p.label}
-      className={`max-h-[264px] overflow-y-auto rounded-[12px] border border-feed-line bg-feed-card py-[4px] ${
-        p.placement === "above"
-          ? "absolute bottom-full left-0 right-0 z-30 mb-[6px] shadow-[0_8px_30px_rgba(0,0,0,0.35)]"
-          : "mt-[8px]"
-      }`}
+      className={`max-h-[208px] overflow-y-auto rounded-[12px] border border-feed-line bg-feed-card py-[4px] ${p.className ?? ""}`}
     >
       {p.items.map((s, i) => (
         <li key={s.userId} role="option" aria-selected={i === p.highlighted}>
           <button
             type="button"
-            // Before the box loses focus, so the pick lands in it.
-            onMouseDown={(e) => {
-              e.preventDefault();
-              p.onPick(s.username);
-            }}
+            // The box keeps its focus (and caret) through the press; the pick is the click,
+            // so a keyboard or a screen reader can pick too.
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => p.onPick(s.username)}
             className={`flex w-full items-center gap-[10px] px-[12px] py-[8px] text-left ${
               i === p.highlighted ? "bg-feed-chip" : ""
             }`}

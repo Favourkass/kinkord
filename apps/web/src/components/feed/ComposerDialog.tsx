@@ -127,7 +127,7 @@ export default function ComposerDialog(p: ComposerDialogProps) {
               rows={5}
               className="w-full resize-none bg-transparent text-[15px] leading-[22px] text-feed-text outline-none placeholder:text-feed-muted"
             />
-            <MentionSuggestions {...p.mentions} placement="inline" label={p.labels.mentions} />
+            <MentionSuggestions {...p.mentions} label={p.labels.mentions} className="mt-[8px]" />
           </div>
 
           {p.photos.length > 0 && (

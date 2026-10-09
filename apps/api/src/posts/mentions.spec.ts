@@ -16,6 +16,21 @@ describe("mentionCandidates", () => {
     expect(mentionCandidates("thanks @tega.")).toEqual(["tega.", "tega"]);
   });
 
+  it("takes the whole word: a longer one isn't a username, whatever its first 30 characters are", () => {
+    const thirty = "a".repeat(30);
+    expect(mentionCandidates(`@${thirty}b`)).toEqual([]);
+    expect(mentionCandidates(`@${thirty}.b`)).toEqual([]);
+    // Still a username before the sentence's full stop, or an ellipsis.
+    expect(mentionCandidates(`thanks @${thirty}.`)).toEqual([thirty]);
+    expect(mentionCandidates(`@${thirty}...`)).toEqual([thirty]);
+  });
+
+  it("strips a long run of dots quickly", () => {
+    const started = Date.now();
+    expect(mentionCandidates(`@${".".repeat(50_000)}a`)).toEqual([]);
+    expect(Date.now() - started).toBeLessThan(500);
+  });
+
   it("leaves email addresses and too-short handles alone", () => {
     expect(mentionCandidates("mail ada@kinkord.com, ping @ab")).toEqual([]);
     expect(mentionCandidates(null)).toEqual([]);
@@ -28,6 +43,12 @@ describe("mentionsIn", () => {
     expect(mentionsIn("thanks @tega.", new Set(["tega"]))).toEqual(["tega"]);
     expect(mentionsIn("hi @ada.", new Set(["ada.", "ada"]))).toEqual(["ada."]);
     expect(mentionsIn("hi @ghost", new Set(["ada"]))).toEqual([]);
+  });
+
+  it("mentions nobody for a word longer than a username", () => {
+    const thirty = "a".repeat(30);
+    expect(mentionsIn(`@${thirty}bc`, new Set([thirty]))).toEqual([]);
+    expect(mentionsIn(`see @${thirty}.`, new Set([thirty]))).toEqual([thirty]);
   });
 
   it("names each member once, and ten at most", () => {
