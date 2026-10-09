@@ -14,6 +14,13 @@ const MENTION = /(^|[^A-Za-z0-9_.@])@([A-Za-z0-9_.]{3,})/g;
 /** The most members one post or comment tells it mentioned them. */
 export const MAX_MENTIONS = 10;
 
+/**
+ * The most different @handles looked at in one post or comment: room for ten
+ * members among other words. It bounds the lookup, which a long post full of
+ * handles would otherwise grow past what one query can ask (and fail the page).
+ */
+export const MAX_HANDLES = 30;
+
 /** Long enough and short enough for a username: 3–30 characters (USERNAME_RE). */
 const usernameLength = (name: string) => name.length >= 3 && name.length <= 30;
 
@@ -28,21 +35,28 @@ function withoutFullStop(handle: string): string {
 }
 
 /**
- * Each @handle as written, lowercased (usernames are stored so), and without a
- * trailing full stop; each only when it's a username's length.
+ * Each different @handle, the first thirty: as written, lowercased (usernames
+ * are stored so), and without a trailing full stop; each only when it's a
+ * username's length. A word no username could be isn't a handle.
  */
 function handlesIn(
   text: string | null | undefined,
 ): Array<{ full: string | null; short: string | null }> {
   if (!text) return [];
-  return [...text.matchAll(MENTION)].map((m) => {
-    const full = m[2].toLowerCase();
-    const short = withoutFullStop(full);
-    return {
-      full: usernameLength(full) ? full : null,
+  const handles = new Map<string, { full: string | null; short: string | null }>();
+  for (const m of text.matchAll(MENTION)) {
+    const word = m[2].toLowerCase();
+    if (handles.has(word)) continue;
+    const short = withoutFullStop(word);
+    const handle = {
+      full: usernameLength(word) ? word : null,
       short: usernameLength(short) ? short : null,
     };
-  });
+    if (!handle.full && !handle.short) continue;
+    handles.set(word, handle);
+    if (handles.size === MAX_HANDLES) break;
+  }
+  return [...handles.values()];
 }
 
 /** Every username a text could be mentioning: what to look up. */

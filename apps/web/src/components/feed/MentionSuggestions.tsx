@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useRef } from "react";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import SilverCheck from "@/components/app/SilverCheck";
 
@@ -27,9 +30,16 @@ export type MentionPickerProps = Omit<MentionSuggestionsProps, "label" | "classN
 
 /** Members to mention, while "@" and a few letters are typed. */
 export default function MentionSuggestions(p: MentionSuggestionsProps) {
+  const listRef = useRef<HTMLUListElement>(null);
+  // The arrows move the highlight while the box keeps its focus: keep that row in sight.
+  useEffect(() => {
+    listRef.current?.children[p.highlighted]?.scrollIntoView({ block: "nearest" });
+  }, [p.highlighted]);
+
   if (!p.open) return null;
   return (
     <ul
+      ref={listRef}
       role="listbox"
       aria-label={p.label}
       className={`max-h-[208px] overflow-y-auto rounded-[12px] border border-feed-line bg-feed-card py-[4px] ${p.className ?? ""}`}

@@ -1,7 +1,7 @@
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { SQL } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
-import { knownHandles, MAX_MENTIONS, mentionCandidates, mentionsIn } from "./mentions";
+import { knownHandles, MAX_HANDLES, MAX_MENTIONS, mentionCandidates, mentionsIn } from "./mentions";
 
 describe("mentionCandidates", () => {
   it("finds @handles at the start, after spaces and after punctuation, lowercased", () => {
@@ -23,6 +23,16 @@ describe("mentionCandidates", () => {
     // Still a username before the sentence's full stop, or an ellipsis.
     expect(mentionCandidates(`thanks @${thirty}.`)).toEqual([thirty]);
     expect(mentionCandidates(`@${thirty}...`)).toEqual([thirty]);
+  });
+
+  it("looks at the first thirty different handles only, so the lookup stays small", () => {
+    const many = Array.from({ length: 3_500 }, (_, i) => `@user${i}.`).join(" ");
+    // Each is looked up both ways (with and without the dot).
+    expect(mentionCandidates(many)).toHaveLength(MAX_HANDLES * 2);
+    expect(mentionCandidates(`${many} @ada`)).not.toContain("ada");
+    // Saying one again doesn't use up the room, and nor does a word no username could be.
+    const repeats = `${"@tega ".repeat(100)}@${"a".repeat(40)} @ada`;
+    expect(mentionCandidates(repeats)).toEqual(["tega", "ada"]);
   });
 
   it("strips a long run of dots quickly", () => {
