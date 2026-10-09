@@ -38,6 +38,8 @@ const NO_ITEMS: MemberCardPM[] = [];
 
 /** How long typing pauses before the list searches; clearing the box applies at once. */
 export const SEARCH_DELAY_MS = 300;
+/** The API's limit on a search (GET /members q): longer would be refused. */
+export const SEARCH_MAX_LENGTH = 50;
 
 /**
  * Members list at every level of the directory (Figma 907:1410 list layout):
@@ -86,7 +88,7 @@ export function useMembersRegionPresenter(
   const error = current?.error ?? null;
 
   useEffect(() => {
-    const term = query.trim();
+    const term = query.trim().slice(0, SEARCH_MAX_LENGTH);
     const t = setTimeout(() => setSearch(term), term ? SEARCH_DELAY_MS : 0);
     return () => clearTimeout(t);
   }, [query]);
@@ -209,6 +211,7 @@ export function useMembersRegionPresenter(
       placeholder: copy.searchPlaceholder,
       label: copy.searchLabel,
       iconSize: countryMode ? (24 as const) : (26 as const),
+      maxLength: SEARCH_MAX_LENGTH,
     },
     selector: {
       label: copy.selectorLabel,

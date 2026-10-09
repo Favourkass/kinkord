@@ -171,6 +171,18 @@ describe("useMembersRegionPresenter", () => {
     );
   });
 
+  it("never sends more than the API takes, so a long paste still searches", async () => {
+    const { result } = renderHook(() => useMembersRegionPresenter("ng", "Delta"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.search.maxLength).toBe(50);
+    act(() => result.current.search.onChange("a".repeat(80)));
+    await waitFor(() =>
+      expect(apiGet).toHaveBeenLastCalledWith(
+        `/members?country=NG&state=Delta&q=${"a".repeat(50)}&page=1&limit=20&sort=recent`,
+      ),
+    );
+  });
+
   it("follows optimistically, updates the count, and reverts when the API rejects", async () => {
     const { result } = renderHook(() => useMembersRegionPresenter("ng", "Delta"));
     await waitFor(() => expect(result.current.loading).toBe(false));
