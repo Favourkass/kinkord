@@ -36,6 +36,9 @@ interface RegionPage {
 /** Stable empty list so derived memos don't churn while a page is loading. */
 const NO_ITEMS: MemberCardPM[] = [];
 
+/** How long typing pauses before the list searches; clearing the box applies at once. */
+export const SEARCH_DELAY_MS = 300;
+
 /**
  * Members list at every level of the directory (Figma 907:1410 list layout):
  *   /members/ng        → everyone in Nigeria, dropdown of states (picking one navigates)
@@ -64,6 +67,9 @@ export function useMembersRegionPresenter(
     initialRegion ? decodeParam(initialRegion) : null,
   );
   const [sort, setSort] = useState<MembersSort>("recent");
+  // What's typed, and what the list searches once typing pauses.
+  const [query, setQuery] = useState("");
+  const [search, setSearch] = useState("");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [data, setData] = useState<RegionPage | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -71,7 +77,7 @@ export function useMembersRegionPresenter(
 
   // Country mode needs a launched country; state mode needs a state we have LGAs for.
   const knownState = countryMode ? isCountryAvailable(country) : regions.length > 0;
-  const key = knownState ? `${country}|${state ?? "*"}|${region ?? "*"}|${sort}` : null;
+  const key = knownState ? `${country}|${state ?? "*"}|${region ?? "*"}|${sort}|${search}` : null;
   const current = data?.key === key ? data : null;
   const loading = key !== null && current === null;
   const items = current?.items ?? NO_ITEMS;
@@ -79,12 +85,18 @@ export function useMembersRegionPresenter(
   const page = current?.page ?? 1;
   const error = current?.error ?? null;
 
-  // First page whenever the region / sort / route changes; stale responses are dropped.
+  useEffect(() => {
+    const term = query.trim();
+    const t = setTimeout(() => setSearch(term), term ? SEARCH_DELAY_MS : 0);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  // First page whenever the region / sort / search / route changes; stale responses are dropped.
   useEffect(() => {
     if (!key) return;
     let cancelled = false;
     void membersApi
-      .page({ country, state, region, page: 1, limit: MEMBERS_PAGE_SIZE, sort })
+      .page({ country, state, region, q: search, page: 1, limit: MEMBERS_PAGE_SIZE, sort })
       .then((res) => {
         if (!cancelled) setData({ key, items: res.items, total: res.total, page: 1, error: null });
       })
@@ -99,7 +111,7 @@ export function useMembersRegionPresenter(
     return () => {
       cancelled = true;
     };
-  }, [country, state, region, sort, key, router]);
+  }, [country, state, region, search, sort, key, router]);
 
   const more = hasMore(items.length, total);
 
@@ -108,7 +120,7 @@ export function useMembersRegionPresenter(
     const next = page + 1;
     setLoadingMore(true);
     void membersApi
-      .page({ country, state, region, page: next, limit: MEMBERS_PAGE_SIZE, sort })
+      .page({ country, state, region, q: search, page: next, limit: MEMBERS_PAGE_SIZE, sort })
       .then((res) =>
         setData((prev) =>
           prev && prev.key === key
@@ -126,7 +138,7 @@ export function useMembersRegionPresenter(
         );
       })
       .finally(() => setLoadingMore(false));
-  }, [country, state, region, sort, key, page, loading, loadingMore, more, router]);
+  }, [country, state, region, search, sort, key, page, loading, loadingMore, more, router]);
 
   const selectRegion = useCallback(
     (next: string) => {
@@ -191,6 +203,13 @@ export function useMembersRegionPresenter(
       : countryMode
         ? MEMBERS_COPY.state.notAvailable
         : copy.unknownState,
+    search: {
+      value: query,
+      onChange: setQuery,
+      placeholder: copy.searchPlaceholder,
+      label: copy.searchLabel,
+      iconSize: countryMode ? (24 as const) : (26 as const),
+    },
     selector: {
       label: copy.selectorLabel,
       value: countryMode ? copy.allStates : (region ?? copy.allRegions),
@@ -224,10 +243,13 @@ export function useMembersRegionPresenter(
     onToggleFollow: toggleFollow,
     empty:
       !loading && !error && knownState && items.length === 0
-        ? copy.empty(region ?? placeName)
+        ? search
+          ? copy.noMatch(search, region ?? placeName)
+          : copy.empty(region ?? placeName)
         : null,
     loadingMoreText: copy.loadingMore,
-    endText: items.length > 0 && !more ? copy.end : null,
+    // "Everyone here" isn't true of a search's results.
+    endText: items.length > 0 && !more && !search ? copy.end : null,
     error,
   };
 }

@@ -143,6 +143,34 @@ describe("useMembersRegionPresenter", () => {
     );
   });
 
+  it("searches by name once typing pauses, says when nobody matches, and clears at once", async () => {
+    const { result } = renderHook(() => useMembersRegionPresenter("ng", "Delta"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.search).toMatchObject({ value: "", label: "Search members" });
+    apiGet.mockImplementation((path: string) =>
+      new URL(`http://x${path}`).searchParams.get("q") === "zed"
+        ? pageOf([], 0, 1)
+        : pageOf([member(1), member(2)], 3, 1),
+    );
+    act(() => result.current.search.onChange("ze"));
+    act(() => result.current.search.onChange("zed"));
+    expect(result.current.search.value).toBe("zed");
+    await waitFor(() =>
+      expect(apiGet).toHaveBeenLastCalledWith(
+        "/members?country=NG&state=Delta&q=zed&page=1&limit=20&sort=recent",
+      ),
+    );
+    // Only the paused-on word was sent, not each keystroke.
+    expect(apiGet.mock.calls.some(([path]) => String(path).includes("q=ze&"))).toBe(false);
+    await waitFor(() => expect(result.current.empty).toBe("No one in Delta State matches “zed”."));
+    expect(result.current.endText).toBeNull();
+    act(() => result.current.search.onChange(""));
+    await waitFor(() => expect(result.current.rows).toHaveLength(2));
+    expect(apiGet).toHaveBeenLastCalledWith(
+      "/members?country=NG&state=Delta&page=1&limit=20&sort=recent",
+    );
+  });
+
   it("follows optimistically, updates the count, and reverts when the API rejects", async () => {
     const { result } = renderHook(() => useMembersRegionPresenter("ng", "Delta"));
     await waitFor(() => expect(result.current.loading).toBe(false));
