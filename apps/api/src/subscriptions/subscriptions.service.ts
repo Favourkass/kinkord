@@ -8,6 +8,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  type OnApplicationBootstrap,
 } from "@nestjs/common";
 import { and, desc, eq, gte, inArray, lt, lte } from "drizzle-orm";
 import { DRIZZLE, type Db } from "../db/db.module";
@@ -17,7 +18,7 @@ import {
   subscriptionPayment,
   type BillingPeriod,
 } from "../db/schema";
-import { isSuperAdmin, type AdminCandidate } from "../moderation/admins";
+import { founderAccounts, isSuperAdmin, type AdminCandidate } from "../moderation/admins";
 import { PushService } from "../push/push.service";
 import { StorageService } from "../storage/storage.service";
 import type {
@@ -33,6 +34,7 @@ import {
   PAYMENT_WINDOW_MS,
   PROOF_GRACE_MS,
   freeOffset,
+  silverForGood,
   paymentReference,
   silverCheckStatus,
   silverUntil,
@@ -145,7 +147,7 @@ export async function expireAbandoned(db: Db, now: Date = new Date()): Promise<v
  * statement before Silver turns on.
  */
 @Injectable()
-export class SubscriptionsService {
+export class SubscriptionsService implements OnApplicationBootstrap {
   private readonly log = new Logger(SubscriptionsService.name);
 
   /** Swapped in specs to pick a known offset. */
@@ -197,6 +199,36 @@ export class SubscriptionsService {
     }
   }
 
+  /** On start, every founder is on Silver, whether or not they've opened the app since. */
+  async onApplicationBootstrap(): Promise<void> {
+    await this.putFoundersOnSilver();
+  }
+
+  /** Puts every founder on Silver and logs, by id, where each one's check stands. Never throws. */
+  async putFoundersOnSilver(): Promise<void> {
+    try {
+      for (const founder of await founderAccounts(this.db)) {
+        if (silverForGood(await this.silverUntil(founder))) {
+          // Nothing to pay: a checkout they started, to try it say, is let go.
+          await this.db
+            .update(subscriptionPayment)
+            .set({ status: "expired" })
+            .where(
+              and(
+                eq(subscriptionPayment.userId, founder.id),
+                eq(subscriptionPayment.status, "pending"),
+              ),
+            );
+        }
+        const check = await silverCheckStatus(this.db, founder.id);
+        const state = check ? (check.shown ? "shown" : `hidden (${check.reason})`) : "no Silver";
+        this.log.log(`founder ${founder.id}: check ${state}`);
+      }
+    } catch (e) {
+      this.log.warn(`putting the founders on Silver failed: ${String(e)}`);
+    }
+  }
+
   /** The member's plan, the prices, and the payment they're in the middle of, if any. */
   async status(
     who: Pick<AdminCandidate, "id" | "email" | "emailVerified">,
@@ -218,6 +250,7 @@ export class SubscriptionsService {
     const payments = recent.map((row) => toPaymentDto(row, now));
     const open = payments.find((p) => p.status === "pending" || p.status === "submitted") ?? null;
     const latest = payments[0];
+    const forGood = silverForGood(until);
     return {
       plan: until ? "silver" : "basic",
       silverUntil: until?.toISOString() ?? null,
@@ -229,10 +262,12 @@ export class SubscriptionsService {
             showsFrom: check.showsFrom?.toISOString() ?? null,
           }
         : null,
+      forGood,
       available: settings.bank !== null,
       prices: settings.prices,
-      open,
-      rejected: latest?.status === "rejected" ? latest : null,
+      // Silver for good has nothing to pay: no payment to finish, nor one to retry.
+      open: forGood ? null : open,
+      rejected: !forGood && latest?.status === "rejected" ? latest : null,
     };
   }
 
@@ -242,6 +277,9 @@ export class SubscriptionsService {
    * never holds two amounts.
    */
   async checkout(userId: string, period: BillingPeriod): Promise<PaymentDto> {
+    if (silverForGood(await silverUntil(this.db, userId))) {
+      throw new ConflictException("You're on Silver for good, so there's nothing to pay.");
+    }
     const settings = await readSettings(this.db);
     if (!settings.bank) {
       throw new ConflictException("Silver isn't open for payment yet. Check back soon.");

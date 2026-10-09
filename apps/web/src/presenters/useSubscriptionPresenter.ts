@@ -131,7 +131,9 @@ export function useSubscriptionPresenter() {
     basic: copy.plan.basic,
     silver: {
       title: copy.plan.silver.title,
-      body: copy.plan.silver.body(status?.silverUntil ? planDate(status.silverUntil) : ""),
+      body: status?.forGood
+        ? copy.plan.silver.forGood
+        : copy.plan.silver.body(status?.silverUntil ? planDate(status.silverUntil) : ""),
     },
     pending: copy.plan.pending,
     review: copy.plan.review,
@@ -145,15 +147,17 @@ export function useSubscriptionPresenter() {
     ? copy.cta.starting
     : !status
       ? copy.cta.upgrade
-      : state === "review"
-        ? copy.cta.review
-        : resumable
-          ? copy.cta.resume
-          : !status.available
-            ? copy.cta.unavailable
-            : state === "silver"
-              ? copy.cta.extend
-              : copy.cta.upgrade;
+      : status.forGood
+        ? copy.cta.forGood
+        : state === "review"
+          ? copy.cta.review
+          : resumable
+            ? copy.cta.resume
+            : !status.available
+              ? copy.cta.unavailable
+              : state === "silver"
+                ? copy.cta.extend
+                : copy.cta.upgrade;
 
   return {
     loading: status === null && error === null,
@@ -174,7 +178,12 @@ export function useSubscriptionPresenter() {
     showSeeAll: copy.allBenefits.length > copy.features.length,
     cta: {
       label: ctaLabel,
-      disabled: !status || starting || state === "review" || (!resumable && !status.available),
+      disabled:
+        !status ||
+        starting ||
+        Boolean(status.forGood) ||
+        state === "review" ||
+        (!resumable && !status.available),
       onClick: () => void upgrade(),
     },
   };

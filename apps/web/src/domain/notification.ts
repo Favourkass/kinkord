@@ -83,9 +83,9 @@ const KINDS: Record<
     action: () => "We couldn't confirm your payment. Open it to see why.",
   },
   silver_check: {
-    category: "Silver checks",
+    category: "Silver badges",
     icon: "shield",
-    action: () => "A Silver member changed their name or photo. Review their check.",
+    action: () => "A Silver member changed their name or photo. Review their badge.",
   },
   test: {
     category: "Notifications enabled",

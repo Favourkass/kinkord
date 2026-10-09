@@ -110,6 +110,8 @@ export interface SubscriptionStatusDto {
   silverUntil: string | null;
   /** Null on Basic. */
   check: SilverCheckDto | null;
+  /** Silver that never runs out (the founders'): nothing to pay, so no payments shown. */
+  forGood: boolean;
   /** Checkout stays closed until there's an account to pay into. */
   available: boolean;
   prices: PlanPrices;
