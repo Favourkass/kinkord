@@ -11,7 +11,7 @@ import { useHomePresenter } from "@/presenters/useHomePresenter";
 /** Post-login home: the feed (Figma "Hompage Light" 344:138 / dark 837:295). */
 export default function HomePage() {
   const home = useHomePresenter();
-  const feed = useFeedPresenter();
+  const feed = useFeedPresenter({ postMaxLength: postBodyMax(home.silver) });
   const nav = getAppShellNav();
 
   return (
@@ -66,6 +66,7 @@ export default function HomePage() {
         avatarUrl: home.avatarUrl,
         draft: feed.draft,
         onDraftChange: feed.setDraft,
+        mentions: feed.postMentions,
         maxLength: postBodyMax(home.silver),
         visibility: feed.visibility,
         visibilities: FEED_VISIBILITIES,
@@ -88,6 +89,7 @@ export default function HomePage() {
           removePhoto: FEED_COPY.removePhoto,
           placeholder: FEED_COPY.composerPlaceholder,
           visibilityLabel: FEED_COPY.visibilityLabel,
+          mentions: FEED_COPY.mentionSuggestions,
         },
       }}
       commentsPanel={{
@@ -99,6 +101,7 @@ export default function HomePage() {
         onLoadMore: feed.loadMoreComments,
         draft: feed.commentDraft,
         onDraftChange: feed.setCommentDraft,
+        mentions: feed.commentMentions,
         maxLength: COMMENT_BODY_MAX,
         canSubmit: feed.canComment,
         sending: feed.commentSending,
@@ -115,6 +118,7 @@ export default function HomePage() {
           loadMore: FEED_COPY.commentsMore,
           loading: FEED_COPY.loading,
           close: FEED_COPY.closeComments,
+          mentions: FEED_COPY.mentionSuggestions,
         },
       }}
       people={{

@@ -39,6 +39,7 @@ export function getPostList(feed: Feed, viewerAvatarUrl: string | null) {
       onLoadMore: feed.loadMoreComments,
       draft: feed.commentDraft,
       onDraftChange: feed.setCommentDraft,
+      mentions: feed.commentMentions,
       maxLength: COMMENT_BODY_MAX,
       canSubmit: feed.canComment,
       sending: feed.commentSending,
@@ -55,6 +56,7 @@ export function getPostList(feed: Feed, viewerAvatarUrl: string | null) {
         loadMore: FEED_COPY.commentsMore,
         loading: FEED_COPY.loading,
         close: FEED_COPY.closeComments,
+        mentions: FEED_COPY.mentionSuggestions,
       },
     },
     lightbox: {

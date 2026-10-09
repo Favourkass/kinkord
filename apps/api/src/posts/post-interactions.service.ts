@@ -12,6 +12,7 @@ import {
   user,
   COMMENT_BODY_MAX,
 } from "../db/schema";
+import { knownHandles, mentionCandidates, mentionsIn } from "./mentions";
 import { StorageService } from "../storage/storage.service";
 import { silverCheck } from "../subscriptions/plans";
 import {
@@ -39,6 +40,8 @@ export interface CommentVM {
     /** Shows the Silver check beside their name. */
     silver: boolean;
   };
+  /** The @handles in the body that are members, lowercased: the ones the app links. */
+  mentions: string[];
   /** Whether the viewer may delete it: their own comment, or any comment on their post. */
   canDelete: boolean;
 }
@@ -142,10 +145,15 @@ export class PostInteractionsService {
       .select({ total: count() })
       .from(postComment)
       .where(and(eq(postComment.postId, postId), isNull(postComment.deletedAt)));
+    const members = await knownHandles(
+      this.db,
+      page.flatMap((r) => mentionCandidates(r.body)),
+    );
     const items = await Promise.all(
       page.map(async (r) => ({
         id: r.id,
         body: r.body,
+        mentions: mentionsIn(r.body, members),
         createdAt: r.createdAt.toISOString(),
         author: {
           userId: r.authorId,
@@ -172,6 +180,8 @@ export class PostInteractionsService {
       .values({ postId, authorId: userId, body })
       .returning();
     this.push.newComment(postId, authorId, userId);
+    // The post's author hears of the comment already; once is enough.
+    this.posts.notifyMentions(postId, userId, body, [authorId]);
     const [me] = await this.db
       .select({
         username: user.username,
@@ -182,9 +192,11 @@ export class PostInteractionsService {
       .from(user)
       .leftJoin(profile, eq(profile.userId, user.id))
       .where(eq(user.id, userId));
+    const members = await knownHandles(this.db, mentionCandidates(row.body));
     return {
       id: row.id,
       body: row.body,
+      mentions: mentionsIn(row.body, members),
       createdAt: row.createdAt.toISOString(),
       author: {
         userId: userId,

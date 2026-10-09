@@ -152,6 +152,12 @@ describe("toPostVM", () => {
     expect(vm.authorHref).toBeNull();
   });
 
+  it("links the @mentions the API confirmed", () => {
+    const vm = toPostVM(post({ body: "brunch with @tega", mentions: ["tega"] }), false, href, NOW);
+    expect(vm.bodyParts).toEqual([{ text: "brunch with " }, { mention: "@tega", href: "/u/tega" }]);
+    expect(toPostVM(post({ body: null }), false, href, NOW).bodyParts).toEqual([]);
+  });
+
   it("shows the Silver check only when the API says the author has one", () => {
     expect(toPostVM(post(), false, href, NOW).authorSilver).toBe(false);
     const silver = post({ author: { ...author, silver: true } });

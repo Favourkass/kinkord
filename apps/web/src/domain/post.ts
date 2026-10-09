@@ -4,6 +4,7 @@
  * on a long body.
  */
 import { compactNumber, shortTimeAgo } from "@/util/format";
+import { bodyParts, type BodyPart } from "./mentions";
 
 export type PostVisibility = "public" | "friends";
 
@@ -44,6 +45,8 @@ export interface PostPM {
   /** Set when this row is somebody's repost of the post above. */
   repostedBy: Pick<PostAuthorPM, "userId" | "username" | "displayName"> | null;
   mine: boolean;
+  /** The @handles in the body that are members, lowercased. Absent from an older API. */
+  mentions?: string[];
 }
 
 export interface FeedPM {
@@ -57,6 +60,8 @@ export interface CommentPM {
   createdAt: string;
   author: PostAuthorPM;
   canDelete: boolean;
+  /** The @handles in the body that are members, lowercased. Absent from an older API. */
+  mentions?: string[];
 }
 
 export interface CommentsPM {
@@ -132,6 +137,8 @@ export interface PostVM {
   time: string;
   /** Already clamped when `canExpand` is true and the reader hasn't expanded it. */
   body: string | null;
+  /** The body as text and @mention links. */
+  bodyParts: BodyPart[];
   /** Offer the "more" affordance. */
   canExpand: boolean;
   expanded: boolean;
@@ -177,6 +184,8 @@ export interface CommentVM {
   avatarUrl: string | null;
   time: string;
   body: string;
+  /** The body as text and @mention links. */
+  bodyParts: BodyPart[];
   canDelete: boolean;
 }
 
@@ -207,6 +216,7 @@ export function toPostVM(
   now = new Date(),
 ): PostVM {
   const canExpand = needsClamp(pm.body);
+  const body = pm.body && canExpand && !expanded ? clampBody(pm.body) : pm.body;
   return {
     id: pm.id,
     postId: pm.postId,
@@ -218,7 +228,9 @@ export function toPostVM(
     authorHref: hrefFor(pm.author.username),
     avatarUrl: pm.author.avatarUrl,
     time: shortTimeAgo(pm.createdAt, now) ?? "",
-    body: pm.body && canExpand && !expanded ? clampBody(pm.body) : pm.body,
+    body,
+    // A mention the clamp cut in half reads as text until "more".
+    bodyParts: body ? bodyParts(body, pm.mentions, (u) => hrefFor(u) ?? "") : [],
     canExpand,
     expanded,
     media: pm.media.map((m, i) => ({
@@ -249,6 +261,7 @@ export function toCommentVM(pm: CommentPM, hrefFor: HrefFor, now = new Date()): 
     avatarUrl: pm.author.avatarUrl,
     time: shortTimeAgo(pm.createdAt, now) ?? "",
     body: pm.body,
+    bodyParts: bodyParts(pm.body, pm.mentions, (u) => hrefFor(u) ?? ""),
     canDelete: pm.canDelete,
   };
 }
