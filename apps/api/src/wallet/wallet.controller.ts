@@ -18,6 +18,7 @@ import { isSuperAdmin } from "../moderation/admins";
 import { parse, paymentId } from "../subscriptions/subscriptions.controller";
 import {
   walletBankSchema,
+  walletGiftSchema,
   walletDecisionSchema,
   walletProofSchema,
   walletQuerySchema,
@@ -25,6 +26,7 @@ import {
   walletSettingsSchema,
   withdrawalSchema,
 } from "./dto";
+import { WalletGiftsService } from "./wallet-gifts.service";
 import { WalletService, walletOperationDto } from "./wallet.service";
 const uploadSchema = z.object({
   contentType: z.string(),
@@ -37,11 +39,15 @@ const uploadSchema = z.object({
 @Controller("wallet")
 @UseGuards(AuthGuard)
 export class WalletController {
-  constructor(private readonly wallet: WalletService) {}
+  constructor(
+    private readonly wallet: WalletService,
+    private readonly gifts: WalletGiftsService,
+  ) {}
   @Get() async status(@Req() req: AuthedRequest) {
     return {
       settings: await this.wallet.settings(),
       balances: await this.wallet.balances(req.user.id),
+      redemption: await this.wallet.redemptionEligibility(req.user.id),
     };
   }
   @Get("banks") banks(@Req() req: AuthedRequest) {
@@ -61,6 +67,9 @@ export class WalletController {
   }
   @Get("operations/:id") async operation(@Req() req: AuthedRequest, @Param("id") id: string) {
     return walletOperationDto(await this.wallet.operation(req.user.id, paymentId(id)));
+  }
+  @Post("gifts") gift(@Req() req: AuthedRequest, @Body() body: unknown) {
+    return this.gifts.send(req.user.id, parse(walletGiftSchema, body));
   }
   @Post("purchases") purchase(@Req() req: AuthedRequest, @Body() body: unknown) {
     return this.wallet.create(req.user.id, "purchase", parse(walletRequestSchema, body));

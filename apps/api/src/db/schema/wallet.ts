@@ -111,3 +111,28 @@ export const walletLedger = pgTable(
     index("wallet_ledger_member_idx").on(t.userId, t.createdAt),
   ],
 );
+
+/** Immutable, balanced transfer: quantity leaves sender and enters recipient in one transaction. */
+export const walletGift = pgTable(
+  "wallet_gift",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    senderId: text("sender_id").notNull(),
+    recipientId: text("recipient_id").notNull(),
+    postId: uuid("post_id").notNull(),
+    currency: text("currency").$type<WalletCurrency>().notNull(),
+    quantity: integer("quantity").notNull(),
+    requestKey: uuid("request_key").notNull(),
+    senderName: text("sender_name").notNull(),
+    recipientName: text("recipient_name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("wallet_gift_request_idx").on(t.senderId, t.requestKey),
+    index("wallet_gift_sender_idx").on(t.senderId, t.createdAt),
+    index("wallet_gift_recipient_idx").on(t.recipientId, t.createdAt),
+    check("wallet_gift_positive", sql`${t.quantity} > 0 and ${t.quantity} <= 1000000`),
+    check("wallet_gift_different_members", sql`${t.senderId} <> ${t.recipientId}`),
+    check("wallet_gift_currency", sql`${t.currency} in ('coin', 'star', 'crown')`),
+  ],
+);

@@ -4,6 +4,7 @@ import ConfirmDialog, { type ConfirmDialogProps } from "./ConfirmDialog";
 import FeedShell, { type FeedShellProps } from "./FeedShell";
 import MediaLightbox, { type MediaLightboxProps } from "./MediaLightbox";
 import PostCard, { type PostCardProps } from "./PostCard";
+import GiftDialog, { type GiftDialogProps } from "./GiftDialog";
 import Toast, { type ToastProps } from "./Toast";
 
 export interface PostListScreenProps {
@@ -23,6 +24,7 @@ export interface PostListScreenProps {
   onComment: (postId: string) => void;
   onSave: (postId: string) => void;
   onShare: (postId: string) => void;
+  onGift: (postId: string, currency?: "coin" | "star" | "crown") => void;
   onOpenMedia: (media: PostMediaVM) => void;
   hasMore: boolean;
   loadingMore: boolean;
@@ -31,6 +33,7 @@ export interface PostListScreenProps {
   lightbox: MediaLightboxProps;
   confirm: ConfirmDialogProps;
   toast: ToastProps;
+  giftDialog: GiftDialogProps;
   copy: { empty: string; loading: string; loadMore: string };
 }
 
@@ -78,6 +81,7 @@ export default function PostListScreen(p: PostListScreenProps) {
             onComment={() => p.onComment(post.postId)}
             onSave={() => p.onSave(post.postId)}
             onShare={() => p.onShare(post.postId)}
+            onGift={(currency) => p.onGift(post.postId, currency)}
             onOpenMedia={p.onOpenMedia}
           />
         ))}
@@ -100,6 +104,7 @@ export default function PostListScreen(p: PostListScreenProps) {
       <MediaLightbox {...p.lightbox} />
       <ConfirmDialog {...p.confirm} />
       <Toast {...p.toast} />
+      <GiftDialog {...p.giftDialog} />
     </>
   );
 }

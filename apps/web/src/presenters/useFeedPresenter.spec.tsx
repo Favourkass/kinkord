@@ -19,6 +19,7 @@ const comment = vi.fn();
 const removeComment = vi.fn();
 const removePost = vi.fn();
 const suggested = vi.fn();
+const recordShare = vi.fn().mockResolvedValue({ postId: "p1", shares: 1 });
 const repost = vi.fn();
 const unrepost = vi.fn();
 const save = vi.fn();
@@ -32,6 +33,7 @@ const uploadPostPhoto = vi.fn();
 vi.mock("@/services/posts.service", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/posts.service")>()),
   postsApi: {
+    share: (...a: unknown[]) => recordShare(...a),
     feed: (...a: unknown[]) => feed(...a),
     create: (...a: unknown[]) => create(...a),
     like: (...a: unknown[]) => like(...a),
@@ -52,6 +54,20 @@ vi.mock("@/services/posts.service", async (importOriginal) => ({
   },
   uploadPostPhoto: (...a: unknown[]) => uploadPostPhoto(...a),
 }));
+
+const giftBalance = vi.fn();
+const giftSend = vi.fn();
+vi.mock("@/services/post-gifts.service", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/services/post-gifts.service")>();
+  return {
+    ...original,
+    postGiftsService: {
+      ...original.postGiftsService,
+      balance: (...args: unknown[]) => giftBalance(...args),
+      send: (...args: unknown[]) => giftSend(...args),
+    },
+  };
+});
 
 const { useFeedPresenter } = await import("./useFeedPresenter");
 const { ApiError } = await import("@/services/apiClient");
@@ -652,6 +668,9 @@ describe("sharing", () => {
     await act(async () => result.current.share("p1"));
 
     expect(share).toHaveBeenCalledWith({ url: `${origin}/p/p1` });
+    expect(recordShare).toHaveBeenCalledWith("p1");
+    expect(result.current.posts[0].shares).toBe("1");
+
     // The sheet is its own confirmation; no toast on top of it.
     expect(result.current.shareNote).toBeNull();
     Reflect.deleteProperty(navigator, "share");
@@ -667,6 +686,8 @@ describe("sharing", () => {
 
     expect(writeText).toHaveBeenCalledWith(`${origin}/p/p1`);
     expect(result.current.shareNote).toBe("Link copied");
+    expect(recordShare).toHaveBeenCalledWith("p1");
+    expect(result.current.posts[0].shares).toBe("1");
 
     act(() => result.current.dismissShareNote());
     expect(result.current.shareNote).toBeNull();
@@ -680,6 +701,7 @@ describe("sharing", () => {
     await act(async () => result.current.share("p1"));
 
     expect(result.current.shareNote).toBeNull();
+    expect(recordShare).not.toHaveBeenCalled();
     Reflect.deleteProperty(navigator, "share");
   });
 });
@@ -693,5 +715,74 @@ describe("one post on its own", () => {
     expect(feed).not.toHaveBeenCalled();
     expect(hook.result.current.posts).toHaveLength(1);
     expect(hook.result.current.hasMore).toBe(false);
+  });
+});
+
+describe("post gifting presenter", () => {
+  it("opens the requested currency and prevents a double-click from sending two gifts", async () => {
+    giftBalance.mockResolvedValue({
+      settings: { enabled: true },
+      balances: [{ currency: "star", available: 5, reserved: 0 }],
+    });
+    let finish!: () => void;
+    giftSend.mockReset().mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const { result } = renderHook(() => useFeedPresenter());
+    await waitFor(() => expect(result.current.posts).toHaveLength(1));
+    await act(async () => {
+      await result.current.openGift("p1", "star");
+    });
+    expect(result.current.giftDialog.currency).toBe("star");
+    expect(result.current.giftDialog.canSend).toBe(true);
+    act(() => {
+      void result.current.giftDialog.onSend();
+      void result.current.giftDialog.onSend();
+    });
+    expect(giftSend).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      finish();
+    });
+    expect(result.current.giftDialog.open).toBe(false);
+    expect(result.current.shareNote).toContain("Sent 1 Star to Sir T");
+  });
+  it("keeps the same request key when retrying a lost response", async () => {
+    giftBalance.mockResolvedValue({
+      settings: { enabled: true },
+      balances: [{ currency: "coin", available: 5, reserved: 0 }],
+    });
+    giftSend
+      .mockReset()
+      .mockRejectedValueOnce(new ApiError(0, "Network problem"))
+      .mockResolvedValueOnce({});
+    const { result } = renderHook(() => useFeedPresenter());
+    await waitFor(() => expect(result.current.posts).toHaveLength(1));
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    await act(async () => {
+      await result.current.giftDialog.onSend();
+    });
+    expect(result.current.giftDialog.open).toBe(true);
+    expect(result.current.giftDialog.locked).toBe(true);
+    act(() => {
+      result.current.giftDialog.onClose();
+    });
+    giftBalance.mockResolvedValueOnce({
+      settings: { enabled: true },
+      balances: [{ currency: "coin", available: 0, reserved: 0 }],
+    });
+    await act(async () => {
+      await result.current.openGift("p1", "star");
+    });
+    expect(result.current.giftDialog.currency).toBe("coin");
+    expect(result.current.giftDialog.canSend).toBe(true);
+    await act(async () => {
+      await result.current.giftDialog.onSend();
+    });
+    expect(giftSend.mock.calls[0]).toEqual(giftSend.mock.calls[1]);
   });
 });

@@ -12,6 +12,8 @@ export interface WalletBankPM {
 }
 export interface WalletSettingsPM {
   currency: "NGN";
+  /** Shared configured NGN/USD conversion from Silver payment settings. */
+  usdConversion?: { kobo: number; usdCents: number } | null;
   enabled: boolean;
   rates: Record<KinkCurrency, { buy: number; redeem: number }> | null;
   minimumKobo: number | null;
@@ -20,13 +22,16 @@ export interface WalletSettingsPM {
   canEdit?: boolean;
 }
 export interface WalletSummaryPM {
+  redemption?: { canRedeem: boolean; reason: string | null };
   settings: WalletSettingsPM;
   balances: Array<{ currency: KinkCurrency; available: number; reserved: number }>;
 }
 export interface WalletOperationPM {
   id: string;
   userId: string;
-  kind: "purchase" | "withdrawal";
+  kind: "purchase" | "withdrawal" | "gift_sent" | "gift_received";
+  counterpartyName?: string;
+  postId?: string;
   currency: KinkCurrency;
   quantity: number;
   amountKobo: number;
@@ -56,19 +61,34 @@ export function walletBankVM(bank: WalletBankPM) {
 export function walletOperationVM(row: WalletOperationPM) {
   return {
     ...row,
-    amount: walletMoney(row.amountKobo),
+    amount:
+      row.kind === "gift_sent" || row.kind === "gift_received"
+        ? `${row.kind === "gift_sent" ? "−" : "+"}${row.quantity.toLocaleString("en-NG")}`
+        : walletMoney(row.amountKobo),
+    title: {
+      purchase: "Coin purchase",
+      withdrawal: "Withdrawal",
+      gift_sent: "Gift sent",
+      gift_received: "Gift received",
+    }[row.kind],
+    counterpartyLabel: row.counterpartyName
+      ? `${row.kind === "gift_sent" ? "To" : "From"} ${row.counterpartyName}`
+      : null,
     quantityLabel: row.quantity.toLocaleString("en-NG"),
     date: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(
       new Date(row.createdAt),
     ),
     maskedAccount: `•••• ${row.accountNumber.slice(-4)}`,
-    statusLabel: {
-      pending: "Awaiting action",
-      submitted: "Awaiting payment verification",
-      verified: "Payment verified",
-      approved: "Approved · awaiting transfer",
-      paid: "Paid",
-      rejected: "Rejected",
-    }[row.status],
+    statusLabel:
+      row.kind === "gift_sent" || row.kind === "gift_received"
+        ? "Completed"
+        : {
+            pending: "Awaiting action",
+            submitted: "Awaiting payment verification",
+            verified: "Payment verified",
+            approved: "Approved · awaiting transfer",
+            paid: "Paid",
+            rejected: "Rejected",
+          }[row.status],
   };
 }

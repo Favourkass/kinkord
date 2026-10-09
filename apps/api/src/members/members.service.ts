@@ -15,7 +15,7 @@ import {
 import { PostsService } from "../posts/posts.service";
 import { ONLINE_WINDOW_SECONDS, PresenceService } from "../presence/presence.service";
 import { StorageService } from "../storage/storage.service";
-import { silverCheck, silverSince } from "../subscriptions/plans";
+import { silverCheck, subscriptionSince } from "../subscriptions/plans";
 import { FollowsService } from "./follows.service";
 
 export type MembersSort = "recent" | "followers" | "name";
@@ -236,7 +236,7 @@ export class MembersService {
         // Covers are full-bleed, so they keep the original.
         p.coverKey ? this.storage.presignDownload(p.coverKey) : Promise.resolve(null),
         friendsOnly ? this.follows.areFriends(viewerId, u.id) : Promise.resolve(true),
-        silverSince(this.db, u.id),
+        subscriptionSince(this.db, u.id),
       ]);
     const counts = { ...followCounts, mutualFriends };
     // Friends-only profile seen by a non-friend: what the directory card already shows

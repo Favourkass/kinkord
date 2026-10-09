@@ -16,7 +16,7 @@ export default function SavedPage() {
   return (
     <PostListScreen
       shell={{
-        brand: "KINKORD",
+        brand: "Kinkord",
         greeting: home.greeting,
         name: home.name,
         avatarUrl: home.avatarUrl,

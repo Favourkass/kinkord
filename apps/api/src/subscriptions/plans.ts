@@ -193,3 +193,18 @@ export async function silverSince(db: Db, userId: string): Promise<Date | null> 
     .limit(1);
   return row?.since ?? null;
 }
+
+/** Membership badge date for an active subscriber; verification remains a separate check. */
+export async function subscriptionSince(db: Db, userId: string): Promise<Date | null> {
+  const [row] = await db
+    .select({ since: memberSubscription.startedAt })
+    .from(memberSubscription)
+    .where(
+      and(
+        eq(memberSubscription.userId, userId),
+        gt(memberSubscription.currentPeriodEnd, sql`now()`),
+      ),
+    )
+    .limit(1);
+  return row?.since ?? null;
+}

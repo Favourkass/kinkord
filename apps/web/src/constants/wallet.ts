@@ -36,7 +36,7 @@ export const WALLET_COPY = {
     {
       key: "history",
       title: "Transaction History",
-      description: "Track purchases, withdrawals and admin decisions.",
+      description: "Track purchases, gifts, withdrawals and admin decisions.",
     },
     {
       key: "convert",
@@ -79,7 +79,7 @@ export const WALLET_COPY = {
   bankNotice:
     "Use an account in your name. Check every detail carefully; bank account ownership is not verified automatically.",
   noHistory: "No transactions yet",
-  historyHint: "Your latest 200 purchases and withdrawals appear here.",
+  historyHint: "Your latest 200 purchases, gifts and withdrawals appear here.",
   resume: "Continue payment",
   review: "Review withdrawal",
   quantity: "Quantity to redeem",
@@ -88,6 +88,9 @@ export const WALLET_COPY = {
   estimate: "You will receive",
   fee: "Withdrawal fee: ₦0.00",
   confirm: "Submit withdrawal request",
+  redemptionRequired:
+    "An active Silver subscription and Silver verification badge are required to redeem.",
+  manageSubscription: "View Silver subscription",
   withdrawNotice:
     "Submitting reserves your coins. An admin must approve the request and transfer funds manually. A rejected request releases the coins back to your available balance.",
   submitted: "Withdrawal Submitted",
@@ -97,6 +100,8 @@ export const WALLET_COPY = {
   home: "Back to home",
   history: "View transaction history",
   cancel: "Back",
+  buyHint:
+    "Prices are shown in USD. The payment page shows the naira equivalent to transfer. Coins are credited after payment verification.",
   transfer:
     "Transfer the exact amount to this account, then upload proof. Your wallet is credited only after an admin verifies the payment.",
   amount: "Amount to transfer",

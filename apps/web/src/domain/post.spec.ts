@@ -74,6 +74,8 @@ describe("toPostVM", () => {
     const vm = toPostVM(post(), false, href, NOW);
     expect(vm.likes).toBe("12.5K");
     expect(vm.comments).toBe("300");
+    expect(vm.gifts).toBe("0");
+    expect(toPostVM(post({ gifts: 1250 }), false, href, NOW).gifts).toBe("1.3K");
     expect(vm.time).toBe("1h");
     expect(vm.handle).toBe("@tegamaxwell");
     expect(vm.authorHref).toBe("/u/tegamaxwell");

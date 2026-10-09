@@ -1,3 +1,4 @@
+import { giftHistoryDto } from "./wallet-gifts.service";
 import { randomUUID } from "node:crypto";
 import {
   BadRequestException,
@@ -8,7 +9,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
-import { and, asc, desc, eq, gte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { DRIZZLE, type Db } from "../db/db.module";
 import {
@@ -16,11 +17,13 @@ import {
   walletBalance,
   walletBank,
   walletLedger,
+  walletGift,
   walletOperation,
   walletSettings,
 } from "../db/schema";
 import { StorageService } from "../storage/storage.service";
 import { readSettings } from "../subscriptions/subscriptions.service";
+import { silverCheckStatus } from "../subscriptions/plans";
 import { nextWalletStatus, PACKS, walletAmount, walletPaymentReference } from "./rules";
 import {
   walletBankSchema,
@@ -51,11 +54,21 @@ export class WalletService {
     @Inject(DRIZZLE) private readonly db: Db,
     private readonly storage: StorageService,
   ) {}
+  async redemptionEligibility(userId: string, db: Db = this.db) {
+    const badge = await silverCheckStatus(db, userId);
+    return {
+      canRedeem: !!badge?.shown,
+      reason: badge?.shown
+        ? null
+        : "An active Silver subscription and Silver verification badge are required to redeem.",
+    };
+  }
   async settings() {
     const [row] = await this.db.select().from(walletSettings).where(eq(walletSettings.id, 1));
     const payment = await readSettings(this.db);
     return {
       currency: "NGN" as const,
+      usdConversion: payment.bank ? payment.prices.monthly : null,
       enabled: !!row?.enabled && !!payment.bank,
       rates: row?.rates ?? null,
       minimumKobo: row?.minimumKobo ?? null,
@@ -154,14 +167,26 @@ export class WalletService {
     return this.banks(userId);
   }
   async history(userId: string) {
-    return (
-      await this.db
+    const [operations, gifts] = await Promise.all([
+      this.db
         .select()
         .from(walletOperation)
         .where(eq(walletOperation.userId, userId))
         .orderBy(desc(walletOperation.createdAt))
-        .limit(200)
-    ).map(walletOperationDto);
+        .limit(200),
+      this.db
+        .select()
+        .from(walletGift)
+        .where(or(eq(walletGift.senderId, userId), eq(walletGift.recipientId, userId)))
+        .orderBy(desc(walletGift.createdAt))
+        .limit(200),
+    ]);
+    return [
+      ...operations.map(walletOperationDto),
+      ...gifts.map((row) => giftHistoryDto(row, userId)),
+    ]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, 200);
   }
   async operation(userId: string, id: string) {
     const [row] = await this.db
@@ -205,6 +230,10 @@ export class WalletService {
             throw new ConflictException("Request key already used with different bank details.");
         }
         return existing;
+      }
+      if (kind === "withdrawal") {
+        const eligibility = await this.redemptionEligibility(userId, tx as unknown as Db);
+        if (!eligibility.canRedeem) throw new ForbiddenException(eligibility.reason!);
       }
       const [config] = await tx.select().from(walletSettings).where(eq(walletSettings.id, 1));
       if (!config?.enabled)

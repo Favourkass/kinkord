@@ -143,7 +143,7 @@ export default function WalletView({ vm }: Props) {
       )}
       {vm.mode === "buy" && (
         <>
-          <p className="text-xs leading-relaxed text-app-subtle">{copy.transfer}</p>
+          <p className="text-xs leading-relaxed text-app-subtle">{copy.buyHint}</p>
           {vm.currencies.map((currency) => (
             <section key={currency.kind} className={`${card} border-kink-gold-bright/35`}>
               <div className="mb-4 flex items-center gap-3">
@@ -191,9 +191,7 @@ export default function WalletView({ vm }: Props) {
           {vm.history.map((row) => (
             <article key={row.id} className={card}>
               <div className="flex items-start justify-between gap-3">
-                <h2 className="text-sm font-bold">
-                  {row.kind === "purchase" ? copy.incoming : copy.outgoing}
-                </h2>
+                <h2 className="text-sm font-bold">{row.title}</h2>
                 <span className="text-sm font-bold text-app-members-count">{row.amount}</span>
               </div>
               <p className="mt-2 text-xs">
@@ -203,7 +201,7 @@ export default function WalletView({ vm }: Props) {
                 {row.reference} · {row.date}
               </p>
               <p className="mt-1 text-[10px] text-app-subtle">
-                {row.bankName} {row.maskedAccount}
+                {row.counterpartyLabel ?? `${row.bankName} ${row.maskedAccount}`}
               </p>
               {row.reviewNote && <p className="mt-2 text-xs text-red-500">{row.reviewNote}</p>}
               {row.settlementReference && (
@@ -233,6 +231,17 @@ export default function WalletView({ vm }: Props) {
             </p>
           </section>
           <p className="text-xs leading-relaxed text-app-subtle">{copy.withdrawNotice}</p>
+          {!vm.loading && !vm.canRedeem && (
+            <section className={card}>
+              <p className="text-sm text-app-subtle">{vm.redemptionReason}</p>
+              <Link
+                href={vm.subscriptionHref}
+                className="mt-3 inline-block text-sm font-semibold text-app-members-count"
+              >
+                {copy.manageSubscription}
+              </Link>
+            </section>
+          )}
           {!vm.review ? (
             vm.currencies.map((currency) => (
               <section key={currency.kind} className={`${card} flex items-center gap-3`}>
@@ -247,7 +256,13 @@ export default function WalletView({ vm }: Props) {
                   </p>
                 </div>
                 <button
-                  disabled={vm.busy || !vm.enabled || !currency.available || !vm.banks.length}
+                  disabled={
+                    vm.busy ||
+                    !vm.enabled ||
+                    !vm.canRedeem ||
+                    !currency.available ||
+                    !vm.banks.length
+                  }
                   type="button"
                   onClick={() => vm.onRedeem(currency.kind)}
                   className={button}

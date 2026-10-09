@@ -89,6 +89,7 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     quantity,
     data?.summary.balances.find((b) => b.currency === currency)?.available ?? 0,
     bankId,
+    vm.canRedeem,
   );
   return {
     ...vm,

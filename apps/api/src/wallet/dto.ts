@@ -22,6 +22,7 @@ export const walletRequestSchema = z.object({
   quantity: z.number().int().min(1).max(1_000_000),
   requestKey: z.string().uuid(),
 });
+export const walletGiftSchema = walletRequestSchema.extend({ postId: z.string().uuid() });
 export const withdrawalSchema = walletRequestSchema.extend({ bankId: z.string().uuid() });
 export const walletProofSchema = z.object({
   receiptKey: z.string().min(1).max(500),

@@ -37,6 +37,8 @@ function fixture(results: unknown[][], updates: unknown[][] = []) {
     };
     for (const name of [
       "from",
+      "innerJoin",
+      "leftJoin",
       "where",
       "orderBy",
       "limit",
@@ -62,11 +64,9 @@ function fixture(results: unknown[][], updates: unknown[][] = []) {
     presignUpload: vi.fn(async () => "https://example.test/upload"),
     presignDownload: vi.fn(async () => "https://example.test/receipt"),
   };
-  return {
-    db,
-    storage,
-    service: new WalletService(db as unknown as Db, storage as unknown as StorageService),
-  };
+  const service = new WalletService(db as unknown as Db, storage as unknown as StorageService);
+  vi.spyOn(service, "redemptionEligibility").mockResolvedValue({ canRedeem: true, reason: null });
+  return { db, storage, service };
 }
 describe("WalletService", () => {
   it("does not reveal a transaction that was not returned by the ownership-scoped query", async () => {
@@ -163,4 +163,43 @@ it("enforces the two-account limit on the server before inserting", async () => 
     service.addBank("user", { bankName: "Kuda", accountName: "Test", accountNumber: "1234567890" }),
   ).rejects.toThrow(/up to 2/);
   expect(db.insert).not.toHaveBeenCalled();
+});
+
+describe("withdrawal membership eligibility", () => {
+  it("refuses an ineligible withdrawal before reserving funds", async () => {
+    const { service, db } = fixture([[]]);
+    vi.mocked(service.redemptionEligibility).mockResolvedValue({
+      canRedeem: false,
+      reason: "Silver subscription and verification required",
+    });
+    await expect(
+      service.create("user", "withdrawal", {
+        currency: "coin",
+        quantity: 100,
+        requestKey: "key",
+        bankId: "bank",
+      }),
+    ).rejects.toThrow(/Silver/);
+    expect(db.update).not.toHaveBeenCalled();
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+  it("uses the existing Silver badge rule and denies missing, held or young accounts", async () => {
+    const eligible = {
+      heldAt: null,
+      heldFor: null,
+      createdAt: new Date("2020-01-01"),
+      avatarKey: "avatar",
+      coverKey: "cover",
+    };
+    for (const [rows, expected] of [
+      [[], false],
+      [[eligible], true],
+      [[{ ...eligible, heldAt: new Date() }], false],
+      [[{ ...eligible, createdAt: new Date() }], false],
+    ] as const) {
+      const { service } = fixture([[...rows]]);
+      vi.mocked(service.redemptionEligibility).mockRestore();
+      expect((await service.redemptionEligibility("user")).canRedeem).toBe(expected);
+    }
+  });
 });

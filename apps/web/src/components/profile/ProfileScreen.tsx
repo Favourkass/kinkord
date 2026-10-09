@@ -1,4 +1,5 @@
 import type { AppNavLabels, AppNavLinks, AppTab } from "@/components/app/nav";
+import GiftDialog, { type GiftDialogProps } from "@/components/feed/GiftDialog";
 import CommentsPanel, { type CommentsPanelProps } from "@/components/feed/CommentsPanel";
 import ConfirmDialog, { type ConfirmDialogProps } from "@/components/feed/ConfirmDialog";
 import MediaLightbox, { type MediaLightboxProps } from "@/components/feed/MediaLightbox";
@@ -43,6 +44,7 @@ export interface ProfileScreenProps {
   /** Comment sheet, delete confirm and photo lightbox for the Posts tab. */
   postOverlays: {
     comments: CommentsPanelProps;
+    gift: GiftDialogProps;
     confirm: ConfirmDialogProps;
     lightbox: MediaLightboxProps;
     toast: ToastProps;
@@ -116,6 +118,7 @@ export default function ProfileScreen(p: ProfileScreenProps) {
         )}
       </ProfileShell>
       <CommentsPanel {...p.postOverlays.comments} />
+      <GiftDialog {...p.postOverlays.gift} />
       <ConfirmDialog {...p.postOverlays.confirm} />
       <MediaLightbox {...p.postOverlays.lightbox} />
       <Toast {...p.postOverlays.toast} />

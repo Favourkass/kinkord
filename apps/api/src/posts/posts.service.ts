@@ -14,6 +14,7 @@ import { notBanned } from "../moderation/admins";
 import { PushService } from "../push/push.service";
 import {
   follow,
+  memberSubscription,
   post,
   postComment,
   postLike,
@@ -21,6 +22,7 @@ import {
   postSave,
   profile,
   user,
+  walletGift,
   POST_BODY_MAX,
   POST_MEDIA_MAX,
   type PostMediaKind,
@@ -109,6 +111,7 @@ export interface PostAuthorVM {
   avatarUrl: string | null;
   /** Shows the Silver check beside their name. */
   silver: boolean;
+  subscribed: boolean;
 }
 
 export interface PostVM {
@@ -126,6 +129,8 @@ export interface PostVM {
   author: PostAuthorVM;
   media: PostMediaVM[];
   likes: number;
+  shares: number;
+  gifts: number;
   comments: number;
   reposts: number;
   likedByMe: boolean;
@@ -480,6 +485,19 @@ export class PostsService {
   }
 
   /** Usernames are stored lowercase by the username plugin; accept "@Handle" too. */
+  /** Counts a completed native share or link copy, against the original visible post. */
+  async share(postId: string, viewerId: string) {
+    const visible = await this.byId(postId, viewerId);
+    if (!visible) throw new NotFoundException("Post not found");
+    const [updated] = await this.db
+      .update(post)
+      .set({ shares: sql`${post.shares} + 1` })
+      .where(and(eq(post.id, visible.postId), isNull(post.deletedAt)))
+      .returning({ shares: post.shares });
+    if (!updated) throw new NotFoundException("Post not found");
+    return { postId: visible.postId, shares: updated.shares };
+  }
+
   private async resolveAuthor(username: string): Promise<string> {
     const handle = username.replace(/^@/, "").toLowerCase();
     const [row] = await this.db
@@ -502,6 +520,7 @@ export class PostsService {
       .select({
         id: post.id,
         body: post.body,
+        shares: post.shares,
         visibility: post.visibility,
         createdAt: post.createdAt,
         authorId: post.authorId,
@@ -510,6 +529,7 @@ export class PostsService {
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
         silver: silverCheck(post.authorId),
+        subscribed: sql<boolean>`exists (select 1 from ${memberSubscription} where ${memberSubscription.userId} = ${post.authorId} and ${memberSubscription.currentPeriodEnd} > now())`,
       })
       .from(post)
       .innerJoin(user, eq(user.id, post.authorId))
@@ -540,6 +560,7 @@ export class PostsService {
       .select({
         id: post.id,
         body: post.body,
+        shares: post.shares,
         visibility: post.visibility,
         createdAt: post.createdAt,
         authorId: post.authorId,
@@ -548,6 +569,7 @@ export class PostsService {
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
         silver: silverCheck(post.authorId),
+        subscribed: sql<boolean>`exists (select 1 from ${memberSubscription} where ${memberSubscription.userId} = ${post.authorId} and ${memberSubscription.currentPeriodEnd} > now())`,
       })
       .from(post)
       .innerJoin(user, eq(user.id, post.authorId))
@@ -580,7 +602,7 @@ export class PostsService {
     if (!pairs.length) return [];
 
     const ids = [...new Set(pairs.map((p) => p.content.id))];
-    const [media, likes, comments, reposts, liked, reposted, saved] = await Promise.all([
+    const [media, likes, comments, reposts, liked, reposted, saved, gifts] = await Promise.all([
       this.db
         .select()
         .from(postMedia)
@@ -615,8 +637,14 @@ export class PostsService {
         .select({ postId: postSave.postId })
         .from(postSave)
         .where(and(inArray(postSave.postId, ids), eq(postSave.userId, viewerId))),
+      this.db
+        .select({ postId: walletGift.postId, n: count() })
+        .from(walletGift)
+        .where(inArray(walletGift.postId, ids))
+        .groupBy(walletGift.postId),
     ]);
 
+    const giftCount = new Map(gifts.map((r) => [r.postId, Number(r.n)]));
     const likeCount = new Map(likes.map((r) => [r.postId, Number(r.n)]));
     const commentCount = new Map(comments.map((r) => [r.postId, Number(r.n)]));
     const repostCount = new Map(reposts.map((r) => [r.postId, Number(r.n)]));
@@ -655,9 +683,12 @@ export class PostsService {
           displayName: content.displayName ?? content.username ?? "Member",
           avatarUrl: await avatar(content.avatarKey),
           silver: Boolean(content.silver),
+          subscribed: Boolean(content.subscribed),
         },
         media: mediaByPost.get(content.id) ?? [],
         likes: likeCount.get(content.id) ?? 0,
+        shares: content.shares ?? 0,
+        gifts: giftCount.get(content.id) ?? 0,
         comments: commentCount.get(content.id) ?? 0,
         reposts: repostCount.get(content.id) ?? 0,
         likedByMe: likedByMe.has(content.id),

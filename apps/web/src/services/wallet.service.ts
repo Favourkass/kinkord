@@ -19,6 +19,20 @@ export interface WalletDataPM {
   banks: WalletBankPM[];
   history: WalletOperationPM[];
 }
+/** Dollar catalogue display only; checkout and settlement use the stored NGN amount. */
+export function walletPurchaseUsd(kobo: number, settings: WalletSettingsPM | null, unit = false) {
+  const conversion = settings?.usdConversion;
+  if (!conversion || conversion.kobo <= 0 || conversion.usdCents <= 0 || !Number.isFinite(kobo))
+    return "—";
+  const dollars = (kobo * conversion.usdCents) / conversion.kobo / 100;
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: unit ? 4 : 2,
+  }).format(dollars);
+}
+
 export const walletService = {
   load: async (): Promise<WalletDataPM> => {
     const [summary, banks, history] = await Promise.all([
@@ -67,6 +81,9 @@ export const walletService = {
     walletHref: Routes.kinkcoins,
     homeHref: Routes.appHome,
     historyHref: Routes.kinkcoinsHistory,
+    subscriptionHref: Routes.subscription,
+    canRedeem: data?.summary.redemption?.canRedeem ?? false,
+    redemptionReason: data?.summary.redemption?.reason ?? WALLET_COPY.redemptionRequired,
     banksHref: Routes.kinkcoinsBanks,
     actions: WALLET_COPY.actions.map((a) => ({
       ...a,
@@ -102,12 +119,15 @@ export const walletService = {
       reserved: data?.summary.balances.find((b) => b.currency === kind)?.reserved ?? 0,
       redeemRate: data?.summary.settings.rates?.[kind].redeem ?? 0,
       buyRate: data?.summary.settings.rates?.[kind].buy
-        ? walletMoney(data.summary.settings.rates[kind].buy)
+        ? walletPurchaseUsd(data.summary.settings.rates[kind].buy, data.summary.settings, true)
         : "—",
       packs: (data?.summary.settings.packs[kind] ?? []).map((quantity) => ({
         quantity,
         price: data?.summary.settings.rates
-          ? walletMoney(quantity * data.summary.settings.rates[kind].buy)
+          ? walletPurchaseUsd(
+              quantity * data.summary.settings.rates[kind].buy,
+              data.summary.settings,
+            )
           : "—",
       })),
     })),
@@ -122,6 +142,7 @@ export const walletService = {
     quantity: string,
     available: number,
     bankId: string,
+    canRedeem: boolean,
   ) => {
     const count = Number(quantity),
       rate = settings?.rates?.[currency].redeem ?? 0,
@@ -129,6 +150,7 @@ export const walletService = {
     return {
       amount: walletMoney(Number.isSafeInteger(amount) && amount >= 0 ? amount : 0),
       valid:
+        canRedeem &&
         !!settings?.enabled &&
         !!bankId &&
         /^[1-9]\d*$/.test(quantity) &&

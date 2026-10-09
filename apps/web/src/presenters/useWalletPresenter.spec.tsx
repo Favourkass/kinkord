@@ -11,6 +11,7 @@ vi.mock("@/services/apiClient", () => ({
 }));
 const data: WalletDataPM = {
   summary: {
+    redemption: { canRedeem: true, reason: null },
     settings: {
       currency: "NGN",
       enabled: true,
@@ -87,4 +88,21 @@ it("selects a bank from search and refuses a name outside the directory", async 
   await act(() => result.current.onSaveBank());
   expect(add).toHaveBeenCalled();
   expect(result.current.error).toContain("Choose a bank");
+});
+
+it("blocks redemption when the Silver badge is missing", async () => {
+  vi.spyOn(walletService, "load").mockResolvedValue({
+    ...data,
+    summary: {
+      ...data.summary,
+      redemption: { canRedeem: false, reason: "Silver badge required" },
+    },
+  });
+  const withdraw = vi.spyOn(walletService, "withdraw");
+  const { result } = renderHook(() => useWalletPresenter("withdraw"));
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  act(() => result.current.onRedeem("coin"));
+  expect(result.current.quote.valid).toBe(false);
+  await act(() => result.current.onWithdraw());
+  expect(withdraw).not.toHaveBeenCalled();
 });

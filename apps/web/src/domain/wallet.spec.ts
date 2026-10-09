@@ -30,3 +30,22 @@ describe("wallet display models", () => {
     expect(walletOperationVM({ ...row, status: "paid" }).statusLabel).toBe("Paid");
   });
 });
+
+it("shows gift history without implying a bank payment", () => {
+  const row = {
+    kind: "gift_received",
+    quantity: 3,
+    currency: "star",
+    amountKobo: 0,
+    status: "paid",
+    counterpartyName: "Alice",
+    accountNumber: "",
+    createdAt: "2026-10-08T12:00:00Z",
+  } as WalletOperationPM;
+  expect(walletOperationVM(row)).toMatchObject({
+    title: "Gift received",
+    amount: "+3",
+    statusLabel: "Completed",
+    counterpartyLabel: "From Alice",
+  });
+});

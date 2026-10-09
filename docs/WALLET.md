@@ -1,6 +1,6 @@
 # KinkCoins: bank-transfer purchases and withdrawals
 
-The wallet uses NGN. All prices are integer kobo, balances are whole coins/stars/crowns. Rates and the withdrawal minimum have no default in production: transactions stay disabled until a founder configures them.
+The Buy catalogue displays USD using the configured monthly Silver payment NGN/USD conversion. The payment page and bank transfers use NGN. All prices are integer kobo, balances are whole coins/stars/crowns. Rates and the withdrawal minimum have no default in production: transactions stay disabled until a founder configures them.
 
 ## Configuration
 
@@ -20,6 +20,16 @@ The purchase saves its NGN price and bank details at creation, so later settings
 
 An admin finds the submitted purchase in **Moderation → Wallet → Coin purchases**, checks the actual bank statement against the member's receipt, amount and reference, then selects **Verify payment** and enters the actual bank transfer reference. Only this decision credits the wallet. Rejection requires a reason and does not credit coins. A receipt alone does not prove money arrived; there is no automatic bank reconciliation.
 
+## Post gifts
+
+Timeline, profile, saved and shared-post cards show icons and counts in separate rounded buttons. **Gift** appears for subscribed authors and opens the Coin, Star and Crown picker. Members review the recipient, available balance and whole quantity before sending. The original post's author receives the gift, including when the card is a repost. There is no conversion, fee or admin approval for gifts: 5 Stars deducts 5 Stars from the sender and credits 5 Stars to the author.
+
+The authenticated API derives the recipient from a visible original post. Self gifts, inaccessible/deleted posts, invalid amounts, insufficient available funds and disabled wallet transactions are rejected. Funds reserved for withdrawals cannot be gifted. Gifts and withdrawals acquire the same member locks; two-member locks are acquired in stable order. Debit, credit and the immutable `wallet_gift` transfer journal commit together or roll back together. The journal records both participants, currency, quantity, original post, names at transfer time and timestamp, and is retained if the post disappears. Reconcile available balance using the purchase/withdrawal ledger plus incoming minus outgoing gift journal quantities.
+
+A sender-scoped request key prevents retries and double-clicks from charging twice. Reusing a key with different contents is rejected. A delivered transfer can still be retrieved by the same retry after its post is hidden or deleted. Gifts are final; there is no user reversal flow. Both members see the transfer in Transaction History, with sent/received direction and counterparty. Wallet pages refresh on focus and every 15 seconds. The author can withdraw received units through the existing manual withdrawal approval flow, subject to configured NGN rates and minimums.
+
+Apply migration `0020_post_gifts` before enabling the updated API. Local integration checks exercise all three currencies, retries, concurrent overspending, reserved-fund preservation and journal reconciliation against isolated test wallets. Production gifting uses existing verified wallet funds; there is no test-fund credit endpoint.
+
 ## Bank accounts
 
 **Wallet → Bank Accounts** saves up to two accounts per member in PostgreSQL. Accounts have bank name, holder name and a ten-digit Nigerian account number. The first becomes default; the member can choose another default or remove an account. Removing the default promotes another account. Members cannot access or change another member's bank accounts.
@@ -27,6 +37,8 @@ An admin finds the submitted purchase in **Moderation → Wallet → Coin purcha
 Numbers are masked in the saved-account list and transaction history. A withdrawal stores a snapshot of the selected account, so later deletion/default changes cannot redirect an existing request. Account ownership is not automatically verified; staff must check destination details before transferring.
 
 ## Withdrawal
+
+Buying and sending gifts are available to Basic and Silver members under the normal sign-up/access rules. Only members with an active Silver subscription can receive new gifts. Redemption requires an active Silver subscription **and the existing Silver verification badge**. The API checks `silverCheckStatus` when creating a withdrawal, including the account age, photos and any review hold; the UI shows the requirement and links to Silver when ineligible. Expired subscriptions and held/not-yet-issued badges cannot create withdrawals. Existing withdrawal requests remain reviewable and payable. Purchasing and gifting do not use this eligibility gate.
 
 **Wallet → Withdraw / Redeem → choose currency → review quantity, NGN amount and saved bank → submit.**
 
@@ -54,3 +66,7 @@ Test with separate member and admin accounts: buy a bundle, upload a dummy image
 Unit tests cover validators, amounts, status transitions, ownership, retry behavior and presentation. The manual local integration check also covers receipt upload to MinIO and simultaneous PostgreSQL withdrawals. Existing Silver subscription tests remain passing.
 
 The bank picker uses the pinned Nigerian Bank Logos directory (660 institutions, including OPay and Kuda). The source and MIT license are in `apps/web/public/banks`. It is a maintained directory snapshot, not live account-name resolution or proof that every listed institution currently accepts transfers. Refresh the snapshot when bank coverage changes.
+
+Timeline actions display like, comment, share and gift counts. Gift counts reflect completed transfer records on the original post, not the quantity of currency sent; retried deliveries count once. Share counts record completed native shares or successful link copies, starting from deployment; they do not claim delivery or count cancelled share sheets. Counts persist on the original post, including when displayed through a repost.
+
+Gift actions appear only on subscribed authors’ posts; receiving is also checked by the API before funds move. Expiry does not prevent replaying an already delivered gift. Post names show the Silver membership badge for active subscribers; redemption still uses the existing verification badge eligibility checks.

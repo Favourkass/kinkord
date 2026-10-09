@@ -64,7 +64,7 @@ export interface ShellSource {
 
 export function appShellProps(home: ShellSource, nav: ReturnType<typeof getAppShellNav>) {
   return {
-    brand: "KINKORD",
+    brand: "Kinkord",
     tagline: "THE WORLD'S KINK COMMUNITY",
     greeting: home.greeting,
     name: home.name,

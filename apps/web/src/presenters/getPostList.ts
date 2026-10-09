@@ -26,6 +26,8 @@ export function getPostList(feed: Feed, viewerAvatarUrl: string | null) {
     onComment: feed.openComments,
     onSave: feed.toggleSave,
     onShare: feed.share,
+    onGift: feed.openGift,
+    giftDialog: feed.giftDialog,
     onOpenMedia: feed.openMedia,
     hasMore: feed.hasMore,
     loadingMore: feed.loadingMore,
