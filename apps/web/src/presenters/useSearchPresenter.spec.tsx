@@ -128,6 +128,66 @@ describe("useSearchPresenter", () => {
     expect(router.replace).toHaveBeenLastCalledWith("/search", { scroll: false });
   });
 
+  it("follows the address when it changes under the page: the Search link, Back, Forward", async () => {
+    const { result, rerender } = renderHook(
+      ({ q }: { q: string | null }) => useSearchPresenter(q),
+      {
+        initialProps: { q: "ada" as string | null },
+      },
+    );
+    await waitFor(() => expect(result.current.people.rows).toHaveLength(5));
+    // The header's Search link: /search with nothing in it.
+    rerender({ q: null });
+    expect(result.current.query).toBe("");
+    expect(result.current.term).toBe("");
+    expect(result.current.hint).not.toBeNull();
+    // Back to an earlier search.
+    rerender({ q: "zed" });
+    expect(result.current.query).toBe("zed");
+    await waitFor(() => expect(result.current.people.empty).toBe("No people match “zed”."));
+  });
+
+  it("never undoes typing when its own address change comes back", async () => {
+    const { result, rerender } = renderHook(
+      ({ q }: { q: string | null }) => useSearchPresenter(q),
+      {
+        initialProps: { q: null as string | null },
+      },
+    );
+    act(() => result.current.setQuery("ada"));
+    await waitFor(() => expect(result.current.term).toBe("ada"));
+    act(() => result.current.setQuery("ada ok"));
+    // The page re-renders with ?q=ada (from our replace) while "ada ok" is still being typed.
+    rerender({ q: "ada" });
+    expect(result.current.query).toBe("ada ok");
+  });
+
+  it("undoes a refused follow to exactly how it was, even after the rows refreshed", async () => {
+    let refuse: (e: Error) => void = () => undefined;
+    follow.mockImplementationOnce(
+      () =>
+        new Promise((_, reject) => {
+          refuse = reject;
+        }),
+    );
+    const { result, rerender } = renderHook(
+      ({ q }: { q: string | null }) => useSearchPresenter(q),
+      {
+        initialProps: { q: "ada" as string | null },
+      },
+    );
+    await waitFor(() => expect(result.current.people.rows).toHaveLength(5));
+    act(() => result.current.people.onToggleFollow("u1"));
+    expect(result.current.people.rows[0].isFollowing).toBe(true);
+    // Another search, then back: fresh rows from the API while the follow is still out.
+    rerender({ q: "zed" });
+    rerender({ q: "ada" });
+    await waitFor(() => expect(result.current.people.rows).toHaveLength(5));
+    await act(async () => refuse(new Error("offline")));
+    await waitFor(() => expect(result.current.people.rows[0].busy).toBe(false));
+    expect(result.current.people.rows[0].isFollowing).toBe(false);
+  });
+
   it("never searches more than the API takes", async () => {
     const { result } = renderHook(() => useSearchPresenter(null));
     act(() => result.current.setQuery("a".repeat(80)));

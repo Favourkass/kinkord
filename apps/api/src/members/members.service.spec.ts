@@ -299,6 +299,9 @@ describe("MembersService", () => {
       /case\s+when "user"\."username" = \$1 or lower\("profile"\."display_name"\) = \$2 then 0/,
     );
     expect(rank.params.slice(0, 4)).toEqual(["ada", "ada", "Ada%", "Ada%"]);
+    // The id settles ties, so "Show more people" never repeats or skips anyone.
+    expect(orders[0]).toHaveLength(4);
+    expect(renderWhere(orders[0][3] as SQL).sql).toBe('"profile"."user_id" asc');
   });
 
   it("404s an unknown public profile", async () => {

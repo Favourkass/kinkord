@@ -196,10 +196,11 @@ export class MembersService {
           ? asc(profile.displayName)
           : desc(profile.createdAt);
     // A search's best matches lead; then, as everywhere, who's online and who's followed.
+    // The id settles ties, so the pages of an offset list never repeat or skip anyone.
     const order =
       params.sort === "match" && params.q
-        ? [asc(matchRank(params.q)), desc(isOnline), desc(followers)]
-        : [desc(isOnline), secondary];
+        ? [asc(matchRank(params.q)), desc(isOnline), desc(followers), asc(profile.userId)]
+        : [desc(isOnline), secondary, asc(profile.userId)];
 
     const rows = await this.db
       .select({

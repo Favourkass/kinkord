@@ -49,6 +49,20 @@ export function useSearchPresenter(initialQuery: string | null) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
 
+  // The address can change under the page without remounting it: the header's
+  // Search link back to an empty search, or Back and Forward between searches.
+  // The box follows it then. Our own replace below lands on the same term, so
+  // typing is never undone.
+  const fromAddress = clean(initialQuery ?? "");
+  const [addressSeen, setAddressSeen] = useState(fromAddress);
+  if (fromAddress !== addressSeen) {
+    setAddressSeen(fromAddress);
+    if (fromAddress !== term) {
+      setQuery(fromAddress);
+      setTerm(fromAddress);
+    }
+  }
+
   useEffect(() => {
     const next = clean(query);
     const t = setTimeout(() => setTerm(next), next ? SEARCH_DELAY_MS : 0);
@@ -117,17 +131,21 @@ export function useSearchPresenter(initialQuery: string | null) {
     (userId: string) => {
       const pm = current?.items.find((p) => p.userId === userId);
       if (!pm?.username || busy.has(userId)) return;
-      const flip = (prev: PeoplePage | null) =>
-        prev
-          ? {
-              ...prev,
-              items: prev.items.map((p) => (p.userId === userId ? toggleFollowOnCard(p) : p)),
-            }
-          : prev;
+      const apply = (to: (p: MemberCardPM) => MemberCardPM) => (prev: PeoplePage | null) =>
+        prev ? { ...prev, items: prev.items.map((p) => (p.userId === userId ? to(p) : p)) } : prev;
       setBusy((prev) => new Set(prev).add(userId));
-      setPeople(flip);
+      setPeople(apply(toggleFollowOnCard));
       void (pm.isFollowing ? membersApi.unfollow(pm.username) : membersApi.follow(pm.username))
-        .catch(() => setPeople(flip))
+        // Back to exactly how it was, even if a newer search has refreshed the row since.
+        .catch(() =>
+          setPeople(
+            apply((p) => ({
+              ...p,
+              isFollowing: pm.isFollowing,
+              followersCount: pm.followersCount,
+            })),
+          ),
+        )
         .finally(() =>
           setBusy((prev) => {
             const next = new Set(prev);
