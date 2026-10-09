@@ -344,7 +344,7 @@ describe("MembersService", () => {
       ]),
     );
     const vm = await service.publicProfile("@Nene", "me");
-    expect(vm.coinBalance).toBe(0);
+    expect(vm).not.toHaveProperty("coinBalance");
     expect(vm.isOnline).toBe(false);
     expect(vm.lastSeenAt).toBeNull();
     expect(vm.username).toBe("nene");
@@ -360,6 +360,24 @@ describe("MembersService", () => {
     expect(isFollowing).toHaveBeenCalledWith("me", "u2");
     expect(vm.silver).toBeNull();
   });
+
+  it.each(["public", "friends"])(
+    "never returns another member's %s profile balance",
+    async (visibility) => {
+      const { service, select } = makeService();
+      select.mockReturnValueOnce(
+        chain([
+          {
+            coins: 98765,
+            u: { id: "u2", username: "nene", createdAt: new Date("2024-01-01T00:00:00Z") },
+            p: { profileVisibility: visibility, dateOfBirth: null },
+          },
+        ]),
+      );
+      const vm = await service.publicProfile("nene", "me");
+      expect(vm).not.toHaveProperty("coinBalance");
+    },
+  );
 
   it("shows the Silver check on a profile, with the date their Silver began", async () => {
     const { service, select } = makeService();
@@ -382,6 +400,7 @@ describe("MembersService", () => {
     select.mockReturnValueOnce(
       chain([
         {
+          coins: 2450,
           u: { id: "me", username: "me", createdAt: new Date("2024-01-01T00:00:00Z") },
           p: {
             displayName: "Me",
@@ -406,6 +425,7 @@ describe("MembersService", () => {
       ]),
     );
     const vm = await service.publicProfile("me", "me");
+    expect(vm.coinBalance).toBe(2450);
     expect(vm.isOnline).toBe(true);
     expect(vm.isSelf).toBe(true);
     expect(vm.isFollowing).toBe(false);

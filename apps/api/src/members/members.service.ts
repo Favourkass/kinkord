@@ -30,7 +30,7 @@ import { blockedBy, notBlocking } from "../safety/blocks";
 import { containsPattern } from "../push/notifications.service";
 import { ONLINE_WINDOW_SECONDS, PresenceService } from "../presence/presence.service";
 import { StorageService } from "../storage/storage.service";
-import { silverCheck, subscriptionSince } from "../subscriptions/plans";
+import { silverCheck, silverSince } from "../subscriptions/plans";
 import { FollowsService } from "./follows.service";
 
 /** "match" ranks a search: exact name or username, then starts-with, then anywhere. */
@@ -277,7 +277,7 @@ export class MembersService {
       .select({
         u: user,
         p: profile,
-        coins: sql<number>`coalesce((select ${walletBalance.available} from ${walletBalance} where ${walletBalance.userId}=${user.id} and ${walletBalance.currency}='coin'),0)`,
+        coins: sql<number>`coalesce((select ${walletBalance.available} from ${walletBalance} where ${walletBalance.userId}=${user.id} and ${user.id}=${viewerId} and ${walletBalance.currency}='coin'),0)`,
       })
       .from(user)
       .innerJoin(profile, eq(profile.userId, user.id))
@@ -297,7 +297,7 @@ export class MembersService {
         // Covers are full-bleed, so they keep the original.
         p.coverKey ? this.storage.presignDownload(p.coverKey) : Promise.resolve(null),
         friendsOnly ? this.follows.areFriends(viewerId, u.id) : Promise.resolve(true),
-        subscriptionSince(this.db, u.id),
+        silverSince(this.db, u.id),
       ]);
     const counts = { ...followCounts, mutualFriends };
     // Friends-only profile seen by a non-friend: what the directory card already shows
@@ -307,7 +307,7 @@ export class MembersService {
 
     return {
       userId: u.id,
-      coinBalance: Number(row.coins ?? 0),
+      ...(isSelf ? { coinBalance: Number(row.coins ?? 0) } : {}),
       username: u.username,
       displayName: p.displayName,
       avatarUrl,

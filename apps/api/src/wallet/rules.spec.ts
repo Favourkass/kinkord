@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { paymentReference } from "../subscriptions/plans";
 import { nextWalletStatus, walletAmount, walletPaymentReference } from "./rules";
 const rates = {
   coin: { buy: 1000, redeem: 800 },
@@ -32,22 +33,31 @@ describe("wallet monetary rules", () => {
 });
 
 describe("wallet payment reference", () => {
-  it("matches KIN + year month day hour minute second in Lagos time", () => {
+  it("never shares Silver's reference for a checkout in the same second", () => {
+    const at = new Date("2026-10-09T13:56:01Z");
+    const silver = paymentReference(at);
+    const wallet = walletPaymentReference(at, new Set([silver]));
+    expect(silver).toBe("KIN20261009145601");
+    expect(wallet).toBe("KKC20261009145601");
+    expect(wallet).not.toBe(silver);
+  });
+
+  it("matches KKC + year month day hour minute second in Lagos time", () => {
     expect(walletPaymentReference(new Date("2026-10-07T12:47:20Z"), new Set())).toBe(
-      "KIN20261007134720",
+      "KKC20261007134720",
     );
   });
   it("uses the next free second when another payment has the same code", () => {
     expect(
       walletPaymentReference(
         new Date("2026-10-07T12:47:20Z"),
-        new Set(["KIN20261007134720", "KIN20261007134721"]),
+        new Set(["KKC20261007134720", "KKC20261007134721"]),
       ),
-    ).toBe("KIN20261007134722");
+    ).toBe("KKC20261007134722");
   });
   it("handles date and year rollover without changing the reference format", () => {
     expect(
-      walletPaymentReference(new Date("2026-12-31T22:59:59Z"), new Set(["KIN20261231235959"])),
-    ).toBe("KIN20270101000000");
+      walletPaymentReference(new Date("2026-12-31T22:59:59Z"), new Set(["KKC20261231235959"])),
+    ).toBe("KKC20270101000000");
   });
 });

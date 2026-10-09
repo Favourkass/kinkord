@@ -14,7 +14,7 @@ Apply the committed Drizzle migration through the normal release process. The AP
 
 **Wallet → Buy KinkCoins → choose a bundle → transfer to the displayed bank → enter sender name and transfer reference → upload receipt → submit.**
 
-New purchase references use `KINYYYYMMDDHHmmss` in Africa/Lagos time, matching Silver payments. When wallet purchases share a second, the allocator uses the next free second under a database transaction lock. Existing references stay unchanged so previously issued bank transfer instructions remain valid.
+New purchase references use `KKCYYYYMMDDHHmmss` in Africa/Lagos time, with a wallet-only prefix distinct from Silver’s KIN codes. When wallet purchases share a second, the allocator uses the next free second under a database transaction lock. Existing references stay unchanged so previously issued bank transfer instructions remain valid.
 
 The purchase saves its NGN price and bank details at creation, so later settings changes do not alter an existing checkout. Receipts upload to private S3 through a presigned URL. The server checks receipt ownership, existence, size and file type before submission. Only admins can obtain a download URL.
 
@@ -55,7 +55,7 @@ A pending or approved request can be rejected with a reason, which returns the r
 
 Member-scoped request keys make network retries idempotent. Per-member transaction locks and conditional balance updates prevent concurrent withdrawals from overspending. Decisions and balance/ledger writes commit together. A bank transfer reference cannot be reused for two purchases or two payouts. Settings changes and decisions are recorded in the moderation audit log. Financial operations and ledger entries are retained when a saved bank account is removed.
 
-**Transaction History** shows the latest 200 operations, current status, references and rejection reasons. Pending purchases can be resumed. Wallet screens refresh every 15 seconds and when focused; history remains the source for status updates. Public member profiles display available coin balance, excluding reserved coins.
+**Transaction History** shows the latest 200 operations, current status, references and rejection reasons. Pending purchases can be resumed. Wallet screens refresh every 15 seconds and when focused; history remains the source for status updates. Only the member’s own profile displays available coin balance, excluding reserved coins. Other viewers never receive the balance.
 
 ## Local testing
 
@@ -69,4 +69,4 @@ The bank picker uses the pinned Nigerian Bank Logos directory (660 institutions,
 
 Timeline actions display like, comment, share and gift counts. Gift counts reflect completed transfer records on the original post, not the quantity of currency sent; retried deliveries count once. Share counts record completed native shares or successful link copies, starting from deployment; they do not claim delivery or count cancelled share sheets. Counts persist on the original post, including when displayed through a repost.
 
-Gift actions appear only on subscribed authors’ posts; receiving is also checked by the API before funds move. Expiry does not prevent replaying an already delivered gift. Post names show the Silver membership badge for active subscribers; redemption still uses the existing verification badge eligibility checks.
+Gift actions appear only on subscribed authors’ posts; receiving is also checked by the API before funds move. Expiry does not prevent replaying an already delivered gift. Post names and profiles show the Silver shield only under the existing silver/silverSince verification rules (including account age, email verification and review holds). The independent subscription flag controls gift eligibility, not the shield.

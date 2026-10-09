@@ -2,10 +2,13 @@ import { BadRequestException, ConflictException } from "@nestjs/common";
 import type { WalletCurrency, WalletRates, WalletStatus } from "../db/schema/wallet";
 import { paymentReference } from "../subscriptions/plans";
 
-/** Match Silver payment codes in Lagos time; same-second checkouts take the next free second. */
+/** Wallet-only prefix; retain Lagos timestamps and allocate the next free second on collision. */
 export function walletPaymentReference(at: Date, taken: ReadonlySet<string>): string {
   for (let offset = 0; offset <= taken.size; offset++) {
-    const reference = paymentReference(new Date(at.getTime() + offset * 1000));
+    const reference = paymentReference(new Date(at.getTime() + offset * 1000)).replace(
+      /^KIN/,
+      "KKC",
+    );
     if (!taken.has(reference)) return reference;
   }
   throw new ConflictException("Could not allocate a payment reference. Try again.");

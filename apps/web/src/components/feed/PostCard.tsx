@@ -56,7 +56,7 @@ export default function PostCard({
   const name = (
     <span className="inline-flex items-center gap-[3px] text-[14px] font-bold leading-[17px] text-feed-text">
       {post.authorName}
-      {post.authorSilver || post.authorSubscribed ? <SilverCheck size={15} /> : null}
+      {post.authorSilver ? <SilverCheck size={15} /> : null}
     </span>
   );
   return (

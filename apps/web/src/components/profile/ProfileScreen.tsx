@@ -34,7 +34,7 @@ export interface ProfileScreenProps {
   followBusy: boolean;
   messageHref: string;
   editHref: string;
-  coinBalance: CoinBalanceVM;
+  coinBalance?: CoinBalanceVM;
   silverHref: string;
   heroLabels: ProfileHeroLabels;
   sideLabels: ProfileSideCardLabels;
