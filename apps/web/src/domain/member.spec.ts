@@ -44,8 +44,19 @@ describe("toMemberCardVM", () => {
       followers: "1.2K",
       isFollowing: false,
       silver: false,
+      organization: false,
     });
     expect(toMemberCardVM({ ...card, silver: true }).silver).toBe(true);
+  });
+
+  it("marks the configured organization without changing the source profile", () => {
+    expect(toMemberCardVM(card, true)).toMatchObject({
+      userId: "u1",
+      organization: true,
+      ageTag: null,
+      roles: null,
+      location: null,
+    });
   });
 
   it("falls back to the display name when a member has no handle and drops unknown parts", () => {

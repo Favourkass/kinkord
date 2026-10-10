@@ -1,6 +1,7 @@
 import Link from "next/link";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import SilverCheck from "@/components/app/SilverCheck";
+import OrganizationBadge from "@/components/organization/OrganizationBadge";
 import type { SearchPersonVM } from "@/domain/search";
 
 export interface SearchPeopleProps {
@@ -20,17 +21,40 @@ export interface SearchPeopleProps {
     follow: string;
     following: string;
     morePeople: string;
+    organization: string;
+    verifiedOrganization: string;
   };
 }
 
-function PersonSummary({ person: r }: { person: SearchPersonVM }) {
+function PersonSummary({
+  person: r,
+  organizationLabel,
+  verifiedOrganizationLabel,
+}: {
+  person: SearchPersonVM;
+  organizationLabel: string;
+  verifiedOrganizationLabel: string;
+}) {
   return (
     <>
-      <AvatarCircle src={r.avatarUrl} alt={r.name} size={48} />
+      <AvatarCircle
+        src={r.avatarUrl}
+        alt={r.name}
+        size={48}
+        shape={r.organization ? "square" : "circle"}
+      />
       <span className="min-w-0">
         <span className="flex min-w-0 items-center gap-[4px] text-[15px] font-bold text-feed-text">
           <span className="truncate">{r.name}</span>
           {r.silver ? <SilverCheck size={15} /> : null}
+          {r.organization ? (
+            <OrganizationBadge
+              label={organizationLabel}
+              verified
+              verifiedLabel={verifiedOrganizationLabel}
+              markSize={14}
+            />
+          ) : null}
         </span>
         {r.handle || r.details ? (
           <span className="block truncate text-[13px] text-feed-muted">
@@ -67,11 +91,19 @@ export default function SearchPeople(p: SearchPeopleProps) {
             <li key={r.userId} className="flex items-center gap-[12px] px-[18px] py-[10px]">
               {r.href ? (
                 <Link href={r.href} className="flex min-w-0 flex-1 items-center gap-[12px]">
-                  <PersonSummary person={r} />
+                  <PersonSummary
+                    person={r}
+                    organizationLabel={l.organization}
+                    verifiedOrganizationLabel={l.verifiedOrganization}
+                  />
                 </Link>
               ) : (
                 <span className="flex min-w-0 flex-1 items-center gap-[12px]">
-                  <PersonSummary person={r} />
+                  <PersonSummary
+                    person={r}
+                    organizationLabel={l.organization}
+                    verifiedOrganizationLabel={l.verifiedOrganization}
+                  />
                 </span>
               )}
               {r.canFollow ? (

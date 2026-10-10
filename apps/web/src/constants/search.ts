@@ -15,5 +15,7 @@ export const SEARCH_COPY = {
   noPosts: (q: string) => `No posts contain “${q}”.`,
   follow: "Follow",
   following: "Following",
+  organization: "Org",
+  verifiedOrganization: "Verified organization",
   error: "Search isn’t working right now. Try again.",
 };

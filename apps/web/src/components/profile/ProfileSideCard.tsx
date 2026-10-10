@@ -5,6 +5,7 @@ import MaskIcon from "@/components/app/MaskIcon";
 import type { PublicProfileVM } from "@/domain/member";
 import ExpandableAvatar from "./ExpandableAvatar";
 import SilverBadge, { type SilverBadgeLabels } from "./SilverBadge";
+import OrganizationBadge from "@/components/organization/OrganizationBadge";
 
 export interface ProfileSideCardLabels {
   follow: string;
@@ -15,6 +16,8 @@ export interface ProfileSideCardLabels {
   tagsHeading: string;
   stats: { friends: string; followers: string; following: string };
   silver: SilverBadgeLabels;
+  organization: string;
+  verifiedOrganization: string;
 }
 
 export interface ProfileSideCardProps {
@@ -41,6 +44,7 @@ export default function ProfileSideCard({
   onToggleFollow,
   followBusy,
 }: ProfileSideCardProps) {
+  const organization = vm.accountType === "organization";
   return (
     <section className="flex flex-col gap-[24px] overflow-hidden rounded-[20px] border border-pf-border bg-pf-surface">
       <div className="relative h-[220px]">
@@ -57,7 +61,10 @@ export default function ProfileSideCard({
           )}
         </div>
         <div className="absolute left-[24px] top-[80px] size-[110px]">
-          <span aria-hidden className="absolute inset-0 rounded-full bg-pf-surface" />
+          <span
+            aria-hidden
+            className={`absolute inset-0 ${organization ? "rounded-[20px]" : "rounded-full"} bg-pf-surface`}
+          />
           {vm.avatarUrl ? (
             <ExpandableAvatar
               src={vm.avatarUrl}
@@ -66,9 +73,12 @@ export default function ProfileSideCard({
               closeLabel="Close"
               wrapperClassName="absolute left-[5px] top-[8px] size-[100px]"
               className="size-[100px]"
+              shape={organization ? "square" : "circle"}
             />
           ) : (
-            <span className="absolute left-[5px] top-[8px] grid size-[100px] place-items-center rounded-full bg-pf-surface-2 text-pf-muted">
+            <span
+              className={`absolute left-[5px] top-[8px] grid size-[100px] place-items-center ${organization ? "rounded-[18px]" : "rounded-full"} bg-pf-surface-2 text-pf-muted`}
+            >
               <MaskIcon name="people" width={40} />
             </span>
           )}
@@ -93,6 +103,14 @@ export default function ProfileSideCard({
               {vm.silver ? (
                 <SilverBadge since={vm.silver.since} labels={labels.silver} href={silverHref} />
               ) : null}
+              {organization ? (
+                <OrganizationBadge
+                  label={labels.organization}
+                  verified={vm.organizationVerified}
+                  verifiedLabel={labels.verifiedOrganization}
+                  markSize={16}
+                />
+              ) : null}
             </span>
             {vm.handle && (
               <span className="text-[15px] leading-[18px] text-pf-muted">{vm.handle}</span>
@@ -106,12 +124,16 @@ export default function ProfileSideCard({
           )}
         </div>
         <p className="flex flex-wrap items-center gap-[12px] text-[13px] leading-[16px]">
-          <span className="font-bold text-pf-text">
-            {vm.stats.friends} <span className="text-pf-muted">{labels.stats.friends}</span>
-          </span>
-          <span aria-hidden className="text-pf-muted">
-            ·
-          </span>
+          {!organization ? (
+            <>
+              <span className="font-bold text-pf-text">
+                {vm.stats.friends} <span className="text-pf-muted">{labels.stats.friends}</span>
+              </span>
+              <span aria-hidden className="text-pf-muted">
+                ·
+              </span>
+            </>
+          ) : null}
           <span className="font-bold text-pf-text">
             {vm.stats.followers} <span className="text-pf-muted">{labels.stats.followers}</span>
           </span>
@@ -122,8 +144,8 @@ export default function ProfileSideCard({
             {vm.stats.following} <span className="text-pf-muted">{labels.stats.following}</span>
           </span>
         </p>
-        {coinBalance && <CoinBalance balance={coinBalance} />}
-        {vm.locationParts.length > 0 && (
+        {!organization && coinBalance && <CoinBalance balance={coinBalance} />}
+        {!organization && vm.locationParts.length > 0 && (
           <p className="flex items-center gap-[6px] text-[13px] font-semibold leading-[16px] text-pf-muted">
             <MaskIcon name="map-pin" width={14} className="text-kink-gold-bright" />
             {/* One span, so the comma hugs the word before it rather than the gap. */}
@@ -146,7 +168,7 @@ export default function ProfileSideCard({
             </span>
           </p>
         )}
-        {vm.tagLine && (
+        {!organization && vm.tagLine && (
           <div className="flex flex-col gap-[8px] border-t border-pf-border pt-[8px]">
             <p className="text-[12px] font-bold uppercase leading-[15px] tracking-[0.48px] text-pf-muted">
               {labels.tagsHeading}

@@ -2,6 +2,7 @@ import Link from "next/link";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import MaskIcon from "@/components/app/MaskIcon";
 import SilverCheck from "@/components/app/SilverCheck";
+import OrganizationBadge from "@/components/organization/OrganizationBadge";
 import type { PostMediaVM, PostVM } from "@/domain/post";
 import PostActions, { type PostActionLabels } from "./PostActions";
 import PostMediaGrid from "./PostMediaGrid";
@@ -16,6 +17,10 @@ export interface PostCardProps {
     delete: string;
     /** "Favour reposted", above a repost. */
     repostedBy: (name: string) => string;
+    organization: string;
+    verifiedOrganization: string;
+    follow: string;
+    following: string;
   };
   /** Open when this card's overflow menu is showing. */
   menuOpen: boolean;
@@ -29,6 +34,7 @@ export interface PostCardProps {
   onSave: () => void;
   onShare: () => void;
   onGift: (currency?: "coin" | "star" | "crown") => void;
+  onToggleAuthorFollow: (userId: string) => void;
   onOpenMedia: (media: PostMediaVM) => void;
 }
 
@@ -51,12 +57,20 @@ export default function PostCard({
   onSave,
   onShare,
   onGift,
+  onToggleAuthorFollow,
   onOpenMedia,
 }: PostCardProps) {
   const name = (
     <span className="inline-flex items-center gap-[3px] text-[14px] font-bold leading-[17px] text-feed-text">
       {post.authorName}
       {post.authorSilver ? <SilverCheck size={15} /> : null}
+      {post.authorOrganization ? (
+        <OrganizationBadge
+          label={labels.organization}
+          verified={post.authorOrganizationVerified}
+          verifiedLabel={labels.verifiedOrganization}
+        />
+      ) : null}
     </span>
   );
   return (
@@ -68,7 +82,13 @@ export default function PostCard({
         </p>
       )}
       <header className="flex items-start gap-[12px]">
-        <AvatarCircle src={post.avatarUrl} alt="" size={35} ringClassName="bg-kink-gold-bright" />
+        <AvatarCircle
+          src={post.avatarUrl}
+          alt=""
+          size={35}
+          ringClassName="bg-kink-gold-bright"
+          shape={post.authorOrganization ? "square" : "circle"}
+        />
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-baseline gap-x-[8px]">
             {post.authorHref ? (
@@ -89,6 +109,17 @@ export default function PostCard({
             {post.visibilityNote && <span>· {post.visibilityNote}</span>}
           </p>
         </div>
+        {post.authorOrganization && !post.mine ? (
+          <button
+            type="button"
+            onClick={() => onToggleAuthorFollow(post.authorUserId)}
+            disabled={!post.authorFollowReady || post.authorFollowBusy}
+            aria-pressed={post.authorIsFollowing}
+            className="shrink-0 rounded-full bg-kink-gold-bright px-[14px] py-[6px] text-[11px] font-bold text-black disabled:opacity-60"
+          >
+            {post.authorIsFollowing ? labels.following : labels.follow}
+          </button>
+        ) : null}
         {/* Repost and save live here, so the action row keeps its four buttons. */}
         <div className="relative shrink-0">
           <button

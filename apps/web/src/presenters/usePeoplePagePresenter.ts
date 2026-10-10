@@ -13,6 +13,7 @@ import {
   type PublicProfilePM,
 } from "@/domain/member";
 import { ApiError } from "@/services/apiClient";
+import { isOfficialOrganization } from "@/services/organization-placeholder.service";
 import {
   decodeParam,
   hasMore,
@@ -61,7 +62,13 @@ export function usePeoplePagePresenter(usernameParam: string, tabParam?: string 
   const [fatal, setFatal] = useState<string | null>(null);
 
   const pm = profile?.username === username ? profile.pm : null;
-  const key = `${username}|${tab}`;
+  const organization = isOfficialOrganization(pm?.userId);
+  const availableTabs = useMemo<FriendsTab[]>(
+    () => (organization ? ["followers", "following"] : TABS),
+    [organization],
+  );
+  const resolvedTab: FriendsTab = availableTabs.includes(tab) ? tab : "followers";
+  const key = `${username}|${resolvedTab}`;
   const current = data?.key === key ? data : null;
 
   useEffect(() => {
@@ -92,7 +99,7 @@ export function usePeoplePagePresenter(usernameParam: string, tabParam?: string 
     if (current) return;
     let cancelled = false;
     void membersApi
-      .friends(username, tab, 1, PAGE)
+      .friends(username, resolvedTab, 1, PAGE)
       .then((res) => {
         if (!cancelled) setData({ key, items: res.items, total: res.total, page: 1, error: null });
       })
@@ -103,7 +110,7 @@ export function usePeoplePagePresenter(usernameParam: string, tabParam?: string 
     return () => {
       cancelled = true;
     };
-  }, [username, tab, key, current]);
+  }, [username, resolvedTab, key, current]);
 
   const more = hasMore(current?.items.length ?? 0, current?.total ?? 0);
   const loadMore = useCallback(() => {
@@ -111,7 +118,7 @@ export function usePeoplePagePresenter(usernameParam: string, tabParam?: string 
     const next = current.page + 1;
     setLoadingMore(true);
     void membersApi
-      .friends(username, tab, next, PAGE)
+      .friends(username, resolvedTab, next, PAGE)
       .then((res) =>
         setData((prev) =>
           prev && prev.key === key
@@ -125,15 +132,15 @@ export function usePeoplePagePresenter(usernameParam: string, tabParam?: string 
         ),
       )
       .finally(() => setLoadingMore(false));
-  }, [current, loadingMore, more, username, tab, key]);
+  }, [current, loadingMore, more, username, resolvedTab, key]);
 
   const setTab = useCallback(
     (next: string) => {
-      if (!isTab(next)) return;
-      setTabState(next);
-      router.replace(Routes.memberPeople(username, next));
+      if (!isTab(next) || !availableTabs.includes(next as FriendsTab)) return;
+      setTabState(next as FriendsTab);
+      router.replace(Routes.memberPeople(username, next as FriendsTab));
     },
-    [router, username],
+    [router, username, availableTabs],
   );
 
   const toggleFollow = useCallback((row: FriendRowVM) => {
@@ -156,7 +163,10 @@ export function usePeoplePagePresenter(usernameParam: string, tabParam?: string 
       );
   }, []);
 
-  const vm = useMemo(() => (pm ? toPublicProfileVM(pm, placeHref) : null), [pm]);
+  const vm = useMemo(
+    () => (pm ? toPublicProfileVM(pm, placeHref, new Date(), organization) : null),
+    [pm, organization],
+  );
   const label = (key: FriendsTab) =>
     key === "all"
       ? copy.tabs.all(vm?.stats.friends ?? "0")
@@ -168,20 +178,24 @@ export function usePeoplePagePresenter(usernameParam: string, tabParam?: string 
             ? copy.tabs.mutual(vm?.stats.mutualFriends ?? "0")
             : copy.tabs.suggested;
 
-  const rows = (current?.items ?? []).map((f) => ({
-    userId: f.userId,
-    username: f.username,
-    displayName: f.displayName,
-    handle: f.username ? `@${f.username}` : null,
-    avatarUrl: f.avatarUrl,
-    ageTag: ageTagOf(f.age, f.gender),
-    location: locationOf(f.city, f.state),
-    isFollowing: f.isFollowing,
-    busy: busy.has(f.userId),
-    silver: Boolean(f.silver),
-    href: Routes.member(f.username ?? f.userId),
-    pill: Boolean(pm?.isSelf) && tab === "all",
-  }));
+  const rows = (current?.items ?? []).map((f) => {
+    const rowOrganization = isOfficialOrganization(f.userId);
+    return {
+      userId: f.userId,
+      username: f.username,
+      displayName: f.displayName,
+      handle: f.username ? `@${f.username}` : null,
+      avatarUrl: f.avatarUrl,
+      ageTag: rowOrganization ? null : ageTagOf(f.age, f.gender),
+      location: rowOrganization ? null : locationOf(f.city, f.state),
+      isFollowing: f.isFollowing,
+      busy: busy.has(f.userId),
+      silver: Boolean(f.silver),
+      organization: rowOrganization,
+      href: Routes.member(f.username ?? f.userId),
+      pill: Boolean(pm?.isSelf) && resolvedTab === "all",
+    };
+  });
 
   return {
     loading: !fatal && (pm === null || current === null),
@@ -191,7 +205,11 @@ export function usePeoplePagePresenter(usernameParam: string, tabParam?: string 
     back: () => router.push(Routes.member(username)),
     activeTab: pm?.isSelf ? ("profile" as const) : undefined,
     people: {
-      subTabs: TABS.map((key) => ({ key, label: label(key), active: tab === key })),
+      subTabs: availableTabs.map((key) => ({
+        key,
+        label: label(key),
+        active: resolvedTab === key,
+      })),
       onSubTab: setTab,
       rows,
       labels: {
@@ -199,11 +217,14 @@ export function usePeoplePagePresenter(usernameParam: string, tabParam?: string 
         following: copy.following,
         friendsPill: copy.friendsPill,
         more: copy.more,
+        organization: MEMBERS_COPY.profile.organization,
+        verifiedOrganization: MEMBERS_COPY.profile.verifiedOrganization,
       },
       onToggleFollow: toggleFollow,
       loading: current === null,
       loadingText: MEMBERS_COPY.common.loading,
-      empty: current && current.items.length === 0 && !current.error ? copy.empty[tab] : null,
+      empty:
+        current && current.items.length === 0 && !current.error ? copy.empty[resolvedTab] : null,
       error: current?.error ?? null,
       seeMoreHref: null,
       seeMoreLabel: copy.seeMore,

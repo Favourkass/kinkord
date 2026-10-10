@@ -73,9 +73,12 @@ export const MEMBERS_COPY = {
     online: "Online",
     lastSeen: (ago: string) => `Last seen ${ago}`,
     stats: { friends: "Friends", followers: "Followers", following: "Following" },
+    organization: "Org",
+    verifiedOrganization: "Verified organization",
     /** About tab cards (Figma 1256:800 + Profile Sections Design). */
     about: {
       aboutMe: "About Me",
+      aboutUs: "About Us",
       personal: "Personal Information",
       age: "Age",
       dateOfBirth: "Date of Birth",

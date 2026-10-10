@@ -24,6 +24,10 @@ const labels = {
   menu: "Options",
   delete: "Delete",
   repostedBy: (name: string) => name,
+  organization: "Org",
+  verifiedOrganization: "Verified organization",
+  follow: "Follow",
+  following: "Following",
 };
 
 function show(silver: boolean, subscribed: boolean) {
@@ -67,6 +71,7 @@ function show(silver: boolean, subscribed: boolean) {
       onSave={action}
       onShare={action}
       onGift={action}
+      onToggleAuthorFollow={action}
       onOpenMedia={action}
     />,
   );
@@ -120,6 +125,7 @@ function menuOf(over: Partial<PostPM>) {
       onSave={on.save}
       onShare={noop}
       onGift={noop}
+      onToggleAuthorFollow={noop}
       onOpenMedia={noop}
     />,
   );

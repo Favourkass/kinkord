@@ -35,6 +35,7 @@ export function getProfilePosts(feed: Feed, viewerAvatarUrl: string | null) {
       onShare: feed.share,
       onGift: feed.openGift,
       onOpenMedia: feed.openMedia,
+      onTogglePostAuthorFollow: feed.togglePostAuthorFollow,
       hasMore: feed.hasMore,
       loadingMore: feed.loadingMore,
       onLoadMore: feed.loadMore,

@@ -45,6 +45,7 @@ jobs:
           push: true
           build-args: |
             NEXT_PUBLIC_API_URL=https://api.kinkord.com
+            NEXT_PUBLIC_KINKORD_OFFICIAL_USER_ID=${{ vars.NEXT_PUBLIC_KINKORD_OFFICIAL_USER_ID }}
           tags: |
             ${{ steps.ecr.outputs.registry }}/kinkord-web:latest
             ${{ steps.ecr.outputs.registry }}/kinkord-web:${{ github.sha }}
