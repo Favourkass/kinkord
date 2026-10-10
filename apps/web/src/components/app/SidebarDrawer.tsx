@@ -1,8 +1,9 @@
-import Image from "next/image";
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
+import VerifiedMark from "@/components/brand/VerifiedMark";
+import AccountMenu from "./AccountMenu";
 import AvatarCircle from "./AvatarCircle";
-import MaskIcon from "./MaskIcon";
-import type { AppNavLabels, AppNavLinks } from "./nav";
+import type { AppNav, AppNavLabels, AppNavLinks, DrawerNavigation } from "./nav";
 
 export interface SidebarDrawerProps {
   open: boolean;
@@ -10,27 +11,30 @@ export interface SidebarDrawerProps {
   name: string;
   avatarUrl: string | null;
   membersCount: string;
-  links: Pick<AppNavLinks, "members" | "settings" | "profile" | "saved" | "subscription">;
-  labels: Pick<
-    AppNavLabels,
-    "members" | "settings" | "logout" | "profile" | "saved" | "subscription"
-  >;
+  verified: boolean;
+  active?: AppNav;
+  links: Pick<AppNavLinks, "profile">;
+  labels: Pick<AppNavLabels, "logout" | "profile">;
+  navigation: DrawerNavigation;
+  settingsOpen: boolean;
+  onToggleSettings: () => void;
   onLogout: () => void;
 }
 
-/**
- * Mobile slide-over (Figma 873:269 dark / 873:233 light): 348px panel with an
- * identity card, the Members row (live count) and, pinned to the bottom,
- * "Settings and Privacy" + "Log Out".
- */
+/** Mobile slide-over: who you are, then the account menu. Copy and order come from the presenter. */
 export default function SidebarDrawer({
   open,
   onClose,
   name,
   avatarUrl,
   membersCount,
+  verified,
+  active,
   links,
   labels,
+  navigation,
+  settingsOpen,
+  onToggleSettings,
   onLogout,
 }: SidebarDrawerProps) {
   if (!open) return null;
@@ -42,84 +46,43 @@ export default function SidebarDrawer({
         onClick={onClose}
         className="absolute inset-0 bg-black/40"
       />
-      <div className="absolute inset-y-0 left-0 flex w-[348px] max-w-[88vw] flex-col border-r border-app-drawer-border bg-app-drawer">
+      <aside className="absolute inset-y-0 left-0 flex w-[348px] max-w-[92vw] flex-col overflow-y-auto border-r border-app-drawer-border bg-app-drawer px-4 pb-[calc(24px+env(safe-area-inset-bottom))] pt-[calc(22px+env(safe-area-inset-top))]">
         <Link
           href={links.profile}
           onClick={onClose}
-          aria-label={labels.profile}
-          className="mx-[18px] mt-[29px] flex h-[51px] items-center gap-[13px] rounded-[15px] border border-drawer-identity-border px-[12px]"
+          className="mb-3 flex min-h-[58px] items-center gap-3 rounded-xl border border-drawer-identity-border px-3 py-2"
         >
-          <AvatarCircle src={avatarUrl} alt="" size={33} ringClassName="bg-kink-gold-bright" />
-          <p className="truncate text-[15px] font-bold text-drawer-text">{name}</p>
-        </Link>
-        <Link
-          href={links.members}
-          onClick={onClose}
-          className="ml-[18px] mt-[21px] flex h-[36px] w-[245px] items-center rounded-[12px] bg-app-members pl-[13px] pr-[9px]"
-        >
-          <MaskIcon name="people" width={16} className="text-app-members-count" />
-          <span className="pl-[10px] text-[12px] font-medium text-drawer-text">
-            {labels.members}
-          </span>
-          <span className="ml-auto text-[10px] font-medium text-app-members-count">
-            {membersCount}
-          </span>
-          <MaskIcon
-            name="chevron-right-14"
-            width={14}
-            className="ml-[14px] text-app-members-count"
-          />
-        </Link>
-        <Link
-          href={links.saved}
-          onClick={onClose}
-          className="ml-[18px] mt-[11px] flex h-[36px] w-[245px] items-center rounded-[12px] pl-[13px] pr-[9px]"
-        >
-          <MaskIcon
-            src="/app/feed/icon-bookmark.svg"
-            width={16}
-            className="text-app-members-count"
-          />
-          <span className="pl-[10px] text-[12px] font-medium text-drawer-text">{labels.saved}</span>
-          <MaskIcon name="chevron-right-14" width={14} className="ml-auto text-app-members-count" />
-        </Link>
-        <Link
-          href={links.subscription}
-          onClick={onClose}
-          className="ml-[18px] mt-[11px] flex h-[36px] w-[245px] items-center rounded-[12px] pl-[13px] pr-[9px]"
-        >
-          <Image src="/app/subscription/silver-crest.png" alt="" width={16} height={15} />
-          <span className="pl-[10px] text-[12px] font-medium text-drawer-text">
-            {labels.subscription}
-          </span>
-          <MaskIcon name="chevron-right-14" width={14} className="ml-auto text-app-members-count" />
-        </Link>
-        <div className="mt-auto pb-[37px]">
-          <Link
-            href={links.settings}
-            onClick={onClose}
-            className="ml-[31px] flex h-[36px] w-[245px] items-center rounded-[12px] bg-drawer-settings pl-[16px] pr-[13px]"
-          >
-            <MaskIcon name="settings" width={16} className="text-app-members-count" />
-            <span className="pl-[10px] text-[12px] font-medium text-drawer-text">
-              {labels.settings}
+          <AvatarCircle src={avatarUrl} alt="" size={35} ringClassName="bg-kink-gold-bright" />
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-1.5">
+              <span className="truncate text-[15px] font-bold text-drawer-text">
+                {name || labels.profile}
+              </span>
+              {verified ? (
+                <>
+                  <VerifiedMark size={14} />
+                  <span className="sr-only">{navigation.verifiedLabel}</span>
+                </>
+              ) : null}
             </span>
-            <MaskIcon
-              name="chevron-right-14"
-              width={14}
-              className="ml-auto text-app-members-count"
-            />
-          </Link>
-          <button
-            type="button"
-            onClick={onLogout}
-            className="ml-[48px] mt-[11px] flex items-center gap-[10px] text-[12px] font-medium text-drawer-text"
-          >
-            <MaskIcon name="logout" width={16} className="text-[#b8850f]" />
-            {labels.logout}
-          </button>
-        </div>
-      </div>
+            <span className="block truncate text-[11px] text-app-subtle">
+              {navigation.viewProfileLabel}
+            </span>
+          </span>
+          <ChevronRight aria-hidden="true" size={17} className="text-app-muted" />
+        </Link>
+        <AccountMenu
+          variant="drawer"
+          navigation={navigation}
+          membersCount={membersCount}
+          active={active}
+          settingsOpen={settingsOpen}
+          onToggleSettings={onToggleSettings}
+          onNavigate={onClose}
+          logoutLabel={labels.logout}
+          onLogout={onLogout}
+        />
+      </aside>
     </div>
   );
 }

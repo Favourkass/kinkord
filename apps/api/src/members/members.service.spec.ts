@@ -520,6 +520,37 @@ describe("MembersService.publicProfile visibility (Edit Profile → Privacy)", (
     expect(pub.restricted).toBe(false);
     expect(areFriends).not.toHaveBeenCalled();
   });
+
+  it("shows the Verified badge only for the profile as verified, and as the member allows", async () => {
+    const { service, select } = makeService();
+    const verified = (over: Record<string, unknown> = {}, visibility = "public") => {
+      const [row] = rowFor(visibility);
+      return [
+        {
+          ...row,
+          p: { ...row.p, avatarKey: "avatars/u2/a.jpg", showVerifiedBadge: true, ...over },
+          bronze: {
+            status: "verified",
+            verifiedAvatarKey: "avatars/u2/a.jpg",
+            verifiedDob: "2000-01-01",
+            verifiedGender: "Female",
+          },
+        },
+      ];
+    };
+    select.mockReturnValueOnce(chain(verified()));
+    expect((await service.publicProfile("nene", "me")).verification.identity).toBe(true);
+
+    // A new birth date since verifying takes it away.
+    select.mockReturnValueOnce(chain(verified({ dateOfBirth: "1990-01-01" })));
+    expect((await service.publicProfile("nene", "me")).verification.identity).toBeUndefined();
+
+    // The member chose to hide it from others, but still sees it themselves.
+    select.mockReturnValueOnce(chain(verified({ showVerifiedBadge: false })));
+    expect((await service.publicProfile("nene", "me")).verification.identity).toBeUndefined();
+    select.mockReturnValueOnce(chain(verified({ showVerifiedBadge: false })));
+    expect((await service.publicProfile("nene", "u2")).verification.identity).toBe(true);
+  });
 });
 
 describe("MembersService people tabs + media (profile rebuild, 2026-09-12)", () => {

@@ -1,8 +1,8 @@
-import Image from "next/image";
 import Link from "next/link";
+import AccountMenu from "./AccountMenu";
 import AvatarCircle from "./AvatarCircle";
 import MaskIcon, { type MaskIconName } from "./MaskIcon";
-import type { AppNav, AppNavLabels, AppNavLinks } from "./nav";
+import type { AppNav, AppNavLabels, AppNavLinks, DrawerNavigation } from "./nav";
 import UnreadBadge from "./UnreadBadge";
 
 export interface DesktopSidebarProps {
@@ -13,15 +13,19 @@ export interface DesktopSidebarProps {
   notificationsCount?: number;
   messagesCount?: number;
   avatarUrl: string | null;
+  membersCount: string;
   links: AppNavLinks;
   labels: AppNavLabels;
+  navigation: DrawerNavigation;
+  settingsOpen: boolean;
+  onToggleSettings: () => void;
   onLogout: () => void;
 }
 
 /**
  * Desktop sidebar per the Figma "PC" frames (881:799 dark / 881:849 light): 333px
- * panel, 48px gold wordmark, Home / Chat / Notifications / Profile, then a divider
- * with "Settings and Privacy" and "Log Out" pinned to the bottom.
+ * panel with the core navigation followed by the client-approved account menu.
+ * Settings children remain behind the same explicit accordion used on mobile.
  */
 export default function DesktopSidebar({
   brand,
@@ -30,8 +34,12 @@ export default function DesktopSidebar({
   notificationsCount,
   messagesCount = 0,
   avatarUrl,
+  membersCount,
   links,
   labels,
+  navigation,
+  settingsOpen,
+  onToggleSettings,
   onLogout,
 }: DesktopSidebarProps) {
   const unread = {
@@ -63,7 +71,7 @@ export default function DesktopSidebar({
       isActive ? "text-kink-gold-bright" : "text-side-text"
     }`;
   return (
-    <aside className="sticky top-0 flex h-dvh w-[333px] shrink-0 flex-col bg-side-bg pb-[49px] pt-[37px]">
+    <aside className="sticky top-0 flex h-dvh w-[333px] shrink-0 flex-col overflow-y-auto bg-side-bg pb-[32px] pt-[37px]">
       <p className="pl-[38px] text-[48px] font-extrabold leading-[47px] tracking-[4.8px] text-kink-gold-bright">
         {brand}
       </p>
@@ -106,40 +114,18 @@ export default function DesktopSidebar({
           {labels.profile}
         </Link>
       </nav>
-      <div className="mt-auto">
-        <div className="ml-[7px] w-[307px] border-t-[1.5px] border-side-divider" />
-        <Link
-          href={links.saved}
-          aria-current={active === "saved" ? "page" : undefined}
-          className={`mt-[28px] ${row(active === "saved")}`}
-        >
-          <span className="grid size-[29px] place-items-center text-side-text">
-            <MaskIcon src="/app/feed/icon-bookmark.svg" width={29} />
-          </span>
-          {labels.saved}
-        </Link>
-        <Link href={links.subscription} className={`mt-[24px] ${row(false)}`}>
-          <span className="grid size-[29px] place-items-center">
-            <Image src="/app/subscription/silver-crest.png" alt="" width={29} height={26} />
-          </span>
-          {labels.subscription}
-        </Link>
-        <Link
-          href={links.settings}
-          aria-current={active === "settings" ? "page" : undefined}
-          className={`mt-[24px] ${row(active === "settings")}`}
-        >
-          <span className="grid size-[29px] place-items-center text-side-text">
-            <MaskIcon name="settings" width={29} />
-          </span>
-          {labels.settings}
-        </Link>
-        <button type="button" onClick={onLogout} className={`mt-[24px] ${row(false)}`}>
-          <span className="grid size-[29px] place-items-center text-side-text">
-            <MaskIcon name="logout" width={29} />
-          </span>
-          {labels.logout}
-        </button>
+      <div className="mt-[34px] px-[20px]">
+        <div className="mb-4 border-t-[1.5px] border-side-divider" />
+        <AccountMenu
+          variant="sidebar"
+          navigation={navigation}
+          membersCount={membersCount}
+          active={active}
+          settingsOpen={settingsOpen}
+          onToggleSettings={onToggleSettings}
+          logoutLabel={labels.logout}
+          onLogout={onLogout}
+        />
       </div>
     </aside>
   );

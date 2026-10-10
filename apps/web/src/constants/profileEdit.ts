@@ -29,6 +29,7 @@ export const ROW_ICONS: Record<EditRowKey, string> = {
   languages: "/app/profile/edit/row-languages.svg",
   socialLinks: "/app/profile/edit/row-social-links.svg",
   profileVisibility: "/app/profile/edit/row-visibility.svg",
+  verifiedBadge: "/app/profile/icon-verified.svg",
 };
 
 export const PROFILE_EDIT_COPY = {
@@ -121,7 +122,15 @@ export const PROFILE_EDIT_COPY = {
     languages: { title: "Language Spoken", help: "Pick up to 10." },
     socialLinks: { title: "Social Media Links", help: "Public links shown on your profile." },
     profileVisibility: { title: "Profile Visibility", help: null },
+    verifiedBadge: {
+      title: "Verified Badge",
+      help: "Members who can see your profile see the badge. Your ID and selfie are never shown.",
+    },
   } satisfies Record<EditRowKey, { title: string; help: string | null }>,
+  verifiedBadge: {
+    show: { label: "Shown", help: "Members see that your identity is verified." },
+    hide: { label: "Hidden", help: "Only you see your badge." },
+  },
   visibility: {
     public: { label: "Public", help: "Every member can see your full profile." },
     friends: {

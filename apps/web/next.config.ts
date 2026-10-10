@@ -13,6 +13,7 @@ const PRIVATE_SECTIONS = [
   "search",
   "notifications",
   "moderation",
+  "coming-soon",
   "offline",
   "verify-email",
   "reset-password",
