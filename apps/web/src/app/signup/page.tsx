@@ -110,7 +110,11 @@ function SignupWizard() {
                 checked={p.stepOne.ageAttested}
                 onChange={p.stepOne.setAgeAttested}
                 error={p.stepOne.touched && !p.stepOne.ageAttested}
-                trailing={<span className="text-[18px] font-bold text-kink-cream">18+</span>}
+                trailing={
+                  <span aria-hidden="true" className="text-[24px] leading-none">
+                    🔞
+                  </span>
+                }
               >
                 I confirm I am over 18.
               </CheckRow>
