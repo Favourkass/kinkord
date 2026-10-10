@@ -65,7 +65,8 @@ describe("useWalletPresenter", () => {
     const load = vi.spyOn(walletService, "load").mockResolvedValue({ ...data, banks });
     const withdraw = vi
       .spyOn(walletService, "withdraw")
-      .mockRejectedValueOnce(new Error("connection lost"))
+      // How the API client reports a dropped connection.
+      .mockRejectedValueOnce(new ApiError(0, { message: "connection lost" }))
       .mockResolvedValue({
         id: "w1",
         userId: "u",
@@ -106,7 +107,9 @@ describe("useWalletPresenter", () => {
     expect(result.current.canSubmitWithdrawal).toBe(true);
     expect(result.current.unansweredNotice).toBeTruthy();
     await act(() => result.current.onWithdraw());
-    // Same currency, quantity, account and key: the server answers with the one it made.
+    // Same currency, quantity, account, key and reviewed payout (100 × ₦8.00): the server
+    // answers with the one it made.
+    expect(withdraw.mock.calls[0][4]).toBe(80000);
     expect(withdraw).toHaveBeenCalledTimes(2);
     expect(withdraw.mock.calls[1]).toEqual(withdraw.mock.calls[0]);
     expect(result.current.unansweredNotice).toBeNull();

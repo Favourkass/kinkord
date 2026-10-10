@@ -206,7 +206,7 @@ export class WalletService {
   async create(
     userId: string,
     kind: "purchase" | "withdrawal",
-    input: z.infer<typeof walletRequestSchema> & { bankId?: string },
+    input: z.infer<typeof walletRequestSchema> & { bankId?: string; expectedAmountKobo?: number },
   ) {
     const result = await this.db.transaction(async (tx) => {
       await lock(tx, userId);
@@ -248,6 +248,15 @@ export class WalletService {
         kind,
         config.minimumKobo,
       );
+      // The payout the member reviewed: if the rate changed since, they see the new one first.
+      if (
+        kind === "withdrawal" &&
+        input.expectedAmountKobo !== undefined &&
+        input.expectedAmountKobo !== amountKobo
+      )
+        throw new ConflictException(
+          "The withdrawal rate has changed. Review the new amount and submit again.",
+        );
       let bank: { bankName: string; accountName: string; accountNumber: string };
       if (kind === "purchase") {
         const payment = await readSettings(tx as unknown as Db);

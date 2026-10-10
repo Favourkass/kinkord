@@ -42,6 +42,7 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     quantity: string;
     bankId: string;
     key: string;
+    expectedAmountKobo: number;
   } | null>(null);
   const keyFor = (value: string) => {
     const existing = keys.current.get(value);
@@ -197,7 +198,13 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
           throw new Error(
             "Check the quantity, withdrawable balance, minimum and selected bank account.",
           );
-        const request = unanswered ?? { currency, quantity, bankId, key: keyFor(withdrawal) };
+        const request = unanswered ?? {
+          currency,
+          quantity,
+          bankId,
+          key: keyFor(withdrawal),
+          expectedAmountKobo: quote.amountKobo,
+        };
         setUnanswered(request);
         let result: WalletOperationPM;
         try {
@@ -206,10 +213,16 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
             Number(request.quantity),
             request.bankId,
             request.key,
+            request.expectedAmountKobo,
           );
         } catch (e) {
-          // A refusal is an answer: nothing was made, so the form decides what's sent next.
-          if (e instanceof ApiError && e.status < 500) setUnanswered(null);
+          // A refusal (4xx) is an answer: nothing was made, so the form decides what's sent
+          // next. A dropped connection (status 0) or a server error is not: keep it.
+          if (e instanceof ApiError && e.status >= 400 && e.status < 500) {
+            setUnanswered(null);
+            // A changed rate, say: show what a new request would be.
+            void refresh();
+          }
           throw e;
         }
         keys.current.delete(`withdraw:${request.currency}:${request.quantity}:${request.bankId}`);

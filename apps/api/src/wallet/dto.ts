@@ -23,7 +23,11 @@ export const walletRequestSchema = z.object({
   requestKey: z.string().uuid(),
 });
 export const walletGiftSchema = walletRequestSchema.extend({ postId: z.string().uuid() });
-export const withdrawalSchema = walletRequestSchema.extend({ bankId: z.string().uuid() });
+export const withdrawalSchema = walletRequestSchema.extend({
+  bankId: z.string().uuid(),
+  /** The payout the member reviewed, in kobo: refused if the rate has changed since. */
+  expectedAmountKobo: z.number().int().positive().max(1_000_000_000),
+});
 export const walletProofSchema = z.object({
   receiptKey: z.string().min(1).max(500),
   senderReference: z.string().trim().min(1).max(100),

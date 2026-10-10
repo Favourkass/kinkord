@@ -57,3 +57,18 @@ it("does not record a transfer reference while merely approving a withdrawal", (
     walletDecisionSchema.safeParse({ action: "approve", bankReference: "NOT-PAID" }).success,
   ).toBe(false);
 });
+
+describe("withdrawal requests", () => {
+  const request = {
+    currency: "coin",
+    quantity: 100,
+    requestKey: "22222222-2222-4222-8222-222222222222",
+    bankId: "33333333-3333-4333-8333-333333333333",
+  };
+  it("carry the payout the member reviewed", () => {
+    expect(withdrawalSchema.safeParse(request).success).toBe(false);
+    expect(withdrawalSchema.safeParse({ ...request, expectedAmountKobo: 80000 }).success).toBe(
+      true,
+    );
+  });
+});

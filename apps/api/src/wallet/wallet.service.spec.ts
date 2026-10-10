@@ -143,6 +143,21 @@ describe("WalletService", () => {
     expect(values[0]).toMatchObject({ kind: "withdrawal", bankId: "bank" });
     expect(values[1]).toMatchObject({ phase: "hold", availableDelta: -100, earnedDelta: -100 });
   });
+  it("refuses a withdrawal whose rate changed after the member reviewed it", async () => {
+    const { service, db } = fixture([[], [{ rates, enabled: 1, minimumKobo: 80000 }]]);
+    await expect(
+      service.create("user", "withdrawal", {
+        currency: "coin",
+        quantity: 100,
+        bankId: "bank",
+        requestKey: "key",
+        // Reviewed at ₦4.00 a coin; it's ₦8.00 now.
+        expectedAmountKobo: 40000,
+      }),
+    ).rejects.toThrow(/rate has changed/);
+    expect(db.update).not.toHaveBeenCalled();
+    expect(db.insert).not.toHaveBeenCalled();
+  });
   it("replays a withdrawal whose account has since been removed", async () => {
     const made = { ...row, kind: "withdrawal" as const, bankId: "bank" };
     const { service, db } = fixture([[made]]);
