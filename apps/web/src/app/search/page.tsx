@@ -28,15 +28,19 @@ function Search() {
         name: home.name,
         avatarUrl: home.avatarUrl,
         membersCount: home.membersCount,
+        verified: home.verified,
         notificationsUnread: home.notificationsUnread,
         notificationsCount: home.notificationsCount,
         messagesCount: home.messagesCount,
         drawerOpen: home.drawerOpen,
+        settingsMenuOpen: home.settingsMenuOpen,
         onMenu: home.openDrawer,
         onCloseDrawer: home.closeDrawer,
+        onToggleSettingsMenu: home.toggleSettingsMenu,
         onLogout: home.logout,
         links: nav.links,
         labels: nav.labels,
+        drawerNavigation: nav.drawer,
       }}
       query={s.query}
       onQuery={s.setQuery}

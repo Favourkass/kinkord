@@ -9,6 +9,8 @@ import {
   type S3ClientConfig,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import sharp from "sharp";
+import { verificationImage, VERIFICATION_IMAGE_MAX_BYTES } from "./verification-image";
 
 /** Download URLs are identical within this window, so browsers can cache them. */
 export const DOWNLOAD_URL_WINDOW_S = 3600;
@@ -19,6 +21,8 @@ export const DOWNLOAD_URL_WINDOW_S = 3600;
  */
 export const IMAGE_VARIANTS = ["sm", "md"] as const;
 export type ImageVariant = (typeof IMAGE_VARIANTS)[number];
+/** Longest edge of each size, as the web makes them (apps/web/src/util/image.ts). */
+export const VARIANT_MAX_DIM: Record<ImageVariant, number> = { sm: 160, md: 480 };
 
 /** `avatars/u1/abc.jpg` + "sm" -> `avatars/u1/abc_sm.jpg`. */
 export function variantKey(key: string, variant: ImageVariant): string {
@@ -56,6 +60,71 @@ export function s3ClientConfig(env: NodeJS.ProcessEnv = process.env): S3ClientCo
 export class StorageService {
   private readonly s3 = new S3Client(s3ClientConfig());
   private readonly bucket = process.env.MEDIA_BUCKET ?? "";
+
+  /** Reads only a server-selected profile key; never fetches an arbitrary profile URL. */
+  async readVerificationImage(key: string) {
+    const response = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }), {
+      abortSignal: AbortSignal.timeout(10000),
+    });
+    const body = response.Body;
+    if (!body) throw new Error("Profile image unavailable");
+    // SDK's Node body is a readable stream. Breaking iteration destroys the stream.
+    const chunks: Buffer[] = [];
+    let size = 0;
+    for await (const chunk of body as AsyncIterable<Uint8Array>) {
+      size += chunk.length;
+      if (size > VERIFICATION_IMAGE_MAX_BYTES) throw new Error("Profile image too large");
+      chunks.push(Buffer.from(chunk));
+    }
+    return verificationImage(Buffer.concat(chunks));
+  }
+
+  /**
+   * Remakes a photo's smaller sizes from its original. The phone makes them at
+   * upload and nothing else ties them to the original, so this is what makes
+   * every size of a photo someone verifies the same picture.
+   */
+  async regenerateVariants(key: string): Promise<void> {
+    const original = await this.readVerificationImage(key);
+    await Promise.all(
+      IMAGE_VARIANTS.map(async (variant) => {
+        const resized = sharp(original.bytes)
+          .rotate()
+          .resize(VARIANT_MAX_DIM[variant], VARIANT_MAX_DIM[variant], {
+            fit: "inside",
+            withoutEnlargement: true,
+          });
+        const body = await (
+          original.contentType === "image/png"
+            ? resized.png()
+            : original.contentType === "image/webp"
+              ? resized.webp({ quality: 82 })
+              : resized.jpeg({ quality: 82 })
+        ).toBuffer();
+        await this.s3.send(
+          new PutObjectCommand({
+            Bucket: this.bucket,
+            Key: variantKey(key, variant),
+            Body: body,
+            ContentType: original.contentType,
+          }),
+        );
+      }),
+    );
+  }
+
+  /** A short-lived, uncached link for an admin checking a member's photo. */
+  async presignReviewDownload(key: string, variant?: ImageVariant): Promise<string> {
+    return getSignedUrl(
+      this.s3,
+      new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: variant ? variantKey(key, variant) : key,
+        ResponseCacheControl: "no-store",
+      }),
+      { expiresIn: 600 },
+    );
+  }
 
   /**
    * Presigned PUT for a direct browser upload. Expires in 10 minutes. When the

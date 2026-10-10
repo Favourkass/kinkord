@@ -18,6 +18,7 @@ export default function ModerationLayout({ children }: { children: ReactNode }) 
       handle={vm.handle}
       avatarUrl={vm.avatarUrl}
       membersCount={vm.membersCount}
+      verified={vm.verified}
       notificationsUnread={vm.notificationsUnread}
       notificationsCount={vm.notificationsCount}
       messagesCount={vm.messagesCount}
@@ -25,9 +26,12 @@ export default function ModerationLayout({ children }: { children: ReactNode }) 
       drawerOpen={vm.drawerOpen}
       onMenu={vm.openDrawer}
       onCloseDrawer={vm.closeDrawer}
+      settingsMenuOpen={vm.settingsMenuOpen}
+      onToggleSettingsMenu={vm.toggleSettingsMenu}
       onLogout={vm.logout}
       links={nav.links}
       labels={nav.labels}
+      drawerNavigation={nav.drawer}
     >
       {children}
     </AppShell>

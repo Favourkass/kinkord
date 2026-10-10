@@ -3,7 +3,7 @@ import { Routes } from "@/constants/Routes";
 import type { ModerationTab } from "@/components/moderation/ModerationFrame";
 
 export function moderationTabs(
-  active: "members" | "reports" | "payments" | "blocklist",
+  active: "members" | "reports" | "payments" | "verification" | "blocklist",
 ): ModerationTab[] {
   return [
     { label: MODERATION_COPY.tabs.members, href: Routes.moderation, active: active === "members" },
@@ -16,6 +16,11 @@ export function moderationTabs(
       label: MODERATION_COPY.tabs.payments,
       href: Routes.moderationPayments,
       active: active === "payments",
+    },
+    {
+      label: MODERATION_COPY.tabs.verification,
+      href: Routes.moderationVerification,
+      active: active === "verification",
     },
     {
       label: MODERATION_COPY.tabs.blocklist,
