@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "./apiClient";
 import { pendingTransfersService as pending } from "./pendingTransfers.service";
 
@@ -23,6 +23,19 @@ describe("pendingTransfersService", () => {
     pending.settleGift("u1", "k2");
     expect(pending.withdrawals("u1")).toEqual([]);
     expect(pending.gifts("u1")).toEqual([]);
+  });
+});
+
+describe("one tab at a time", () => {
+  it("runs a member's sends under one lock where the browser has Web Locks", async () => {
+    const request = vi.fn((_name: string, work: () => Promise<string>) => work());
+    Object.defineProperty(navigator, "locks", { value: { request }, configurable: true });
+    await expect(pending.exclusive("u1", async () => "sent")).resolves.toBe("sent");
+    expect(request).toHaveBeenCalledWith("kinkord:wallet:u1", expect.any(Function));
+    Reflect.deleteProperty(navigator, "locks");
+  });
+  it("just runs where it has none", async () => {
+    await expect(pending.exclusive("u1", async () => "sent")).resolves.toBe("sent");
   });
 });
 

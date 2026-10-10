@@ -66,11 +66,19 @@ export class WalletGiftsService {
     sameSender(senderId, input.senderId);
     const visible = await this.posts.byId(input.postId, senderId);
     if (!visible) {
-      // A lost response may be retried after the author deletes or hides the post.
-      const [delivered] = await this.db
-        .select()
-        .from(walletGift)
-        .where(and(eq(walletGift.senderId, senderId), eq(walletGift.requestKey, input.requestKey)));
+      // A lost response may be retried after the author deletes or hides the post. The
+      // sender's wallet lock comes first, so a send of this same gift still committing finishes
+      // before this says it was never made.
+      const delivered = await this.db.transaction(async (tx) => {
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"wallet:" + senderId}))`);
+        const [row] = await tx
+          .select()
+          .from(walletGift)
+          .where(
+            and(eq(walletGift.senderId, senderId), eq(walletGift.requestKey, input.requestKey)),
+          );
+        return row;
+      });
       if (delivered) {
         if (
           delivered.postId !== input.postId ||

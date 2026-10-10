@@ -348,6 +348,30 @@ describe("useWalletPresenter", () => {
     expect(result.current.error).toMatch(/another tab/);
     expect(result.current.unansweredNotice).toBeNull();
   });
+  it("sends under the member's cross-tab lock, and a new request after another tab's answer gets a new key", async () => {
+    const request = vi.fn((_name: string, work: () => Promise<unknown>) => work());
+    Object.defineProperty(navigator, "locks", { value: { request }, configurable: true });
+    vi.spyOn(walletService, "load").mockResolvedValue(data);
+    const withdraw = vi
+      .spyOn(walletService, "withdraw")
+      .mockRejectedValueOnce(new ApiError(0, { message: "connection lost" }));
+    const { result } = renderHook(() => useWalletPresenter("withdraw"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => result.current.onRedeem("coin"));
+    await act(() => result.current.onWithdraw());
+    expect(request).toHaveBeenCalledWith("kinkord:wallet:u", expect.any(Function));
+    // Answered in another tab: nothing is sent from here...
+    localStorage.clear();
+    await act(() => result.current.onWithdraw());
+    expect(result.current.error).toMatch(/another tab/);
+    // ...and the next withdrawal is a new one, with a new key.
+    withdraw.mockRejectedValueOnce(new ApiError(0, { message: "connection lost" }));
+    act(() => result.current.onRedeem("coin"));
+    await act(() => result.current.onWithdraw());
+    expect(withdraw).toHaveBeenCalledTimes(2);
+    expect(withdraw.mock.calls[1][3]).not.toBe(withdraw.mock.calls[0][3]);
+    Reflect.deleteProperty(navigator, "locks");
+  });
   it("won't start a withdrawal over another tab's one still unanswered", async () => {
     vi.spyOn(walletService, "load").mockResolvedValue(data);
     const withdraw = vi.spyOn(walletService, "withdraw");

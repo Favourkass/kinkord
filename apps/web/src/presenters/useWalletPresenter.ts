@@ -170,7 +170,6 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
   const bankId = savedBanks.some((bank) => bank.id === picked)
     ? picked
     : (savedBanks.find((bank) => bank.isDefault)?.id ?? savedBanks[0]?.id ?? "");
-  const withdrawal = `withdraw:${currency}:${quantity}:${bankId}`;
   const quote = walletService.withdrawalQuote(
     data?.summary.settings ?? null,
     currency,
@@ -298,56 +297,60 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
             "Check the quantity, withdrawable balance, minimum and selected bank account.",
           );
         if (!member) throw new Error(WALLET_COPY.stillLoading);
-        // Reconciled with the kept copy first: another tab may have settled the request this
-        // page remembers, or kept a newer one, which is then the one to send (never overwritten).
         const own = unanswered && unanswered.member === member ? unanswered : null;
-        const doubts = withdrawalsInDoubt(member, own);
-        const inDoubt = doubts.find((d) => d.key === own?.key) ?? doubts[0] ?? null;
-        if (inDoubt && inDoubt.key !== own?.key) {
-          // Not what this page showed: shown first, then sent.
-          setUnanswered(inDoubt);
-          throw new Error(WALLET_COPY.unanswered);
-        }
-        if (own && !inDoubt) {
-          setUnanswered(null);
-          throw new Error(WALLET_COPY.settledElsewhere);
-        }
-        const wasUnanswered = inDoubt !== null;
-        const request = inDoubt ?? {
+        // A new request gets its own key; a retry is exactly the request in doubt.
+        const fresh = {
           currency,
           quantity,
           bankId,
-          key: keyFor(withdrawal),
+          key: crypto.randomUUID(),
           expectedAmountKobo: quote.amountKobo,
         };
-        const sender = inDoubt?.member ?? member;
-        keepUnanswered(request, sender);
-        let result: WalletOperationPM;
-        try {
-          result = await walletService.withdraw(
-            request.currency,
-            Number(request.quantity),
-            request.bankId,
-            request.key,
-            request.expectedAmountKobo,
-            sender,
-          );
-        } catch (e) {
-          // Refused: nothing was made, so the form decides what's sent next. Unread (signed
-          // out, a sign-up step owed, timed out, rate-limited): settles a first send, never an
-          // earlier one. No answer: it may have gone through, so it's kept.
-          const failure = pendingTransfersService.failure(e);
-          if (failure === "unread" && !wasUnanswered) settleUnanswered(sender, request.key);
-          if (failure === "refused") {
-            settleUnanswered(sender, request.key);
-            // A changed rate, say: show what a new request would be. If that load fails too,
-            // the refusal stays on screen and the next refresh catches up.
-            void refresh().catch(() => undefined);
+        // One tab at a time sends this member's money requests, deciding from the kept copies
+        // as they are once it holds the lock: another tab may have settled this page's request,
+        // or kept a newer one, which is then the one to send (never overwritten).
+        const result = await pendingTransfersService.exclusive(member, async () => {
+          const doubts = withdrawalsInDoubt(member, own);
+          const inDoubt = doubts.find((d) => d.key === own?.key) ?? doubts[0] ?? null;
+          if (inDoubt && inDoubt.key !== own?.key) {
+            // Not what this page showed: shown first, then sent.
+            setUnanswered(inDoubt);
+            throw new Error(WALLET_COPY.unanswered);
           }
-          throw e;
-        }
-        keys.current.delete(`withdraw:${request.currency}:${request.quantity}:${request.bankId}`);
-        settleUnanswered(sender, request.key);
+          if (own && !inDoubt) {
+            setUnanswered(null);
+            throw new Error(WALLET_COPY.settledElsewhere);
+          }
+          const wasUnanswered = inDoubt !== null;
+          const request = inDoubt ?? fresh;
+          const sender = inDoubt?.member ?? member;
+          keepUnanswered(request, sender);
+          try {
+            const made = await walletService.withdraw(
+              request.currency,
+              Number(request.quantity),
+              request.bankId,
+              request.key,
+              request.expectedAmountKobo,
+              sender,
+            );
+            settleUnanswered(sender, request.key);
+            return made;
+          } catch (e) {
+            // Refused: nothing was made. Unread (signed out, a sign-up step owed, timed out,
+            // rate-limited): this send wasn't read, and with the lock held no other tab has
+            // sent it, so a first send is settled too; an earlier one stays in doubt. No
+            // answer: it may have gone through, so it's kept.
+            const failure = pendingTransfersService.failure(e);
+            if (failure === "refused" || (failure === "unread" && !wasUnanswered)) {
+              settleUnanswered(sender, request.key);
+              // A changed rate, say: show what a new request would be. If that load fails
+              // too, the refusal stays on screen and the next refresh catches up.
+              if (failure === "refused") void refresh().catch(() => undefined);
+            }
+            throw e;
+          }
+        });
         supersedeReads();
         setOperation(result);
         setReview(false);

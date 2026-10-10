@@ -107,6 +107,15 @@ describe("post wallet gifts", () => {
     expect(posts.byId).not.toHaveBeenCalled();
     expect(db.select).not.toHaveBeenCalled();
   });
+  it("waits for the sender's lock before saying a gift on a hidden post was never made", async () => {
+    const { service, db } = fixture({ visible: null, selects: [[]] });
+    await expect(service.send("a", input)).rejects.toThrow(/no longer available/);
+    // The lock (execute) comes before the lookup (select), in one transaction.
+    expect(db.transaction).toHaveBeenCalledOnce();
+    expect(db.execute.mock.invocationCallOrder[0]).toBeLessThan(
+      db.select.mock.invocationCallOrder[0],
+    );
+  });
   it("checks visibility once, before the transaction holds a connection", async () => {
     const { service, posts } = fixture();
     await service.send("a", input);

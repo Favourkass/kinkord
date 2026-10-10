@@ -1254,6 +1254,62 @@ describe("post gifting presenter", () => {
     expect(pendingTransfersService.gifts("me").map((g) => g.key)).toEqual(["a"]);
     localStorage.clear();
   });
+  it("keeps this post's gift in doubt, key and all, when the balance can't be read again", async () => {
+    pendingTransfersService.keepGift("me", {
+      postId: "gone",
+      currency: "star",
+      quantity: "2",
+      key: "b",
+    });
+    pendingTransfersService.keepGift("me", {
+      postId: "p1",
+      currency: "coin",
+      quantity: "3",
+      key: "a",
+    });
+    giftBalance
+      .mockReset()
+      .mockResolvedValueOnce({
+        userId: "me",
+        settings: { enabled: true },
+        balances: [{ currency: "coin", available: 5, reserved: 0 }],
+      })
+      .mockRejectedValueOnce(new Error("offline"));
+    giftSend.mockReset().mockResolvedValue({});
+    const { result } = renderHook(() => useFeedPresenter());
+    await waitFor(() => expect(result.current.posts).toHaveLength(1));
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    expect(result.current.giftDialog.locked).toBe(true);
+    await act(async () => {
+      await result.current.giftDialog.onSend();
+    });
+    // The gift in doubt, never a new one.
+    expect(giftSend).toHaveBeenLastCalledWith("p1", "coin", 3, "a", "me");
+    localStorage.clear();
+  });
+  it("sends a gift under the member's cross-tab lock", async () => {
+    const request = vi.fn((_name: string, work: () => Promise<unknown>) => work());
+    Object.defineProperty(navigator, "locks", { value: { request }, configurable: true });
+    giftBalance.mockReset().mockResolvedValue({
+      userId: "me",
+      settings: { enabled: true },
+      balances: [{ currency: "coin", available: 5, reserved: 0 }],
+    });
+    giftSend.mockReset().mockResolvedValue({});
+    const { result } = renderHook(() => useFeedPresenter());
+    await waitFor(() => expect(result.current.posts).toHaveLength(1));
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    await act(async () => {
+      await result.current.giftDialog.onSend();
+    });
+    expect(request).toHaveBeenCalledWith("kinkord:wallet:me", expect.any(Function));
+    expect(giftSend).toHaveBeenCalledOnce();
+    Reflect.deleteProperty(navigator, "locks");
+  });
   it("sends nothing while it can't tell whose wallet it is", async () => {
     giftBalance.mockReset().mockRejectedValue(new Error("offline"));
     giftSend.mockReset();

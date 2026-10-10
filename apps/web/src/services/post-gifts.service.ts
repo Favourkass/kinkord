@@ -4,6 +4,7 @@ import { api } from "./apiClient";
 export const GIFT_COPY = {
   title: "Send a gift",
   earlierSent: "Your earlier gift went through.",
+  answeredElsewhere: "That gift was answered in another tab. Check Transaction History.",
   otherAccount:
     "You're signed in as someone else now. Sign back in to the account that sent this gift to check it.",
   earlierUnconfirmed:

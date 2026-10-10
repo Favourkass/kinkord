@@ -26,6 +26,17 @@ export type TransferFailure = "refused" | "unread" | "unknown";
  * answered, so a retry reuses their key: the server returns the one it made, or makes it once.
  */
 export const pendingTransfersService = {
+  /**
+   * Runs `work` while no other tab of this browser is sending this member's money requests
+   * (Web Locks): a request is never sent, kept or settled by two tabs at once, and each send
+   * decides from the kept copies as they are once it holds the lock. Where the browser has no
+   * Web Locks, it just runs.
+   */
+  exclusive<T>(memberId: string, work: () => Promise<T>): Promise<T> {
+    const locks = typeof navigator === "undefined" ? undefined : navigator.locks;
+    // The lock resolves with what `work` returned: its promise, unwrapped.
+    return locks ? locks.request(`kinkord:wallet:${memberId}`, work).then((done) => done) : work();
+  },
   failure(e: unknown): TransferFailure {
     if (!(e instanceof ApiError)) return "unknown";
     const code = (e.body as { code?: unknown } | null)?.code;

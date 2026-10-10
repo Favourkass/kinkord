@@ -710,23 +710,29 @@ export function useFeedPresenter({
    * server returns the gift it made, makes it once, or refuses, even if its post has gone since.
    * True once it's settled, false while it's still in doubt.
    */
-  const settleEarlierGift = async (gift: InDoubt) => {
-    try {
-      await postGiftsService.send(
-        gift.postId,
-        gift.currency,
-        Number(gift.quantity),
-        gift.key,
-        gift.member,
-      );
-      setShareNote(GIFT_COPY.earlierSent);
-    } catch (e) {
-      if (pendingTransfersService.failure(e) !== "refused") return false;
-      // Refused (its post gone before it landed, say): nothing was sent.
-    }
-    settleGift(gift.member, gift.key);
-    return true;
-  };
+  const settleEarlierGift = (gift: InDoubt) =>
+    pendingTransfersService.exclusive(gift.member, async () => {
+      // Another tab may have answered it while this one waited for the lock.
+      if (!giftsInDoubt(gift.member).some((g) => g.key === gift.key)) {
+        if (uncertainGift.current?.key === gift.key) uncertainGift.current = null;
+        return true;
+      }
+      try {
+        await postGiftsService.send(
+          gift.postId,
+          gift.currency,
+          Number(gift.quantity),
+          gift.key,
+          gift.member,
+        );
+        setShareNote(GIFT_COPY.earlierSent);
+      } catch (e) {
+        if (pendingTransfersService.failure(e) !== "refused") return false;
+        // Refused (its post gone before it landed, say): nothing was sent.
+      }
+      settleGift(gift.member, gift.key);
+      return true;
+    });
   const openGift = async (postId: string, currency: KinkCurrency = "coin") => {
     if (giftBusy.current) return;
     const target = posts.find((p) => p.postId === postId);
@@ -775,6 +781,14 @@ export function useFeedPresenter({
         return;
       }
       const pending = doubts.find((g) => g.postId === postId) ?? null;
+      // Restored before anything else can fail, so a retry is always exactly this gift.
+      uncertainGift.current = pending;
+      if (pending) {
+        setGiftCurrency(pending.currency);
+        setGiftQuantity(pending.quantity);
+        setGiftLocked(true);
+        giftKey.current = pending.key;
+      }
       if (settledAny) {
         // One may have just been sent: read the balance again before offering this one, and
         // stop if another account is signed in now.
@@ -787,13 +801,6 @@ export function useFeedPresenter({
           return;
         }
         setGiftSummary(after);
-      }
-      uncertainGift.current = pending;
-      if (pending) {
-        setGiftCurrency(pending.currency);
-        setGiftQuantity(pending.quantity);
-        setGiftLocked(true);
-        giftKey.current = pending.key;
       }
       if (!summary.settings.enabled) setGiftError(GIFT_COPY.unavailable);
     } catch (e) {
@@ -811,48 +818,82 @@ export function useFeedPresenter({
     const member = recovered?.member ?? giftSummary?.userId;
     // A gift is only sent knowing whose wallet it comes from.
     if (giftBusy.current || !giftTarget || !member || (!giftLocked && !quote.valid)) return;
-    const wasInDoubt = recovered !== null;
-    // Nothing new while another gift is in doubt (another tab's, say): it would be left behind.
-    if (!wasInDoubt && giftsInDoubt(member).length > 0) {
-      setGiftError(GIFT_COPY.earlierUnconfirmed);
-      return;
-    }
+    // A retry is exactly the gift in doubt (its key and amount), never the form's.
+    const attempt: GiftInDoubt = recovered
+      ? {
+          postId: recovered.postId,
+          currency: recovered.currency,
+          quantity: recovered.quantity,
+          key: recovered.key,
+        }
+      : {
+          postId: giftTarget.postId,
+          currency: giftCurrency,
+          quantity: giftQuantity,
+          key: giftKey.current,
+        };
     giftBusy.current = true;
     setGiftSending(true);
     setGiftError(null);
-    const gift = {
-      postId: giftTarget.postId,
-      currency: giftCurrency,
-      quantity: giftQuantity,
-      key: giftKey.current,
-    };
-    // Kept before it's sent: if the page goes before the answer comes, a retry reuses its key.
-    const persisted = pendingTransfersService.keepGift(member, gift);
-    uncertainGift.current = { ...gift, member, persisted };
     try {
-      await postGiftsService.send(gift.postId, gift.currency, quote.quantity, gift.key, member);
-      settleGift(member, gift.key);
-      setGiftLocked(false);
-      setShareNote(postGiftsService.sentLabel(giftQuantity, giftCurrency, giftTarget.name));
-      setGiftTarget(null);
-      // Read the committed count so a retried, idempotent gift never counts twice.
-      const updated = await postsApi.byId(giftTarget.postId).catch(() => null);
-      if (updated)
-        setPosts((prev) =>
-          applyToContent(prev, updated.postId, (p) => ({ ...p, gifts: updated.gifts ?? 0 })),
-        );
-    } catch (e) {
-      const failure = pendingTransfersService.failure(e);
-      const message = e instanceof Error ? e.message : "Please try again.";
-      if (failure === "refused" || (failure === "unread" && !wasInDoubt)) {
-        // Answered (or this first send never read): nothing was sent.
-        settleGift(member, gift.key);
+      // One tab at a time sends this member's money requests, deciding from the kept copies
+      // as they are once it holds the lock.
+      const outcome = await pendingTransfersService.exclusive(member, async () => {
+        const doubts = giftsInDoubt(member);
+        if (recovered && !doubts.some((g) => g.key === recovered.key)) {
+          uncertainGift.current = null;
+          return "answered elsewhere" as const;
+        }
+        // Nothing new while another gift is in doubt (another tab's): it would be left behind.
+        if (!recovered && doubts.length > 0) return "another in doubt" as const;
+        // Kept before it's sent: if the page goes before the answer comes, a retry reuses its
+        // key. (Storage can be off or full: then it's this page's own record.)
+        const persisted = pendingTransfersService.keepGift(member, attempt);
+        uncertainGift.current = { ...attempt, member, persisted };
+        try {
+          await postGiftsService.send(
+            attempt.postId,
+            attempt.currency,
+            Number(attempt.quantity),
+            attempt.key,
+            member,
+          );
+        } catch (e) {
+          const failure = pendingTransfersService.failure(e);
+          // Refused: nothing was made. Unread: this send wasn't read, and with the lock held no
+          // other tab has sent it, so a first send is settled too. No answer: kept.
+          if (failure === "refused" || (failure === "unread" && !recovered))
+            settleGift(member, attempt.key);
+          return { failure, message: e instanceof Error ? e.message : "Please try again." };
+        }
+        settleGift(member, attempt.key);
+        return "sent" as const;
+      });
+      if (outcome === "answered elsewhere") {
         setGiftLocked(false);
-        setGiftError(message);
-      } else if (failure === "unread") {
+        setGiftTarget(null);
+        setShareNote(GIFT_COPY.answeredElsewhere);
+      } else if (outcome === "another in doubt") {
+        setGiftError(GIFT_COPY.earlierUnconfirmed);
+      } else if (outcome === "sent") {
+        setGiftLocked(false);
+        setShareNote(
+          postGiftsService.sentLabel(attempt.quantity, attempt.currency, giftTarget.name),
+        );
+        setGiftTarget(null);
+        // Read the committed count so a retried, idempotent gift never counts twice.
+        const updated = await postsApi.byId(attempt.postId).catch(() => null);
+        if (updated)
+          setPosts((prev) =>
+            applyToContent(prev, updated.postId, (p) => ({ ...p, gifts: updated.gifts ?? 0 })),
+          );
+      } else if (outcome.failure === "refused" || (outcome.failure === "unread" && !recovered)) {
+        setGiftLocked(false);
+        setGiftError(outcome.message);
+      } else if (outcome.failure === "unread") {
         // Says nothing about the earlier send: still in doubt, key and all.
         setGiftLocked(true);
-        setGiftError(message);
+        setGiftError(outcome.message);
       } else {
         setGiftLocked(true);
         setGiftError(
