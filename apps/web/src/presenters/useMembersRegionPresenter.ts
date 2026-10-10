@@ -11,6 +11,7 @@ import {
   type RegionRowVM,
 } from "@/domain/member";
 import { ApiError } from "@/services/apiClient";
+import { isOfficialOrganization } from "@/services/organization-placeholder.service";
 import {
   decodeParam,
   hasMore,
@@ -184,7 +185,7 @@ export function useMembersRegionPresenter(
   const rows = useMemo<RegionRowVM[]>(
     () =>
       items.map((pm) => {
-        const card = toMemberCardVM(pm);
+        const card = toMemberCardVM(pm, isOfficialOrganization(pm.userId));
         return {
           card,
           href: Routes.member(pm.username ?? pm.userId),
@@ -238,6 +239,8 @@ export function useMembersRegionPresenter(
       following: copy.following,
       posts: copy.posts,
       followers: copy.followers,
+      organization: MEMBERS_COPY.profile.organization,
+      verifiedOrganization: MEMBERS_COPY.profile.verifiedOrganization,
     },
     loading,
     loadingMore,

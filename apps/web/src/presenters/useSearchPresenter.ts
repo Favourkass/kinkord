@@ -14,6 +14,7 @@ import {
 } from "@/domain/search";
 import { ApiError } from "@/services/apiClient";
 import { membersApi, toggleFollowOnCard } from "@/services/members.service";
+import { isOfficialOrganization } from "@/services/organization-placeholder.service";
 
 /** How long typing pauses before searching; clearing the box applies at once. */
 export const SEARCH_DELAY_MS = 300;
@@ -235,7 +236,7 @@ export function useSearchPresenter(initialQuery: string | null) {
   const rows = useMemo(
     () =>
       (current?.items ?? []).map((pm) => ({
-        ...toSearchPersonVM(pm, Routes.member),
+        ...toSearchPersonVM(pm, Routes.member, isOfficialOrganization(pm.userId)),
         busy: busy.has(pm.userId),
       })),
     [current, busy],
@@ -286,6 +287,8 @@ export function useSearchPresenter(initialQuery: string | null) {
       searching: copy.searching,
       follow: copy.follow,
       following: copy.following,
+      organization: copy.organization,
+      verifiedOrganization: copy.verifiedOrganization,
       morePeople: copy.morePeople,
       loadMore: copy.loadMore,
     },

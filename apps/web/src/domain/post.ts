@@ -132,10 +132,16 @@ export interface PostVM {
    * that is not the viewer's to delete.
    */
   isRepost: boolean;
+  authorUserId: string;
   authorName: string;
   /** The Silver check beside the author's name. */
   authorSilver: boolean;
   authorSubscribed: boolean;
+  authorOrganization: boolean;
+  authorOrganizationVerified: boolean;
+  authorIsFollowing: boolean;
+  authorFollowReady: boolean;
+  authorFollowBusy: boolean;
   handle: string | null;
   /** Link to the author's profile, or null for a member with no username yet. */
   authorHref: string | null;
@@ -175,6 +181,7 @@ export interface FeedSuggestionVM {
   userId: string;
   displayName: string;
   silver: boolean;
+  organization: boolean;
   handle: string | null;
   avatarUrl: string | null;
   isFollowing: boolean;
@@ -240,9 +247,15 @@ export function toPostVM(
     postId: pm.postId,
     repostedByName: pm.repostedBy?.displayName ?? null,
     isRepost: pm.id !== pm.postId,
+    authorUserId: pm.author.userId,
     authorName: pm.author.displayName,
     authorSilver: Boolean(pm.author.silver),
     authorSubscribed: Boolean(pm.author.subscribed),
+    authorOrganization: false,
+    authorOrganizationVerified: false,
+    authorIsFollowing: false,
+    authorFollowReady: false,
+    authorFollowBusy: false,
     handle: handleOf(pm.author.username),
     authorHref: hrefFor(pm.author.username),
     avatarUrl: pm.author.avatarUrl,

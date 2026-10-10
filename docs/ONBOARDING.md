@@ -31,6 +31,7 @@ cp apps/api/.env.example apps/api/.env
 
 # Web environment
 echo "NEXT_PUBLIC_API_URL=http://localhost:4000" > apps/web/.env.local
+echo "NEXT_PUBLIC_KINKORD_OFFICIAL_USER_ID=<official-user-id>" >> apps/web/.env.local
 
 # Database schema
 pnpm --filter api db:migrate

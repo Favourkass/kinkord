@@ -32,6 +32,7 @@ export interface SearchPersonVM {
   details: string | null;
   avatarUrl: string | null;
   silver: boolean;
+  organization: boolean;
   isFollowing: boolean;
   /** Profiles open by username, so a member without one has no link (and no Follow). */
   href: string | null;
@@ -41,16 +42,19 @@ export interface SearchPersonVM {
 export function toSearchPersonVM(
   pm: MemberCardPM,
   memberHref: (username: string) => string,
+  organization = false,
 ): SearchPersonVM {
   return {
     userId: pm.userId,
     name: pm.displayName || pm.username || "",
     handle: pm.username ? `@${pm.username}` : null,
-    details:
-      [ageTagOf(pm.age, pm.gender), locationOf(pm.city, pm.state)].filter(Boolean).join(" · ") ||
-      null,
+    details: organization
+      ? null
+      : [ageTagOf(pm.age, pm.gender), locationOf(pm.city, pm.state)].filter(Boolean).join(" · ") ||
+        null,
     avatarUrl: pm.avatarUrl,
     silver: Boolean(pm.silver),
+    organization,
     isFollowing: pm.isFollowing,
     href: pm.username ? memberHref(pm.username) : null,
     canFollow: Boolean(pm.username),

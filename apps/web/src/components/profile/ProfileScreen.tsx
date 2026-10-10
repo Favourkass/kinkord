@@ -96,7 +96,11 @@ export default function ProfileScreen(p: ProfileScreenProps) {
         sideCard={
           ready && p.vm ? <ProfileSideCard vm={p.vm} labels={p.sideLabels} {...actions} /> : null
         }
-        aside={ready ? <SuggestedFriends {...p.suggested} /> : null}
+        aside={
+          ready && p.vm?.accountType !== "organization" ? (
+            <SuggestedFriends {...p.suggested} />
+          ) : null
+        }
         viewerAvatarUrl={p.viewerAvatarUrl}
         notificationsUnread={p.notificationsUnread}
         notificationsCount={p.notificationsCount}

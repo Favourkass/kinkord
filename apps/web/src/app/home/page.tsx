@@ -50,6 +50,7 @@ export default function HomePage() {
       onGift={feed.openGift}
       giftDialog={feed.giftDialog}
       onOpenMedia={feed.openMedia}
+      onTogglePostAuthorFollow={feed.togglePostAuthorFollow}
       hasMore={feed.hasMore}
       loadingMore={feed.loadingMore}
       onLoadMore={feed.loadMore}
@@ -133,6 +134,8 @@ export default function HomePage() {
         dismissLabel: FEED_COPY.peopleDismiss,
         onDismiss: feed.hideSuggestions,
         onToggleFollow: feed.toggleFollow,
+        organizationLabel: FEED_COPY.organization,
+        verifiedOrganizationLabel: FEED_COPY.verifiedOrganization,
       }}
       lightbox={{
         media: feed.lightbox,

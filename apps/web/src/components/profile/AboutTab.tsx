@@ -4,6 +4,7 @@ import type { PublicProfileVM, SocialPlatform } from "@/domain/member";
 
 export interface AboutLabels {
   aboutMe: string;
+  aboutUs: string;
   personal: string;
   age: string;
   dateOfBirth: string;
@@ -121,6 +122,18 @@ export default function AboutTab({ vm, labels }: AboutTabProps) {
       ) : null}
     </div>
   );
+
+  if (vm.accountType === "organization") {
+    return (
+      <div className="flex flex-col gap-[16px] px-[16px] pb-[40px] pt-[16px] lg:p-0">
+        <Card icon={ICONS.aboutMe} title={labels.aboutUs}>
+          <p className={`text-[14px] leading-[1.5] ${vm.bio ? "text-pf-body" : "text-pf-muted"}`}>
+            {vm.bio ?? labels.notShared}
+          </p>
+        </Card>
+      </div>
+    );
+  }
 
   if (vm.restricted) {
     return (

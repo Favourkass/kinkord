@@ -26,6 +26,8 @@ import type { GiftInDoubt } from "@/domain/wallet";
 import { GIFT_COPY, postGiftsService } from "@/services/post-gifts.service";
 import { pendingTransfersService } from "@/services/pendingTransfers.service";
 import { ApiError } from "@/services/apiClient";
+import { membersApi } from "@/services/members.service";
+import { isOfficialOrganization } from "@/services/organization-placeholder.service";
 import { useMentionSuggestions, type MentionField } from "./useMentionSuggestions";
 import {
   applyLike,
@@ -52,6 +54,14 @@ const memberHref = (username: string | null) => (username ? Routes.member(userna
 
 interface DraftPhoto extends DraftPhotoVM {
   key: string | null;
+}
+
+interface OrganizationFollowState {
+  userId: string;
+  username: string;
+  isFollowing: boolean;
+  ready: boolean;
+  busy: boolean;
 }
 
 export interface FeedOptions {
@@ -98,6 +108,9 @@ export function useFeedPresenter({
   const router = useRouter();
 
   const [posts, setPosts] = useState<PostPM[]>([]);
+  const [organizationFollow, setOrganizationFollow] = useState<OrganizationFollowState | null>(
+    null,
+  );
   const [cursor, setCursor] = useState<string | null>(null);
   const surface = `${postId ?? ""}|${author ?? ""}|${saved}|${search ?? ""}`;
   /**
@@ -606,6 +619,63 @@ export function useFeedPresenter({
 
   // ---- suggestions ------------------------------------------------------
 
+  const officialAuthor = posts.find((post) => isOfficialOrganization(post.author.userId))?.author;
+  const officialAuthorId = officialAuthor?.userId ?? null;
+  const officialUsername = officialAuthor?.username ?? null;
+
+  // Posts do not carry follow state. Resolve it once for the configured official
+  // account, then share one optimistic state across every one of its posts.
+  useEffect(() => {
+    if (!officialAuthorId || !officialUsername) return;
+    let cancelled = false;
+    void membersApi
+      .profile(officialUsername)
+      .then((profile) => {
+        if (cancelled || profile.userId !== officialAuthorId) return;
+        setOrganizationFollow({
+          userId: officialAuthorId,
+          username: officialUsername,
+          isFollowing: profile.isFollowing,
+          ready: true,
+          busy: false,
+        });
+      })
+      .catch(() => {
+        if (!cancelled)
+          setOrganizationFollow((current) =>
+            current?.userId === officialAuthorId ? { ...current, ready: false } : current,
+          );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [officialAuthorId, officialUsername]);
+
+  const togglePostAuthorFollow = useCallback(
+    (userId: string) => {
+      const current = organizationFollow;
+      if (!current || current.userId !== userId || !current.ready || current.busy) return;
+      const nextFollowing = !current.isFollowing;
+      setOrganizationFollow({ ...current, isFollowing: nextFollowing, busy: true });
+      void (
+        current.isFollowing
+          ? membersApi.unfollow(current.username)
+          : membersApi.follow(current.username)
+      )
+        .catch(() =>
+          setOrganizationFollow((latest) =>
+            latest?.userId === userId ? { ...latest, isFollowing: current.isFollowing } : latest,
+          ),
+        )
+        .finally(() =>
+          setOrganizationFollow((latest) =>
+            latest?.userId === userId ? { ...latest, busy: false } : latest,
+          ),
+        );
+    },
+    [organizationFollow],
+  );
+
   const hideSuggestions = useCallback(() => setSuggestionsHidden(true), []);
 
   const toggleFollow = useCallback(
@@ -636,8 +706,24 @@ export function useFeedPresenter({
   // ---- view models ------------------------------------------------------
 
   const postVMs: PostVM[] = useMemo(
-    () => posts.map((p) => toPostVM(p, expanded.includes(p.id), memberHref)),
-    [posts, expanded],
+    () =>
+      posts.map((p) => {
+        const organization = isOfficialOrganization(p.author.userId);
+        const follow =
+          organizationFollow?.userId === p.author.userId &&
+          organizationFollow.username === p.author.username
+            ? organizationFollow
+            : null;
+        return {
+          ...toPostVM(p, expanded.includes(p.id), memberHref),
+          authorOrganization: organization,
+          authorOrganizationVerified: organization,
+          authorIsFollowing: follow?.isFollowing ?? false,
+          authorFollowReady: follow?.ready ?? false,
+          authorFollowBusy: follow?.busy ?? false,
+        };
+      }),
+    [posts, expanded, organizationFollow],
   );
 
   const commentVMs: CommentVM[] = useMemo(
@@ -651,6 +737,7 @@ export function useFeedPresenter({
         userId: s.userId,
         displayName: s.displayName,
         silver: Boolean(s.silver),
+        organization: isOfficialOrganization(s.userId),
         handle: handleOf(s.username),
         avatarUrl: s.avatarUrl,
         isFollowing: s.isFollowing,
@@ -1015,6 +1102,7 @@ export function useFeedPresenter({
     suggestionsHidden,
     hideSuggestions,
     toggleFollow,
+    togglePostAuthorFollow,
   };
 }
 

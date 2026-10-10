@@ -62,6 +62,8 @@ export const FEED_COPY = {
   peopleDismiss: "Hide suggestions",
   peopleAdd: "Add friend",
   peopleAdded: "Remove",
+  organization: "Org",
+  verifiedOrganization: "Verified organization",
   /** Desktop right rail, which the mobile frame has no room for. */
   asideHeading: "Kinkord",
   asideTagline: "The world's kink community",
@@ -97,4 +99,8 @@ export const POST_CARD_LABELS = {
   menu: FEED_COPY.postMenu,
   delete: FEED_COPY.deletePost,
   repostedBy: FEED_COPY.repostedBy,
+  organization: FEED_COPY.organization,
+  verifiedOrganization: FEED_COPY.verifiedOrganization,
+  follow: "Follow",
+  following: "Following",
 } as const;

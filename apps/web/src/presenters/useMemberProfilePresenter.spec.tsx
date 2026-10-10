@@ -138,6 +138,7 @@ const routeGet =
 
 describe("useMemberProfilePresenter", () => {
   beforeEach(() => {
+    vi.unstubAllEnvs();
     replace.mockClear();
     apiGet.mockReset().mockImplementation(routeGet());
     apiPost.mockReset().mockResolvedValue({});
@@ -154,6 +155,27 @@ describe("useMemberProfilePresenter", () => {
       else expect(result.current.coinBalance).toBeUndefined();
     },
   );
+
+  it("presents only the configured immutable id as the official organization", async () => {
+    vi.stubEnv("NEXT_PUBLIC_KINKORD_OFFICIAL_USER_ID", "u2");
+    const { result } = renderHook(() => useMemberProfilePresenter("nene", "people"));
+
+    await waitFor(() => expect(result.current.people.rows).toHaveLength(1));
+    expect(result.current.vm).toMatchObject({
+      userId: "u2",
+      accountType: "organization",
+      organizationVerified: true,
+    });
+    expect(result.current.presenceText).toBeNull();
+    expect(result.current.people.subTabs.map((item) => item.key)).toEqual([
+      "followers",
+      "following",
+    ]);
+    expect(apiGet).toHaveBeenCalledWith("/profiles/nene/friends?tab=followers&page=1&limit=5");
+    expect(apiGet).not.toHaveBeenCalledWith(
+      "/profiles/nene/friends?tab=suggested&page=1&limit=3",
+    );
+  });
 
   it("loads the profile, defaults to the About tab and formats presence", async () => {
     const { result } = renderHook(() => useMemberProfilePresenter("%40Nene"));
