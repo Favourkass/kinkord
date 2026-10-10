@@ -20,7 +20,6 @@ const check = (over: Partial<MemberCheckPM> = {}): MemberCheckPM => ({
   shown: false,
   reason: "held",
   heldFor: "name",
-  showsFrom: null,
   ...over,
 });
 

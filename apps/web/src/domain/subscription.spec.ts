@@ -222,14 +222,12 @@ describe("toMemberCheckVM", () => {
     shown: "Showing.",
     held: { name: "Name.", username: "Username.", photo: "Photo.", admin: "Removed." },
     photos: "Photos.",
-    newAccount: (d: string) => `From ${d}.`,
   };
   const pm = (over: Partial<MemberCheckPM> = {}): MemberCheckPM => ({
     silverUntil: "2027-10-06T12:00:00Z",
     shown: true,
     reason: null,
     heldFor: null,
-    showsFrom: null,
     ...over,
   });
 
@@ -257,11 +255,5 @@ describe("toMemberCheckVM", () => {
       status: "Photos.",
       canApprove: false,
     });
-    expect(
-      toMemberCheckVM(
-        pm({ shown: false, reason: "new_account", showsFrom: "2026-10-20T00:00:00Z" }),
-        labels,
-      ).status,
-    ).toBe("From 20 Oct 2026.");
   });
 });

@@ -29,9 +29,8 @@ export interface HeldCheckDto {
 export interface MemberCheckDto {
   silverUntil: string;
   shown: boolean;
-  reason: "held" | "new_account" | "photos" | null;
+  reason: "held" | "photos" | null;
   heldFor: SilverCheckHold | null;
-  showsFrom: string | null;
 }
 
 /**
@@ -132,7 +131,6 @@ export class SilverChecksService {
       shown: status.shown,
       reason: status.reason,
       heldFor: status.heldFor,
-      showsFrom: status.showsFrom?.toISOString() ?? null,
     };
   }
 

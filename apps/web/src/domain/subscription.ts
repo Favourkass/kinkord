@@ -54,10 +54,8 @@ export type SilverCheckHold = "name" | "username" | "photo" | "admin";
 /** Whether a Silver member's check shows and, when it doesn't, why. */
 export interface SilverCheckPM {
   shown: boolean;
-  reason: "held" | "new_account" | "photos" | null;
+  reason: "held" | "photos" | null;
   heldFor: SilverCheckHold | null;
-  /** When a new account's check appears. */
-  showsFrom: string | null;
 }
 
 export interface SubscriptionStatusPM {
@@ -305,20 +303,13 @@ export function toMemberCheckVM(
     shown: string;
     held: Record<SilverCheckHold, string>;
     photos: string;
-    newAccount: (date: string) => string;
   },
 ): MemberCheckVM {
   const held = pm.reason === "held";
   return {
     until: labels.until(planDate(pm.silverUntil)),
     shown: pm.shown,
-    status: pm.shown
-      ? labels.shown
-      : held
-        ? labels.held[pm.heldFor ?? "admin"]
-        : pm.reason === "photos"
-          ? labels.photos
-          : labels.newAccount(pm.showsFrom ? planDate(pm.showsFrom) : ""),
+    status: pm.shown ? labels.shown : held ? labels.held[pm.heldFor ?? "admin"] : labels.photos,
     canApprove: held,
     canRemove: !(held && pm.heldFor === "admin"),
   };

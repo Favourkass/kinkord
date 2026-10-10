@@ -99,9 +99,8 @@ export interface PaymentDto {
 /** The member's own Silver check: why it isn't showing, when it isn't. */
 export interface SilverCheckDto {
   shown: boolean;
-  reason: "held" | "new_account" | "photos" | null;
+  reason: "held" | "photos" | null;
   heldFor: SilverCheckHold | null;
-  showsFrom: string | null;
 }
 
 export interface SubscriptionStatusDto {

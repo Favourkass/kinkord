@@ -26,7 +26,6 @@ export const SUBSCRIPTION_COPY = {
             admin: "Your badge is hidden after a review by our team.",
           },
           photos: "Add a profile photo and a cover photo to show your badge.",
-          newAccount: (date: string) => `Your badge shows from ${date}.`,
         },
       },
       pending: {

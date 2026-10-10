@@ -259,7 +259,6 @@ export class SubscriptionsService implements OnApplicationBootstrap {
             shown: check.shown,
             reason: check.reason,
             heldFor: check.heldFor,
-            showsFrom: check.showsFrom?.toISOString() ?? null,
           }
         : null,
       forGood,

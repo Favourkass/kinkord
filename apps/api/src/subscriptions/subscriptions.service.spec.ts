@@ -260,7 +260,6 @@ describe("SubscriptionsService.status", () => {
         {
           heldAt: null,
           heldFor: null,
-          createdAt: new Date("2026-01-01T00:00:00Z"),
           avatarKey: "a",
           coverKey: "c",
         },
@@ -271,25 +270,15 @@ describe("SubscriptionsService.status", () => {
     expect(status).toMatchObject({ plan: "silver", silverUntil: end.toISOString() });
     expect(status.available).toBe(true);
     expect(status.open?.status).toBe("submitted");
-    expect(status.check).toEqual({ shown: true, reason: null, heldFor: null, showsFrom: null });
+    expect(status.check).toEqual({ shown: true, reason: null, heldFor: null });
   });
 
   it("says why a Silver member's check isn't showing yet", async () => {
     const end = new Date("2026-11-06T12:00:00Z");
-    const created = new Date("2026-09-20T00:00:00Z");
-    const fresh = make([
-      [{ end }],
-      [settingsRow],
-      [{ heldAt: null, heldFor: null, createdAt: created, avatarKey: "a", coverKey: "c" }],
-      [],
-    ]);
-    await expect(fresh.service.status(member)).resolves.toMatchObject({
-      check: { shown: false, reason: "new_account", showsFrom: "2026-10-20T00:00:00.000Z" },
-    });
     const held = make([
       [{ end }],
       [settingsRow],
-      [{ heldAt: NOW, heldFor: "name", createdAt: created, avatarKey: "a", coverKey: "c" }],
+      [{ heldAt: NOW, heldFor: "name", avatarKey: "a", coverKey: "c" }],
       [],
     ]);
     await expect(held.service.status(member)).resolves.toMatchObject({

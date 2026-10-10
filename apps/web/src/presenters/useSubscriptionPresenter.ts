@@ -62,9 +62,7 @@ export function checkNote(check: SilverCheckPM): { shown: boolean; text: string 
       ? copy.held[check.heldFor ?? "admin"]
       : check.reason === "photos"
         ? copy.photos
-        : check.reason === "new_account" && check.showsFrom
-          ? copy.newAccount(planDate(check.showsFrom))
-          : copy.held.admin;
+        : copy.held.admin;
   return { shown: false, text };
 }
 
