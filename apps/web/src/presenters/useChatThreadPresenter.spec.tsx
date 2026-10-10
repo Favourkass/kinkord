@@ -43,6 +43,7 @@ const svc = {
   conversation: vi.fn(),
   history: vi.fn(),
   send: vi.fn(),
+  setTyping: vi.fn(async () => ({ ok: true })),
   markRead: vi.fn(),
   allowance: vi.fn(),
   uploadPhoto: vi.fn(),
@@ -440,5 +441,55 @@ describe("useChatThreadPresenter", () => {
     await waitFor(() => expect(result.current.safety.blocked).not.toBeNull());
     expect(safety.block).toHaveBeenCalledWith("u2");
     expect(result.current.thread.peer?.blockedByMe).toBe(true);
+  });
+  it("throttles typing heartbeats and clears them after idle", async () => {
+    live.up = true;
+    const { result } = renderHook(() => useChatThreadPresenter("c1"));
+    await waitFor(() => expect(result.current.thread.loading).toBe(false));
+    vi.useFakeTimers();
+    try {
+      svc.setTyping.mockClear();
+      act(() => {
+        result.current.onTyping(true);
+        result.current.onTyping(true);
+      });
+      expect(svc.setTyping).toHaveBeenCalledTimes(1);
+      expect(svc.setTyping).toHaveBeenCalledWith("c1", true);
+      act(() => vi.advanceTimersByTime(5000));
+      expect(svc.setTyping).toHaveBeenLastCalledWith("c1", false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("renders live typing without fetching the header and expires it locally", async () => {
+    live.up = true;
+    const { result } = renderHook(() => useChatThreadPresenter("c1"));
+    await waitFor(() => expect(result.current.thread.loading).toBe(false));
+    svc.conversation.mockClear();
+    vi.useFakeTimers();
+    try {
+      act(() =>
+        live.hear?.({
+          type: "typing",
+          conversationId: "c1",
+          typing: true,
+          expiresAt: Date.now() + 8000,
+        }),
+      );
+      expect(result.current.thread.peer?.typing).toBe(true);
+      expect(svc.conversation).not.toHaveBeenCalled();
+      act(() => vi.advanceTimersByTime(8000));
+      expect(result.current.thread.peer?.typing).toBe(false);
+      expect(svc.conversation).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("does not send typing requests without a live connection", async () => {
+    const { result } = renderHook(() => useChatThreadPresenter("c1"));
+    await waitFor(() => expect(result.current.thread.loading).toBe(false));
+    svc.setTyping.mockClear();
+    act(() => result.current.onTyping(true));
+    expect(svc.setTyping).not.toHaveBeenCalled();
   });
 });

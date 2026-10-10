@@ -42,3 +42,17 @@ describe("eventsFromFrame", () => {
     ).toEqual([]);
   });
 });
+
+it("accepts only valid transient typing hints", () => {
+  const event = { type: "typing", conversationId: "c1", typing: true, expiresAt: 12345 };
+  expect(eventsFromFrame({ type: "data", event: [JSON.stringify(event)] })).toEqual([event]);
+  expect(
+    eventsFromFrame({
+      type: "data",
+      event: [
+        { ...event, expiresAt: "bad" },
+        { ...event, typing: "yes" },
+      ],
+    }),
+  ).toEqual([]);
+});

@@ -33,6 +33,8 @@ export const photoUploadSchema = z.object({
   contentLength: z.number().int().positive().optional(),
 });
 
+export const typingSchema = z.object({ typing: z.boolean() });
+
 export const markReadSchema = z.object({
   messageId: z.string().uuid(),
 });
@@ -76,6 +78,8 @@ export interface ChatPeerDto {
   /** Shows the Silver check beside their name. */
   silver: boolean;
   online: boolean;
+  verified: boolean;
+  presence: "online" | "away" | "offline";
   /** The viewer blocked them: the thread stays, read-only until they unblock. */
   blockedByMe: boolean;
 }

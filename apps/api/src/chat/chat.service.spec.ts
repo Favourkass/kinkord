@@ -436,6 +436,7 @@ describe("ChatService.listConversations", () => {
           avatarKey: "avatars/u2/a.png",
           lastSeenAt: new Date(),
           silver: true,
+          verified: true,
         },
       ],
       [row("m1")],
@@ -450,6 +451,8 @@ describe("ChatService.listConversations", () => {
         displayName: "Ada",
         avatarUrl: "https://media/avatars/u2/a.png?sm",
         online: true,
+        presence: "online",
+        verified: true,
         silver: true,
       },
       lastMessage: { id: "m1", body: "hello" },
@@ -820,5 +823,50 @@ describe("chat unread badge", () => {
   });
   it("returns zero when no messages are unread", async () => {
     await expect(make([[{ total: 0 }]]).service.unreadCount("u1")).resolves.toEqual({ count: 0 });
+  });
+});
+
+describe("ChatService.setTyping", () => {
+  it("publishes only to the authorised peer without writing to the database", async () => {
+    const { service, realtime, calls } = make([
+      [{ userId: "u1" }],
+      [{ userId: "u2", blockedByMe: false }],
+    ]);
+    await service.setTyping("u1", "c1", true);
+    expect(realtime.notify).toHaveBeenCalledWith(["u2"], {
+      type: "typing",
+      conversationId: "c1",
+      typing: true,
+      expiresAt: expect.any(Number),
+    });
+    expect(calls.some((c) => ["update", "insert", "delete"].includes(c.op))).toBe(false);
+  });
+  it("suppresses repeated hints but sends stop immediately", async () => {
+    const { service, realtime, calls } = make([
+      [{ userId: "u1" }],
+      [{ userId: "u2", blockedByMe: false }],
+      [{ userId: "u1" }],
+      [{ userId: "u2", blockedByMe: false }],
+    ]);
+    await service.setTyping("u1", "c1", true);
+    const count = calls.length;
+    await service.setTyping("u1", "c1", true);
+    expect(calls).toHaveLength(count);
+    await service.setTyping("u1", "c1", false);
+    expect(realtime.notify).toHaveBeenCalledTimes(2);
+    expect(realtime.notify).toHaveBeenLastCalledWith(
+      ["u2"],
+      expect.objectContaining({ typing: false }),
+    );
+  });
+  it("rejects non-members and blocked peers", async () => {
+    await expect(make([[]]).service.setTyping("u1", "c1", true)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    const blocked = make([[{ userId: "u1" }], [{ userId: "u2", blockedByMe: true }]]);
+    await expect(blocked.service.setTyping("u1", "c1", true)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(blocked.realtime.notify).not.toHaveBeenCalled();
   });
 });

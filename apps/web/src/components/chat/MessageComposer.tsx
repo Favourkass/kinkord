@@ -17,6 +17,7 @@ export interface ComposerPhotoProps {
 
 export interface MessageComposerProps {
   onSend: (body: string) => void;
+  onTyping?: (active: boolean) => void;
   placeholder: string;
   sendLabel: string;
   maxLength: number;
@@ -31,6 +32,7 @@ export interface MessageComposerProps {
  */
 export default function MessageComposer({
   onSend,
+  onTyping,
   placeholder,
   sendLabel,
   maxLength,
@@ -47,6 +49,7 @@ export default function MessageComposer({
 
   const submit = () => {
     if (!canSend) return;
+    onTyping?.(false);
     onSend(value.trim());
     setValue("");
     inputRef.current?.focus();
@@ -148,7 +151,11 @@ export default function MessageComposer({
           value={value}
           maxLength={maxLength}
           disabled={disabled}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(e) => {
+            setValue(e.target.value);
+            onTyping?.(e.target.value.trim().length > 0);
+          }}
+          onBlur={() => onTyping?.(false)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
