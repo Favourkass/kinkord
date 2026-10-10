@@ -4,6 +4,7 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { useWalletPresenter } from "./useWalletPresenter";
 import { ApiError } from "@/services/apiClient";
+import { pendingTransfersService } from "@/services/pendingTransfers.service";
 import { walletService, type WalletDataPM } from "@/services/wallet.service";
 const router = vi.hoisted(() => ({ push: vi.fn() }));
 // Each test's hook unmounts after it, so its polling and focus listener stop with it.
@@ -226,13 +227,13 @@ describe("useWalletPresenter", () => {
   });
   it("brings back a withdrawal left unanswered before a reload, review open, same key", async () => {
     const kept = {
-      currency: "coin",
+      currency: "coin" as const,
       quantity: "100",
       bankId: "bank",
       key: "kept-key",
       expectedAmountKobo: 80000,
     };
-    localStorage.setItem("kinkord:unanswered:withdrawal:u", JSON.stringify(kept));
+    pendingTransfersService.keepWithdrawal("u", kept);
     vi.spyOn(walletService, "load").mockResolvedValue({
       ...data,
       summary: { ...data.summary, userId: "u" },
@@ -265,19 +266,16 @@ describe("useWalletPresenter", () => {
     expect(result.current.review).toBe(true);
     await act(() => result.current.onWithdraw());
     expect(withdraw).toHaveBeenCalledWith("coin", 100, "bank", "kept-key", 80000, "u");
-    expect(localStorage.getItem("kinkord:unanswered:withdrawal:u")).toBeNull();
+    expect(pendingTransfersService.withdrawals("u")).toEqual([]);
   });
   it("brings back a kept withdrawal when Retry loads the wallet after a failed first load", async () => {
-    localStorage.setItem(
-      "kinkord:unanswered:withdrawal:u",
-      JSON.stringify({
-        currency: "coin",
-        quantity: "100",
-        bankId: "bank",
-        key: "kept-key",
-        expectedAmountKobo: 80000,
-      }),
-    );
+    pendingTransfersService.keepWithdrawal("u", {
+      currency: "coin",
+      quantity: "100",
+      bankId: "bank",
+      key: "kept-key",
+      expectedAmountKobo: 80000,
+    });
     vi.spyOn(walletService, "load")
       .mockRejectedValueOnce(new Error("offline"))
       .mockResolvedValue(data);
@@ -329,16 +327,14 @@ describe("useWalletPresenter", () => {
     act(() => result.current.onRedeem("coin"));
     await act(() => result.current.onWithdraw());
     // Another tab settled that one and kept a newer withdrawal, still unanswered.
-    localStorage.setItem(
-      "kinkord:unanswered:withdrawal:u",
-      JSON.stringify({
-        currency: "coin",
-        quantity: "120",
-        bankId: "bank",
-        key: "newer",
-        expectedAmountKobo: 96000,
-      }),
-    );
+    localStorage.clear();
+    pendingTransfersService.keepWithdrawal("u", {
+      currency: "coin",
+      quantity: "120",
+      bankId: "bank",
+      key: "newer",
+      expectedAmountKobo: 96000,
+    });
     await act(() => result.current.onWithdraw());
     expect(withdraw).toHaveBeenCalledOnce();
     expect(result.current.quantity).toBe("120");
@@ -359,31 +355,25 @@ describe("useWalletPresenter", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     act(() => result.current.onRedeem("coin"));
     // Another tab sent one that got no answer, after this page loaded.
-    localStorage.setItem(
-      "kinkord:unanswered:withdrawal:u",
-      JSON.stringify({
-        currency: "coin",
-        quantity: "100",
-        bankId: "bank",
-        key: "other-tab",
-        expectedAmountKobo: 80000,
-      }),
-    );
+    pendingTransfersService.keepWithdrawal("u", {
+      currency: "coin",
+      quantity: "100",
+      bankId: "bank",
+      key: "other-tab",
+      expectedAmountKobo: 80000,
+    });
     await act(() => result.current.onWithdraw());
     expect(withdraw).not.toHaveBeenCalled();
     expect(result.current.unansweredNotice).toBeTruthy();
   });
   it("never brings back another member's unanswered withdrawal", async () => {
-    localStorage.setItem(
-      "kinkord:unanswered:withdrawal:someone-else",
-      JSON.stringify({
-        currency: "coin",
-        quantity: "100",
-        bankId: "bank",
-        key: "theirs",
-        expectedAmountKobo: 80000,
-      }),
-    );
+    pendingTransfersService.keepWithdrawal("someone-else", {
+      currency: "coin",
+      quantity: "100",
+      bankId: "bank",
+      key: "theirs",
+      expectedAmountKobo: 80000,
+    });
     vi.spyOn(walletService, "load").mockResolvedValue({
       ...data,
       summary: { ...data.summary, userId: "u" },
@@ -445,7 +435,7 @@ describe("useWalletPresenter", () => {
     expect(withdraw.mock.calls[1][5]).toBe("u");
     expect(result.current.error).toMatch(/someone else/);
     expect(result.current.unansweredNotice).toBeTruthy();
-    expect(localStorage.getItem("kinkord:unanswered:withdrawal:u")).not.toBeNull();
+    expect(pendingTransfersService.withdrawals("u")).toHaveLength(1);
   });
   it("keeps an unanswered withdrawal when the retry meets a sign-up step", async () => {
     vi.spyOn(walletService, "load").mockResolvedValue(data);

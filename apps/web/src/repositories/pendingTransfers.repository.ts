@@ -3,30 +3,46 @@ import type { GiftInDoubt, UnansweredWithdrawal } from "@/domain/wallet";
 
 /**
  * Money requests sent but not yet answered (a lost response), kept in this browser per member,
- * so a reload or a later visit sends them again with the same key instead of starting a second
- * one. Storage can be off (private mode): then they last as long as the page.
+ * each under its own request key: tabs never share an entry, so none overwrites another's. A
+ * reload or a later visit sends them again with the same key instead of starting a second one.
  */
-const key = (slot: string, memberId: string) => `kinkord:unanswered:${slot}:${memberId}`;
+const prefix = (slot: string, memberId: string) => `kinkord:unanswered:${slot}:${memberId}:`;
 
-function read(slot: string, memberId: string): Record<string, unknown> | null {
+/** Every entry kept in a slot for a member; a damaged one is skipped. */
+function entries(slot: string, memberId: string): Record<string, unknown>[] {
+  const start = prefix(slot, memberId);
+  const found: Record<string, unknown>[] = [];
   try {
-    const raw = localStorage.getItem(key(slot, memberId));
-    const value: unknown = raw ? JSON.parse(raw) : null;
-    return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(start)) keys.push(key);
+    }
+    for (const key of keys.sort()) {
+      try {
+        const value: unknown = JSON.parse(localStorage.getItem(key) ?? "null");
+        if (value && typeof value === "object") found.push(value as Record<string, unknown>);
+      } catch {
+        // Damaged: skipped.
+      }
+    }
   } catch {
-    return null;
+    // Storage off: nothing kept.
+  }
+  return found;
+}
+/** True once it's really kept: storage can be off, or full. */
+function keep(slot: string, memberId: string, key: string, value: object): boolean {
+  try {
+    localStorage.setItem(prefix(slot, memberId) + key, JSON.stringify(value));
+    return true;
+  } catch {
+    return false;
   }
 }
-function write(slot: string, memberId: string, value: object) {
+function settle(slot: string, memberId: string, key: string) {
   try {
-    localStorage.setItem(key(slot, memberId), JSON.stringify(value));
-  } catch {
-    // Kept for this page only.
-  }
-}
-function clear(slot: string, memberId: string) {
-  try {
-    localStorage.removeItem(key(slot, memberId));
+    localStorage.removeItem(prefix(slot, memberId) + key);
   } catch {
     // Nothing kept to clear.
   }
@@ -35,51 +51,39 @@ function clear(slot: string, memberId: string) {
 const isCurrency = (v: unknown): v is KinkCurrency => v === "coin" || v === "star" || v === "crown";
 const isText = (v: unknown): v is string => typeof v === "string" && v.length > 0;
 
+function toWithdrawal(v: Record<string, unknown>): UnansweredWithdrawal | null {
+  return isCurrency(v.currency) &&
+    isText(v.quantity) &&
+    isText(v.bankId) &&
+    isText(v.key) &&
+    Number.isSafeInteger(v.expectedAmountKobo)
+    ? {
+        currency: v.currency,
+        quantity: v.quantity,
+        bankId: v.bankId,
+        key: v.key,
+        expectedAmountKobo: v.expectedAmountKobo as number,
+      }
+    : null;
+}
+function toGift(v: Record<string, unknown>): GiftInDoubt | null {
+  return isText(v.postId) && isCurrency(v.currency) && isText(v.quantity) && isText(v.key)
+    ? { postId: v.postId, currency: v.currency, quantity: v.quantity, key: v.key }
+    : null;
+}
+const whole = <T>(value: T | null): value is T => value !== null;
+
 export const pendingTransfersRepository = {
-  /** Whether this browser keeps requests at all (storage is off in some private modes). */
-  canKeep(): boolean {
-    try {
-      localStorage.setItem("kinkord:unanswered:probe", "1");
-      localStorage.removeItem("kinkord:unanswered:probe");
-      return true;
-    } catch {
-      return false;
-    }
-  },
-  /** An unanswered withdrawal kept for this member, if a whole one is. */
-  withdrawal(memberId: string): UnansweredWithdrawal | null {
-    const v = read("withdrawal", memberId);
-    return v &&
-      isCurrency(v.currency) &&
-      isText(v.quantity) &&
-      isText(v.bankId) &&
-      isText(v.key) &&
-      Number.isSafeInteger(v.expectedAmountKobo)
-      ? {
-          currency: v.currency,
-          quantity: v.quantity,
-          bankId: v.bankId,
-          key: v.key,
-          expectedAmountKobo: v.expectedAmountKobo as number,
-        }
-      : null;
-  },
+  /** This member's unanswered withdrawals kept in this browser (any tab's). */
+  withdrawals: (memberId: string): UnansweredWithdrawal[] =>
+    entries("withdrawal", memberId).map(toWithdrawal).filter(whole),
+  /** True once kept; false when this browser couldn't keep it. */
   keepWithdrawal: (memberId: string, request: UnansweredWithdrawal) =>
-    write("withdrawal", memberId, request),
-  /** Clears the kept withdrawal only if it's the one answered (another tab may have kept a newer one). */
-  settleWithdrawal(memberId: string, key: string) {
-    if (read("withdrawal", memberId)?.key === key) clear("withdrawal", memberId);
-  },
-  /** A gift in doubt kept for this member, if a whole one is. */
-  gift(memberId: string): GiftInDoubt | null {
-    const v = read("gift", memberId);
-    return v && isText(v.postId) && isCurrency(v.currency) && isText(v.quantity) && isText(v.key)
-      ? { postId: v.postId, currency: v.currency, quantity: v.quantity, key: v.key }
-      : null;
-  },
-  keepGift: (memberId: string, gift: GiftInDoubt) => write("gift", memberId, gift),
-  /** Clears the kept gift only if it's the one answered (another tab may have kept a newer one). */
-  settleGift(memberId: string, key: string) {
-    if (read("gift", memberId)?.key === key) clear("gift", memberId);
-  },
+    keep("withdrawal", memberId, request.key, request),
+  settleWithdrawal: (memberId: string, key: string) => settle("withdrawal", memberId, key),
+  /** This member's gifts in doubt kept in this browser (any tab's). */
+  gifts: (memberId: string): GiftInDoubt[] => entries("gift", memberId).map(toGift).filter(whole),
+  /** True once kept; false when this browser couldn't keep it. */
+  keepGift: (memberId: string, gift: GiftInDoubt) => keep("gift", memberId, gift.key, gift),
+  settleGift: (memberId: string, key: string) => settle("gift", memberId, key),
 };

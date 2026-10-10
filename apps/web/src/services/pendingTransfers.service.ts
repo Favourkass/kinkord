@@ -27,18 +27,22 @@ export type TransferFailure = "refused" | "unread" | "unknown";
  */
 export const pendingTransfersService = {
   failure(e: unknown): TransferFailure {
-    if (!(e instanceof ApiError) || e.status === 0 || e.status >= 500) return "unknown";
+    if (!(e instanceof ApiError)) return "unknown";
     const code = (e.body as { code?: unknown } | null)?.code;
+    // Switched off: a definite "no", before anything was read or moved.
+    if (code === "WALLET_DISABLED") return "refused";
+    if (e.status === 0 || e.status >= 500) return "unknown";
     if ([401, 408, 429].includes(e.status) || (typeof code === "string" && UNREAD_CODES.has(code)))
       return "unread";
     return e.status >= 400 ? "refused" : "unknown";
   },
-  canKeep: () => store.canKeep(),
-  withdrawal: (memberId: string): UnansweredWithdrawal | null => store.withdrawal(memberId),
+  withdrawals: (memberId: string): UnansweredWithdrawal[] => store.withdrawals(memberId),
+  /** True once kept; false when this browser couldn't keep it. */
   keepWithdrawal: (memberId: string, request: UnansweredWithdrawal) =>
     store.keepWithdrawal(memberId, request),
   settleWithdrawal: (memberId: string, key: string) => store.settleWithdrawal(memberId, key),
-  gift: (memberId: string): GiftInDoubt | null => store.gift(memberId),
+  gifts: (memberId: string): GiftInDoubt[] => store.gifts(memberId),
+  /** True once kept; false when this browser couldn't keep it. */
   keepGift: (memberId: string, gift: GiftInDoubt) => store.keepGift(memberId, gift),
   settleGift: (memberId: string, key: string) => store.settleGift(memberId, key),
 };

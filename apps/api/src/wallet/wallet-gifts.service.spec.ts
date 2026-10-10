@@ -169,7 +169,9 @@ describe("post wallet gifts", () => {
   });
   it("respects the wallet transaction switch", async () => {
     const { service, db } = fixture({ selects: [[], [{ enabled: 0 }]] });
-    await expect(service.send("a", input)).rejects.toThrow(/not enabled/);
+    await expect(service.send("a", input)).rejects.toMatchObject({
+      response: { code: "WALLET_DISABLED", message: "Wallet transactions are not enabled yet." },
+    });
     expect(db.update).not.toHaveBeenCalled();
   });
   it("rejects posts deleted or changed before transfer", async () => {

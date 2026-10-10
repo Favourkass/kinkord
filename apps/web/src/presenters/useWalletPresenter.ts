@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Routes } from "@/constants/Routes";
 import { WALLET_COPY } from "@/constants/wallet";
@@ -21,6 +21,23 @@ const withBadge = <T extends { name: string }>(bank: T) => ({
   badge: bankBadge(bank.name),
 });
 import { walletService, type WalletDataPM } from "@/services/wallet.service";
+/** An unanswered withdrawal: its sender (it's only ever sent again as them), and whether this browser could keep it. */
+type InDoubt = UnansweredWithdrawal & { member: string; persisted: boolean };
+
+/**
+ * This member's unanswered withdrawals: those kept in this browser, any tab's (the truth
+ * across tabs: another may have settled this page's one, or kept others), and this page's
+ * own when it couldn't be kept.
+ */
+const withdrawalsInDoubt = (owner: string, own: InDoubt | null): InDoubt[] => {
+  const kept = pendingTransfersService
+    .withdrawals(owner)
+    .map((request) => ({ ...request, member: owner, persisted: true }));
+  if (own && own.member === owner && !own.persisted && !kept.some((k) => k.key === own.key))
+    kept.push(own);
+  return kept;
+};
+
 export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
   const router = useRouter();
   const [data, setData] = useState<WalletDataPM | null>(null),
@@ -44,17 +61,15 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
   // Until it's answered, it's what gets sent, exactly as it was (same account and key),
   // whatever the form says now: the server returns the withdrawal it made, or refuses.
   // With its sender: it's only ever sent again by them.
-  const [unanswered, setUnanswered] = useState<(UnansweredWithdrawal & { member: string }) | null>(
-    null,
-  );
+  const [unanswered, setUnanswered] = useState<InDoubt | null>(null);
   // Unanswered requests are kept in this browser too, for this member, until answered.
   const member = data?.summary.userId ?? null;
   const keepUnanswered = (request: UnansweredWithdrawal, sender: string) => {
-    setUnanswered({ ...request, member: sender });
-    pendingTransfersService.keepWithdrawal(sender, request);
+    const persisted = pendingTransfersService.keepWithdrawal(sender, request);
+    setUnanswered({ ...request, member: sender, persisted });
   };
   const settleUnanswered = (sender: string, key: string) => {
-    setUnanswered(null);
+    setUnanswered((current) => (current?.key === key ? null : current));
     pendingTransfersService.settleWithdrawal(sender, key);
   };
   /**
@@ -62,25 +77,22 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
    * (a reload's, say), restored before anything new can be sent. Another account's (a switch in
    * another tab) stays kept for them.
    */
-  const applyLoad = (next: WalletDataPM) => {
+  const applyLoad = useCallback((next: WalletDataPM) => {
     setData(next);
     const owner = next.summary.userId;
-    const kept = owner ? pendingTransfersService.withdrawal(owner) : null;
-    // The kept copy is the truth across tabs (another may have settled this page's request, or
-    // kept a newer one); only with storage off does this page's own record count.
-    setUnanswered((current) =>
-      kept && owner
-        ? { ...kept, member: owner }
-        : current && current.member === owner && !pendingTransfersService.canKeep()
-          ? current
-          : null,
-    );
+    // The one shown: this page's own while it's still in doubt, else the first kept (a reload's,
+    // or another tab's). Another account's (a switch in another tab) stays kept for them.
+    setUnanswered((current) => {
+      if (!owner) return null;
+      const doubts = withdrawalsInDoubt(owner, current);
+      return doubts.find((d) => d.key === current?.key) ?? doubts[0] ?? null;
+    });
     // The account shown is pinned once: a default changed elsewhere doesn't move it.
     setBankId(
       (previous) =>
         previous || next.banks.find((bank) => bank.isDefault)?.id || next.banks[0]?.id || "",
     );
-  };
+  }, []);
   const keyFor = (value: string) => {
     const existing = keys.current.get(value);
     if (existing) return existing;
@@ -134,7 +146,7 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
       clearInterval(interval);
       window.removeEventListener("focus", focus);
     };
-  }, [paymentId]);
+  }, [paymentId, applyLoad]);
   const vm = walletService.view(mode, data);
   const run = async (work: () => Promise<void>) => {
     if (running.current) return;
@@ -289,12 +301,8 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
         // Reconciled with the kept copy first: another tab may have settled the request this
         // page remembers, or kept a newer one, which is then the one to send (never overwritten).
         const own = unanswered && unanswered.member === member ? unanswered : null;
-        const kept = pendingTransfersService.withdrawal(member);
-        const inDoubt = kept
-          ? { ...kept, member }
-          : own && !pendingTransfersService.canKeep()
-            ? own
-            : null;
+        const doubts = withdrawalsInDoubt(member, own);
+        const inDoubt = doubts.find((d) => d.key === own?.key) ?? doubts[0] ?? null;
         if (inDoubt && inDoubt.key !== own?.key) {
           // Not what this page showed: shown first, then sent.
           setUnanswered(inDoubt);

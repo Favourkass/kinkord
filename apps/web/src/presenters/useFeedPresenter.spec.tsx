@@ -71,6 +71,7 @@ vi.mock("@/services/post-gifts.service", async (importOriginal) => {
 
 const { useFeedPresenter } = await import("./useFeedPresenter");
 const { ApiError } = await import("@/services/apiClient");
+const { pendingTransfersService } = await import("@/services/pendingTransfers.service");
 
 const author = { userId: "u2", username: "tega", displayName: "Sir T", avatarUrl: null };
 
@@ -1014,10 +1015,12 @@ describe("post gifting presenter", () => {
     expect(giftSend.mock.calls[0]).toEqual(giftSend.mock.calls[1]);
   });
   it("brings back a gift left in doubt before a reload, with its key", async () => {
-    localStorage.setItem(
-      "kinkord:unanswered:gift:me",
-      JSON.stringify({ postId: "p1", currency: "star", quantity: "2", key: "kept-key" }),
-    );
+    pendingTransfersService.keepGift("me", {
+      postId: "p1",
+      currency: "star",
+      quantity: "2",
+      key: "kept-key",
+    });
     giftBalance.mockResolvedValue({
       userId: "me",
       settings: { enabled: true },
@@ -1035,14 +1038,16 @@ describe("post gifting presenter", () => {
       await result.current.giftDialog.onSend();
     });
     expect(giftSend).toHaveBeenCalledWith("p1", "star", 2, "kept-key", "me");
-    expect(localStorage.getItem("kinkord:unanswered:gift:me")).toBeNull();
+    expect(pendingTransfersService.gifts("me")).toEqual([]);
     localStorage.clear();
   });
   it("settles an earlier gift whose post has gone before opening another", async () => {
-    localStorage.setItem(
-      "kinkord:unanswered:gift:me",
-      JSON.stringify({ postId: "gone", currency: "star", quantity: "2", key: "kept-key" }),
-    );
+    pendingTransfersService.keepGift("me", {
+      postId: "gone",
+      currency: "star",
+      quantity: "2",
+      key: "kept-key",
+    });
     giftBalance.mockResolvedValue({
       userId: "me",
       settings: { enabled: true },
@@ -1057,7 +1062,7 @@ describe("post gifting presenter", () => {
     // Sent again as it was, though its post isn't here: the server answers for it.
     expect(giftSend).toHaveBeenCalledWith("gone", "star", 2, "kept-key", "me");
     expect(result.current.shareNote).toBe("Your earlier gift went through.");
-    expect(localStorage.getItem("kinkord:unanswered:gift:me")).toBeNull();
+    expect(pendingTransfersService.gifts("me")).toEqual([]);
     expect(result.current.giftDialog.open).toBe(true);
     expect(result.current.giftDialog.locked).toBe(false);
     // The balance is read again after the earlier gift went through.
@@ -1081,12 +1086,13 @@ describe("post gifting presenter", () => {
     act(() => {
       void result.current.giftDialog.onSend();
     });
-    const kept = JSON.parse(localStorage.getItem("kinkord:unanswered:gift:me") ?? "null");
-    expect(kept).toMatchObject({ postId: "p1", key: giftSend.mock.calls[0][3] });
+    expect(pendingTransfersService.gifts("me")).toEqual([
+      expect.objectContaining({ postId: "p1", key: giftSend.mock.calls[0][3] }),
+    ]);
     await act(async () => {
       answer();
     });
-    expect(localStorage.getItem("kinkord:unanswered:gift:me")).toBeNull();
+    expect(pendingTransfersService.gifts("me")).toEqual([]);
   });
   it("takes the kept copy over its own memory: another tab may have settled it or kept a newer one", async () => {
     giftBalance.mockReset().mockResolvedValue({
@@ -1107,10 +1113,13 @@ describe("post gifting presenter", () => {
       result.current.giftDialog.onClose();
     });
     // Another tab settled that one and kept a newer gift, still in doubt.
-    localStorage.setItem(
-      "kinkord:unanswered:gift:me",
-      JSON.stringify({ postId: "p1", currency: "coin", quantity: "3", key: "newer" }),
-    );
+    localStorage.clear();
+    pendingTransfersService.keepGift("me", {
+      postId: "p1",
+      currency: "coin",
+      quantity: "3",
+      key: "newer",
+    });
     await act(async () => {
       await result.current.openGift("p1");
     });
@@ -1140,15 +1149,109 @@ describe("post gifting presenter", () => {
     await act(async () => {
       await result.current.openGift("p1");
     });
-    localStorage.setItem(
-      "kinkord:unanswered:gift:me",
-      JSON.stringify({ postId: "p1", currency: "coin", quantity: "1", key: "other-tab" }),
-    );
+    pendingTransfersService.keepGift("me", {
+      postId: "p1",
+      currency: "coin",
+      quantity: "1",
+      key: "other-tab",
+    });
     await act(async () => {
       await result.current.giftDialog.onSend();
     });
     expect(giftSend).not.toHaveBeenCalled();
     expect(result.current.giftDialog.error).toMatch(/earlier gift/);
+    localStorage.clear();
+  });
+  it("stops recovering when another account is signed in partway", async () => {
+    pendingTransfersService.keepGift("me", {
+      postId: "gone",
+      currency: "star",
+      quantity: "2",
+      key: "kept-key",
+    });
+    giftBalance
+      .mockReset()
+      .mockResolvedValueOnce({
+        userId: "me",
+        settings: { enabled: true },
+        balances: [{ currency: "coin", available: 5, reserved: 0 }],
+      })
+      .mockResolvedValue({
+        userId: "someone-else",
+        settings: { enabled: true },
+        balances: [{ currency: "coin", available: 5, reserved: 0 }],
+      });
+    giftSend.mockReset().mockResolvedValueOnce({});
+    const { result } = renderHook(() => useFeedPresenter());
+    await waitFor(() => expect(result.current.posts).toHaveLength(1));
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    expect(result.current.giftDialog.open).toBe(false);
+    expect(result.current.shareNote).toMatch(/someone else/);
+    localStorage.clear();
+  });
+  it("still retries with its key a gift this browser couldn't keep", async () => {
+    giftBalance.mockReset().mockResolvedValue({
+      userId: "me",
+      settings: { enabled: true },
+      balances: [{ currency: "coin", available: 5, reserved: 0 }],
+    });
+    giftSend.mockReset().mockRejectedValueOnce(new ApiError(0, "Network problem"));
+    const full = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("full");
+    });
+    const { result } = renderHook(() => useFeedPresenter());
+    await waitFor(() => expect(result.current.posts).toHaveLength(1));
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    await act(async () => {
+      await result.current.giftDialog.onSend();
+    });
+    act(() => {
+      result.current.giftDialog.onClose();
+    });
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    // Not kept anywhere, but still this page's own: the same gift, same key.
+    expect(result.current.giftDialog.locked).toBe(true);
+    giftSend.mockResolvedValueOnce({});
+    await act(async () => {
+      await result.current.giftDialog.onSend();
+    });
+    expect(giftSend.mock.calls[1][3]).toBe(giftSend.mock.calls[0][3]);
+    full.mockRestore();
+  });
+  it("settles every other tab's gift first, then retries this post's own", async () => {
+    pendingTransfersService.keepGift("me", {
+      postId: "gone",
+      currency: "star",
+      quantity: "2",
+      key: "b",
+    });
+    pendingTransfersService.keepGift("me", {
+      postId: "p1",
+      currency: "coin",
+      quantity: "3",
+      key: "a",
+    });
+    giftBalance.mockReset().mockResolvedValue({
+      userId: "me",
+      settings: { enabled: true },
+      balances: [{ currency: "coin", available: 5, reserved: 0 }],
+    });
+    giftSend.mockReset().mockResolvedValue({});
+    const { result } = renderHook(() => useFeedPresenter());
+    await waitFor(() => expect(result.current.posts).toHaveLength(1));
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    expect(giftSend).toHaveBeenCalledWith("gone", "star", 2, "b", "me");
+    expect(result.current.giftDialog.locked).toBe(true);
+    expect(result.current.giftDialog.quantity).toBe("3");
+    expect(pendingTransfersService.gifts("me").map((g) => g.key)).toEqual(["a"]);
     localStorage.clear();
   });
   it("sends nothing while it can't tell whose wallet it is", async () => {
@@ -1195,7 +1298,7 @@ describe("post gifting presenter", () => {
     expect(result.current.giftDialog.locked).toBe(false);
     expect(giftSend).toHaveBeenCalledTimes(1);
     // Still kept for its sender.
-    expect(localStorage.getItem("kinkord:unanswered:gift:me")).not.toBeNull();
+    expect(pendingTransfersService.gifts("me")).toHaveLength(1);
     localStorage.clear();
   });
   it("keeps a gift in doubt when its retry finds them signed out", async () => {

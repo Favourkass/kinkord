@@ -17,51 +17,42 @@ const withdrawal = {
 const gift = { postId: "p1", currency: "star" as const, quantity: "2", key: "k2" };
 
 describe("pendingTransfersRepository", () => {
-  it("keeps requests per member until they're settled", () => {
-    store.keepWithdrawal("u1", withdrawal);
+  it("keeps requests per member until each is settled", () => {
+    expect(store.keepWithdrawal("u1", withdrawal)).toBe(true);
+    expect(store.keepGift("u1", gift)).toBe(true);
+    expect(store.withdrawals("u1")).toEqual([withdrawal]);
+    expect(store.gifts("u1")).toEqual([gift]);
+    expect(store.withdrawals("u2")).toEqual([]);
+    store.settleWithdrawal("u1", "k1");
+    store.settleGift("u1", "k2");
+    expect(store.withdrawals("u1")).toEqual([]);
+    expect(store.gifts("u1")).toEqual([]);
+  });
+
+  it("keeps each tab's request apart: settling one leaves the others", () => {
     store.keepGift("u1", gift);
-    expect(store.withdrawal("u1")).toEqual(withdrawal);
-    expect(store.gift("u1")).toEqual(gift);
-    expect(store.withdrawal("u2")).toBeNull();
-    expect(store.gift("u2")).toBeNull();
-    store.settleWithdrawal("u1", "k1");
+    store.keepGift("u1", { ...gift, key: "other-tab" });
+    expect(store.gifts("u1").map((g) => g.key)).toEqual(["k2", "other-tab"]);
     store.settleGift("u1", "k2");
-    expect(store.withdrawal("u1")).toBeNull();
-    expect(store.gift("u1")).toBeNull();
+    expect(store.gifts("u1").map((g) => g.key)).toEqual(["other-tab"]);
   });
 
-  it("clears only the request that was answered, not a newer one kept since", () => {
-    store.keepGift("u1", { ...gift, key: "newer" });
-    store.settleGift("u1", "k2");
-    expect(store.gift("u1")?.key).toBe("newer");
-    store.keepWithdrawal("u1", { ...withdrawal, key: "newer" });
-    store.settleWithdrawal("u1", "k1");
-    expect(store.withdrawal("u1")?.key).toBe("newer");
-  });
-
-  it("returns nothing for an entry that isn't a whole request, or damaged", () => {
+  it("skips an entry that isn't a whole request, or damaged", () => {
     localStorage.setItem(
-      "kinkord:unanswered:withdrawal:u1",
+      "kinkord:unanswered:withdrawal:u1:k1",
       JSON.stringify({ ...withdrawal, key: "" }),
     );
-    localStorage.setItem(
-      "kinkord:unanswered:gift:u1",
-      JSON.stringify({ ...gift, currency: "cash" }),
-    );
-    expect(store.withdrawal("u1")).toBeNull();
-    expect(store.gift("u1")).toBeNull();
-    localStorage.setItem("kinkord:unanswered:gift:u2", "{not json");
-    expect(store.gift("u2")).toBeNull();
+    localStorage.setItem("kinkord:unanswered:gift:u1:k2", JSON.stringify({ ...gift, currency: "cash" }));
+    localStorage.setItem("kinkord:unanswered:gift:u1:k3", "{not json");
+    expect(store.withdrawals("u1")).toEqual([]);
+    expect(store.gifts("u1")).toEqual([]);
   });
 
-  it("never throws when storage is off", () => {
-    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
-      throw new Error("off");
-    });
+  it("says when it couldn't keep a request (storage off or full), and never throws", () => {
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-      throw new Error("off");
+      throw new Error("full");
     });
-    expect(store.gift("u1")).toBeNull();
-    expect(() => store.keepGift("u1", gift)).not.toThrow();
+    expect(store.keepGift("u1", gift)).toBe(false);
+    expect(store.gifts("u1")).toEqual([]);
   });
 });

@@ -1,4 +1,8 @@
-import { BadRequestException, ConflictException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  ServiceUnavailableException,
+} from "@nestjs/common";
 import type { WalletCurrency, WalletRates, WalletStatus } from "../db/schema/wallet";
 import { paymentReference } from "../subscriptions/plans";
 
@@ -26,6 +30,16 @@ export function sameSender(userId: string, senderId: string | undefined) {
       message: "You're signed in as someone else now.",
     });
 }
+
+/**
+ * Wallet transactions are switched off: refused before anything is read or moved, with a code
+ * the app reads as a refusal (a definite "no"), unlike an ambiguous server error.
+ */
+export const walletDisabled = () =>
+  new ServiceUnavailableException({
+    code: "WALLET_DISABLED",
+    message: "Wallet transactions are not enabled yet.",
+  });
 
 export const PACKS = {
   coin: [100, 500, 1000, 2500],

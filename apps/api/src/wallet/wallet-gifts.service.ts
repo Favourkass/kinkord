@@ -5,7 +5,6 @@ import {
   Inject,
   Injectable,
   NotFoundException,
-  ServiceUnavailableException,
 } from "@nestjs/common";
 import { and, eq, gte, isNull, sql } from "drizzle-orm";
 import type { z } from "zod";
@@ -14,7 +13,7 @@ import { post, profile, walletBalance, walletGift, walletSettings } from "../db/
 import { PostsService } from "../posts/posts.service";
 import { hasSilver } from "../subscriptions/plans";
 import { walletGiftSchema } from "./dto";
-import { sameSender } from "./rules";
+import { sameSender, walletDisabled } from "./rules";
 
 type Gift = typeof walletGift.$inferSelect;
 
@@ -108,8 +107,7 @@ export class WalletGiftsService {
         .from(walletSettings)
         .where(eq(walletSettings.id, 1))
         .for("share");
-      if (!config?.enabled)
-        throw new ServiceUnavailableException("Wallet transactions are not enabled yet.");
+      if (!config?.enabled) throw walletDisabled();
       const [target] = await tx
         .select()
         .from(post)
