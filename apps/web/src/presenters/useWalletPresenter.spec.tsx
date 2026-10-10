@@ -128,6 +128,51 @@ describe("useWalletPresenter", () => {
     await act(() => new Promise((r) => setTimeout(r, 0)));
     expect(result.current.error).toBe("The withdrawal rate has changed.");
   });
+  it("keeps the account shown when the default changes elsewhere", async () => {
+    const second = { ...data.banks[0], id: "bank2", isDefault: 0 };
+    const load = vi
+      .spyOn(walletService, "load")
+      .mockResolvedValue({ ...data, banks: [...data.banks, second] });
+    const { result } = renderHook(() => useWalletPresenter("withdraw"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => result.current.onRedeem("coin"));
+    expect(result.current.bankId).toBe("bank");
+    // Another tab makes the second account the default.
+    load.mockResolvedValue({
+      ...data,
+      banks: [
+        { ...data.banks[0], isDefault: 0 },
+        { ...second, isDefault: 1 },
+      ],
+    });
+    await act(() => result.current.onRefresh());
+    expect(result.current.bankId).toBe("bank");
+  });
+  it("keeps an unanswered withdrawal when the retry finds them signed out", async () => {
+    vi.spyOn(walletService, "load").mockResolvedValue(data);
+    vi.spyOn(walletService, "withdraw")
+      .mockRejectedValueOnce(new ApiError(0, { message: "connection lost" }))
+      .mockRejectedValueOnce(new ApiError(401, { message: "Sign in again." }));
+    const { result } = renderHook(() => useWalletPresenter("withdraw"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => result.current.onRedeem("coin"));
+    await act(() => result.current.onWithdraw());
+    await act(() => result.current.onWithdraw());
+    expect(result.current.unansweredNotice).toBeTruthy();
+    expect(result.current.canSubmitWithdrawal).toBe(true);
+  });
+  it("settles a first send that was turned away unread", async () => {
+    vi.spyOn(walletService, "load").mockResolvedValue(data);
+    vi.spyOn(walletService, "withdraw").mockRejectedValueOnce(
+      new ApiError(401, { message: "Sign in again." }),
+    );
+    const { result } = renderHook(() => useWalletPresenter("withdraw"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => result.current.onRedeem("coin"));
+    await act(() => result.current.onWithdraw());
+    expect(result.current.error).toBe("Sign in again.");
+    expect(result.current.unansweredNotice).toBeNull();
+  });
   it("takes a refusal as an answer: the form decides what's sent next", async () => {
     vi.spyOn(walletService, "load").mockResolvedValue(data);
     vi.spyOn(walletService, "withdraw").mockRejectedValueOnce(

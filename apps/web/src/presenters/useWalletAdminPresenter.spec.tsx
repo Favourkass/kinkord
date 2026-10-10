@@ -21,6 +21,27 @@ describe("useWalletAdminPresenter", () => {
     } as never);
     vi.spyOn(walletAdminService, "queue").mockResolvedValue([]);
   });
+  it("keeps a failed settings load on screen when the queue loads", async () => {
+    vi.mocked(walletAdminService.settings).mockRejectedValueOnce(new Error("Settings are down."));
+    const { result } = renderHook(() => useWalletAdminPresenter());
+    await waitFor(() => expect(walletAdminService.queue).toHaveBeenCalled());
+    await waitFor(() => expect(result.current.error).toBe("Settings are down."));
+  });
+  it("fills the settings form when a refresh succeeds after a failed first load", async () => {
+    const rates = {
+      coin: { buy: 1000, redeem: 800 },
+      star: { buy: 10000, redeem: 8000 },
+      crown: { buy: 100000, redeem: 80000 },
+    };
+    vi.mocked(walletAdminService.settings)
+      .mockRejectedValueOnce(new Error("Settings are down."))
+      .mockResolvedValue({ rates, minimumKobo: 50000, enabled: true, canEdit: true } as never);
+    const { result } = renderHook(() => useWalletAdminPresenter());
+    await waitFor(() => expect(result.current.error).toBe("Settings are down."));
+    await act(() => result.current.onRefresh());
+    expect(result.current.error).toBeNull();
+    expect(result.current.form).toMatchObject({ coinBuy: "10", minimum: "500", enabled: true });
+  });
   it("keeps unsaved settings when the queue filter changes", async () => {
     const { result } = renderHook(() => useWalletAdminPresenter());
     await waitFor(() => expect(walletAdminService.queue).toHaveBeenCalled());

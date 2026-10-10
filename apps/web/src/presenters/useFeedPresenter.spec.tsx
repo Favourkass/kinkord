@@ -1010,4 +1010,39 @@ describe("post gifting presenter", () => {
     });
     expect(giftSend.mock.calls[0]).toEqual(giftSend.mock.calls[1]);
   });
+  it("keeps a gift in doubt when its retry finds them signed out", async () => {
+    giftBalance.mockResolvedValue({
+      settings: { enabled: true },
+      balances: [{ currency: "coin", available: 5, reserved: 0 }],
+    });
+    giftSend
+      .mockReset()
+      .mockRejectedValueOnce(new ApiError(0, "Network problem"))
+      .mockRejectedValueOnce(new ApiError(401, "Sign in again."))
+      .mockResolvedValueOnce({});
+    const { result } = renderHook(() => useFeedPresenter());
+    await waitFor(() => expect(result.current.posts).toHaveLength(1));
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    await act(async () => {
+      await result.current.giftDialog.onSend();
+    });
+    await act(async () => {
+      await result.current.giftDialog.onSend();
+    });
+    // Still in doubt: reopening offers the same gift, with the same key.
+    expect(result.current.giftDialog.locked).toBe(true);
+    act(() => {
+      result.current.giftDialog.onClose();
+    });
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    expect(result.current.giftDialog.locked).toBe(true);
+    await act(async () => {
+      await result.current.giftDialog.onSend();
+    });
+    expect(giftSend.mock.calls[2]).toEqual(giftSend.mock.calls[0]);
+  });
 });

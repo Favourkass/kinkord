@@ -65,6 +65,11 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
         if (!live) return;
         setData(next);
         if (payment) setOperation(payment);
+        // The account shown is pinned once: a default changed elsewhere doesn't move it.
+        setBankId(
+          (previous) =>
+            previous || next.banks.find((bank) => bank.isDefault)?.id || next.banks[0]?.id || "",
+        );
         setError(null);
       } catch (e) {
         if (live) setError(e instanceof Error ? e.message : "Could not load wallet.");
@@ -198,6 +203,7 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
           throw new Error(
             "Check the quantity, withdrawable balance, minimum and selected bank account.",
           );
+        const wasUnanswered = unanswered !== null;
         const request = unanswered ?? {
           currency,
           quantity,
@@ -217,8 +223,12 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
           );
         } catch (e) {
           // A refusal (4xx) is an answer: nothing was made, so the form decides what's sent
-          // next. A dropped connection (status 0) or a server error is not: keep it.
-          if (e instanceof ApiError && e.status >= 400 && e.status < 500) {
+          // next. A dropped connection (status 0) or a server error is not: keep it. Being
+          // signed out, timed out or rate-limited means this send wasn't read, which settles a
+          // first send but says nothing about an earlier one.
+          const unread = e instanceof ApiError && [401, 408, 429].includes(e.status);
+          if (unread && !wasUnanswered) setUnanswered(null);
+          if (e instanceof ApiError && e.status >= 400 && e.status < 500 && !unread) {
             setUnanswered(null);
             // A changed rate, say: show what a new request would be. If that load fails too,
             // the refusal stays on screen and the next refresh catches up.

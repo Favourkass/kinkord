@@ -740,7 +740,12 @@ export function useFeedPresenter({
         );
     } catch (e) {
       const unknown = !(e instanceof ApiError) || e.status === 0 || e.status >= 500;
-      if (unknown) {
+      // Turned away before it was read (signed out, timed out, rate-limited): that says nothing
+      // about an earlier send of this gift, so one in doubt stays in doubt, key and all.
+      const unread = e instanceof ApiError && [401, 408, 429].includes(e.status);
+      if (unread && uncertainGift.current) {
+        setGiftError(e.message);
+      } else if (unknown) {
         uncertainGift.current = {
           postId: giftTarget.postId,
           currency: giftCurrency,

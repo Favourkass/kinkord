@@ -34,6 +34,12 @@ export function useWalletAdminPresenter() {
     [kind, setKind] = useState<"purchase" | "withdrawal">("purchase"),
     [status, setStatus] = useState("submitted"),
     [error, setError] = useState<string | null>(null),
+    // Each load's failure stays until that load succeeds: one can't hide the other's.
+    [settingsFailed, setSettingsFailed] = useState<string | null>(null),
+    [queueFailed, setQueueFailed] = useState<string | null>(null),
+    // Whether the settings form has been drafted from what's saved: once it has, it's the
+    // founder's, and loads never overwrite it.
+    [drafted, setDrafted] = useState(false),
     [notice, setNotice] = useState<string | null>(null),
     [busy, setBusy] = useState(false),
     [form, setForm] = useState(blank),
@@ -45,11 +51,19 @@ export function useWalletAdminPresenter() {
   const loadQueue = async () => {
     const ask = ++asked.current;
     const queue = await walletAdminService.queue(kind, status);
-    if (ask === asked.current) setRows(queue);
+    if (ask !== asked.current) return;
+    setRows(queue);
+    setQueueFailed(null);
   };
   const refresh = async () => {
     const [next] = await Promise.all([walletAdminService.settings(), loadQueue()]);
     setSettings(next);
+    setSettingsFailed(null);
+    // A first load that failed is made up for now; a drafted form is never overwritten.
+    if (!drafted) {
+      setForm(formFrom(next));
+      setDrafted(true);
+    }
     return next;
   };
   // The settings, and the form drafted from them, load once: filtering the queue keeps edits.
@@ -61,9 +75,12 @@ export function useWalletAdminPresenter() {
         if (!live) return;
         setSettings(next);
         setForm(formFrom(next));
+        setDrafted(true);
+        setSettingsFailed(null);
       },
       (e) => {
-        if (live) setError(e instanceof Error ? e.message : "Could not load wallet settings.");
+        if (live)
+          setSettingsFailed(e instanceof Error ? e.message : "Could not load wallet settings.");
       },
     );
     return () => {
@@ -78,11 +95,11 @@ export function useWalletAdminPresenter() {
       (queue) => {
         if (ask !== asked.current) return;
         setRows(queue);
-        setError(null);
+        setQueueFailed(null);
       },
       (e) => {
         if (ask === asked.current)
-          setError(e instanceof Error ? e.message : "Could not load wallet requests.");
+          setQueueFailed(e instanceof Error ? e.message : "Could not load wallet requests.");
       },
     );
   }, [access.isAdmin, kind, status]);
@@ -106,7 +123,7 @@ export function useWalletAdminPresenter() {
     copy: WALLET_COPY,
     kind,
     status,
-    error,
+    error: error ?? settingsFailed ?? queueFailed,
     notice,
     busy,
     form,
