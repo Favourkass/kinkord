@@ -134,6 +134,13 @@
       "when": 1791360571068,
       "tag": "0018_silver_check",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791568481694,
+      "tag": "0019_eager_maestro",
+      "breakpoints": true
     }
   ]
 }
