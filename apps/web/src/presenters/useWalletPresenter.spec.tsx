@@ -114,6 +114,20 @@ describe("useWalletPresenter", () => {
     expect(withdraw.mock.calls[1]).toEqual(withdraw.mock.calls[0]);
     expect(result.current.unansweredNotice).toBeNull();
   });
+  it("keeps the refusal on screen when the refresh after it fails", async () => {
+    vi.spyOn(walletService, "load")
+      .mockResolvedValueOnce(data)
+      .mockRejectedValue(new Error("offline"));
+    vi.spyOn(walletService, "withdraw").mockRejectedValueOnce(
+      new ApiError(409, { message: "The withdrawal rate has changed." }),
+    );
+    const { result } = renderHook(() => useWalletPresenter("withdraw"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => result.current.onRedeem("coin"));
+    await act(() => result.current.onWithdraw());
+    await act(() => new Promise((r) => setTimeout(r, 0)));
+    expect(result.current.error).toBe("The withdrawal rate has changed.");
+  });
   it("takes a refusal as an answer: the form decides what's sent next", async () => {
     vi.spyOn(walletService, "load").mockResolvedValue(data);
     vi.spyOn(walletService, "withdraw").mockRejectedValueOnce(

@@ -220,8 +220,9 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
           // next. A dropped connection (status 0) or a server error is not: keep it.
           if (e instanceof ApiError && e.status >= 400 && e.status < 500) {
             setUnanswered(null);
-            // A changed rate, say: show what a new request would be.
-            void refresh();
+            // A changed rate, say: show what a new request would be. If that load fails too,
+            // the refusal stays on screen and the next refresh catches up.
+            void refresh().catch(() => undefined);
           }
           throw e;
         }

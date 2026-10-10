@@ -277,6 +277,8 @@ export default function WalletView({ vm }: Props) {
           ) : (
             <form
               className={`${card} space-y-4`}
+              // An unanswered request is sent again as it was, whatever the fields say now.
+              noValidate={!!vm.unansweredNotice}
               onSubmit={(event) => {
                 event.preventDefault();
                 vm.onWithdraw();
