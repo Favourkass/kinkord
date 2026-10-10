@@ -7,6 +7,8 @@ import type {
   AdminMemberPM,
   AdminReportPM,
   AdminReportStatus,
+  AdminTeamMemberPM,
+  AdminTeamPM,
   BlockRulePM,
   NewBlockRulePM,
 } from "@/domain/moderation";
@@ -54,4 +56,14 @@ export const moderationService = {
 
   removeRule: (id: string) =>
     api.del<{ removed: string }>(`/admin/blocklist/${encodeURIComponent(id)}`),
+
+  /** Everyone with the admin tools, and whether you may change that. */
+  team: () => api.get<AdminTeamPM>("/admin/staff"),
+
+  /** Founders only. */
+  addAdmin: (username: string) => api.post<AdminTeamMemberPM>("/admin/staff", { username }),
+
+  /** Founders only. */
+  removeAdmin: (id: string) =>
+    api.del<{ removed: string }>(`/admin/staff/${encodeURIComponent(id)}`),
 };

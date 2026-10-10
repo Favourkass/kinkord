@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   Post,
@@ -15,6 +16,7 @@ import { AuthGuard, type AuthedRequest } from "../auth/auth.guard";
 import { reportQuerySchema, resolveReportSchema } from "../safety/dto";
 import { ReportsService } from "../safety/reports.service";
 import { AdminGuard } from "./admin.guard";
+import { isSuperAdmin } from "./admins";
 import { ModerationService } from "./moderation.service";
 
 const reasonSchema = z.string().trim().max(300).nullish();
@@ -30,6 +32,21 @@ const ruleSchema = z.object({
   action: z.enum(["block", "flag"]),
   reason: reasonSchema,
 });
+
+const newAdminSchema = z.object({
+  username: z
+    .string()
+    .trim()
+    .transform((v) => v.replace(/^@/, "").toLowerCase())
+    .pipe(z.string().min(1, "Enter their username.").max(64)),
+});
+
+/** Who gets the admin tools is the founders' decision alone. */
+function foundersOnly(req: AuthedRequest) {
+  if (!isSuperAdmin(req.user)) {
+    throw new ForbiddenException("Only the founders can add or remove admins.");
+  }
+}
 
 function parse<T>(schema: z.ZodType<T>, body: unknown): T {
   const parsed = schema.safeParse(body);
@@ -135,5 +152,26 @@ export class ModerationController {
   @UseGuards(AdminGuard)
   removeRule(@Req() req: AuthedRequest, @Param("id") id: string) {
     return this.moderation.removeRule(req.user.id, id);
+  }
+
+  /** Who has the admin tools. Every admin may look; only the founders change it. */
+  @Get("staff")
+  @UseGuards(AdminGuard)
+  async team(@Req() req: AuthedRequest) {
+    return { admins: await this.moderation.team(), canManage: isSuperAdmin(req.user) };
+  }
+
+  @Post("staff")
+  @UseGuards(AdminGuard)
+  async addAdmin(@Req() req: AuthedRequest, @Body() body: unknown) {
+    foundersOnly(req);
+    return this.moderation.addAdmin(req.user.id, parse(newAdminSchema, body ?? {}).username);
+  }
+
+  @Delete("staff/:id")
+  @UseGuards(AdminGuard)
+  async removeAdmin(@Req() req: AuthedRequest, @Param("id") id: string) {
+    foundersOnly(req);
+    return this.moderation.removeAdmin(req.user.id, id);
   }
 }
