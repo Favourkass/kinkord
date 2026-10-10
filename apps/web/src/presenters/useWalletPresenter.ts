@@ -53,9 +53,31 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     setUnanswered({ ...request, member: sender });
     pendingTransfersService.keepWithdrawal(sender, request);
   };
-  const settleUnanswered = (sender: string) => {
+  const settleUnanswered = (sender: string, key: string) => {
     setUnanswered(null);
-    pendingTransfersService.settleWithdrawal(sender);
+    pendingTransfersService.settleWithdrawal(sender, key);
+  };
+  /**
+   * What every successful load does: the wallet, and this member's kept unanswered withdrawal
+   * (a reload's, say), restored before anything new can be sent. Another account's (a switch in
+   * another tab) stays kept for them.
+   */
+  const applyLoad = (next: WalletDataPM) => {
+    setData(next);
+    const owner = next.summary.userId;
+    const kept = owner ? pendingTransfersService.withdrawal(owner) : null;
+    setUnanswered((current) =>
+      current && current.member === owner
+        ? current
+        : kept && owner
+          ? { ...kept, member: owner }
+          : null,
+    );
+    // The account shown is pinned once: a default changed elsewhere doesn't move it.
+    setBankId(
+      (previous) =>
+        previous || next.banks.find((bank) => bank.isDefault)?.id || next.banks[0]?.id || "",
+    );
   };
   const keyFor = (value: string) => {
     const existing = keys.current.get(value);
@@ -74,7 +96,7 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
   const refresh = async () => {
     const asked = ++reads.current;
     const next = await walletService.load();
-    if (asked === reads.current) setData(next);
+    if (asked === reads.current) applyLoad(next);
     return next;
   };
   useEffect(() => {
@@ -91,24 +113,8 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
         const next = await walletService.load();
         const payment = paymentId ? await walletService.operation(paymentId) : null;
         if (!live || asked !== reads.current) return;
-        setData(next);
+        applyLoad(next);
         if (payment) setOperation(payment);
-        // One left unanswered on an earlier visit (a reload, say) comes back, key and all.
-        // Only this member's: another account's (a switch in another tab) stays kept for them.
-        const owner = next.summary.userId;
-        const kept = owner ? pendingTransfersService.withdrawal(owner) : null;
-        setUnanswered((current) =>
-          current && current.member === owner
-            ? current
-            : kept && owner
-              ? { ...kept, member: owner }
-              : null,
-        );
-        // The account shown is pinned once: a default changed elsewhere doesn't move it.
-        setBankId(
-          (previous) =>
-            previous || next.banks.find((bank) => bank.isDefault)?.id || next.banks[0]?.id || "",
-        );
         setError(null);
       } catch (e) {
         if (live) setError(e instanceof Error ? e.message : "Could not load wallet.");
@@ -201,6 +207,21 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     canSubmitWithdrawal: quote.valid || unanswered !== null,
     unansweredNotice: unanswered ? WALLET_COPY.unanswered : null,
     operation: operation ? walletOperationVM(operation) : null,
+    // What happened to it: a recovered request may already be approved, paid or rejected.
+    operationTitle:
+      operation?.status === "pending"
+        ? WALLET_COPY.submitted
+        : operation
+          ? walletOperationVM(operation).statusLabel
+          : "",
+    operationNote:
+      operation?.status === "approved"
+        ? WALLET_COPY.approved
+        : operation?.status === "paid"
+          ? WALLET_COPY.paid
+          : operation?.status === "rejected"
+            ? (operation.reviewNote ?? WALLET_COPY.failed)
+            : WALLET_COPY.processing,
     selectedBank: vm.banks.find((bank) => bank.id === (unanswered?.bankId ?? bankId)) ?? null,
     onRefresh: () =>
       run(async () => {
@@ -264,12 +285,6 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
           );
         if (!member) throw new Error(WALLET_COPY.stillLoading);
         const wasUnanswered = unanswered !== null;
-        if (unanswered) {
-          // Sent again only by its sender: whoever is signed in now (another tab may have
-          // switched accounts) is checked first.
-          const now = await walletService.load();
-          if (now.summary.userId !== unanswered.member) throw new Error(WALLET_COPY.otherAccount);
-        }
         const request = unanswered ?? {
           currency,
           quantity,
@@ -287,15 +302,16 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
             request.bankId,
             request.key,
             request.expectedAmountKobo,
+            sender,
           );
         } catch (e) {
           // Refused: nothing was made, so the form decides what's sent next. Unread (signed
           // out, a sign-up step owed, timed out, rate-limited): settles a first send, never an
           // earlier one. No answer: it may have gone through, so it's kept.
           const failure = pendingTransfersService.failure(e);
-          if (failure === "unread" && !wasUnanswered) settleUnanswered(sender);
+          if (failure === "unread" && !wasUnanswered) settleUnanswered(sender, request.key);
           if (failure === "refused") {
-            settleUnanswered(sender);
+            settleUnanswered(sender, request.key);
             // A changed rate, say: show what a new request would be. If that load fails too,
             // the refusal stays on screen and the next refresh catches up.
             void refresh().catch(() => undefined);
@@ -303,7 +319,7 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
           throw e;
         }
         keys.current.delete(`withdraw:${request.currency}:${request.quantity}:${request.bankId}`);
-        settleUnanswered(sender);
+        settleUnanswered(sender, request.key);
         supersedeReads();
         setOperation(result);
         setReview(false);

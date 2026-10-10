@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { paymentReference } from "../subscriptions/plans";
-import { nextWalletStatus, walletAmount, walletPaymentReference } from "./rules";
+import { nextWalletStatus, sameSender, walletAmount, walletPaymentReference } from "./rules";
 const rates = {
   coin: { buy: 1000, redeem: 800 },
   star: { buy: 10000, redeem: 8000 },
@@ -59,5 +59,20 @@ describe("wallet payment reference", () => {
     expect(
       walletPaymentReference(new Date("2026-12-31T22:59:59Z"), new Set(["KKC20261231235959"])),
     ).toBe("KKC20270101000000");
+  });
+});
+
+describe("sameSender", () => {
+  it("passes the member signed in, and refuses another as WRONG_ACCOUNT", () => {
+    expect(() => sameSender("u1", "u1")).not.toThrow();
+    expect(() => sameSender("u1", undefined)).not.toThrow();
+    try {
+      sameSender("u1", "u2");
+      throw new Error("not refused");
+    } catch (e) {
+      expect((e as { getResponse(): unknown }).getResponse()).toMatchObject({
+        code: "WRONG_ACCOUNT",
+      });
+    }
   });
 });

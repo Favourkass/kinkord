@@ -8,6 +8,7 @@ const input = {
   currency: "coin" as const,
   quantity: 5,
   requestKey: "22222222-2222-4222-8222-222222222222",
+  senderId: "a",
 };
 const gift = {
   id: "g",
@@ -97,6 +98,14 @@ describe("post wallet gifts", () => {
       postId: input.postId,
     });
     expect(result).toMatchObject({ kind: "gift_sent", counterpartyName: "Bob" });
+  });
+  it("refuses a gift sent as someone other than who is signed in, before anything is read", async () => {
+    const { service, db, posts } = fixture();
+    await expect(service.send("b", input)).rejects.toMatchObject({
+      response: { code: "WRONG_ACCOUNT" },
+    });
+    expect(posts.byId).not.toHaveBeenCalled();
+    expect(db.select).not.toHaveBeenCalled();
   });
   it("checks visibility once, before the transaction holds a connection", async () => {
     const { service, posts } = fixture();

@@ -56,7 +56,10 @@ export const pendingTransfersRepository = {
   },
   keepWithdrawal: (memberId: string, request: UnansweredWithdrawal) =>
     write("withdrawal", memberId, request),
-  settleWithdrawal: (memberId: string) => clear("withdrawal", memberId),
+  /** Clears the kept withdrawal only if it's the one answered (another tab may have kept a newer one). */
+  settleWithdrawal(memberId: string, key: string) {
+    if (read("withdrawal", memberId)?.key === key) clear("withdrawal", memberId);
+  },
   /** A gift in doubt kept for this member, if a whole one is. */
   gift(memberId: string): GiftInDoubt | null {
     const v = read("gift", memberId);
@@ -65,5 +68,8 @@ export const pendingTransfersRepository = {
       : null;
   },
   keepGift: (memberId: string, gift: GiftInDoubt) => write("gift", memberId, gift),
-  settleGift: (memberId: string) => clear("gift", memberId),
+  /** Clears the kept gift only if it's the one answered (another tab may have kept a newer one). */
+  settleGift(memberId: string, key: string) {
+    if (read("gift", memberId)?.key === key) clear("gift", memberId);
+  },
 };

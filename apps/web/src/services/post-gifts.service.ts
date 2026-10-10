@@ -25,8 +25,21 @@ const unit = (quantity: string, currency: KinkCurrency) =>
     : GIFT_COPY.labels[currency];
 export const postGiftsService = {
   balance: () => api.get<WalletSummaryPM>("/wallet"),
-  send: (postId: string, currency: KinkCurrency, quantity: number, requestKey: string) =>
-    api.post<WalletOperationPM>("/wallet/gifts", { postId, currency, quantity, requestKey }),
+  /** `senderId`: who the app sends as; the API refuses it if someone else is signed in now. */
+  send: (
+    postId: string,
+    currency: KinkCurrency,
+    quantity: number,
+    requestKey: string,
+    senderId: string,
+  ) =>
+    api.post<WalletOperationPM>("/wallet/gifts", {
+      postId,
+      currency,
+      quantity,
+      requestKey,
+      senderId,
+    }),
   quote: (summary: WalletSummaryPM | null, currency: KinkCurrency, raw: string) => {
     const available = summary?.balances.find((b) => b.currency === currency)?.available ?? 0;
     const quantity = Number(raw);

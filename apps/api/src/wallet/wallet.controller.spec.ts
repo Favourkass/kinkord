@@ -87,6 +87,7 @@ it("derives gift sender from the session and strips a forged recipient", () => {
     requestKey: "22222222-2222-4222-8222-222222222222",
     quantity: 2,
     currency: "coin",
+    senderId: "sender",
   };
   c.gift({ user: { id: "sender" } } as AuthedRequest, { ...input, recipientId: "attacker" });
   expect(send).toHaveBeenCalledWith("sender", input);

@@ -24,10 +24,19 @@ describe("pendingTransfersRepository", () => {
     expect(store.gift("u1")).toEqual(gift);
     expect(store.withdrawal("u2")).toBeNull();
     expect(store.gift("u2")).toBeNull();
-    store.settleWithdrawal("u1");
-    store.settleGift("u1");
+    store.settleWithdrawal("u1", "k1");
+    store.settleGift("u1", "k2");
     expect(store.withdrawal("u1")).toBeNull();
     expect(store.gift("u1")).toBeNull();
+  });
+
+  it("clears only the request that was answered, not a newer one kept since", () => {
+    store.keepGift("u1", { ...gift, key: "newer" });
+    store.settleGift("u1", "k2");
+    expect(store.gift("u1")?.key).toBe("newer");
+    store.keepWithdrawal("u1", { ...withdrawal, key: "newer" });
+    store.settleWithdrawal("u1", "k1");
+    expect(store.withdrawal("u1")?.key).toBe("newer");
   });
 
   it("returns nothing for an entry that isn't a whole request, or damaged", () => {

@@ -352,9 +352,9 @@ export default function WalletView({ vm }: Props) {
       {vm.mode === "withdraw" && vm.operation && (
         <section className={`${card} space-y-4 py-8 text-center`}>
           <Hourglass size={42} className="mx-auto text-app-members-count" />
-          <h2 className="text-2xl font-bold">{copy.submitted}</h2>
+          <h2 className="text-2xl font-bold">{vm.operationTitle}</h2>
           <p className="text-xl font-bold text-app-members-count">{vm.operation.amount}</p>
-          <p className="text-xs leading-relaxed text-app-subtle">{copy.processing}</p>
+          <p className="text-xs leading-relaxed text-app-subtle">{vm.operationNote}</p>
           <p className="break-all font-mono text-xs">{vm.operation.reference}</p>
           <Link className={button} href={vm.historyHref}>
             {copy.history}

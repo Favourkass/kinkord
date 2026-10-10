@@ -1034,7 +1034,7 @@ describe("post gifting presenter", () => {
     await act(async () => {
       await result.current.giftDialog.onSend();
     });
-    expect(giftSend).toHaveBeenCalledWith("p1", "star", 2, "kept-key");
+    expect(giftSend).toHaveBeenCalledWith("p1", "star", 2, "kept-key", "me");
     expect(localStorage.getItem("kinkord:unanswered:gift:me")).toBeNull();
     localStorage.clear();
   });
@@ -1055,11 +1055,13 @@ describe("post gifting presenter", () => {
       await result.current.openGift("p1");
     });
     // Sent again as it was, though its post isn't here: the server answers for it.
-    expect(giftSend).toHaveBeenCalledWith("gone", "star", 2, "kept-key");
+    expect(giftSend).toHaveBeenCalledWith("gone", "star", 2, "kept-key", "me");
     expect(result.current.shareNote).toBe("Your earlier gift went through.");
     expect(localStorage.getItem("kinkord:unanswered:gift:me")).toBeNull();
     expect(result.current.giftDialog.open).toBe(true);
     expect(result.current.giftDialog.locked).toBe(false);
+    // The balance is read again after the earlier gift went through.
+    expect(giftBalance).toHaveBeenCalledTimes(2);
   });
   it("keeps a gift before it's sent, so a reload mid-send keeps its key", async () => {
     giftBalance.mockReset().mockResolvedValue({

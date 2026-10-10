@@ -14,6 +14,7 @@ import { post, profile, walletBalance, walletGift, walletSettings } from "../db/
 import { PostsService } from "../posts/posts.service";
 import { hasSilver } from "../subscriptions/plans";
 import { walletGiftSchema } from "./dto";
+import { sameSender } from "./rules";
 
 type Gift = typeof walletGift.$inferSelect;
 
@@ -63,6 +64,7 @@ export class WalletGiftsService {
   }
   async send(senderId: string, raw: z.infer<typeof walletGiftSchema>) {
     const input = walletGiftSchema.parse(raw);
+    sameSender(senderId, input.senderId);
     const visible = await this.posts.byId(input.postId, senderId);
     if (!visible) {
       // A lost response may be retried after the author deletes or hides the post.

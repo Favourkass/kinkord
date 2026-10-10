@@ -68,9 +68,13 @@ describe("withdrawal requests", () => {
   };
   it("carry the payout the member reviewed", () => {
     expect(withdrawalSchema.safeParse(request).success).toBe(false);
+    // And the member it's sent as.
     expect(withdrawalSchema.safeParse({ ...request, expectedAmountKobo: 80000 }).success).toBe(
-      true,
+      false,
     );
+    expect(
+      withdrawalSchema.safeParse({ ...request, expectedAmountKobo: 80000, senderId: "u1" }).success,
+    ).toBe(true);
   });
 });
 
@@ -82,6 +86,7 @@ describe("wallet ids", () => {
       requestKey: "AAAAAAAA-2222-4222-8222-222222222222",
       bankId: "BBBBBBBB-3333-4333-8333-333333333333",
       expectedAmountKobo: 80000,
+      senderId: "u1",
     });
     expect(parsed.requestKey).toBe("aaaaaaaa-2222-4222-8222-222222222222");
     expect(parsed.bankId).toBe("bbbbbbbb-3333-4333-8333-333333333333");
@@ -91,6 +96,7 @@ describe("wallet ids", () => {
         quantity: 1,
         requestKey: "22222222-2222-4222-8222-222222222222",
         postId: "CCCCCCCC-1111-4111-8111-111111111111",
+        senderId: "u1",
       }).postId,
     ).toBe("cccccccc-1111-4111-8111-111111111111");
   });

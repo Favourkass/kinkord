@@ -264,8 +264,60 @@ describe("useWalletPresenter", () => {
     act(() => result.current.onCancel());
     expect(result.current.review).toBe(true);
     await act(() => result.current.onWithdraw());
-    expect(withdraw).toHaveBeenCalledWith("coin", 100, "bank", "kept-key", 80000);
+    expect(withdraw).toHaveBeenCalledWith("coin", 100, "bank", "kept-key", 80000, "u");
     expect(localStorage.getItem("kinkord:unanswered:withdrawal:u")).toBeNull();
+  });
+  it("brings back a kept withdrawal when Retry loads the wallet after a failed first load", async () => {
+    localStorage.setItem(
+      "kinkord:unanswered:withdrawal:u",
+      JSON.stringify({
+        currency: "coin",
+        quantity: "100",
+        bankId: "bank",
+        key: "kept-key",
+        expectedAmountKobo: 80000,
+      }),
+    );
+    vi.spyOn(walletService, "load")
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValue(data);
+    const { result } = renderHook(() => useWalletPresenter("withdraw"));
+    await waitFor(() => expect(result.current.error).toBe("offline"));
+    await act(() => result.current.onRefresh());
+    expect(result.current.unansweredNotice).toBeTruthy();
+    expect(result.current.review).toBe(true);
+  });
+  it("shows what really happened to a recovered withdrawal, paid included", async () => {
+    vi.spyOn(walletService, "load").mockResolvedValue(data);
+    vi.spyOn(walletService, "withdraw")
+      .mockRejectedValueOnce(new ApiError(0, { message: "connection lost" }))
+      .mockResolvedValueOnce({
+        id: "w1",
+        userId: "u",
+        kind: "withdrawal",
+        currency: "coin",
+        quantity: 100,
+        amountKobo: 80000,
+        status: "paid",
+        reference: "KRD-1",
+        bankName: "Test",
+        accountName: "Test",
+        accountNumber: "1234567890",
+        receiptKey: null,
+        senderReference: null,
+        senderAccountName: null,
+        reviewNote: null,
+        settlementReference: "BANK-REF",
+        createdAt: "2026-10-10T09:00:00.000Z",
+        updatedAt: "2026-10-10T09:00:00.000Z",
+      });
+    const { result } = renderHook(() => useWalletPresenter("withdraw"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => result.current.onRedeem("coin"));
+    await act(() => result.current.onWithdraw());
+    await act(() => result.current.onWithdraw());
+    expect(result.current.operationTitle).toBe("Paid");
+    expect(result.current.operationNote).toBe("The admin has recorded your bank transfer as paid.");
   });
   it("never brings back another member's unanswered withdrawal", async () => {
     localStorage.setItem(
@@ -319,20 +371,26 @@ describe("useWalletPresenter", () => {
     expect(result.current.unansweredNotice).toBeTruthy();
     expect(result.current.canSubmitWithdrawal).toBe(true);
   });
-  it("won't send an unanswered withdrawal under another account", async () => {
-    const load = vi.spyOn(walletService, "load").mockResolvedValue(data);
+  it("keeps an unanswered withdrawal when the API finds another account signed in", async () => {
+    vi.spyOn(walletService, "load").mockResolvedValue(data);
     const withdraw = vi
       .spyOn(walletService, "withdraw")
-      .mockRejectedValueOnce(new ApiError(0, { message: "connection lost" }));
+      .mockRejectedValueOnce(new ApiError(0, { message: "connection lost" }))
+      .mockRejectedValueOnce(
+        new ApiError(409, {
+          code: "WRONG_ACCOUNT",
+          message: "You're signed in as someone else now.",
+        }),
+      );
     const { result } = renderHook(() => useWalletPresenter("withdraw"));
     await waitFor(() => expect(result.current.loading).toBe(false));
     act(() => result.current.onRedeem("coin"));
     await act(() => result.current.onWithdraw());
-    // Another tab signs in as someone else before the retry.
-    load.mockResolvedValue({ ...data, summary: { ...data.summary, userId: "someone-else" } });
+    // Another tab signed in as someone else: the API refuses the retry before reading it.
     await act(() => result.current.onWithdraw());
-    expect(withdraw).toHaveBeenCalledOnce();
+    expect(withdraw.mock.calls[1][5]).toBe("u");
     expect(result.current.error).toMatch(/someone else/);
+    expect(result.current.unansweredNotice).toBeTruthy();
     expect(localStorage.getItem("kinkord:unanswered:withdrawal:u")).not.toBeNull();
   });
   it("keeps an unanswered withdrawal when the retry meets a sign-up step", async () => {

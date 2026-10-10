@@ -22,13 +22,14 @@ describe("post gift rules", () => {
       ).valid,
     ).toBe(false);
   });
-  it("sends currency units unchanged and leaves recipient identity to the server", async () => {
-    await postGiftsService.send("post", "star", 3, "retry-key");
+  it("sends currency units unchanged, as the member, and leaves the recipient to the server", async () => {
+    await postGiftsService.send("post", "star", 3, "retry-key", "me");
     expect(post).toHaveBeenCalledWith("/wallet/gifts", {
       postId: "post",
       currency: "star",
       quantity: 3,
       requestKey: "retry-key",
+      senderId: "me",
     });
   });
 });

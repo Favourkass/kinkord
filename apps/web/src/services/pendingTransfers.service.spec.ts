@@ -19,8 +19,8 @@ describe("pendingTransfersService", () => {
     pending.keepGift("u1", gift);
     expect(pending.withdrawal("u1")).toEqual(withdrawal);
     expect(pending.gift("u1")).toEqual(gift);
-    pending.settleWithdrawal("u1");
-    pending.settleGift("u1");
+    pending.settleWithdrawal("u1", "k1");
+    pending.settleGift("u1", "k2");
     expect(pending.withdrawal("u1")).toBeNull();
     expect(pending.gift("u1")).toBeNull();
   });
@@ -39,6 +39,10 @@ describe("what a failed money request says", () => {
       pending.failure(
         new ApiError(403, { code: "PROFILE_PHOTOS_REQUIRED", message: "Add your photos" }),
       ),
+    ).toBe("unread");
+    // Sent as one member while another is signed in (a switch in another tab).
+    expect(
+      pending.failure(new ApiError(409, { code: "WRONG_ACCOUNT", message: "Someone else" })),
     ).toBe("unread");
   });
   it("is unknown without an answer", () => {

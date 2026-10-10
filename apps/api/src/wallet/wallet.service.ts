@@ -24,7 +24,7 @@ import {
 import { StorageService } from "../storage/storage.service";
 import { readSettings } from "../subscriptions/subscriptions.service";
 import { silverCheckStatus } from "../subscriptions/plans";
-import { nextWalletStatus, PACKS, walletAmount, walletPaymentReference } from "./rules";
+import { nextWalletStatus, PACKS, sameSender, walletAmount, walletPaymentReference } from "./rules";
 import {
   walletBankSchema,
   walletDecisionSchema,
@@ -206,8 +206,13 @@ export class WalletService {
   async create(
     userId: string,
     kind: "purchase" | "withdrawal",
-    input: z.infer<typeof walletRequestSchema> & { bankId?: string; expectedAmountKobo?: number },
+    input: z.infer<typeof walletRequestSchema> & {
+      bankId?: string;
+      expectedAmountKobo?: number;
+      senderId?: string;
+    },
   ) {
+    sameSender(userId, input.senderId);
     const result = await this.db.transaction(async (tx) => {
       await lock(tx, userId);
       const [existing] = await tx

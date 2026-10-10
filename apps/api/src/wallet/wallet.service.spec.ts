@@ -143,6 +143,19 @@ describe("WalletService", () => {
     expect(values[0]).toMatchObject({ kind: "withdrawal", bankId: "bank" });
     expect(values[1]).toMatchObject({ phase: "hold", availableDelta: -100, earnedDelta: -100 });
   });
+  it("refuses a withdrawal sent as someone other than who is signed in", async () => {
+    const { service, db } = fixture([]);
+    await expect(
+      service.create("user", "withdrawal", {
+        currency: "coin",
+        quantity: 100,
+        bankId: "bank",
+        requestKey: "key",
+        senderId: "someone-else",
+      }),
+    ).rejects.toMatchObject({ response: { code: "WRONG_ACCOUNT" } });
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
   it("refuses a withdrawal whose rate changed after the member reviewed it", async () => {
     const { service, db } = fixture([[], [{ rates, enabled: 1, minimumKobo: 80000 }]]);
     await expect(
