@@ -47,8 +47,21 @@ export const walletService = {
     api.get<WalletOperationPM>(`/wallet/operations/${encodeURIComponent(id)}`),
   buy: (currency: KinkCurrency, quantity: number, requestKey: string) =>
     api.post<WalletOperationPM>("/wallet/purchases", { currency, quantity, requestKey }),
-  withdraw: (currency: KinkCurrency, quantity: number, bankId: string, requestKey: string) =>
-    api.post<WalletOperationPM>("/wallet/withdrawals", { currency, quantity, bankId, requestKey }),
+  withdraw: (
+    currency: KinkCurrency,
+    quantity: number,
+    bankId: string,
+    requestKey: string,
+    /** The payout the member reviewed: the API refuses it if the rate has changed since. */
+    expectedAmountKobo: number,
+  ) =>
+    api.post<WalletOperationPM>("/wallet/withdrawals", {
+      currency,
+      quantity,
+      bankId,
+      requestKey,
+      expectedAmountKobo,
+    }),
   addBank: (input: { bankName: string; accountName: string; accountNumber: string }) => {
     if (!banksService.find(input.bankName)) throw new Error("Choose a bank from the list.");
     return api.post<WalletBankPM[]>("/wallet/banks", input);
@@ -150,8 +163,10 @@ export const walletService = {
     const count = Number(quantity),
       rate = settings?.rates?.[currency].redeem ?? 0,
       amount = count * rate;
+    const amountKobo = Number.isSafeInteger(amount) && amount >= 0 ? amount : 0;
     return {
-      amount: walletMoney(Number.isSafeInteger(amount) && amount >= 0 ? amount : 0),
+      amount: walletMoney(amountKobo),
+      amountKobo,
       valid:
         canRedeem &&
         !!settings?.enabled &&

@@ -16,6 +16,17 @@ const blank = {
   minimum: "",
   enabled: false,
 };
+/** The settings form, drafted from what's saved. */
+const formFrom = (next: WalletSettingsPM) => ({
+  coinBuy: next.rates ? String(next.rates.coin.buy / 100) : "",
+  coinRedeem: next.rates ? String(next.rates.coin.redeem / 100) : "",
+  starBuy: next.rates ? String(next.rates.star.buy / 100) : "",
+  starRedeem: next.rates ? String(next.rates.star.redeem / 100) : "",
+  crownBuy: next.rates ? String(next.rates.crown.buy / 100) : "",
+  crownRedeem: next.rates ? String(next.rates.crown.redeem / 100) : "",
+  minimum: next.minimumKobo ? String(next.minimumKobo / 100) : "",
+  enabled: next.enabled,
+});
 export function useWalletAdminPresenter() {
   const access = useAdminAccessPresenter(),
     [settings, setSettings] = useState<WalletSettingsPM | null>(null),
@@ -23,48 +34,74 @@ export function useWalletAdminPresenter() {
     [kind, setKind] = useState<"purchase" | "withdrawal">("purchase"),
     [status, setStatus] = useState("submitted"),
     [error, setError] = useState<string | null>(null),
+    // Each load's failure stays until that load succeeds: one can't hide the other's.
+    [settingsFailed, setSettingsFailed] = useState<string | null>(null),
+    [queueFailed, setQueueFailed] = useState<string | null>(null),
+    // Whether the settings form has been drafted from what's saved: once it has, it's the
+    // founder's, and loads never overwrite it.
+    [drafted, setDrafted] = useState(false),
     [notice, setNotice] = useState<string | null>(null),
     [busy, setBusy] = useState(false),
     [form, setForm] = useState(blank),
     [dialog, setDialog] = useState<{ id: string; action: Action } | null>(null),
     [detail, setDetail] = useState("");
   const running = useRef(false);
-  const refresh = async () => {
-    const [next, queue] = await Promise.all([
-      walletAdminService.settings(),
-      walletAdminService.queue(kind, status),
-    ]);
-    setSettings(next);
+  // Each queue load is numbered: only the latest (a filter change or a refresh) fills the rows.
+  const asked = useRef(0);
+  const loadQueue = async () => {
+    const ask = ++asked.current;
+    const queue = await walletAdminService.queue(kind, status);
+    if (ask !== asked.current) return;
     setRows(queue);
+    setQueueFailed(null);
+  };
+  const refresh = async () => {
+    const [next] = await Promise.all([walletAdminService.settings(), loadQueue()]);
+    setSettings(next);
+    setSettingsFailed(null);
+    // A first load that failed is made up for now; a drafted form is never overwritten.
+    if (!drafted) {
+      setForm(formFrom(next));
+      setDrafted(true);
+    }
     return next;
   };
+  // The settings, and the form drafted from them, load once: filtering the queue keeps edits.
   useEffect(() => {
     if (!access.isAdmin) return;
     let live = true;
-    Promise.all([walletAdminService.settings(), walletAdminService.queue(kind, status)]).then(
-      ([next, queue]) => {
+    walletAdminService.settings().then(
+      (next) => {
         if (!live) return;
         setSettings(next);
-        setRows(queue);
-        setError(null);
-        setForm({
-          coinBuy: next.rates ? String(next.rates.coin.buy / 100) : "",
-          coinRedeem: next.rates ? String(next.rates.coin.redeem / 100) : "",
-          starBuy: next.rates ? String(next.rates.star.buy / 100) : "",
-          starRedeem: next.rates ? String(next.rates.star.redeem / 100) : "",
-          crownBuy: next.rates ? String(next.rates.crown.buy / 100) : "",
-          crownRedeem: next.rates ? String(next.rates.crown.redeem / 100) : "",
-          minimum: next.minimumKobo ? String(next.minimumKobo / 100) : "",
-          enabled: next.enabled,
-        });
+        setForm(formFrom(next));
+        setDrafted(true);
+        setSettingsFailed(null);
       },
       (e) => {
-        if (live) setError(e instanceof Error ? e.message : "Could not load wallet requests.");
+        if (live)
+          setSettingsFailed(e instanceof Error ? e.message : "Could not load wallet settings.");
       },
     );
     return () => {
       live = false;
     };
+  }, [access.isAdmin]);
+  // The queue follows its filters; a slower load for an earlier filter is dropped.
+  useEffect(() => {
+    if (!access.isAdmin) return;
+    const ask = ++asked.current;
+    walletAdminService.queue(kind, status).then(
+      (queue) => {
+        if (ask !== asked.current) return;
+        setRows(queue);
+        setQueueFailed(null);
+      },
+      (e) => {
+        if (ask === asked.current)
+          setQueueFailed(e instanceof Error ? e.message : "Could not load wallet requests.");
+      },
+    );
   }, [access.isAdmin, kind, status]);
   const run = async (work: () => Promise<void>) => {
     if (running.current) return;
@@ -86,7 +123,7 @@ export function useWalletAdminPresenter() {
     copy: WALLET_COPY,
     kind,
     status,
-    error,
+    error: error ?? settingsFailed ?? queueFailed,
     notice,
     busy,
     form,

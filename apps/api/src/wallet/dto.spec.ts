@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   walletBankSchema,
   walletDecisionSchema,
+  walletGiftSchema,
   walletSettingsSchema,
   withdrawalSchema,
 } from "./dto";
@@ -56,4 +57,41 @@ it("does not record a transfer reference while merely approving a withdrawal", (
   expect(
     walletDecisionSchema.safeParse({ action: "approve", bankReference: "NOT-PAID" }).success,
   ).toBe(false);
+});
+
+describe("withdrawal requests", () => {
+  const request = {
+    currency: "coin",
+    quantity: 100,
+    requestKey: "22222222-2222-4222-8222-222222222222",
+    bankId: "33333333-3333-4333-8333-333333333333",
+  };
+  it("carry the payout the member reviewed", () => {
+    expect(withdrawalSchema.safeParse(request).success).toBe(false);
+    expect(withdrawalSchema.safeParse({ ...request, expectedAmountKobo: 80000 }).success).toBe(
+      true,
+    );
+  });
+});
+
+describe("wallet ids", () => {
+  it("are lowercased, as Postgres returns them, so a retry compares like for like", () => {
+    const parsed = withdrawalSchema.parse({
+      currency: "coin",
+      quantity: 100,
+      requestKey: "AAAAAAAA-2222-4222-8222-222222222222",
+      bankId: "BBBBBBBB-3333-4333-8333-333333333333",
+      expectedAmountKobo: 80000,
+    });
+    expect(parsed.requestKey).toBe("aaaaaaaa-2222-4222-8222-222222222222");
+    expect(parsed.bankId).toBe("bbbbbbbb-3333-4333-8333-333333333333");
+    expect(
+      walletGiftSchema.parse({
+        currency: "coin",
+        quantity: 1,
+        requestKey: "22222222-2222-4222-8222-222222222222",
+        postId: "CCCCCCCC-1111-4111-8111-111111111111",
+      }).postId,
+    ).toBe("cccccccc-1111-4111-8111-111111111111");
+  });
 });

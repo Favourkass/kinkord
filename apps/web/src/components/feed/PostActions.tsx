@@ -35,8 +35,11 @@ export interface PostActionsProps {
 }
 
 const ICON = 18;
-const ACTION =
-  "flex min-h-9 min-w-0 items-center justify-center gap-1.5 rounded-full bg-feed-line/40 px-2 text-[13px] font-medium text-feed-text transition-colors hover:text-kink-gold-bright focus-visible:outline-2 focus-visible:outline-kink-gold-bright";
+const BASE =
+  "flex min-h-9 min-w-0 items-center justify-center gap-1.5 rounded-full px-2 text-[13px] font-medium transition-colors hover:text-kink-gold-bright focus-visible:outline-2 focus-visible:outline-kink-gold-bright";
+const ACTION = `${BASE} bg-feed-line/40 text-feed-text`;
+/** A like already given: gold, so it reads as done (and tapping undoes it). */
+const PRESSED = `${BASE} bg-kink-gold-bright/20 text-kink-gold-bright`;
 const GOLD = "text-kink-gold-bright drop-shadow-[0_1px_1px_rgba(190,128,0,0.45)]";
 
 /** Four compact timeline actions; currency selection stays inside the gift picker. */
@@ -61,7 +64,7 @@ export default function PostActions({
           onClick={onLike}
           aria-pressed={likedByMe}
           aria-label={`${likedByMe ? labels.unlike : labels.like} (${likes})`}
-          className={ACTION}
+          className={likedByMe ? PRESSED : ACTION}
         >
           <MaskIcon src="/app/feed/icon-like.svg" width={ICON} className={GOLD} />
           <span className="tabular-nums">{likes}</span>

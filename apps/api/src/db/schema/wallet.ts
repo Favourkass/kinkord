@@ -74,6 +74,11 @@ export const walletOperation = pgTable(
     status: text("status").$type<WalletStatus>().notNull().default("pending"),
     reference: text("reference").notNull(),
     requestKey: uuid("request_key").notNull(),
+    /**
+     * The saved account a withdrawal was made to (its details are copied below): what a retry
+     * is checked against, even after that account is removed. Null for a purchase.
+     */
+    bankId: uuid("bank_id"),
     bankName: text("bank_name").notNull(),
     accountName: text("account_name").notNull(),
     accountNumber: text("account_number").notNull(),

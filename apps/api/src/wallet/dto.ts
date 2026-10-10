@@ -1,5 +1,11 @@
 import { z } from "zod";
 export const currencySchema = z.enum(["coin", "star", "crown"]);
+/** A UUID, lowercased as Postgres returns it, so retries compare like for like. */
+const id = () =>
+  z
+    .string()
+    .uuid()
+    .transform((value) => value.toLowerCase());
 const rate = z.number().int().min(1).max(10_000_000);
 const pair = z
   .object({ buy: rate, redeem: rate })
@@ -20,10 +26,14 @@ export const walletBankSchema = z.object({
 export const walletRequestSchema = z.object({
   currency: currencySchema,
   quantity: z.number().int().min(1).max(1_000_000),
-  requestKey: z.string().uuid(),
+  requestKey: id(),
 });
-export const walletGiftSchema = walletRequestSchema.extend({ postId: z.string().uuid() });
-export const withdrawalSchema = walletRequestSchema.extend({ bankId: z.string().uuid() });
+export const walletGiftSchema = walletRequestSchema.extend({ postId: id() });
+export const withdrawalSchema = walletRequestSchema.extend({
+  bankId: id(),
+  /** The payout the member reviewed, in kobo: refused if the rate has changed since. */
+  expectedAmountKobo: z.number().int().positive().max(1_000_000_000),
+});
 export const walletProofSchema = z.object({
   receiptKey: z.string().min(1).max(500),
   senderReference: z.string().trim().min(1).max(100),

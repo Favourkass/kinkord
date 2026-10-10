@@ -277,6 +277,8 @@ export default function WalletView({ vm }: Props) {
           ) : (
             <form
               className={`${card} space-y-4`}
+              // An unanswered request is sent again as it was, whatever the fields say now.
+              noValidate={!!vm.unansweredNotice}
               onSubmit={(event) => {
                 event.preventDefault();
                 vm.onWithdraw();
@@ -321,6 +323,9 @@ export default function WalletView({ vm }: Props) {
                 <strong className="text-xl text-app-members-count">{vm.quote.amount}</strong>
               </p>
               <p className="text-xs text-app-subtle">{copy.fee}</p>
+              {vm.unansweredNotice && (
+                <p className="text-xs text-app-subtle">{vm.unansweredNotice}</p>
+              )}
               <button disabled={vm.busy || !vm.canSubmitWithdrawal} className={`${button} w-full`}>
                 {copy.confirm}
                 <ArrowRight size={16} />

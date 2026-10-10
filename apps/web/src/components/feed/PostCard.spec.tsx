@@ -149,3 +149,17 @@ describe("the post menu", () => {
     expect(on.remove).toHaveBeenCalledOnce();
   });
 });
+
+describe("the like button", () => {
+  it("looks pressed once liked, not only to a screen reader", () => {
+    menuOf({ likedByMe: true });
+    const liked = screen.getByRole("button", { name: "Unlike (0)" });
+    expect(liked.getAttribute("aria-pressed")).toBe("true");
+    expect(liked.className).toContain("bg-kink-gold-bright/20");
+    cleanup();
+    menuOf({});
+    expect(screen.getByRole("button", { name: "Like (0)" }).className).not.toContain(
+      "bg-kink-gold-bright/20",
+    );
+  });
+});

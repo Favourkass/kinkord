@@ -206,7 +206,7 @@ export class WalletService {
   async create(
     userId: string,
     kind: "purchase" | "withdrawal",
-    input: z.infer<typeof walletRequestSchema> & { bankId?: string },
+    input: z.infer<typeof walletRequestSchema> & { bankId?: string; expectedAmountKobo?: number },
   ) {
     const result = await this.db.transaction(async (tx) => {
       await lock(tx, userId);
@@ -224,16 +224,12 @@ export class WalletService {
         )
           throw new ConflictException("Request key already used for another transaction.");
         if (kind === "withdrawal") {
-          const [requestedBank] = await tx
-            .select()
-            .from(walletBank)
-            .where(and(eq(walletBank.id, input.bankId!), eq(walletBank.userId, userId)));
-          if (
-            !requestedBank ||
-            requestedBank.bankName !== existing.bankName ||
-            requestedBank.accountName !== existing.accountName ||
-            requestedBank.accountNumber !== existing.accountNumber
-          )
+          // Checked against the account the withdrawal was made to, which stays the same even
+          // once that account is removed: a lost answer can always be fetched again.
+          const sameAccount = existing.bankId
+            ? existing.bankId === input.bankId
+            : await this.sameSavedAccount(tx, userId, input.bankId!, existing);
+          if (!sameAccount)
             throw new ConflictException("Request key already used with different bank details.");
         }
         return existing;
@@ -252,6 +248,15 @@ export class WalletService {
         kind,
         config.minimumKobo,
       );
+      // The payout the member reviewed: if the rate changed since, they see the new one first.
+      if (
+        kind === "withdrawal" &&
+        input.expectedAmountKobo !== undefined &&
+        input.expectedAmountKobo !== amountKobo
+      )
+        throw new ConflictException(
+          "The withdrawal rate has changed. Review the new amount and submit again.",
+        );
       let bank: { bankName: string; accountName: string; accountNumber: string };
       if (kind === "purchase") {
         const payment = await readSettings(tx as unknown as Db);
@@ -311,6 +316,7 @@ export class WalletService {
           currency: input.currency,
           quantity: input.quantity,
           requestKey: input.requestKey,
+          bankId: kind === "withdrawal" ? (input.bankId ?? null) : null,
           amountKobo,
           ...{
             bankName: bank.bankName,
@@ -333,6 +339,19 @@ export class WalletService {
       return row;
     });
     return walletOperationDto(result);
+  }
+  /** For a withdrawal made before its account was recorded: compare the copied details. */
+  private async sameSavedAccount(tx: Tx, userId: string, bankId: string, existing: Operation) {
+    const [requested] = await tx
+      .select()
+      .from(walletBank)
+      .where(and(eq(walletBank.id, bankId), eq(walletBank.userId, userId)));
+    return (
+      !!requested &&
+      requested.bankName === existing.bankName &&
+      requested.accountName === existing.accountName &&
+      requested.accountNumber === existing.accountNumber
+    );
   }
   async receiptUpload(userId: string, id: string, contentType: string, size: number) {
     const row = await this.operation(userId, id);

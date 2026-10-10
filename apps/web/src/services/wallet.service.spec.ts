@@ -46,13 +46,14 @@ describe("wallet rules at the client boundary", () => {
       ).valid,
     ).toBe(false);
   });
-  it("sends identity-free requests with a retry key; the API derives the member", async () => {
-    await walletService.withdraw("coin", 100, "bank", "retry");
+  it("sends identity-free requests with a retry key and the payout reviewed; the API derives the member", async () => {
+    await walletService.withdraw("coin", 100, "bank", "retry", 80000);
     expect(post).toHaveBeenCalledWith("/wallet/withdrawals", {
       currency: "coin",
       quantity: 100,
       bankId: "bank",
       requestKey: "retry",
+      expectedAmountKobo: 80000,
     });
   });
 });
