@@ -109,18 +109,32 @@ describe("NotificationsService.record", () => {
     expect(t.realtime.notify).not.toHaveBeenCalled();
   });
 
-  it("tells nobody twice when a like, repost or follow is undone and done again", async () => {
-    const t = make([[], []]); // not blocked; the insert hits the existing row
-    await expect(
-      t.service.record("kemi", { type: "like", actorId: "ada", subjectId: "p1" }),
-    ).resolves.toBeNull();
-    expect(t.arg("insert", "values")).toMatchObject({ dedupeKey: "like:ada:p1" });
-    expect(t.has("insert", "onConflictDoNothing")).toBe(true);
-    expect(t.realtime.notify).not.toHaveBeenCalled();
+  it.each(["like", "repost"] as const)(
+    "tells nobody twice when a %s is undone and done again",
+    async (type) => {
+      const t = make([[], []]); // not blocked; the insert hits the existing row
+      await expect(
+        t.service.record("kemi", { type, actorId: "ada", subjectId: "p1" }),
+      ).resolves.toBeNull();
+      expect(t.arg("insert", "values")).toMatchObject({ dedupeKey: `${type}:ada:p1` });
+      expect(t.has("insert", "onConflictDoNothing")).toBe(true);
+      expect(t.realtime.notify).not.toHaveBeenCalled();
+    },
+  );
 
-    const follow = make([[], [{ id: ID }]]);
-    await follow.service.record("kemi", { type: "follow", actorId: "ada" });
-    expect(follow.arg("insert", "values")).toMatchObject({ dedupeKey: "follow:ada" });
+  it("records a fresh follow after an unfollow instead of suppressing it behind an old row", async () => {
+    const secondId = "00000000-0000-4000-8000-000000000002";
+    // Block check, first insert, retention sweep, block check, second insert.
+    const t = make([[], [{ id: ID }], [], [], [{ id: secondId }]]);
+    const event = { type: "follow" as const, actorId: "ada" };
+    await expect(t.service.record("kemi", event)).resolves.toBe(ID);
+    await expect(t.service.record("kemi", event)).resolves.toBe(secondId);
+    for (const nth of [0, 1]) {
+      expect(t.arg("insert", "values", nth)).toMatchObject({ type: "follow", dedupeKey: null });
+      expect(t.has("insert", "onConflictDoNothing", nth)).toBe(false);
+      expect(t.has("insert", "onConflictDoUpdate", nth)).toBe(false);
+    }
+    expect(t.realtime.notify).toHaveBeenCalledTimes(2);
   });
 
   it("keeps one row per chat: another message moves it back to the top as unread", async () => {

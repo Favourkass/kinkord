@@ -72,6 +72,26 @@ describe("FollowsService", () => {
     expect(push.newFollower).not.toHaveBeenCalled();
   });
 
+  it("notifies on follow and re-follow, but not an existing follow or unfollow", async () => {
+    const { db, select, insert } = makeDb();
+    const svc = new FollowsService(db, push as never);
+    for (let i = 0; i < 4; i++) {
+      select.mockReturnValueOnce(chain([{ id: "u2" }]));
+      select.mockReturnValueOnce(chain([{ c: 1 }]));
+    }
+    insert.mockReturnValueOnce(chain([{ followerId: "me" }]));
+    insert.mockReturnValueOnce(chain([]));
+    insert.mockReturnValueOnce(chain([{ followerId: "me" }]));
+    await svc.follow("me", "raven");
+    await svc.follow("me", "raven");
+    expect(push.newFollower).toHaveBeenCalledTimes(1);
+    await svc.unfollow("me", "raven");
+    expect(push.newFollower).toHaveBeenCalledTimes(1);
+    await svc.follow("me", "raven");
+    expect(push.newFollower).toHaveBeenCalledTimes(2);
+    expect(push.newFollower).toHaveBeenLastCalledWith("me", "u2");
+  });
+
   it("unfollows and reports the decremented count", async () => {
     const { db, select, del } = makeDb();
     select.mockReturnValueOnce(chain([{ id: "u2" }]));
