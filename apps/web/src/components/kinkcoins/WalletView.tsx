@@ -144,6 +144,59 @@ export default function WalletView({ vm }: Props) {
       {vm.mode === "buy" && (
         <>
           <p className="text-xs leading-relaxed text-app-subtle">{copy.buyHint}</p>
+          <form
+            className={`${card} space-y-4`}
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (vm.purchaseQuote.valid) vm.onBuy(vm.buyCurrency, Number(vm.buyQuantity));
+            }}
+          >
+            <h2 className="font-bold text-app-members-count">{copy.customPurchase}</h2>
+            <select
+              aria-label="Gift currency"
+              value={vm.buyCurrency}
+              onChange={(event) => vm.onBuyCurrency(event.target.value as typeof vm.buyCurrency)}
+              className={input}
+              disabled={vm.busy}
+            >
+              {vm.currencies.map((currency) => (
+                <option key={currency.kind} value={currency.kind}>
+                  {currency.label}
+                </option>
+              ))}
+            </select>
+            <label className="block text-xs">
+              {copy.purchaseQuantity}
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={vm.buyQuantity}
+                onChange={(event) => vm.onBuyQuantity(event.target.value)}
+                className={input}
+                disabled={vm.busy}
+              />
+            </label>
+            <label className="block text-xs">
+              {copy.purchaseBudget}
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={vm.buyBudget}
+                onChange={(event) => vm.onBuyBudget(event.target.value)}
+                className={input}
+                disabled={vm.busy}
+              />
+            </label>
+            <p className="text-xs text-app-subtle">{copy.purchaseBudgetHint}</p>
+            <p className="font-bold text-app-members-count">
+              {copy.purchasePrice}: {vm.purchaseQuote.amount}
+            </p>
+            <button className={button} disabled={vm.busy || !vm.purchaseQuote.valid}>
+              {copy.buy}
+            </button>
+          </form>
           {vm.currencies.map((currency) => (
             <section key={currency.kind} className={`${card} border-kink-gold-bright/35`}>
               <div className="mb-4 flex items-center gap-3">
@@ -248,6 +301,10 @@ export default function WalletView({ vm }: Props) {
                 <CoinMedallion kind={currency.kind} />
                 <div className="flex-1">
                   <h3 className="font-bold">{currency.label}</h3>
+                  <p className="mt-1 text-xs text-app-subtle">{currency.redeemRateLabel} / unit</p>
+                  <p className="mt-1 text-xs text-app-subtle">
+                    {copy.minimum}: {currency.minimumWithdrawalUnits} {currency.label}
+                  </p>
                   <p className="mt-1 text-xs text-app-subtle">
                     {copy.available}: {currency.available.toLocaleString()}
                   </p>

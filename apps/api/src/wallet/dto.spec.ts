@@ -34,19 +34,24 @@ describe("wallet request validation", () => {
   });
   it("rejects negative rates, fractional kobo and redemption above purchase price", () => {
     const input = {
-      rates: {
+      usdRates: {
         coin: { buy: 1000, redeem: 800 },
         star: { buy: 10000, redeem: 8000 },
         crown: { buy: 100000, redeem: 80000 },
       },
-      minimumKobo: 80000,
+      exchangeRateKobo: 140000,
+      minimumKobo: 10_000_000,
       enabled: true,
     };
     expect(walletSettingsSchema.safeParse(input).success).toBe(true);
+    expect(walletSettingsSchema.safeParse({ ...input, exchangeRateKobo: 140001 }).success).toBe(
+      false,
+    );
+    expect(walletSettingsSchema.safeParse({ ...input, exchangeRateKobo: 0 }).success).toBe(false);
     expect(
       walletSettingsSchema.safeParse({
         ...input,
-        rates: { ...input.rates, coin: { buy: 100, redeem: 101 } },
+        usdRates: { ...input.usdRates, coin: { buy: 100, redeem: 101 } },
       }).success,
     ).toBe(false);
     expect(walletSettingsSchema.safeParse({ ...input, minimumKobo: 10.5 }).success).toBe(false);

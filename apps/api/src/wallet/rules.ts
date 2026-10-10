@@ -41,6 +41,15 @@ export const walletDisabled = () =>
     message: "Wallet transactions are not enabled yet.",
   });
 
+/** USD cents to integer kobo; the wallet FX rate is independent of subscriptions. */
+export function walletNairaRates(usdRates: WalletRates, exchangeRateKobo: number): WalletRates {
+  const pair = (kind: WalletCurrency) => ({
+    buy: (usdRates[kind].buy * exchangeRateKobo) / 100,
+    redeem: (usdRates[kind].redeem * exchangeRateKobo) / 100,
+  });
+  return { coin: pair("coin"), star: pair("star"), crown: pair("crown") };
+}
+
 export const PACKS = {
   coin: [100, 500, 1000, 2500],
   star: [10, 50, 100, 250],
@@ -55,12 +64,12 @@ export function walletAmount(
 ) {
   if (!Number.isSafeInteger(quantity) || quantity < 1)
     throw new BadRequestException("Enter a whole positive quantity.");
-  if (kind === "purchase" && !PACKS[currency].includes(quantity))
-    throw new BadRequestException("Choose an available bundle.");
   const amount = quantity * rates[currency][kind === "purchase" ? "buy" : "redeem"];
   if (!Number.isSafeInteger(amount) || amount > 1_000_000_000)
     throw new BadRequestException("Amount exceeds the wallet limit.");
-  if (kind === "withdrawal" && amount < minimum)
+  if (kind === "purchase" && amount < 100_000)
+    throw new BadRequestException("Minimum purchase is ₦1,000.");
+  if (kind === "withdrawal" && amount < Math.max(minimum, 10_000_000))
     throw new BadRequestException("Withdrawal is below the configured minimum.");
   return amount;
 }

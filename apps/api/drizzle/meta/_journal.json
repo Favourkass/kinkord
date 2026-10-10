@@ -169,6 +169,20 @@
       "when": 1791623598188,
       "tag": "0023_wallet_operation_bank",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791646897533,
+      "tag": "0024_wallet_naira_rates",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791648311746,
+      "tag": "0025_wallet_usd_standard",
+      "breakpoints": true
     }
   ]
 }

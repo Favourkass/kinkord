@@ -14,16 +14,18 @@ const blank = {
   crownBuy: "",
   crownRedeem: "",
   minimum: "",
+  exchangeRate: "",
   enabled: false,
 };
 /** The settings form, drafted from what's saved. */
 const formFrom = (next: WalletSettingsPM) => ({
-  coinBuy: next.rates ? String(next.rates.coin.buy / 100) : "",
-  coinRedeem: next.rates ? String(next.rates.coin.redeem / 100) : "",
-  starBuy: next.rates ? String(next.rates.star.buy / 100) : "",
-  starRedeem: next.rates ? String(next.rates.star.redeem / 100) : "",
-  crownBuy: next.rates ? String(next.rates.crown.buy / 100) : "",
-  crownRedeem: next.rates ? String(next.rates.crown.redeem / 100) : "",
+  coinBuy: next.usdRates ? String(next.usdRates.coin.buy / 100) : "",
+  coinRedeem: next.usdRates ? String(next.usdRates.coin.redeem / 100) : "",
+  starBuy: next.usdRates ? String(next.usdRates.star.buy / 100) : "",
+  starRedeem: next.usdRates ? String(next.usdRates.star.redeem / 100) : "",
+  crownBuy: next.usdRates ? String(next.usdRates.crown.buy / 100) : "",
+  crownRedeem: next.usdRates ? String(next.usdRates.crown.redeem / 100) : "",
+  exchangeRate: next.exchangeRateKobo ? String(next.exchangeRateKobo / 100) : "",
   minimum: next.minimumKobo ? String(next.minimumKobo / 100) : "",
   enabled: next.enabled,
 });
@@ -173,11 +175,12 @@ export function useWalletAdminPresenter() {
     onSave: () =>
       run(async () => {
         await walletAdminService.saveSettings({
-          rates: {
+          usdRates: {
             coin: { buy: ngnToKobo(form.coinBuy), redeem: ngnToKobo(form.coinRedeem) },
             star: { buy: ngnToKobo(form.starBuy), redeem: ngnToKobo(form.starRedeem) },
             crown: { buy: ngnToKobo(form.crownBuy), redeem: ngnToKobo(form.crownRedeem) },
           },
+          exchangeRateKobo: ngnToKobo(form.exchangeRate),
           minimumKobo: ngnToKobo(form.minimum),
           enabled: form.enabled,
         });

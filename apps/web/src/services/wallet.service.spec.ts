@@ -5,13 +5,14 @@ const post = vi.hoisted(() => vi.fn());
 vi.mock("./apiClient", () => ({ api: { post }, uploadToPresignedUrl: vi.fn() }));
 const settings: WalletSettingsPM = {
   currency: "NGN",
+  usdConversion: { kobo: 560000, usdCents: 400 },
   enabled: true,
   rates: {
     coin: { buy: 1000, redeem: 800 },
     star: { buy: 10000, redeem: 8000 },
     crown: { buy: 100000, redeem: 80000 },
   },
-  minimumKobo: 80000,
+  minimumKobo: 10_000_000,
   bank: null,
   packs: { coin: [100], star: [10], crown: [1] },
 };
@@ -22,10 +23,10 @@ describe("wallet rules at the client boundary", () => {
     for (const bad of ["1.234", "-1", "NaN", "0", "1e4"]) expect(() => ngnToKobo(bad)).toThrow();
   });
   it("uses the configured minimum and never allows reserved or missing funds", () => {
-    expect(walletService.minimumQuantity(settings, "coin")).toBe("100");
-    expect(walletService.withdrawalQuote(settings, "coin", "100", 100, "bank", true).valid).toBe(
-      true,
-    );
+    expect(walletService.minimumQuantity(settings, "coin")).toBe("12500");
+    expect(
+      walletService.withdrawalQuote(settings, "coin", "12500", 12500, "bank", true).valid,
+    ).toBe(true);
     for (const [quantity, available, bank] of [
       ["99", 100, "bank"],
       ["101", 100, "bank"],
@@ -65,32 +66,68 @@ it("requires withdrawal eligibility even with enough funds and a bank account", 
   );
 });
 
-describe("dollar catalogue prices", () => {
-  const converted = { ...settings, usdConversion: { kobo: 560000, usdCents: 400 } };
-  it("uses the configured conversion, calculating bundles before rounding", () => {
-    expect(walletPurchaseUsd(1000, converted, true)).toBe("$0.0071");
-    expect(walletPurchaseUsd(100000, converted)).toBe("$0.71");
-    expect(walletPurchaseUsd(1400000, converted)).toBe("$10.00");
+it("requires 12,500 coins, 1,250 stars or 125 crowns for a ₦100,000 withdrawal", () => {
+  for (const [kind, count] of [
+    ["coin", 12500],
+    ["star", 1250],
+    ["crown", 125],
+  ] as const) {
+    expect(walletService.minimumQuantity(settings, kind)).toBe(String(count));
     expect(
-      walletPurchaseUsd(1400000, { ...converted, usdConversion: { kobo: 700000, usdCents: 400 } }),
-    ).toBe("$8.00");
-  });
-  it("does not invent an exchange rate when settings are unavailable", () => {
-    expect(walletPurchaseUsd(1000, settings)).toBe("—");
+      walletService.withdrawalQuote(settings, kind, String(count), count, "bank", true).valid,
+    ).toBe(true);
     expect(
-      walletPurchaseUsd(1000, { ...converted, usdConversion: { kobo: 0, usdCents: 400 } }),
-    ).toBe("—");
-  });
-  it("shows USD in the buy catalogue while keeping the withdrawal quote in NGN", () => {
+      walletService.withdrawalQuote(settings, kind, String(count - 1), count, "bank", true).valid,
+    ).toBe(false);
+  }
+});
+describe("dollar catalogue and naira custom purchase budgets", () => {
+  it("shows dollar catalogue prices using the shared payment conversion", () => {
     const vm = walletService.view("buy", {
-      summary: { settings: converted, balances: [] },
+      summary: { settings, balances: [] },
       banks: [],
       history: [],
     });
     expect(vm.currencies[0].buyRate).toBe("$0.0071");
     expect(vm.currencies[0].packs[0].price).toBe("$0.71");
-    expect(
-      walletService.withdrawalQuote(converted, "coin", "100", 100, "bank", true).amount,
-    ).toContain("₦");
+    expect(walletPurchaseUsd(100000, null)).toBe("—");
   });
+  it("converts budgets to whole units without exceeding the entered budget", () => {
+    expect(walletService.quantityForBudget(settings, "coin", "1234")).toBe("123");
+    expect(walletService.quantityForBudget(settings, "star", "1234")).toBe("12");
+    expect(walletService.quantityForBudget(settings, "crown", "1234")).toBe("1");
+    expect(walletService.quantityForBudget(settings, "coin", "-1")).toBe("");
+    expect(walletService.purchaseQuote(settings, "coin", "123")).toMatchObject({
+      valid: true,
+      amountNgn: "1230",
+    });
+    expect(walletService.purchaseQuote(settings, "coin", "99").valid).toBe(false);
+    expect(walletService.purchaseQuote(settings, "coin", "100.5").valid).toBe(false);
+  });
+});
+
+it("keeps the specified USD standard with independent ₦1,400 wallet conversion", () => {
+  const dollarSettings = {
+    ...settings,
+    usdConversion: { kobo: 140000, usdCents: 100 },
+    rates: {
+      coin: { buy: 14000, redeem: 11200 },
+      star: { buy: 140000, redeem: 112000 },
+      crown: { buy: 1400000, redeem: 1120000 },
+    },
+  };
+  const vm = walletService.view("buy", {
+    summary: { settings: dollarSettings, balances: [] },
+    banks: [],
+    history: [],
+  });
+  expect(vm.currencies.map((c) => c.buyRate)).toEqual(["$0.10", "$1.00", "$10.00"]);
+  expect(walletService.purchaseQuote(dollarSettings, "coin", "100")).toMatchObject({
+    amount: "$10.00",
+    amountNgn: "14000",
+    valid: true,
+  });
+  expect(walletService.minimumQuantity(dollarSettings, "coin")).toBe("893");
+  expect(walletService.minimumQuantity(dollarSettings, "star")).toBe("90");
+  expect(walletService.minimumQuantity(dollarSettings, "crown")).toBe("9");
 });

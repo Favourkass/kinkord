@@ -20,6 +20,7 @@ export interface WalletDataPM {
   banks: WalletBankPM[];
   history: WalletOperationPM[];
 }
+
 /** Dollar catalogue display only; checkout and settlement use the stored NGN amount. */
 export function walletPurchaseUsd(kobo: number, settings: WalletSettingsPM | null, unit = false) {
   const conversion = settings?.usdConversion;
@@ -117,7 +118,7 @@ export const walletService = {
     bankLimitReached: (data?.banks.length ?? 0) >= 2,
     enabled: data?.summary.settings.enabled ?? false,
     minimum: data?.summary.settings.minimumKobo
-      ? walletMoney(data.summary.settings.minimumKobo)
+      ? walletMoney(Math.max(data.summary.settings.minimumKobo, 10_000_000))
       : "—",
     banks:
       data?.banks.map((bank) => ({
@@ -136,6 +137,15 @@ export const walletService = {
       reserved: data?.summary.balances.find((b) => b.currency === kind)?.reserved ?? 0,
       withdrawable: data?.summary.balances.find((b) => b.currency === kind)?.withdrawable ?? 0,
       redeemRate: data?.summary.settings.rates?.[kind].redeem ?? 0,
+      redeemRateLabel: data?.summary.settings.rates?.[kind].redeem
+        ? `${walletPurchaseUsd(data.summary.settings.rates[kind].redeem, data.summary.settings, true)} · ${walletMoney(data.summary.settings.rates[kind].redeem)}`
+        : "—",
+      minimumWithdrawalUnits: data?.summary.settings.rates?.[kind].redeem
+        ? Math.ceil(
+            Math.max(data.summary.settings.minimumKobo ?? 0, 10_000_000) /
+              data.summary.settings.rates[kind].redeem,
+          ).toLocaleString("en-NG")
+        : "—",
       buyRate: data?.summary.settings.rates?.[kind].buy
         ? walletPurchaseUsd(data.summary.settings.rates[kind].buy, data.summary.settings, true)
         : "—",
@@ -150,9 +160,42 @@ export const walletService = {
       })),
     })),
   }),
+  purchaseQuote: (settings: WalletSettingsPM | null, currency: KinkCurrency, quantity: string) => {
+    const count = Number(quantity);
+    const amountKobo = count * (settings?.rates?.[currency].buy ?? 0);
+    return {
+      amount: walletPurchaseUsd(Number.isSafeInteger(amountKobo) ? amountKobo : 0, settings),
+      amountNgn: Number.isSafeInteger(amountKobo) && amountKobo > 0 ? String(amountKobo / 100) : "",
+      valid:
+        !!settings?.enabled &&
+        /^[1-9]\d*$/.test(quantity) &&
+        Number.isSafeInteger(count) &&
+        count <= 1_000_000 &&
+        Number.isSafeInteger(amountKobo) &&
+        amountKobo >= 100_000 &&
+        amountKobo <= 1_000_000_000,
+    };
+  },
+  quantityForBudget: (
+    settings: WalletSettingsPM | null,
+    currency: KinkCurrency,
+    amount: string,
+  ) => {
+    const rate = settings?.rates?.[currency].buy ?? 0;
+    try {
+      const count = Math.floor(ngnToKobo(amount) / rate);
+      return rate > 0 && count > 0 && count <= 1_000_000 ? String(count) : "";
+    } catch {
+      return "";
+    }
+  },
   minimumQuantity: (settings: WalletSettingsPM | null, currency: KinkCurrency) =>
     settings?.rates?.[currency].redeem
-      ? String(Math.ceil((settings.minimumKobo ?? 0) / settings.rates[currency].redeem))
+      ? String(
+          Math.ceil(
+            Math.max(settings.minimumKobo ?? 0, 10_000_000) / settings.rates[currency].redeem,
+          ),
+        )
       : "",
   withdrawalQuote: (
     settings: WalletSettingsPM | null,
@@ -180,14 +223,15 @@ export const walletService = {
         count <= 1_000_000 &&
         amount > 0 &&
         amount <= 1_000_000_000 &&
-        amount >= (settings.minimumKobo ?? Infinity),
+        amount >= Math.max(settings.minimumKobo ?? Infinity, 10_000_000),
     };
   },
 };
 export const walletAdminService = {
   settings: () => api.get<WalletSettingsPM>("/admin/wallet/settings"),
   saveSettings: (input: {
-    rates: NonNullable<WalletSettingsPM["rates"]>;
+    usdRates: NonNullable<WalletSettingsPM["rates"]>;
+    exchangeRateKobo: number;
     minimumKobo: number;
     enabled: boolean;
   }) => api.put<WalletSettingsPM>("/admin/wallet/settings", input),

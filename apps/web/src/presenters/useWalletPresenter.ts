@@ -51,6 +51,9 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     [currency, setCurrency] = useState<KinkCurrency>("coin"),
     [quantity, setQuantity] = useState(""),
     [picked, setBankId] = useState("");
+  const [buyCurrency, setBuyCurrency] = useState<KinkCurrency>("coin");
+  const [buyQuantity, setBuyQuantity] = useState("100");
+  const [buyBudget, setBuyBudget] = useState<string | null>(null);
   const [bankForm, setBankForm] = useState({ bankName: "", accountName: "", accountNumber: "" }),
     [proof, setProof] = useState({ senderAccountName: "", senderReference: "" }),
     [file, setFile] = useState<File | null>(null);
@@ -204,8 +207,31 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     bankId,
     vm.canRedeem,
   );
+  const purchaseQuote = walletService.purchaseQuote(
+    data?.summary.settings ?? null,
+    buyCurrency,
+    buyQuantity,
+  );
   return {
     ...vm,
+    purchaseQuote,
+    buyCurrency,
+    buyQuantity,
+    buyBudget: buyBudget ?? purchaseQuote.amountNgn,
+    onBuyCurrency: (kind: KinkCurrency) => {
+      setBuyCurrency(kind);
+      setBuyBudget(null);
+    },
+    onBuyQuantity: (value: string) => {
+      setBuyQuantity(value);
+      setBuyBudget(null);
+    },
+    onBuyBudget: (value: string) => {
+      setBuyBudget(value);
+      setBuyQuantity(
+        walletService.quantityForBudget(data?.summary.settings ?? null, buyCurrency, value),
+      );
+    },
     mode,
     loading,
     error,

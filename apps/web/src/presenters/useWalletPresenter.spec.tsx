@@ -27,11 +27,11 @@ const data: WalletDataPM = {
         star: { buy: 10000, redeem: 8000 },
         crown: { buy: 100000, redeem: 80000 },
       },
-      minimumKobo: 80000,
+      minimumKobo: 10_000_000,
       bank: null,
-      packs: { coin: [100], star: [], crown: [] },
+      packs: { coin: [12500], star: [], crown: [] },
     },
-    balances: [{ currency: "coin", available: 200, reserved: 0, withdrawable: 150 }],
+    balances: [{ currency: "coin", available: 25000, reserved: 0, withdrawable: 18750 }],
   },
   banks: [
     {
@@ -54,15 +54,29 @@ describe("useWalletPresenter", () => {
     router.push.mockReset();
     vi.spyOn(walletService, "load").mockResolvedValue(data);
   });
+  it("links custom purchase quantity and budget without rounding up", async () => {
+    const { result } = renderHook(() => useWalletPresenter("buy"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => result.current.onBuyQuantity("123"));
+    expect(result.current.buyBudget).toBe("1230");
+    act(() => result.current.onBuyBudget("1234"));
+    expect(result.current.buyQuantity).toBe("123");
+    expect(result.current.buyBudget).toBe("1234");
+    expect(result.current.purchaseQuote.amountNgn).toBe("1230");
+    act(() => result.current.onBuyCurrency("star"));
+    expect(result.current.buyBudget).toBe("12300");
+    act(() => result.current.onBuyBudget("999"));
+    expect(result.current.purchaseQuote.valid).toBe(false);
+  });
   it("loads server balances and requires an explicit withdrawal review", async () => {
     const { result } = renderHook(() => useWalletPresenter("withdraw"));
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.currencies[0].available).toBe(200);
-    expect(result.current.currencies[0].withdrawable).toBe(150);
+    expect(result.current.currencies[0].available).toBe(25000);
+    expect(result.current.currencies[0].withdrawable).toBe(18750);
     expect(result.current.bankId).toBe("bank");
     expect(result.current.review).toBe(false);
     act(() => result.current.onRedeem("coin"));
-    expect(result.current.quantity).toBe("100");
+    expect(result.current.quantity).toBe("12500");
     expect(result.current.quote.valid).toBe(true);
   });
   it("sends an unanswered withdrawal again exactly as it was, whatever the form says now", async () => {
@@ -78,8 +92,8 @@ describe("useWalletPresenter", () => {
         userId: "u",
         kind: "withdrawal",
         currency: "coin",
-        quantity: 100,
-        amountKobo: 80000,
+        quantity: 12500,
+        amountKobo: 10_000_000,
         status: "pending",
         reference: "KRD-20261010-ABCD1234",
         bankName: "Test",
@@ -104,7 +118,7 @@ describe("useWalletPresenter", () => {
       banks,
       summary: {
         ...data.summary,
-        balances: [{ currency: "coin", available: 100, reserved: 100, withdrawable: 50 }],
+        balances: [{ currency: "coin", available: 12500, reserved: 12500, withdrawable: 50 }],
       },
     });
     await act(() => result.current.onRefresh());
@@ -113,9 +127,9 @@ describe("useWalletPresenter", () => {
     expect(result.current.canSubmitWithdrawal).toBe(true);
     expect(result.current.unansweredNotice).toBeTruthy();
     await act(() => result.current.onWithdraw());
-    // Same currency, quantity, account, key and reviewed payout (100 × ₦8.00): the server
+    // Same currency, quantity, account, key and reviewed payout (12500 × ₦8.00): the server
     // answers with the one it made.
-    expect(withdraw.mock.calls[0][4]).toBe(80000);
+    expect(withdraw.mock.calls[0][4]).toBe(10_000_000);
     expect(withdraw).toHaveBeenCalledTimes(2);
     expect(withdraw.mock.calls[1]).toEqual(withdraw.mock.calls[0]);
     expect(result.current.unansweredNotice).toBeNull();
@@ -140,7 +154,7 @@ describe("useWalletPresenter", () => {
       userId: "u",
       kind: "purchase" as const,
       currency: "coin" as const,
-      quantity: 100,
+      quantity: 12500,
       amountKobo: 100000,
       status: "pending" as const,
       reference: "KKC20261010100000",
@@ -195,18 +209,18 @@ describe("useWalletPresenter", () => {
     act(() => result.current.onRedeem("coin"));
     await act(() => result.current.onWithdraw());
     act(() => {
-      result.current.onQuantity("150");
+      result.current.onQuantity("18750");
       result.current.onBank("bank2");
     });
     expect(result.current.fieldsLocked).toBe(true);
-    expect(result.current.quantity).toBe("100");
+    expect(result.current.quantity).toBe("12500");
     expect(result.current.bankId).toBe("bank");
-    expect(result.current.quote.amountKobo).toBe(80000);
+    expect(result.current.quote.amountKobo).toBe(10_000_000);
   });
   it("loads at once under Strict Mode's second setup", async () => {
     vi.spyOn(walletService, "load").mockResolvedValue(data);
     const { result } = renderHook(() => useWalletPresenter("withdraw"), { wrapper: StrictMode });
-    await waitFor(() => expect(result.current.currencies[0].available).toBe(200));
+    await waitFor(() => expect(result.current.currencies[0].available).toBe(25000));
     expect(result.current.loading).toBe(false);
   });
   it("still loads when reads are slower than the polling", async () => {
@@ -223,15 +237,15 @@ describe("useWalletPresenter", () => {
     await act(async () => {
       answers[0](data);
     });
-    expect(result.current.currencies[0].available).toBe(200);
+    expect(result.current.currencies[0].available).toBe(25000);
   });
   it("brings back a withdrawal left unanswered before a reload, review open, same key", async () => {
     const kept = {
       currency: "coin" as const,
-      quantity: "100",
+      quantity: "12500",
       bankId: "bank",
       key: "kept-key",
-      expectedAmountKobo: 80000,
+      expectedAmountKobo: 10_000_000,
     };
     pendingTransfersService.keepWithdrawal("u", kept);
     vi.spyOn(walletService, "load").mockResolvedValue({
@@ -243,8 +257,8 @@ describe("useWalletPresenter", () => {
       userId: "u",
       kind: "withdrawal",
       currency: "coin",
-      quantity: 100,
-      amountKobo: 80000,
+      quantity: 12500,
+      amountKobo: 10_000_000,
       status: "pending",
       reference: "KRD-1",
       bankName: "Test",
@@ -265,16 +279,16 @@ describe("useWalletPresenter", () => {
     act(() => result.current.onCancel());
     expect(result.current.review).toBe(true);
     await act(() => result.current.onWithdraw());
-    expect(withdraw).toHaveBeenCalledWith("coin", 100, "bank", "kept-key", 80000, "u");
+    expect(withdraw).toHaveBeenCalledWith("coin", 12500, "bank", "kept-key", 10_000_000, "u");
     expect(pendingTransfersService.withdrawals("u")).toEqual([]);
   });
   it("brings back a kept withdrawal when Retry loads the wallet after a failed first load", async () => {
     pendingTransfersService.keepWithdrawal("u", {
       currency: "coin",
-      quantity: "100",
+      quantity: "12500",
       bankId: "bank",
       key: "kept-key",
-      expectedAmountKobo: 80000,
+      expectedAmountKobo: 10_000_000,
     });
     vi.spyOn(walletService, "load")
       .mockRejectedValueOnce(new Error("offline"))
@@ -294,8 +308,8 @@ describe("useWalletPresenter", () => {
         userId: "u",
         kind: "withdrawal",
         currency: "coin",
-        quantity: 100,
-        amountKobo: 80000,
+        quantity: 12500,
+        amountKobo: 10_000_000,
         status: "paid",
         reference: "KRD-1",
         bankName: "Test",
@@ -438,10 +452,10 @@ describe("useWalletPresenter", () => {
     // Another tab sent one that got no answer, after this page loaded.
     pendingTransfersService.keepWithdrawal("u", {
       currency: "coin",
-      quantity: "100",
+      quantity: "12500",
       bankId: "bank",
       key: "other-tab",
-      expectedAmountKobo: 80000,
+      expectedAmountKobo: 10_000_000,
     });
     await act(() => result.current.onWithdraw());
     expect(withdraw).not.toHaveBeenCalled();
@@ -450,10 +464,10 @@ describe("useWalletPresenter", () => {
   it("never brings back another member's unanswered withdrawal", async () => {
     pendingTransfersService.keepWithdrawal("someone-else", {
       currency: "coin",
-      quantity: "100",
+      quantity: "12500",
       bankId: "bank",
       key: "theirs",
-      expectedAmountKobo: 80000,
+      expectedAmountKobo: 10_000_000,
     });
     vi.spyOn(walletService, "load").mockResolvedValue({
       ...data,
@@ -576,13 +590,13 @@ describe("useWalletPresenter", () => {
       ...data,
       summary: {
         ...data.summary,
-        balances: [{ currency: "coin", available: 200, reserved: 0, withdrawable: 50 }],
+        balances: [{ currency: "coin", available: 25000, reserved: 0, withdrawable: 50 }],
       },
     });
     const { result } = renderHook(() => useWalletPresenter("withdraw"));
     await waitFor(() => expect(result.current.loading).toBe(false));
     act(() => result.current.onRedeem("coin"));
-    expect(result.current.quantity).toBe("100");
+    expect(result.current.quantity).toBe("12500");
     expect(result.current.quote.valid).toBe(false);
   });
   it("keeps the same request key when a purchase response fails, then permits a new purchase after success", async () => {
@@ -592,12 +606,12 @@ describe("useWalletPresenter", () => {
       .mockResolvedValue({ id: "payment" } as never);
     const { result } = renderHook(() => useWalletPresenter("buy"));
     await waitFor(() => expect(result.current.loading).toBe(false));
-    await act(() => result.current.onBuy("coin", 100));
+    await act(() => result.current.onBuy("coin", 12500));
     expect(result.current.error).toBe("connection lost");
-    await act(() => result.current.onBuy("coin", 100));
+    await act(() => result.current.onBuy("coin", 12500));
     expect(buy.mock.calls[0][2]).toBe(buy.mock.calls[1][2]);
     expect(router.push).toHaveBeenCalledWith("/kinkcoins/pay/payment");
-    await act(() => result.current.onBuy("coin", 100));
+    await act(() => result.current.onBuy("coin", 12500));
     expect(buy.mock.calls[2][2]).not.toBe(buy.mock.calls[1][2]);
   });
 });
