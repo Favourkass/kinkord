@@ -217,7 +217,7 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     purchaseQuote,
     buyCurrency,
     buyQuantity,
-    buyBudget: buyBudget ?? purchaseQuote.amountNgn,
+    buyBudget: buyBudget ?? purchaseQuote.amountUsd,
     onBuyCurrency: (kind: KinkCurrency) => {
       setBuyCurrency(kind);
       setBuyBudget(null);

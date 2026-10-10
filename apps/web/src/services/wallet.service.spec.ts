@@ -5,6 +5,11 @@ const post = vi.hoisted(() => vi.fn());
 vi.mock("./apiClient", () => ({ api: { post }, uploadToPresignedUrl: vi.fn() }));
 const settings: WalletSettingsPM = {
   currency: "NGN",
+  usdRates: {
+    coin: { buy: 10, redeem: 8 },
+    star: { buy: 100, redeem: 80 },
+    crown: { buy: 1000, redeem: 800 },
+  },
   usdConversion: { kobo: 560000, usdCents: 400 },
   enabled: true,
   rates: {
@@ -81,7 +86,7 @@ it("requires 12,500 coins, 1,250 stars or 125 crowns for a ₦100,000 withdrawal
     ).toBe(false);
   }
 });
-describe("dollar catalogue and naira custom purchase budgets", () => {
+describe("dollar catalogue and dollar custom purchase budgets", () => {
   it("shows dollar catalogue prices using the shared payment conversion", () => {
     const vm = walletService.view("buy", {
       summary: { settings, balances: [] },
@@ -93,9 +98,9 @@ describe("dollar catalogue and naira custom purchase budgets", () => {
     expect(walletPurchaseUsd(100000, null)).toBe("—");
   });
   it("converts budgets to whole units without exceeding the entered budget", () => {
-    expect(walletService.quantityForBudget(settings, "coin", "1234")).toBe("123");
-    expect(walletService.quantityForBudget(settings, "star", "1234")).toBe("12");
-    expect(walletService.quantityForBudget(settings, "crown", "1234")).toBe("1");
+    expect(walletService.quantityForBudget(settings, "coin", "12.34")).toBe("123");
+    expect(walletService.quantityForBudget(settings, "star", "12.34")).toBe("12");
+    expect(walletService.quantityForBudget(settings, "crown", "12.34")).toBe("1");
     expect(walletService.quantityForBudget(settings, "coin", "-1")).toBe("");
     expect(walletService.purchaseQuote(settings, "coin", "123")).toMatchObject({
       valid: true,
@@ -130,4 +135,19 @@ it("keeps the specified USD standard with independent ₦1,400 wallet conversion
   expect(walletService.minimumQuantity(dollarSettings, "coin")).toBe("893");
   expect(walletService.minimumQuantity(dollarSettings, "star")).toBe("90");
   expect(walletService.minimumQuantity(dollarSettings, "crown")).toBe("9");
+});
+
+it("converts USD budgets for all gift currencies without overspending or accepting malformed values", () => {
+  for (const [kind, budget, units] of [
+    ["coin", "10.09", "100"],
+    ["star", "10.99", "10"],
+    ["crown", "19.99", "1"],
+  ] as const) {
+    expect(walletService.quantityForBudget(settings, kind, budget)).toBe(units);
+    expect(walletService.purchaseQuote(settings, kind, units).amountUsd).toBe("10");
+  }
+  for (const value of ["", "-1", "0", "1e3", "NaN", "1.234"]) {
+    expect(walletService.quantityForBudget(settings, "coin", value)).toBe("");
+  }
+  expect(walletService.quantityForBudget(null, "coin", "10")).toBe("");
 });

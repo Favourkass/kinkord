@@ -111,9 +111,9 @@ export const WALLET_COPY = {
   purchasePrice: "Purchase price (USD)",
   customPurchase: "Choose your own amount",
   purchaseQuantity: "Number to buy",
-  purchaseBudget: "Amount available (NGN)",
+  purchaseBudget: "Amount available (USD)",
   purchaseBudgetHint:
-    "Whole units only. Your payment amount is shown below; any unused budget stays with you.",
+    "Enter a quantity or a USD amount. Whole units only; any unused budget stays with you.",
   buyHint:
     "Prices are shown in USD. The payment page shows the exact naira amount to transfer. Minimum purchase is ₦1,000. Coins are credited after payment verification. Bought coins are for gifting and can't be withdrawn.",
   transfer:

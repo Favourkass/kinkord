@@ -166,6 +166,10 @@ export const walletService = {
     return {
       amount: walletPurchaseUsd(Number.isSafeInteger(amountKobo) ? amountKobo : 0, settings),
       amountNgn: Number.isSafeInteger(amountKobo) && amountKobo > 0 ? String(amountKobo / 100) : "",
+      amountUsd:
+        settings?.usdRates && Number.isSafeInteger(count) && count > 0
+          ? String((count * settings.usdRates[currency].buy) / 100)
+          : "",
       valid:
         !!settings?.enabled &&
         /^[1-9]\d*$/.test(quantity) &&
@@ -181,9 +185,10 @@ export const walletService = {
     currency: KinkCurrency,
     amount: string,
   ) => {
-    const rate = settings?.rates?.[currency].buy ?? 0;
+    const rate = settings?.usdRates?.[currency].buy ?? 0;
     try {
-      const count = Math.floor(ngnToKobo(amount) / rate);
+      // Integer cents avoid rounding up a fractional coin beyond the member's budget.
+      const count = Math.floor(usdToCents(amount) / rate);
       return rate > 0 && count > 0 && count <= 1_000_000 ? String(count) : "";
     } catch {
       return "";
@@ -249,8 +254,14 @@ export const walletAdminService = {
   ) => api.post<WalletOperationPM>(`/admin/wallet/${encodeURIComponent(id)}/decision`, input),
 };
 export function ngnToKobo(value: string) {
+  return moneyToMinorUnits(value, "NGN");
+}
+export function usdToCents(value: string) {
+  return moneyToMinorUnits(value, "USD");
+}
+function moneyToMinorUnits(value: string, currency: "NGN" | "USD") {
   if (!/^\d+(\.\d{1,2})?$/.test(value.trim()))
-    throw new Error("Enter a valid NGN amount with no more than two decimal places.");
+    throw new Error(`Enter a valid ${currency} amount with no more than two decimal places.`);
   const [whole, fraction = ""] = value.trim().split(".");
   const result = Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
   if (!Number.isSafeInteger(result) || result < 1 || result > 1_000_000_000)

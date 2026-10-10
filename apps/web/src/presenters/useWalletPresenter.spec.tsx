@@ -21,6 +21,11 @@ const data: WalletDataPM = {
     redemption: { canRedeem: true, reason: null },
     settings: {
       currency: "NGN",
+      usdRates: {
+        coin: { buy: 10, redeem: 8 },
+        star: { buy: 100, redeem: 80 },
+        crown: { buy: 1000, redeem: 800 },
+      },
       enabled: true,
       rates: {
         coin: { buy: 1000, redeem: 800 },
@@ -58,14 +63,14 @@ describe("useWalletPresenter", () => {
     const { result } = renderHook(() => useWalletPresenter("buy"));
     await waitFor(() => expect(result.current.loading).toBe(false));
     act(() => result.current.onBuyQuantity("123"));
-    expect(result.current.buyBudget).toBe("1230");
-    act(() => result.current.onBuyBudget("1234"));
+    expect(result.current.buyBudget).toBe("12.3");
+    act(() => result.current.onBuyBudget("12.34"));
     expect(result.current.buyQuantity).toBe("123");
-    expect(result.current.buyBudget).toBe("1234");
+    expect(result.current.buyBudget).toBe("12.34");
     expect(result.current.purchaseQuote.amountNgn).toBe("1230");
     act(() => result.current.onBuyCurrency("star"));
-    expect(result.current.buyBudget).toBe("12300");
-    act(() => result.current.onBuyBudget("999"));
+    expect(result.current.buyBudget).toBe("123");
+    act(() => result.current.onBuyBudget("9.99"));
     expect(result.current.purchaseQuote.valid).toBe(false);
   });
   it("loads server balances and requires an explicit withdrawal review", async () => {
