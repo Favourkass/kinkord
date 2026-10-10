@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  adminVerificationActions,
   toAdminReportVM,
+  toAdminVerificationReviewVM,
   type AdminReportPM,
+  type AdminVerificationReviewPM,
   toAdminMemberDetailVM,
   toAdminMemberRowVM,
   toAdminPostVM,
@@ -216,5 +219,97 @@ describe("toAdminReportVM", () => {
       details: null,
       open: false,
     });
+  });
+});
+
+describe("toAdminVerificationReviewVM", () => {
+  const review: AdminVerificationReviewPM = {
+    id: "v1",
+    userId: "u2",
+    username: "ada",
+    displayName: " Ada ",
+    reasonCodes: ["PROFILE_PHOTO_MATCH_INCONCLUSIVE", "SOMETHING_NEW"],
+    createdAt: "2026-09-28T08:00:00Z",
+    providerSessionId: "session-1",
+    checks: {
+      governmentId: true,
+      liveness: true,
+      idFace: true,
+      profileFace: false,
+      dateOfBirth: true,
+      gender: true,
+      country: false,
+    },
+    photoUrl: "https://m/a_md.jpg",
+    originalPhotoUrl: "https://m/a.jpg",
+  };
+  const labels = {
+    noName: "Unnamed member",
+    checks: {
+      governmentId: "Government ID",
+      liveness: "Live selfie",
+      idFace: "Selfie matches ID",
+      profileFace: "Selfie matches profile photo",
+      dateOfBirth: "Birth date",
+      gender: "Gender",
+      country: "Country",
+    },
+    reasons: { PROFILE_PHOTO_MATCH_INCONCLUSIVE: "Unclear photo match" },
+  };
+  const href = (id: string) => `/moderation/members/${id}`;
+
+  it("labels the reasons and checks, and allows approval when the ID itself passed", () => {
+    const vm = toAdminVerificationReviewVM(review, href, labels, now);
+    expect(vm).toMatchObject({
+      name: "Ada",
+      handle: "@ada",
+      memberHref: "/moderation/members/u2",
+      when: "an hour ago",
+      reasons: ["Unclear photo match", "SOMETHING_NEW"],
+      sessionId: "session-1",
+      canApprove: true,
+    });
+    expect(vm.checks.filter((c) => !c.passed).map((c) => c.key)).toEqual([
+      "profileFace",
+      "country",
+    ]);
+  });
+
+  it("only allows rejecting when something only the ID can prove failed", () => {
+    const vm = toAdminVerificationReviewVM(
+      {
+        ...review,
+        displayName: null,
+        username: null,
+        checks: { ...review.checks, liveness: false },
+      },
+      href,
+      labels,
+      now,
+    );
+    expect(vm.name).toBe("Unnamed member");
+    expect(vm.canApprove).toBe(false);
+  });
+});
+
+describe("adminVerificationActions", () => {
+  it("offers revoking a live verification and reopening a closed one", () => {
+    expect(adminVerificationActions({ status: "verified", attemptsUsed: 0 })).toEqual({
+      revoke: true,
+      reopen: false,
+    });
+    expect(adminVerificationActions({ status: "revoked", attemptsUsed: 0 })).toEqual({
+      revoke: false,
+      reopen: true,
+    });
+    expect(adminVerificationActions({ status: "rejected", attemptsUsed: 3 })).toEqual({
+      revoke: true,
+      reopen: true,
+    });
+    expect(adminVerificationActions({ status: "not_started", attemptsUsed: 0 })).toEqual({
+      revoke: false,
+      reopen: false,
+    });
+    expect(adminVerificationActions(null)).toEqual({ revoke: false, reopen: false });
   });
 });
