@@ -47,12 +47,14 @@ export const pendingTransfersService = {
       return "unread";
     return e.status >= 400 ? "refused" : "unknown";
   },
-  withdrawals: (memberId: string): UnansweredWithdrawal[] => store.withdrawals(memberId),
+  /** Null when storage can't be read: then there's no telling what's kept. */
+  withdrawals: (memberId: string): UnansweredWithdrawal[] | null => store.withdrawals(memberId),
   /** True once kept; false when this browser couldn't keep it. */
   keepWithdrawal: (memberId: string, request: UnansweredWithdrawal) =>
     store.keepWithdrawal(memberId, request),
   settleWithdrawal: (memberId: string, key: string) => store.settleWithdrawal(memberId, key),
-  gifts: (memberId: string): GiftInDoubt[] => store.gifts(memberId),
+  /** Null when storage can't be read: then there's no telling what's kept. */
+  gifts: (memberId: string): GiftInDoubt[] | null => store.gifts(memberId),
   /** True once kept; false when this browser couldn't keep it. */
   keepGift: (memberId: string, gift: GiftInDoubt) => store.keepGift(memberId, gift),
   settleGift: (memberId: string, key: string) => store.settleGift(memberId, key),

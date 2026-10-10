@@ -372,6 +372,63 @@ describe("useWalletPresenter", () => {
     expect(withdraw.mock.calls[1][3]).not.toBe(withdraw.mock.calls[0][3]);
     Reflect.deleteProperty(navigator, "locks");
   });
+  it("starts over when another account is signed in, keeping the last one's request for it", async () => {
+    const load = vi.spyOn(walletService, "load").mockResolvedValue(data);
+    vi.spyOn(walletService, "withdraw").mockRejectedValueOnce(
+      new ApiError(0, { message: "connection lost" }),
+    );
+    const { result } = renderHook(() => useWalletPresenter("withdraw"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => result.current.onRedeem("coin"));
+    await act(() => result.current.onWithdraw());
+    // Another tab signs in as someone else.
+    load.mockResolvedValue({
+      ...data,
+      summary: { ...data.summary, userId: "someone-else" },
+      banks: [{ ...data.banks[0], id: "their-bank", userId: "someone-else" }],
+    });
+    await act(() => result.current.onRefresh());
+    expect(result.current.review).toBe(false);
+    expect(result.current.unansweredNotice).toBeNull();
+    expect(result.current.notice).toMatch(/someone else/);
+    expect(result.current.bankId).toBe("their-bank");
+    expect(pendingTransfersService.withdrawals("u")).toHaveLength(1);
+  });
+  it("closes the review when a refresh finds it answered in another tab", async () => {
+    vi.spyOn(walletService, "load").mockResolvedValue(data);
+    vi.spyOn(walletService, "withdraw").mockRejectedValueOnce(
+      new ApiError(0, { message: "connection lost" }),
+    );
+    const { result } = renderHook(() => useWalletPresenter("withdraw"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => result.current.onRedeem("coin"));
+    await act(() => result.current.onWithdraw());
+    expect(result.current.unansweredNotice).toBeTruthy();
+    localStorage.clear();
+    await act(() => result.current.onRefresh());
+    expect(result.current.review).toBe(false);
+    expect(result.current.unansweredNotice).toBeNull();
+    expect(result.current.notice).toMatch(/another tab/);
+  });
+  it("keeps its own unanswered withdrawal when storage can't be read", async () => {
+    vi.spyOn(walletService, "load").mockResolvedValue(data);
+    const withdraw = vi
+      .spyOn(walletService, "withdraw")
+      .mockRejectedValueOnce(new ApiError(0, { message: "connection lost" }))
+      .mockRejectedValueOnce(new ApiError(0, { message: "connection lost" }));
+    const { result } = renderHook(() => useWalletPresenter("withdraw"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => result.current.onRedeem("coin"));
+    await act(() => result.current.onWithdraw());
+    const blocked = vi.spyOn(Storage.prototype, "key").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    await act(() => result.current.onWithdraw());
+    // Sent again with its own key, not taken for answered elsewhere.
+    expect(withdraw).toHaveBeenCalledTimes(2);
+    expect(withdraw.mock.calls[1][3]).toBe(withdraw.mock.calls[0][3]);
+    blocked.mockRestore();
+  });
   it("won't start a withdrawal over another tab's one still unanswered", async () => {
     vi.spyOn(walletService, "load").mockResolvedValue(data);
     const withdraw = vi.spyOn(walletService, "withdraw");

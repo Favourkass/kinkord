@@ -1251,7 +1251,7 @@ describe("post gifting presenter", () => {
     expect(giftSend).toHaveBeenCalledWith("gone", "star", 2, "b", "me");
     expect(result.current.giftDialog.locked).toBe(true);
     expect(result.current.giftDialog.quantity).toBe("3");
-    expect(pendingTransfersService.gifts("me").map((g) => g.key)).toEqual(["a"]);
+    expect(pendingTransfersService.gifts("me")?.map((g) => g.key)).toEqual(["a"]);
     localStorage.clear();
   });
   it("keeps this post's gift in doubt, key and all, when the balance can't be read again", async () => {
@@ -1287,6 +1287,39 @@ describe("post gifting presenter", () => {
     });
     // The gift in doubt, never a new one.
     expect(giftSend).toHaveBeenLastCalledWith("p1", "coin", 3, "a", "me");
+    localStorage.clear();
+  });
+  it("keeps its own gift in doubt when storage can't be read", async () => {
+    giftBalance.mockReset().mockResolvedValue({
+      userId: "me",
+      settings: { enabled: true },
+      balances: [{ currency: "coin", available: 5, reserved: 0 }],
+    });
+    giftSend.mockReset().mockRejectedValueOnce(new ApiError(0, "Network problem"));
+    const { result } = renderHook(() => useFeedPresenter());
+    await waitFor(() => expect(result.current.posts).toHaveLength(1));
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    await act(async () => {
+      await result.current.giftDialog.onSend();
+    });
+    act(() => {
+      result.current.giftDialog.onClose();
+    });
+    const blocked = vi.spyOn(Storage.prototype, "key").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    expect(result.current.giftDialog.locked).toBe(true);
+    giftSend.mockResolvedValueOnce({});
+    await act(async () => {
+      await result.current.giftDialog.onSend();
+    });
+    expect(giftSend.mock.calls[1][3]).toBe(giftSend.mock.calls[0][3]);
+    blocked.mockRestore();
     localStorage.clear();
   });
   it("sends a gift under the member's cross-tab lock", async () => {

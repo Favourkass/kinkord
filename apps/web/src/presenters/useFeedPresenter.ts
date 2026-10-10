@@ -697,12 +697,12 @@ export function useFeedPresenter({
    * couldn't be kept.
    */
   const giftsInDoubt = (member: string): InDoubt[] => {
-    const kept = pendingTransfersService
-      .gifts(member)
-      .map((gift) => ({ ...gift, member, persisted: true }));
-    const own = uncertainGift.current;
-    if (own && own.member === member && !own.persisted && !kept.some((g) => g.key === own.key))
-      kept.push(own);
+    const own = uncertainGift.current?.member === member ? uncertainGift.current : null;
+    const stored = pendingTransfersService.gifts(member);
+    // Storage can't be read: no telling what's kept, so this page's own still counts.
+    if (stored === null) return own ? [own] : [];
+    const kept = stored.map((gift) => ({ ...gift, member, persisted: true }));
+    if (own && !own.persisted && !kept.some((g) => g.key === own.key)) kept.push(own);
     return kept;
   };
   /**

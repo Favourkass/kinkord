@@ -30,11 +30,12 @@ type InDoubt = UnansweredWithdrawal & { member: string; persisted: boolean };
  * own when it couldn't be kept.
  */
 const withdrawalsInDoubt = (owner: string, own: InDoubt | null): InDoubt[] => {
-  const kept = pendingTransfersService
-    .withdrawals(owner)
-    .map((request) => ({ ...request, member: owner, persisted: true }));
-  if (own && own.member === owner && !own.persisted && !kept.some((k) => k.key === own.key))
-    kept.push(own);
+  const mine = own && own.member === owner ? own : null;
+  const stored = pendingTransfersService.withdrawals(owner);
+  // Storage can't be read: no telling what's kept, so this page's own still counts.
+  if (stored === null) return mine ? [mine] : [];
+  const kept = stored.map((request) => ({ ...request, member: owner, persisted: true }));
+  if (mine && !mine.persisted && !kept.some((k) => k.key === mine.key)) kept.push(mine);
   return kept;
 };
 
@@ -64,11 +65,22 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
   const [unanswered, setUnanswered] = useState<InDoubt | null>(null);
   // Unanswered requests are kept in this browser too, for this member, until answered.
   const member = data?.summary.userId ?? null;
+  // The unanswered request on screen, and whose wallet is shown, for loads (which run outside
+  // render) to compare against.
+  const shownUnanswered = useRef<InDoubt | null>(null);
+  const walletOwner = useRef<string | null>(null);
+  useEffect(() => {
+    shownUnanswered.current = unanswered;
+  }, [unanswered]);
   const keepUnanswered = (request: UnansweredWithdrawal, sender: string) => {
     const persisted = pendingTransfersService.keepWithdrawal(sender, request);
-    setUnanswered({ ...request, member: sender, persisted });
+    const shown = { ...request, member: sender, persisted };
+    shownUnanswered.current = shown;
+    setUnanswered(shown);
   };
   const settleUnanswered = (sender: string, key: string) => {
+    // Answered here: a load straight after mustn't take it for one answered elsewhere.
+    if (shownUnanswered.current?.key === key) shownUnanswered.current = null;
     setUnanswered((current) => (current?.key === key ? null : current));
     pendingTransfersService.settleWithdrawal(sender, key);
   };
@@ -79,14 +91,28 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
    */
   const applyLoad = useCallback((next: WalletDataPM) => {
     setData(next);
-    const owner = next.summary.userId;
+    const owner = next.summary.userId ?? null;
+    // Another account now (signed in from another tab): nothing of the last one's review carries
+    // over, so a submit can't become a new withdrawal from its wallet; its unanswered request
+    // stays kept for it.
+    const previousOwner = walletOwner.current;
+    walletOwner.current = owner;
+    if (previousOwner !== null && owner !== previousOwner) {
+      setReview(false);
+      setBankId("");
+      if (shownUnanswered.current) setNotice(WALLET_COPY.otherAccount);
+      shownUnanswered.current = null;
+    }
     // The one shown: this page's own while it's still in doubt, else the first kept (a reload's,
-    // or another tab's). Another account's (a switch in another tab) stays kept for them.
-    setUnanswered((current) => {
-      if (!owner) return null;
-      const doubts = withdrawalsInDoubt(owner, current);
-      return doubts.find((d) => d.key === current?.key) ?? doubts[0] ?? null;
-    });
+    // or another tab's).
+    const current = shownUnanswered.current;
+    const doubts = owner ? withdrawalsInDoubt(owner, current) : [];
+    if (current && current.member === owner && !doubts.some((d) => d.key === current.key)) {
+      // Answered in another tab: its review closes, so Confirm can't send a new one in its place.
+      setReview(false);
+      setNotice(WALLET_COPY.settledElsewhere);
+    }
+    setUnanswered(doubts.find((d) => d.key === current?.key) ?? doubts[0] ?? null);
     // The account shown is pinned once: a default changed elsewhere doesn't move it.
     setBankId(
       (previous) =>

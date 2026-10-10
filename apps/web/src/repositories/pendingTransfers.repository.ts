@@ -8,8 +8,11 @@ import type { GiftInDoubt, UnansweredWithdrawal } from "@/domain/wallet";
  */
 const prefix = (slot: string, memberId: string) => `kinkord:unanswered:${slot}:${memberId}:`;
 
-/** Every entry kept in a slot for a member; a damaged one is skipped. */
-function entries(slot: string, memberId: string): Record<string, unknown>[] {
+/**
+ * Every entry kept in a slot for a member (a damaged one is skipped), or null when storage
+ * can't be read: then there's no telling what's kept, which isn't the same as nothing.
+ */
+function entries(slot: string, memberId: string): Record<string, unknown>[] | null {
   const start = prefix(slot, memberId);
   const found: Record<string, unknown>[] = [];
   try {
@@ -27,7 +30,7 @@ function entries(slot: string, memberId: string): Record<string, unknown>[] {
       }
     }
   } catch {
-    // Storage off: nothing kept.
+    return null;
   }
   return found;
 }
@@ -74,15 +77,16 @@ function toGift(v: Record<string, unknown>): GiftInDoubt | null {
 const whole = <T>(value: T | null): value is T => value !== null;
 
 export const pendingTransfersRepository = {
-  /** This member's unanswered withdrawals kept in this browser (any tab's). */
-  withdrawals: (memberId: string): UnansweredWithdrawal[] =>
-    entries("withdrawal", memberId).map(toWithdrawal).filter(whole),
+  /** This member's unanswered withdrawals kept in this browser (any tab's); null if unreadable. */
+  withdrawals: (memberId: string): UnansweredWithdrawal[] | null =>
+    entries("withdrawal", memberId)?.map(toWithdrawal).filter(whole) ?? null,
   /** True once kept; false when this browser couldn't keep it. */
   keepWithdrawal: (memberId: string, request: UnansweredWithdrawal) =>
     keep("withdrawal", memberId, request.key, request),
   settleWithdrawal: (memberId: string, key: string) => settle("withdrawal", memberId, key),
-  /** This member's gifts in doubt kept in this browser (any tab's). */
-  gifts: (memberId: string): GiftInDoubt[] => entries("gift", memberId).map(toGift).filter(whole),
+  /** This member's gifts in doubt kept in this browser (any tab's); null if unreadable. */
+  gifts: (memberId: string): GiftInDoubt[] | null =>
+    entries("gift", memberId)?.map(toGift).filter(whole) ?? null,
   /** True once kept; false when this browser couldn't keep it. */
   keepGift: (memberId: string, gift: GiftInDoubt) => keep("gift", memberId, gift.key, gift),
   settleGift: (memberId: string, key: string) => settle("gift", memberId, key),
