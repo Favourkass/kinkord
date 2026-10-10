@@ -14,6 +14,7 @@ import { z } from "zod";
 import { DRIZZLE, type Db } from "../db/db.module";
 import {
   moderationLog,
+  user,
   walletBalance,
   walletBank,
   walletLedger,
@@ -21,6 +22,7 @@ import {
   walletOperation,
   walletSettings,
 } from "../db/schema";
+import { isSuperAdmin } from "../moderation/admins";
 import { StorageService } from "../storage/storage.service";
 import { readSettings } from "../subscriptions/subscriptions.service";
 import { silverCheckStatus } from "../subscriptions/plans";
@@ -57,6 +59,8 @@ export function walletOperationDto(row: Operation) {
   return { ...row, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
 }
 
+/** Days an account must have before it can cash out gifts. The founders don't wait. */
+export const WITHDRAWAL_MIN_ACCOUNT_DAYS = 30;
 @Injectable()
 export class WalletService {
   constructor(
@@ -65,12 +69,35 @@ export class WalletService {
   ) {}
   async redemptionEligibility(userId: string, db: Db = this.db) {
     const badge = await silverCheckStatus(db, userId);
-    return {
-      canRedeem: !!badge?.shown,
-      reason: badge?.shown
-        ? null
-        : "An active Silver subscription and Silver verification badge are required to redeem.",
-    };
+    if (!badge?.shown)
+      return {
+        canRedeem: false,
+        reason:
+          "An active Silver subscription and Silver verification badge are required to redeem.",
+      };
+    // The badge shows at once, but cashing out waits: a new account can't take gifts and leave.
+    const [account] = await db
+      .select({ createdAt: user.createdAt, email: user.email, emailVerified: user.emailVerified })
+      .from(user)
+      .where(eq(user.id, userId))
+      .limit(1);
+    if (!account) return { canRedeem: false, reason: "Account not found." };
+    const opensAt = new Date(
+      account.createdAt.getTime() + WITHDRAWAL_MIN_ACCOUNT_DAYS * 86_400_000,
+    );
+    if (opensAt > new Date() && !isSuperAdmin(account)) {
+      const date = opensAt.toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        timeZone: "UTC",
+      });
+      return {
+        canRedeem: false,
+        reason: `Withdrawals open on ${date}, ${WITHDRAWAL_MIN_ACCOUNT_DAYS} days after you joined.`,
+      };
+    }
+    return { canRedeem: true, reason: null };
   }
   async settings() {
     const [row] = await this.db.select().from(walletSettings).where(eq(walletSettings.id, 1));

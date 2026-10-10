@@ -315,23 +315,32 @@ describe("withdrawal membership eligibility", () => {
     expect(db.update).not.toHaveBeenCalled();
     expect(db.insert).not.toHaveBeenCalled();
   });
-  it("uses the existing Silver badge rule and denies missing, held or young accounts", async () => {
-    const eligible = {
-      heldAt: null,
-      heldFor: null,
+  it("needs the Silver badge, and an account 30 days old, unless it's a founder's", async () => {
+    const badge = { heldAt: null, heldFor: null, avatarKey: "avatar", coverKey: "cover" };
+    const account = {
       createdAt: new Date("2020-01-01"),
-      avatarKey: "avatar",
-      coverKey: "cover",
+      email: "m@example.test",
+      emailVerified: true,
     };
-    for (const [rows, expected] of [
-      [[], false],
-      [[eligible], true],
-      [[{ ...eligible, heldAt: new Date() }], false],
-      [[{ ...eligible, createdAt: new Date() }], false],
+    const today = { ...account, createdAt: new Date() };
+    for (const [results, expected] of [
+      [[[]], false],
+      [[[{ ...badge, heldAt: new Date() }]], false],
+      [[[badge], [account]], true],
+      [[[badge], [today]], false],
+      [[[badge], [{ ...today, email: "maxihandsome@gmail.com" }]], true],
     ] as const) {
-      const { service } = fixture([[...rows]]);
+      const { service } = fixture(results.map((rows) => [...rows]));
       vi.mocked(service.redemptionEligibility).mockRestore();
       expect((await service.redemptionEligibility("user")).canRedeem).toBe(expected);
     }
+    const { service } = fixture([[badge], [today]]);
+    vi.mocked(service.redemptionEligibility).mockRestore();
+    await expect(service.redemptionEligibility("user")).resolves.toEqual({
+      canRedeem: false,
+      reason: expect.stringMatching(
+        /^Withdrawals open on \d{1,2} \w{3} \d{4}, 30 days after you joined\.$/,
+      ),
+    });
   });
 });
