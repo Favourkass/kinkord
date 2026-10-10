@@ -33,6 +33,7 @@ export function getProfilePosts(feed: Feed, viewerAvatarUrl: string | null) {
       onComment: feed.openComments,
       onSave: feed.toggleSave,
       onShare: feed.share,
+      onGift: feed.openGift,
       onOpenMedia: feed.openMedia,
       hasMore: feed.hasMore,
       loadingMore: feed.loadingMore,
@@ -40,6 +41,7 @@ export function getProfilePosts(feed: Feed, viewerAvatarUrl: string | null) {
       loadMoreLabel: copy.loadMore,
     },
     postOverlays: {
+      gift: feed.giftDialog,
       comments: {
         open: feed.commentsFor !== null,
         comments: feed.comments,

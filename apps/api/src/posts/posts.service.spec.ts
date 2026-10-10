@@ -353,6 +353,7 @@ describe("PostsService.byId", () => {
     over.liked ?? [],
     over.reposted ?? [],
     over.saved ?? [],
+    over.gifts ?? [],
   ];
 
   it("carries the counts, the viewer's own reactions, and a small avatar", async () => {
@@ -362,6 +363,7 @@ describe("PostsService.byId", () => {
       ...decorated({
         media: [{ id: "m1", postId: "p1", kind: "image", key: "posts/u2/a.jpg", position: 0 }],
         likes: [{ postId: "p1", n: 3 }],
+        gifts: [{ postId: "p1", n: 5 }],
         comments: [{ postId: "p1", n: 2 }],
         reposts: [{ postId: "p1", n: 9 }],
         liked: [{ postId: "p1" }],
@@ -376,6 +378,7 @@ describe("PostsService.byId", () => {
       id: "p1",
       postId: "p1",
       likes: 3,
+      gifts: 5,
       comments: 2,
       reposts: 9,
       likedByMe: true,
@@ -685,5 +688,33 @@ describe("repost notifications", () => {
     await svc.repost("r1", "u1");
     expect(push.newRepost).toHaveBeenCalledTimes(1);
     expect(push.newRepost).toHaveBeenCalledWith("p1", "u2", "u1");
+  });
+});
+
+describe("share counts", () => {
+  const withTx = (db: ReturnType<typeof makeDb>) =>
+    Object.assign(db, { transaction: vi.fn(async (cb: (tx: unknown) => unknown) => cb(db)) });
+  it("counts a member's first share of the original post, after visibility is checked", async () => {
+    const db = withTx(makeDb([[{ postId: "original" }], [{ shares: 4 }]]));
+    const svc = service(db);
+    vi.spyOn(svc, "byId").mockResolvedValue({ postId: "original" } as never);
+    expect(await svc.share("repost", "viewer")).toEqual({ postId: "original", shares: 4 });
+    expect(svc.byId).toHaveBeenCalledWith("repost", "viewer");
+    expect(db.insert).toHaveBeenCalledOnce();
+    expect(db.update).toHaveBeenCalledOnce();
+  });
+  it("doesn't count the same member sharing it again", async () => {
+    const db = withTx(makeDb([[], [{ shares: 4 }]]));
+    const svc = service(db);
+    vi.spyOn(svc, "byId").mockResolvedValue({ postId: "original" } as never);
+    expect(await svc.share("original", "viewer")).toEqual({ postId: "original", shares: 4 });
+    expect(db.update).not.toHaveBeenCalled();
+  });
+  it("does not count shares of inaccessible posts", async () => {
+    const db = makeDb();
+    const svc = service(db);
+    vi.spyOn(svc, "byId").mockResolvedValue(null);
+    await expect(svc.share("private", "viewer")).rejects.toThrow("Post not found");
+    expect(db.update).not.toHaveBeenCalled();
   });
 });

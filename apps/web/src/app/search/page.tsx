@@ -18,7 +18,10 @@ function Search() {
   const s = useSearchPresenter(params.get("q"));
   // Posts are the feed's own, so a post found behaves exactly as in the feed.
   const feed = useFeedPresenter({ search: s.term, ready: s.postsReady });
-  const { commentsPanel, lightbox, confirm, toast, ...posts } = getPostList(feed, home.avatarUrl);
+  const { giftDialog, commentsPanel, lightbox, confirm, toast, ...posts } = getPostList(
+    feed,
+    home.avatarUrl,
+  );
 
   return (
     <SearchScreen
@@ -54,6 +57,7 @@ function Search() {
         ...posts,
         copy: { empty: s.postsEmpty, loading: s.labels.searching, loadMore: s.labels.loadMore },
       }}
+      giftDialog={giftDialog}
       commentsPanel={commentsPanel}
       lightbox={lightbox}
       confirm={confirm}

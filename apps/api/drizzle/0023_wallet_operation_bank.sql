@@ -1,0 +1,1 @@
+ALTER TABLE "wallet_operation" ADD COLUMN "bank_id" uuid;

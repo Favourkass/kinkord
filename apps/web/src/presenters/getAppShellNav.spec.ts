@@ -13,6 +13,7 @@ describe("getAppShellNav", () => {
       profile: "/profile",
       settings: "/settings",
       saved: "/saved",
+      kinkcoins: "/kinkcoins",
       subscription: "/subscription",
     });
     expect(nav.labels).toEqual({
@@ -24,6 +25,7 @@ describe("getAppShellNav", () => {
       profile: "Profile",
       settings: "Settings and Privacy",
       saved: "Saved",
+      kinkcoins: "KinkCoins & Payment",
       subscription: "Silver Premium",
       logout: "Log Out",
     });

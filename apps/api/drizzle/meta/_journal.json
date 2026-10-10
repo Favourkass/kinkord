@@ -134,6 +134,41 @@
       "when": 1791360571068,
       "tag": "0018_silver_check",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791376973039,
+      "tag": "0019_windy_brother_voodoo",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1791463533441,
+      "tag": "0020_post_gifts",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791533943234,
+      "tag": "0021_post_share_count",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1791621612605,
+      "tag": "0022_wallet_earned_post_shares",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1791623598188,
+      "tag": "0023_wallet_operation_bank",
+      "breakpoints": true
     }
   ]
 }
