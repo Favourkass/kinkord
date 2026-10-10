@@ -242,6 +242,60 @@ export function validateNewRule(draft: NewBlockRulePM): string | null {
   return null;
 }
 
+/** Someone with the admin tools. */
+export interface AdminTeamMemberPM {
+  id: string;
+  name: string;
+  displayName: string | null;
+  username: string | null;
+  avatarUrl: string | null;
+  /** An admin by their email, so they can't be removed. */
+  founder: boolean;
+  /** When they were made an admin; null for a founder. */
+  since: string | null;
+}
+
+export interface AdminTeamPM {
+  admins: AdminTeamMemberPM[];
+  /** Only the founders add and remove admins. */
+  canManage: boolean;
+}
+
+export interface AdminTeamRowVM {
+  id: string;
+  title: string;
+  handle: string;
+  avatarUrl: string | null;
+  note: string;
+  href: string;
+  removable: boolean;
+}
+
+export function toAdminTeamRowVM(
+  pm: AdminTeamMemberPM,
+  opts: {
+    canManage: boolean;
+    href: (id: string) => string;
+    labels: { founder: string; since: (date: string) => string };
+  },
+): AdminTeamRowVM {
+  const since = shortDate(pm.since);
+  return {
+    id: pm.id,
+    title: pm.displayName?.trim() || pm.name,
+    handle: pm.username ? `@${pm.username}` : "no username",
+    avatarUrl: pm.avatarUrl,
+    note: pm.founder ? opts.labels.founder : since ? opts.labels.since(since) : "",
+    href: opts.href(pm.id),
+    removable: opts.canManage && !pm.founder,
+  };
+}
+
+/** A username as typed ("@LadyJane ") the way it's stored: "ladyjane". */
+export function adminUsername(input: string): string {
+  return input.trim().replace(/^@/, "").toLowerCase();
+}
+
 export type AdminReportStatus = "open" | "resolved" | "dismissed";
 
 export interface AdminReportMemberPM {

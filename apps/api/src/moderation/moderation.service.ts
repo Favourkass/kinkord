@@ -1,5 +1,11 @@
-import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import {
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { DRIZZLE, type Db } from "../db/db.module";
 import {
   memberBan,
@@ -18,7 +24,7 @@ import {
 } from "../db/schema";
 import { PostsService } from "../posts/posts.service";
 import { IMAGE_VARIANTS, StorageService, variantKey } from "../storage/storage.service";
-import { isAdmin, isSuperAdmin } from "./admins";
+import { founderAccount, isAdmin, isBanned, isSuperAdmin } from "./admins";
 import { normalizeEmail, normalizeIp, normalizePhone } from "./signup-rules";
 
 const SEARCH_LIMIT = 30;
@@ -66,6 +72,19 @@ export interface AdminMemberDetail extends AdminMemberSummary {
   bannedAt: string | null;
   recentPosts: AdminPostSummary[];
   rules: AdminBlockRule[];
+}
+
+/** Someone with the admin tools. */
+export interface AdminTeamMember {
+  id: string;
+  name: string;
+  displayName: string | null;
+  username: string | null;
+  avatarUrl: string | null;
+  /** An admin by their verified email (SUPER_ADMIN_EMAILS), so not removable here. */
+  founder: boolean;
+  /** When they were made an admin; null for a founder. */
+  since: string | null;
 }
 
 export interface NewBlockRule {
@@ -151,6 +170,88 @@ export class ModerationService {
 
   isAdmin(who: { id: string; email: string; emailVerified: boolean }): Promise<boolean> {
     return isAdmin(this.db, who);
+  }
+
+  private teamSelect() {
+    return this.db
+      .select({
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        email: user.email,
+        emailVerified: user.emailVerified,
+        displayName: profile.displayName,
+        avatarKey: profile.avatarKey,
+        since: staff.createdAt,
+      })
+      .from(user)
+      .leftJoin(profile, eq(profile.userId, user.id))
+      .leftJoin(staff, eq(staff.userId, user.id));
+  }
+
+  private async toTeamMember(
+    r: Awaited<ReturnType<ModerationService["teamSelect"]>>[number],
+  ): Promise<AdminTeamMember> {
+    const founder = isSuperAdmin(r);
+    return {
+      id: r.id,
+      name: r.name,
+      displayName: r.displayName,
+      username: r.username,
+      avatarUrl: r.avatarKey ? await this.storage.presignDownload(r.avatarKey, "sm") : null,
+      founder,
+      since: founder ? null : (r.since?.toISOString() ?? null),
+    };
+  }
+
+  /** The founders, then everyone they made an admin, longest-serving first. */
+  async team(): Promise<AdminTeamMember[]> {
+    const rows = await this.teamSelect()
+      .where(or(founderAccount(user), isNotNull(staff.userId)))
+      .orderBy(asc(staff.createdAt), asc(user.createdAt));
+    const team = await Promise.all(rows.map((r) => this.toTeamMember(r)));
+    return team.sort((a, b) => Number(b.founder) - Number(a.founder));
+  }
+
+  /**
+   * Gives the member with this username the admin tools. Only the founders may
+   * (the controller checks). Making an admin twice changes nothing.
+   */
+  async addAdmin(actorId: string, username: string): Promise<AdminTeamMember> {
+    const handle = username.trim().replace(/^@/, "").toLowerCase();
+    const [row] = await this.teamSelect().where(eq(user.username, handle)).limit(1);
+    if (!row) throw new NotFoundException(`No member has the username @${handle}.`);
+    // Admins can't be blocked, so a blocked admin couldn't be dealt with here.
+    if (await isBanned(this.db, row.id)) {
+      throw new ConflictException(`@${handle} is blocked. Unblock them first.`);
+    }
+    if (isSuperAdmin(row) || row.since) return this.toTeamMember(row);
+    const [added] = await this.db
+      .insert(staff)
+      .values({ userId: row.id })
+      .onConflictDoNothing()
+      .returning({ since: staff.createdAt });
+    if (added) await this.log(actorId, "add-admin", row.id, null, `@${handle}`);
+    return this.toTeamMember({ ...row, since: added?.since ?? new Date() });
+  }
+
+  /** Takes the admin tools away. A founder's come from their email, so they stay. */
+  async removeAdmin(actorId: string, id: string): Promise<{ removed: string }> {
+    const [row] = await this.db
+      .select({ email: user.email, emailVerified: user.emailVerified, username: user.username })
+      .from(user)
+      .where(eq(user.id, id))
+      .limit(1);
+    if (row && isSuperAdmin(row)) {
+      throw new ForbiddenException("The founders are admins by their email and can't be removed.");
+    }
+    const [removed] = await this.db
+      .delete(staff)
+      .where(eq(staff.userId, id))
+      .returning({ userId: staff.userId });
+    if (!removed) throw new NotFoundException("That member isn't an admin.");
+    await this.log(actorId, "remove-admin", id, null, row?.username ? `@${row.username}` : null);
+    return { removed: id };
   }
 
   /** Newest members first; with a query, anyone whose name, handle, email or phone contains it. */

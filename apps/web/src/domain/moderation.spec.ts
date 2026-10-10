@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  adminUsername,
+  toAdminTeamRowVM,
   toAdminReportVM,
   type AdminReportPM,
   toAdminMemberDetailVM,
@@ -216,5 +218,48 @@ describe("toAdminReportVM", () => {
       details: null,
       open: false,
     });
+  });
+});
+
+describe("toAdminTeamRowVM", () => {
+  const labels = { founder: "Founder", since: (d: string) => `Admin since ${d}` };
+  const href = (id: string) => `/moderation/members/${id}`;
+  const jane = {
+    id: "u7",
+    name: "Jane Doe",
+    displayName: "  ",
+    username: "ladyjane",
+    avatarUrl: null,
+    founder: false,
+    since: "2026-10-10T09:00:00.000Z",
+  };
+
+  it("says since when, and is removable only by someone who manages admins", () => {
+    expect(toAdminTeamRowVM(jane, { canManage: true, href, labels })).toEqual({
+      id: "u7",
+      title: "Jane Doe",
+      handle: "@ladyjane",
+      avatarUrl: null,
+      note: "Admin since 10 Oct 2026",
+      href: "/moderation/members/u7",
+      removable: true,
+    });
+    expect(toAdminTeamRowVM(jane, { canManage: false, href, labels }).removable).toBe(false);
+  });
+
+  it("never offers to remove a founder", () => {
+    const founder = { ...jane, founder: true, since: null, username: null };
+    expect(toAdminTeamRowVM(founder, { canManage: true, href, labels })).toMatchObject({
+      handle: "no username",
+      note: "Founder",
+      removable: false,
+    });
+  });
+});
+
+describe("adminUsername", () => {
+  it("reads a username however it was typed", () => {
+    expect(adminUsername("  @LadyJane ")).toBe("ladyjane");
+    expect(adminUsername("@")).toBe("");
   });
 });
