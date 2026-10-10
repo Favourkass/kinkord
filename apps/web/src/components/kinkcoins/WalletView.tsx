@@ -293,6 +293,7 @@ export default function WalletView({ vm }: Props) {
                   min={1}
                   step={1}
                   value={vm.quantity}
+                  disabled={vm.fieldsLocked}
                   onChange={(event) => vm.onQuantity(event.target.value)}
                   className={input}
                 />
@@ -302,6 +303,7 @@ export default function WalletView({ vm }: Props) {
                 <select
                   aria-label={copy.chooseWithdrawalBank}
                   value={vm.bankId}
+                  disabled={vm.fieldsLocked}
                   onChange={(event) => vm.onBank(event.target.value)}
                   required
                   className={input}

@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
-import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, it, expect, vi } from "vitest";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { useWalletPresenter } from "./useWalletPresenter";
 import { ApiError } from "@/services/apiClient";
 import { walletService, type WalletDataPM } from "@/services/wallet.service";
 const router = vi.hoisted(() => ({ push: vi.fn() }));
+// Each test's hook unmounts after it, so its polling and focus listener stop with it.
+afterEach(cleanup);
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("@/services/apiClient", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/apiClient")>()),
@@ -127,6 +129,91 @@ describe("useWalletPresenter", () => {
     await act(() => result.current.onWithdraw());
     await act(() => new Promise((r) => setTimeout(r, 0)));
     expect(result.current.error).toBe("The withdrawal rate has changed.");
+  });
+  it("keeps proof it has sent, though a read that started earlier lands after", async () => {
+    const pending = {
+      id: "op1",
+      userId: "u",
+      kind: "purchase" as const,
+      currency: "coin" as const,
+      quantity: 100,
+      amountKobo: 100000,
+      status: "pending" as const,
+      reference: "KKC20261010100000",
+      bankName: "Test",
+      accountName: "Test",
+      accountNumber: "1234567890",
+      receiptKey: null,
+      senderReference: null,
+      senderAccountName: null,
+      reviewNote: null,
+      settlementReference: null,
+      createdAt: "2026-10-10T09:00:00.000Z",
+      updatedAt: "2026-10-10T09:00:00.000Z",
+    };
+    vi.spyOn(walletService, "load").mockResolvedValue(data);
+    let late: (op: typeof pending) => void = () => undefined;
+    vi.spyOn(walletService, "operation")
+      .mockResolvedValueOnce(pending)
+      .mockImplementationOnce(() => new Promise((resolve) => (late = resolve)))
+      .mockResolvedValue({ ...pending, status: "submitted" as never });
+    vi.spyOn(walletService, "submitProof").mockResolvedValue({
+      ...pending,
+      status: "submitted" as never,
+    });
+    const { result } = renderHook(() => useWalletPresenter("pay", "op1"));
+    await waitFor(() => expect(result.current.operation?.status).toBe("pending"));
+    // A background read starts (the window regains focus), and is slow.
+    act(() => {
+      window.dispatchEvent(new Event("focus"));
+    });
+    act(() => {
+      result.current.onFile(new File(["x"], "receipt.png", { type: "image/png" }));
+      result.current.onProofField("senderAccountName", "Ada Okafor");
+      result.current.onProofField("senderReference", "REF123");
+    });
+    await act(() => result.current.onSubmitProof());
+    expect(result.current.operation?.status).toBe("submitted");
+    // The slow read lands with the payment as it was before.
+    await act(async () => {
+      late(pending);
+    });
+    expect(result.current.operation?.status).toBe("submitted");
+  });
+  it("shows the request a retry will send, with its fields locked", async () => {
+    const second = { ...data.banks[0], id: "bank2", isDefault: 0 };
+    vi.spyOn(walletService, "load").mockResolvedValue({ ...data, banks: [...data.banks, second] });
+    vi.spyOn(walletService, "withdraw").mockRejectedValueOnce(
+      new ApiError(0, { message: "connection lost" }),
+    );
+    const { result } = renderHook(() => useWalletPresenter("withdraw"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => result.current.onRedeem("coin"));
+    await act(() => result.current.onWithdraw());
+    act(() => {
+      result.current.onQuantity("150");
+      result.current.onBank("bank2");
+    });
+    expect(result.current.fieldsLocked).toBe(true);
+    expect(result.current.quantity).toBe("100");
+    expect(result.current.bankId).toBe("bank");
+    expect(result.current.quote.amountKobo).toBe(80000);
+  });
+  it("still loads when reads are slower than the polling", async () => {
+    const answers: Array<(value: WalletDataPM) => void> = [];
+    const load = vi
+      .spyOn(walletService, "load")
+      .mockImplementation(() => new Promise((resolve) => answers.push(resolve)));
+    const { result } = renderHook(() => useWalletPresenter("withdraw"));
+    // A poll (the window regains focus) while the first read is still out: skipped.
+    act(() => {
+      window.dispatchEvent(new Event("focus"));
+    });
+    expect(load).toHaveBeenCalledOnce();
+    await act(async () => {
+      answers[0](data);
+    });
+    expect(result.current.currencies[0].available).toBe(200);
   });
   it("keeps the account shown when the default changes elsewhere", async () => {
     const second = { ...data.banks[0], id: "bank2", isDefault: 0 };

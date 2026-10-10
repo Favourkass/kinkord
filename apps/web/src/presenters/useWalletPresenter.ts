@@ -3,7 +3,12 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Routes } from "@/constants/Routes";
 import { WALLET_COPY } from "@/constants/wallet";
-import { walletOperationVM, type WalletMode, type WalletOperationPM } from "@/domain/wallet";
+import {
+  walletMoney,
+  walletOperationVM,
+  type WalletMode,
+  type WalletOperationPM,
+} from "@/domain/wallet";
 import type { KinkCurrency } from "@/domain/kinkcoins";
 import { bankBadge } from "@/domain/subscription";
 import { ApiError } from "@/services/apiClient";
@@ -51,18 +56,32 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     keys.current.set(value, next);
     return next;
   };
+  // Every read of the wallet is numbered, and a change made here (proof sent, a withdrawal, a
+  // bank account) moves the number on: a read that started before it can't land afterwards and
+  // put back what it replaced.
+  const reads = useRef(0);
+  const supersedeReads = () => {
+    reads.current += 1;
+  };
   const refresh = async () => {
+    const asked = ++reads.current;
     const next = await walletService.load();
-    setData(next);
+    if (asked === reads.current) setData(next);
     return next;
   };
+  // One background read at a time: a poll while one is still out (a slow connection) is
+  // skipped, so slow reads can't keep superseding each other and nothing ever lands.
+  const reading = useRef(false);
   useEffect(() => {
     let live = true;
     const read = async () => {
+      if (reading.current) return;
+      reading.current = true;
+      const asked = ++reads.current;
       try {
         const next = await walletService.load();
         const payment = paymentId ? await walletService.operation(paymentId) : null;
-        if (!live) return;
+        if (!live || asked !== reads.current) return;
         setData(next);
         if (payment) setOperation(payment);
         // The account shown is pinned once: a default changed elsewhere doesn't move it.
@@ -74,6 +93,7 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
       } catch (e) {
         if (live) setError(e instanceof Error ? e.message : "Could not load wallet.");
       } finally {
+        reading.current = false;
         if (live) setLoading(false);
       }
     };
@@ -145,19 +165,31 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     },
     proof,
     fileName: file?.name ?? null,
-    currency,
-    quantity,
-    bankId,
+    // While a request is unanswered, the review shows it (what a retry sends), locked.
+    currency: unanswered?.currency ?? currency,
+    quantity: unanswered?.quantity ?? quantity,
+    bankId: unanswered?.bankId ?? bankId,
+    fieldsLocked: unanswered !== null,
     review,
-    quote,
+    quote: unanswered
+      ? {
+          ...quote,
+          amount: walletMoney(unanswered.expectedAmountKobo),
+          amountKobo: unanswered.expectedAmountKobo,
+        }
+      : quote,
     canSubmitWithdrawal: quote.valid || unanswered !== null,
     unansweredNotice: unanswered ? WALLET_COPY.unanswered : null,
     operation: operation ? walletOperationVM(operation) : null,
-    selectedBank: vm.banks.find((bank) => bank.id === bankId) ?? null,
+    selectedBank: vm.banks.find((bank) => bank.id === (unanswered?.bankId ?? bankId)) ?? null,
     onRefresh: () =>
       run(async () => {
         await refresh();
-        if (paymentId) setOperation(await walletService.operation(paymentId));
+        if (paymentId) {
+          const asked = reads.current;
+          const payment = await walletService.operation(paymentId);
+          if (asked === reads.current) setOperation(payment);
+        }
       }),
     onBuy: (kind: KinkCurrency, count: number) =>
       run(async () => {
@@ -170,6 +202,7 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     onSaveBank: () =>
       run(async () => {
         const banks = await walletService.addBank(bankForm);
+        supersedeReads();
         setData((previous) => (previous ? { ...previous, banks } : null));
         setBankForm({ bankName: "", accountName: "", accountNumber: "" });
         setNotice(vm.copy.saved);
@@ -177,12 +210,14 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     onDefaultBank: (id: string) =>
       run(async () => {
         const banks = await walletService.defaultBank(id);
+        supersedeReads();
         setData((previous) => (previous ? { ...previous, banks } : null));
         setNotice(vm.copy.defaultUpdated);
       }),
     onRemoveBank: (id: string) =>
       run(async () => {
         const banks = await walletService.removeBank(id);
+        supersedeReads();
         setData((previous) => (previous ? { ...previous, banks } : null));
         setNotice(vm.copy.bankRemoved);
       }),
@@ -238,6 +273,7 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
         }
         keys.current.delete(`withdraw:${request.currency}:${request.quantity}:${request.bankId}`);
         setUnanswered(null);
+        supersedeReads();
         setOperation(result);
         setReview(false);
         await refresh();
@@ -249,14 +285,14 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     onSubmitProof: () =>
       run(async () => {
         if (!operation || !file) throw new Error("Choose a receipt first.");
-        setOperation(
-          await walletService.submitProof(
-            operation.id,
-            file,
-            proof.senderAccountName,
-            proof.senderReference,
-          ),
+        const submitted = await walletService.submitProof(
+          operation.id,
+          file,
+          proof.senderAccountName,
+          proof.senderReference,
         );
+        supersedeReads();
+        setOperation(submitted);
         setFile(null);
         await refresh();
       }),

@@ -42,6 +42,27 @@ describe("useWalletAdminPresenter", () => {
     expect(result.current.error).toBeNull();
     expect(result.current.form).toMatchObject({ coinBuy: "10", minimum: "500", enabled: true });
   });
+  it("refreshes after a save with the filters now in force", async () => {
+    let saved: () => void = () => undefined;
+    vi.spyOn(walletAdminService, "saveSettings").mockImplementation(
+      () => new Promise((resolve) => (saved = () => resolve({} as never))),
+    );
+    const { result } = renderHook(() => useWalletAdminPresenter());
+    await waitFor(() => expect(walletAdminService.queue).toHaveBeenCalledTimes(1));
+    let saving: Promise<void> = Promise.resolve();
+    act(() => {
+      saving = result.current.onSave();
+    });
+    act(() => result.current.onKind("withdrawal"));
+    await act(async () => {
+      saved();
+      await saving;
+    });
+    expect(vi.mocked(walletAdminService.queue).mock.calls.at(-1)).toEqual([
+      "withdrawal",
+      "pending",
+    ]);
+  });
   it("keeps unsaved settings when the queue filter changes", async () => {
     const { result } = renderHook(() => useWalletAdminPresenter());
     await waitFor(() => expect(walletAdminService.queue).toHaveBeenCalled());

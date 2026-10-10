@@ -48,9 +48,14 @@ export function useWalletAdminPresenter() {
   const running = useRef(false);
   // Each queue load is numbered: only the latest (a filter change or a refresh) fills the rows.
   const asked = useRef(0);
+  // The filters in force now, for a refresh that started before they changed (after a save).
+  const filters = useRef({ kind, status });
+  useEffect(() => {
+    filters.current = { kind, status };
+  }, [kind, status]);
   const loadQueue = async () => {
     const ask = ++asked.current;
-    const queue = await walletAdminService.queue(kind, status);
+    const queue = await walletAdminService.queue(filters.current.kind, filters.current.status);
     if (ask !== asked.current) return;
     setRows(queue);
     setQueueFailed(null);
