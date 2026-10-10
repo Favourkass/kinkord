@@ -1,4 +1,5 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BronzeService } from "../verification/bronze.service";
 import { and, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { DRIZZLE, type Db } from "../db/db.module";
 import {
@@ -107,6 +108,7 @@ export class ModerationService {
     @Inject(DRIZZLE) private readonly db: Db,
     private readonly storage: StorageService,
     private readonly posts: PostsService,
+    private readonly verification: BronzeService,
   ) {}
 
   private summarySelect() {
@@ -240,6 +242,8 @@ export class ModerationService {
     const target = await this.moderatable(actorId, id);
     const reason = opts.reason?.trim() || null;
     if (opts.block) await this.writeRules(id, target, await this.contactTrail(id), reason);
+    // Didit holds their ID and selfies; erase those before the references go.
+    await this.verification.forgetMember(id).catch(() => undefined);
     const keys = await this.storedKeysOf(id);
     await Promise.all(
       keys.flatMap((k) => [

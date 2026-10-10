@@ -16,6 +16,7 @@ export type NotificationType =
   | "payment_verified"
   | "payment_rejected"
   // A Silver member changed their name or photo, for the admins to look at.
+  | "verification"
   | "silver_check";
 
 /**
