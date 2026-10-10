@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, onTestFinished, vi } from "vitest";
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { SQL } from "drizzle-orm";
 import { WalletService, walletOperationDto } from "./wallet.service";
@@ -316,13 +316,19 @@ describe("withdrawal membership eligibility", () => {
     expect(db.insert).not.toHaveBeenCalled();
   });
   it("needs the Silver badge, and an account 30 days old, unless it's a founder's", async () => {
+    // A fixed clock: the date in the message must not depend on when the suite runs.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-10T12:00:00Z"));
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
     const badge = { heldAt: null, heldFor: null, avatarKey: "avatar", coverKey: "cover" };
     const account = {
       createdAt: new Date("2020-01-01"),
       email: "m@example.test",
       emailVerified: true,
     };
-    const today = { ...account, createdAt: new Date() };
+    const today = { ...account, createdAt: new Date("2026-10-10T09:00:00Z") };
     for (const [results, expected] of [
       [[[]], false],
       [[[{ ...badge, heldAt: new Date() }]], false],
@@ -338,9 +344,7 @@ describe("withdrawal membership eligibility", () => {
     vi.mocked(service.redemptionEligibility).mockRestore();
     await expect(service.redemptionEligibility("user")).resolves.toEqual({
       canRedeem: false,
-      reason: expect.stringMatching(
-        /^Withdrawals open on \d{1,2} \w{3} \d{4}, 30 days after you joined\.$/,
-      ),
+      reason: "Withdrawals open on 9 Nov 2026, 30 days after you joined.",
     });
   });
 });
