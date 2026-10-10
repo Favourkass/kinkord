@@ -86,6 +86,11 @@ export const WALLET_COPY = {
   chooseWithdrawalBank: "Withdrawal account",
   available: "Available",
   withdrawable: "Withdrawable (received as gifts)",
+  stillLoading: "Your wallet is still loading. Try again in a moment.",
+  settledElsewhere:
+    "That withdrawal was answered in another tab. Check Transaction History before starting another.",
+  otherAccount:
+    "You're signed in as someone else now. Sign back in to the account that made this request to check it.",
   unanswered:
     "We didn't hear back about your last withdrawal request. Submitting checks on that one first, before anything new.",
   estimate: "You will receive",

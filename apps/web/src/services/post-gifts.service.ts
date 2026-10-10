@@ -3,6 +3,12 @@ import type { WalletOperationPM, WalletSummaryPM } from "@/domain/wallet";
 import { api } from "./apiClient";
 export const GIFT_COPY = {
   title: "Send a gift",
+  earlierSent: "Your earlier gift went through.",
+  answeredElsewhere: "That gift was answered in another tab. Check Transaction History.",
+  otherAccount:
+    "You're signed in as someone else now. Sign back in to the account that sent this gift to check it.",
+  earlierUnconfirmed:
+    "Your earlier gift isn't confirmed yet. Check your connection, then try again.",
   currency: "Choose currency",
   amount: "Amount",
   close: "Cancel",
@@ -20,8 +26,21 @@ const unit = (quantity: string, currency: KinkCurrency) =>
     : GIFT_COPY.labels[currency];
 export const postGiftsService = {
   balance: () => api.get<WalletSummaryPM>("/wallet"),
-  send: (postId: string, currency: KinkCurrency, quantity: number, requestKey: string) =>
-    api.post<WalletOperationPM>("/wallet/gifts", { postId, currency, quantity, requestKey }),
+  /** `senderId`: who the app sends as; the API refuses it if someone else is signed in now. */
+  send: (
+    postId: string,
+    currency: KinkCurrency,
+    quantity: number,
+    requestKey: string,
+    senderId: string,
+  ) =>
+    api.post<WalletOperationPM>("/wallet/gifts", {
+      postId,
+      currency,
+      quantity,
+      requestKey,
+      senderId,
+    }),
   quote: (summary: WalletSummaryPM | null, currency: KinkCurrency, raw: string) => {
     const available = summary?.balances.find((b) => b.currency === currency)?.available ?? 0;
     const quantity = Number(raw);

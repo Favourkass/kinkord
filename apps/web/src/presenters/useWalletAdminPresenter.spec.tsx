@@ -42,6 +42,39 @@ describe("useWalletAdminPresenter", () => {
     expect(result.current.error).toBeNull();
     expect(result.current.form).toMatchObject({ coinBuy: "10", minimum: "500", enabled: true });
   });
+  it("refreshes after a save with the filters now in force", async () => {
+    vi.mocked(walletAdminService.settings).mockResolvedValue({
+      rates: {
+        coin: { buy: 1000, redeem: 800 },
+        star: { buy: 10000, redeem: 8000 },
+        crown: { buy: 100000, redeem: 80000 },
+      },
+      minimumKobo: 50000,
+      enabled: true,
+      canEdit: true,
+    } as never);
+    let saved: () => void = () => undefined;
+    const save = vi
+      .spyOn(walletAdminService, "saveSettings")
+      .mockImplementation(() => new Promise((resolve) => (saved = () => resolve({} as never))));
+    const { result } = renderHook(() => useWalletAdminPresenter());
+    await waitFor(() => expect(result.current.form.coinBuy).toBe("10"));
+    let saving: Promise<void> = Promise.resolve();
+    act(() => {
+      saving = result.current.onSave();
+    });
+    // The save is out before the filter changes.
+    await waitFor(() => expect(save).toHaveBeenCalled());
+    act(() => result.current.onKind("withdrawal"));
+    await act(async () => {
+      saved();
+      await saving;
+    });
+    expect(vi.mocked(walletAdminService.queue).mock.calls.at(-1)).toEqual([
+      "withdrawal",
+      "pending",
+    ]);
+  });
   it("keeps unsaved settings when the queue filter changes", async () => {
     const { result } = renderHook(() => useWalletAdminPresenter());
     await waitFor(() => expect(walletAdminService.queue).toHaveBeenCalled());

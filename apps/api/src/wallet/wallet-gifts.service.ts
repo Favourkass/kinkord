@@ -5,7 +5,6 @@ import {
   Inject,
   Injectable,
   NotFoundException,
-  ServiceUnavailableException,
 } from "@nestjs/common";
 import { and, eq, gte, isNull, sql } from "drizzle-orm";
 import type { z } from "zod";
@@ -14,6 +13,7 @@ import { post, profile, walletBalance, walletGift, walletSettings } from "../db/
 import { PostsService } from "../posts/posts.service";
 import { hasSilver } from "../subscriptions/plans";
 import { walletGiftSchema } from "./dto";
+import { sameSender, walletDisabled } from "./rules";
 
 type Gift = typeof walletGift.$inferSelect;
 
@@ -63,13 +63,22 @@ export class WalletGiftsService {
   }
   async send(senderId: string, raw: z.infer<typeof walletGiftSchema>) {
     const input = walletGiftSchema.parse(raw);
+    sameSender(senderId, input.senderId);
     const visible = await this.posts.byId(input.postId, senderId);
     if (!visible) {
-      // A lost response may be retried after the author deletes or hides the post.
-      const [delivered] = await this.db
-        .select()
-        .from(walletGift)
-        .where(and(eq(walletGift.senderId, senderId), eq(walletGift.requestKey, input.requestKey)));
+      // A lost response may be retried after the author deletes or hides the post. The
+      // sender's wallet lock comes first, so a send of this same gift still committing finishes
+      // before this says it was never made.
+      const delivered = await this.db.transaction(async (tx) => {
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"wallet:" + senderId}))`);
+        const [row] = await tx
+          .select()
+          .from(walletGift)
+          .where(
+            and(eq(walletGift.senderId, senderId), eq(walletGift.requestKey, input.requestKey)),
+          );
+        return row;
+      });
       if (delivered) {
         if (
           delivered.postId !== input.postId ||
@@ -106,8 +115,7 @@ export class WalletGiftsService {
         .from(walletSettings)
         .where(eq(walletSettings.id, 1))
         .for("share");
-      if (!config?.enabled)
-        throw new ServiceUnavailableException("Wallet transactions are not enabled yet.");
+      if (!config?.enabled) throw walletDisabled();
       const [target] = await tx
         .select()
         .from(post)

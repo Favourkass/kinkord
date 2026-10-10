@@ -28,9 +28,12 @@ export const walletRequestSchema = z.object({
   quantity: z.number().int().min(1).max(1_000_000),
   requestKey: id(),
 });
-export const walletGiftSchema = walletRequestSchema.extend({ postId: id() });
+/** The member the app sends as: refused if someone else is signed in now (another tab). */
+const senderId = () => z.string().trim().min(1).max(64);
+export const walletGiftSchema = walletRequestSchema.extend({ postId: id(), senderId: senderId() });
 export const withdrawalSchema = walletRequestSchema.extend({
   bankId: id(),
+  senderId: senderId(),
   /** The payout the member reviewed, in kobo: refused if the rate has changed since. */
   expectedAmountKobo: z.number().int().positive().max(1_000_000_000),
 });

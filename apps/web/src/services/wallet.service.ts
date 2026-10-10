@@ -54,6 +54,8 @@ export const walletService = {
     requestKey: string,
     /** The payout the member reviewed: the API refuses it if the rate has changed since. */
     expectedAmountKobo: number,
+    /** Who the app sends as: the API refuses it if someone else is signed in now. */
+    senderId: string,
   ) =>
     api.post<WalletOperationPM>("/wallet/withdrawals", {
       currency,
@@ -61,6 +63,7 @@ export const walletService = {
       bankId,
       requestKey,
       expectedAmountKobo,
+      senderId,
     }),
   addBank: (input: { bankName: string; accountName: string; accountNumber: string }) => {
     if (!banksService.find(input.bankName)) throw new Error("Choose a bank from the list.");

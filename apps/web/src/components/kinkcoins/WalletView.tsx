@@ -293,6 +293,7 @@ export default function WalletView({ vm }: Props) {
                   min={1}
                   step={1}
                   value={vm.quantity}
+                  disabled={vm.fieldsLocked}
                   onChange={(event) => vm.onQuantity(event.target.value)}
                   className={input}
                 />
@@ -302,6 +303,7 @@ export default function WalletView({ vm }: Props) {
                 <select
                   aria-label={copy.chooseWithdrawalBank}
                   value={vm.bankId}
+                  disabled={vm.fieldsLocked}
                   onChange={(event) => vm.onBank(event.target.value)}
                   required
                   className={input}
@@ -330,14 +332,16 @@ export default function WalletView({ vm }: Props) {
                 {copy.confirm}
                 <ArrowRight size={16} />
               </button>
-              <button
-                type="button"
-                disabled={vm.busy}
-                onClick={vm.onCancel}
-                className="w-full text-xs text-app-subtle"
-              >
-                {copy.cancel}
-              </button>
+              {vm.canCancel && (
+                <button
+                  type="button"
+                  disabled={vm.busy}
+                  onClick={vm.onCancel}
+                  className="w-full text-xs text-app-subtle"
+                >
+                  {copy.cancel}
+                </button>
+              )}
             </form>
           )}
           <Link href={vm.banksHref} className="block text-xs font-semibold text-app-members-count">
@@ -348,9 +352,9 @@ export default function WalletView({ vm }: Props) {
       {vm.mode === "withdraw" && vm.operation && (
         <section className={`${card} space-y-4 py-8 text-center`}>
           <Hourglass size={42} className="mx-auto text-app-members-count" />
-          <h2 className="text-2xl font-bold">{copy.submitted}</h2>
+          <h2 className="text-2xl font-bold">{vm.operationTitle}</h2>
           <p className="text-xl font-bold text-app-members-count">{vm.operation.amount}</p>
-          <p className="text-xs leading-relaxed text-app-subtle">{copy.processing}</p>
+          <p className="text-xs leading-relaxed text-app-subtle">{vm.operationNote}</p>
           <p className="break-all font-mono text-xs">{vm.operation.reference}</p>
           <Link className={button} href={vm.historyHref}>
             {copy.history}

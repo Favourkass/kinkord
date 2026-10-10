@@ -1,4 +1,8 @@
-import { BadRequestException, ConflictException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  ServiceUnavailableException,
+} from "@nestjs/common";
 import type { WalletCurrency, WalletRates, WalletStatus } from "../db/schema/wallet";
 import { paymentReference } from "../subscriptions/plans";
 
@@ -13,6 +17,29 @@ export function walletPaymentReference(at: Date, taken: ReadonlySet<string>): st
   }
   throw new ConflictException("Could not allocate a payment reference. Try again.");
 }
+
+/**
+ * The member the app sent a gift or withdrawal as must be the one signed in: another tab may
+ * have switched accounts. Refused before anything is read, with a code the app reads as "not
+ * read", so it keeps (never clears) a request it may already have made.
+ */
+export function sameSender(userId: string, senderId: string | undefined) {
+  if (senderId !== undefined && senderId !== userId)
+    throw new ConflictException({
+      code: "WRONG_ACCOUNT",
+      message: "You're signed in as someone else now.",
+    });
+}
+
+/**
+ * Wallet transactions are switched off: refused before anything is read or moved, with a code
+ * the app reads as a refusal (a definite "no"), unlike an ambiguous server error.
+ */
+export const walletDisabled = () =>
+  new ServiceUnavailableException({
+    code: "WALLET_DISABLED",
+    message: "Wallet transactions are not enabled yet.",
+  });
 
 export const PACKS = {
   coin: [100, 500, 1000, 2500],

@@ -24,7 +24,14 @@ import {
 import { StorageService } from "../storage/storage.service";
 import { readSettings } from "../subscriptions/subscriptions.service";
 import { silverCheckStatus } from "../subscriptions/plans";
-import { nextWalletStatus, PACKS, walletAmount, walletPaymentReference } from "./rules";
+import {
+  nextWalletStatus,
+  PACKS,
+  sameSender,
+  walletAmount,
+  walletDisabled,
+  walletPaymentReference,
+} from "./rules";
 import {
   walletBankSchema,
   walletDecisionSchema,
@@ -206,8 +213,13 @@ export class WalletService {
   async create(
     userId: string,
     kind: "purchase" | "withdrawal",
-    input: z.infer<typeof walletRequestSchema> & { bankId?: string; expectedAmountKobo?: number },
+    input: z.infer<typeof walletRequestSchema> & {
+      bankId?: string;
+      expectedAmountKobo?: number;
+      senderId?: string;
+    },
   ) {
+    sameSender(userId, input.senderId);
     const result = await this.db.transaction(async (tx) => {
       await lock(tx, userId);
       const [existing] = await tx
@@ -239,8 +251,7 @@ export class WalletService {
         if (!eligibility.canRedeem) throw new ForbiddenException(eligibility.reason!);
       }
       const [config] = await tx.select().from(walletSettings).where(eq(walletSettings.id, 1));
-      if (!config?.enabled)
-        throw new ServiceUnavailableException("Wallet transactions are not enabled yet.");
+      if (!config?.enabled) throw walletDisabled();
       const amountKobo = walletAmount(
         config.rates,
         input.currency,

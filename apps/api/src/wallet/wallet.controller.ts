@@ -45,6 +45,8 @@ export class WalletController {
   ) {}
   @Get() async status(@Req() req: AuthedRequest) {
     return {
+      // Whose wallet this is: the app keeps unanswered requests per member.
+      userId: req.user.id,
       settings: await this.wallet.settings(),
       balances: await this.wallet.balances(req.user.id),
       redemption: await this.wallet.redemptionEligibility(req.user.id),

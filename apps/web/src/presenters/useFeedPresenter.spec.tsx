@@ -71,6 +71,7 @@ vi.mock("@/services/post-gifts.service", async (importOriginal) => {
 
 const { useFeedPresenter } = await import("./useFeedPresenter");
 const { ApiError } = await import("@/services/apiClient");
+const { pendingTransfersService } = await import("@/services/pendingTransfers.service");
 
 const author = { userId: "u2", username: "tega", displayName: "Sir T", avatarUrl: null };
 
@@ -946,6 +947,7 @@ describe("one post on its own", () => {
 describe("post gifting presenter", () => {
   it("opens the requested currency and prevents a double-click from sending two gifts", async () => {
     giftBalance.mockResolvedValue({
+      userId: "me",
       settings: { enabled: true },
       balances: [{ currency: "star", available: 5, reserved: 0 }],
     });
@@ -976,6 +978,7 @@ describe("post gifting presenter", () => {
   });
   it("keeps the same request key when retrying a lost response", async () => {
     giftBalance.mockResolvedValue({
+      userId: "me",
       settings: { enabled: true },
       balances: [{ currency: "coin", available: 5, reserved: 0 }],
     });
@@ -997,6 +1000,7 @@ describe("post gifting presenter", () => {
       result.current.giftDialog.onClose();
     });
     giftBalance.mockResolvedValueOnce({
+      userId: "me",
       settings: { enabled: true },
       balances: [{ currency: "coin", available: 0, reserved: 0 }],
     });
@@ -1010,8 +1014,385 @@ describe("post gifting presenter", () => {
     });
     expect(giftSend.mock.calls[0]).toEqual(giftSend.mock.calls[1]);
   });
+  it("brings back a gift left in doubt before a reload, with its key", async () => {
+    pendingTransfersService.keepGift("me", {
+      postId: "p1",
+      currency: "star",
+      quantity: "2",
+      key: "kept-key",
+    });
+    giftBalance.mockResolvedValue({
+      userId: "me",
+      settings: { enabled: true },
+      balances: [{ currency: "star", available: 5, reserved: 0 }],
+    });
+    giftSend.mockReset().mockResolvedValueOnce({});
+    const { result } = renderHook(() => useFeedPresenter());
+    await waitFor(() => expect(result.current.posts).toHaveLength(1));
+    await act(async () => {
+      await result.current.openGift("p1", "coin");
+    });
+    expect(result.current.giftDialog.locked).toBe(true);
+    expect(result.current.giftDialog.currency).toBe("star");
+    await act(async () => {
+      await result.current.giftDialog.onSend();
+    });
+    expect(giftSend).toHaveBeenCalledWith("p1", "star", 2, "kept-key", "me");
+    expect(pendingTransfersService.gifts("me")).toEqual([]);
+    localStorage.clear();
+  });
+  it("settles an earlier gift whose post has gone before opening another", async () => {
+    pendingTransfersService.keepGift("me", {
+      postId: "gone",
+      currency: "star",
+      quantity: "2",
+      key: "kept-key",
+    });
+    giftBalance.mockResolvedValue({
+      userId: "me",
+      settings: { enabled: true },
+      balances: [{ currency: "coin", available: 5, reserved: 0 }],
+    });
+    giftSend.mockReset().mockResolvedValueOnce({});
+    const { result } = renderHook(() => useFeedPresenter());
+    await waitFor(() => expect(result.current.posts).toHaveLength(1));
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    // Sent again as it was, though its post isn't here: the server answers for it.
+    expect(giftSend).toHaveBeenCalledWith("gone", "star", 2, "kept-key", "me");
+    expect(result.current.shareNote).toBe("Your earlier gift went through.");
+    expect(pendingTransfersService.gifts("me")).toEqual([]);
+    expect(result.current.giftDialog.open).toBe(true);
+    expect(result.current.giftDialog.locked).toBe(false);
+    // The balance is read again after the earlier gift went through.
+    expect(giftBalance).toHaveBeenCalledTimes(2);
+  });
+  it("keeps a gift before it's sent, so a reload mid-send keeps its key", async () => {
+    giftBalance.mockReset().mockResolvedValue({
+      userId: "me",
+      settings: { enabled: true },
+      balances: [{ currency: "coin", available: 5, reserved: 0 }],
+    });
+    let answer: () => void = () => undefined;
+    giftSend
+      .mockReset()
+      .mockImplementation(() => new Promise<void>((resolve) => (answer = () => resolve())));
+    const { result } = renderHook(() => useFeedPresenter());
+    await waitFor(() => expect(result.current.posts).toHaveLength(1));
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    act(() => {
+      void result.current.giftDialog.onSend();
+    });
+    expect(pendingTransfersService.gifts("me")).toEqual([
+      expect.objectContaining({ postId: "p1", key: giftSend.mock.calls[0][3] }),
+    ]);
+    await act(async () => {
+      answer();
+    });
+    expect(pendingTransfersService.gifts("me")).toEqual([]);
+  });
+  it("takes the kept copy over its own memory: another tab may have settled it or kept a newer one", async () => {
+    giftBalance.mockReset().mockResolvedValue({
+      userId: "me",
+      settings: { enabled: true },
+      balances: [{ currency: "coin", available: 5, reserved: 0 }],
+    });
+    giftSend.mockReset().mockRejectedValueOnce(new ApiError(0, "Network problem"));
+    const { result } = renderHook(() => useFeedPresenter());
+    await waitFor(() => expect(result.current.posts).toHaveLength(1));
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    await act(async () => {
+      await result.current.giftDialog.onSend();
+    });
+    act(() => {
+      result.current.giftDialog.onClose();
+    });
+    // Another tab settled that one and kept a newer gift, still in doubt.
+    localStorage.clear();
+    pendingTransfersService.keepGift("me", {
+      postId: "p1",
+      currency: "coin",
+      quantity: "3",
+      key: "newer",
+    });
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    expect(result.current.giftDialog.locked).toBe(true);
+    expect(result.current.giftDialog.quantity).toBe("3");
+    giftSend.mockResolvedValueOnce({});
+    await act(async () => {
+      await result.current.giftDialog.onSend();
+    });
+    expect(giftSend.mock.calls.at(-1)?.[3]).toBe("newer");
+    // And once it's settled elsewhere, nothing is in doubt here.
+    localStorage.clear();
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    expect(result.current.giftDialog.locked).toBe(false);
+  });
+  it("won't start a gift over another tab's one still in doubt", async () => {
+    giftBalance.mockReset().mockResolvedValue({
+      userId: "me",
+      settings: { enabled: true },
+      balances: [{ currency: "coin", available: 5, reserved: 0 }],
+    });
+    giftSend.mockReset();
+    const { result } = renderHook(() => useFeedPresenter());
+    await waitFor(() => expect(result.current.posts).toHaveLength(1));
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    pendingTransfersService.keepGift("me", {
+      postId: "p1",
+      currency: "coin",
+      quantity: "1",
+      key: "other-tab",
+    });
+    await act(async () => {
+      await result.current.giftDialog.onSend();
+    });
+    expect(giftSend).not.toHaveBeenCalled();
+    expect(result.current.giftDialog.error).toMatch(/earlier gift/);
+    localStorage.clear();
+  });
+  it("stops recovering when another account is signed in partway", async () => {
+    pendingTransfersService.keepGift("me", {
+      postId: "gone",
+      currency: "star",
+      quantity: "2",
+      key: "kept-key",
+    });
+    giftBalance
+      .mockReset()
+      .mockResolvedValueOnce({
+        userId: "me",
+        settings: { enabled: true },
+        balances: [{ currency: "coin", available: 5, reserved: 0 }],
+      })
+      .mockResolvedValue({
+        userId: "someone-else",
+        settings: { enabled: true },
+        balances: [{ currency: "coin", available: 5, reserved: 0 }],
+      });
+    giftSend.mockReset().mockResolvedValueOnce({});
+    const { result } = renderHook(() => useFeedPresenter());
+    await waitFor(() => expect(result.current.posts).toHaveLength(1));
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    expect(result.current.giftDialog.open).toBe(false);
+    expect(result.current.shareNote).toMatch(/someone else/);
+    localStorage.clear();
+  });
+  it("still retries with its key a gift this browser couldn't keep", async () => {
+    giftBalance.mockReset().mockResolvedValue({
+      userId: "me",
+      settings: { enabled: true },
+      balances: [{ currency: "coin", available: 5, reserved: 0 }],
+    });
+    giftSend.mockReset().mockRejectedValueOnce(new ApiError(0, "Network problem"));
+    const full = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("full");
+    });
+    const { result } = renderHook(() => useFeedPresenter());
+    await waitFor(() => expect(result.current.posts).toHaveLength(1));
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    await act(async () => {
+      await result.current.giftDialog.onSend();
+    });
+    act(() => {
+      result.current.giftDialog.onClose();
+    });
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    // Not kept anywhere, but still this page's own: the same gift, same key.
+    expect(result.current.giftDialog.locked).toBe(true);
+    giftSend.mockResolvedValueOnce({});
+    await act(async () => {
+      await result.current.giftDialog.onSend();
+    });
+    expect(giftSend.mock.calls[1][3]).toBe(giftSend.mock.calls[0][3]);
+    full.mockRestore();
+  });
+  it("settles every other tab's gift first, then retries this post's own", async () => {
+    pendingTransfersService.keepGift("me", {
+      postId: "gone",
+      currency: "star",
+      quantity: "2",
+      key: "b",
+    });
+    pendingTransfersService.keepGift("me", {
+      postId: "p1",
+      currency: "coin",
+      quantity: "3",
+      key: "a",
+    });
+    giftBalance.mockReset().mockResolvedValue({
+      userId: "me",
+      settings: { enabled: true },
+      balances: [{ currency: "coin", available: 5, reserved: 0 }],
+    });
+    giftSend.mockReset().mockResolvedValue({});
+    const { result } = renderHook(() => useFeedPresenter());
+    await waitFor(() => expect(result.current.posts).toHaveLength(1));
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    expect(giftSend).toHaveBeenCalledWith("gone", "star", 2, "b", "me");
+    expect(result.current.giftDialog.locked).toBe(true);
+    expect(result.current.giftDialog.quantity).toBe("3");
+    expect(pendingTransfersService.gifts("me")?.map((g) => g.key)).toEqual(["a"]);
+    localStorage.clear();
+  });
+  it("keeps this post's gift in doubt, key and all, when the balance can't be read again", async () => {
+    pendingTransfersService.keepGift("me", {
+      postId: "gone",
+      currency: "star",
+      quantity: "2",
+      key: "b",
+    });
+    pendingTransfersService.keepGift("me", {
+      postId: "p1",
+      currency: "coin",
+      quantity: "3",
+      key: "a",
+    });
+    giftBalance
+      .mockReset()
+      .mockResolvedValueOnce({
+        userId: "me",
+        settings: { enabled: true },
+        balances: [{ currency: "coin", available: 5, reserved: 0 }],
+      })
+      .mockRejectedValueOnce(new Error("offline"));
+    giftSend.mockReset().mockResolvedValue({});
+    const { result } = renderHook(() => useFeedPresenter());
+    await waitFor(() => expect(result.current.posts).toHaveLength(1));
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    expect(result.current.giftDialog.locked).toBe(true);
+    await act(async () => {
+      await result.current.giftDialog.onSend();
+    });
+    // The gift in doubt, never a new one.
+    expect(giftSend).toHaveBeenLastCalledWith("p1", "coin", 3, "a", "me");
+    localStorage.clear();
+  });
+  it("keeps its own gift in doubt when storage can't be read", async () => {
+    giftBalance.mockReset().mockResolvedValue({
+      userId: "me",
+      settings: { enabled: true },
+      balances: [{ currency: "coin", available: 5, reserved: 0 }],
+    });
+    giftSend.mockReset().mockRejectedValueOnce(new ApiError(0, "Network problem"));
+    const { result } = renderHook(() => useFeedPresenter());
+    await waitFor(() => expect(result.current.posts).toHaveLength(1));
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    await act(async () => {
+      await result.current.giftDialog.onSend();
+    });
+    act(() => {
+      result.current.giftDialog.onClose();
+    });
+    const blocked = vi.spyOn(Storage.prototype, "key").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    expect(result.current.giftDialog.locked).toBe(true);
+    giftSend.mockResolvedValueOnce({});
+    await act(async () => {
+      await result.current.giftDialog.onSend();
+    });
+    expect(giftSend.mock.calls[1][3]).toBe(giftSend.mock.calls[0][3]);
+    blocked.mockRestore();
+    localStorage.clear();
+  });
+  it("sends a gift under the member's cross-tab lock", async () => {
+    const request = vi.fn((_name: string, work: () => Promise<unknown>) => work());
+    Object.defineProperty(navigator, "locks", { value: { request }, configurable: true });
+    giftBalance.mockReset().mockResolvedValue({
+      userId: "me",
+      settings: { enabled: true },
+      balances: [{ currency: "coin", available: 5, reserved: 0 }],
+    });
+    giftSend.mockReset().mockResolvedValue({});
+    const { result } = renderHook(() => useFeedPresenter());
+    await waitFor(() => expect(result.current.posts).toHaveLength(1));
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    await act(async () => {
+      await result.current.giftDialog.onSend();
+    });
+    expect(request).toHaveBeenCalledWith("kinkord:wallet:me", expect.any(Function));
+    expect(giftSend).toHaveBeenCalledOnce();
+    Reflect.deleteProperty(navigator, "locks");
+  });
+  it("sends nothing while it can't tell whose wallet it is", async () => {
+    giftBalance.mockReset().mockRejectedValue(new Error("offline"));
+    giftSend.mockReset();
+    const { result } = renderHook(() => useFeedPresenter());
+    await waitFor(() => expect(result.current.posts).toHaveLength(1));
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    await act(async () => {
+      await result.current.giftDialog.onSend();
+    });
+    expect(giftSend).not.toHaveBeenCalled();
+    expect(result.current.giftDialog.error).toBe("offline");
+  });
+  it("never sends another account's gift in doubt", async () => {
+    giftBalance.mockReset().mockResolvedValue({
+      userId: "me",
+      settings: { enabled: true },
+      balances: [{ currency: "coin", available: 5, reserved: 0 }],
+    });
+    giftSend.mockReset().mockRejectedValueOnce(new ApiError(0, "Network problem"));
+    const { result } = renderHook(() => useFeedPresenter());
+    await waitFor(() => expect(result.current.posts).toHaveLength(1));
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    await act(async () => {
+      await result.current.giftDialog.onSend();
+    });
+    act(() => {
+      result.current.giftDialog.onClose();
+    });
+    // Another tab signs in as someone else.
+    giftBalance.mockResolvedValue({
+      userId: "someone-else",
+      settings: { enabled: true },
+      balances: [{ currency: "coin", available: 5, reserved: 0 }],
+    });
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    expect(result.current.giftDialog.locked).toBe(false);
+    expect(giftSend).toHaveBeenCalledTimes(1);
+    // Still kept for its sender.
+    expect(pendingTransfersService.gifts("me")).toHaveLength(1);
+    localStorage.clear();
+  });
   it("keeps a gift in doubt when its retry finds them signed out", async () => {
     giftBalance.mockResolvedValue({
+      userId: "me",
       settings: { enabled: true },
       balances: [{ currency: "coin", available: 5, reserved: 0 }],
     });

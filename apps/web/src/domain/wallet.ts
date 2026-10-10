@@ -24,6 +24,8 @@ export interface WalletSettingsPM {
   canDecide?: boolean;
 }
 export interface WalletSummaryPM {
+  /** Whose wallet this is. Absent from an older API. */
+  userId?: string;
   redemption?: { canRedeem: boolean; reason: string | null };
   settings: WalletSettingsPM;
   balances: Array<{
@@ -99,4 +101,21 @@ export function walletOperationVM(row: WalletOperationPM) {
             rejected: "Rejected",
           }[row.status],
   };
+}
+
+/** A withdrawal sent but not answered: sent again exactly as it was. */
+export interface UnansweredWithdrawal {
+  currency: KinkCurrency;
+  quantity: string;
+  bankId: string;
+  key: string;
+  expectedAmountKobo: number;
+}
+
+/** A gift sent but not answered: sent again exactly as it was. */
+export interface GiftInDoubt {
+  postId: string;
+  currency: KinkCurrency;
+  quantity: string;
+  key: string;
 }

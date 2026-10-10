@@ -8,6 +8,7 @@ const input = {
   currency: "coin" as const,
   quantity: 5,
   requestKey: "22222222-2222-4222-8222-222222222222",
+  senderId: "a",
 };
 const gift = {
   id: "g",
@@ -98,6 +99,23 @@ describe("post wallet gifts", () => {
     });
     expect(result).toMatchObject({ kind: "gift_sent", counterpartyName: "Bob" });
   });
+  it("refuses a gift sent as someone other than who is signed in, before anything is read", async () => {
+    const { service, db, posts } = fixture();
+    await expect(service.send("b", input)).rejects.toMatchObject({
+      response: { code: "WRONG_ACCOUNT" },
+    });
+    expect(posts.byId).not.toHaveBeenCalled();
+    expect(db.select).not.toHaveBeenCalled();
+  });
+  it("waits for the sender's lock before saying a gift on a hidden post was never made", async () => {
+    const { service, db } = fixture({ visible: null, selects: [[]] });
+    await expect(service.send("a", input)).rejects.toThrow(/no longer available/);
+    // The lock (execute) comes before the lookup (select), in one transaction.
+    expect(db.transaction).toHaveBeenCalledOnce();
+    expect(db.execute.mock.invocationCallOrder[0]).toBeLessThan(
+      db.select.mock.invocationCallOrder[0],
+    );
+  });
   it("checks visibility once, before the transaction holds a connection", async () => {
     const { service, posts } = fixture();
     await service.send("a", input);
@@ -160,7 +178,9 @@ describe("post wallet gifts", () => {
   });
   it("respects the wallet transaction switch", async () => {
     const { service, db } = fixture({ selects: [[], [{ enabled: 0 }]] });
-    await expect(service.send("a", input)).rejects.toThrow(/not enabled/);
+    await expect(service.send("a", input)).rejects.toMatchObject({
+      response: { code: "WALLET_DISABLED", message: "Wallet transactions are not enabled yet." },
+    });
     expect(db.update).not.toHaveBeenCalled();
   });
   it("rejects posts deleted or changed before transfer", async () => {
