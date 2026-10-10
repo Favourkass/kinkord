@@ -33,3 +33,13 @@ describe("PresenceService.touch", () => {
     expect(execute).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("PresenceService.status", () => {
+  it("distinguishes online, away and offline from recent activity", () => {
+    const now = new Date("2026-10-10T12:00:00Z");
+    expect(PresenceService.status(new Date(now.getTime() - 299_000), now)).toBe("online");
+    expect(PresenceService.status(new Date(now.getTime() - 300_000), now)).toBe("away");
+    expect(PresenceService.status(new Date(now.getTime() - 900_000), now)).toBe("offline");
+    expect(PresenceService.status(null, now)).toBe("offline");
+  });
+});

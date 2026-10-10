@@ -37,6 +37,9 @@ export interface ChatPeerPM {
   avatarUrl: string | null;
   /** Shows the Silver check; absent from an older API. */
   silver?: boolean;
+  verified?: boolean;
+  presence?: "online" | "away" | "offline";
+  typing?: boolean;
   online: boolean;
   /** The viewer blocked them: the thread stays, read-only until they unblock. */
   blockedByMe: boolean;
@@ -68,15 +71,23 @@ export interface PendingMessage {
   status: "sending" | "failed";
 }
 
+export type ChatInboxFilter = "all" | "unread" | "online" | "groups";
+
 export interface ConversationRowVM {
   id: string;
   href: string;
   displayName: string;
+  presenceLabel?: string;
+  verifiedLabel?: string;
+  verified?: boolean;
+  presence?: "online" | "away" | "offline";
+  typing?: boolean;
   silver: boolean;
   avatarUrl: string | null;
   preview: string;
   time: string;
   unread: number;
+  sentByMe?: boolean;
   isOnline: boolean;
 }
 
@@ -103,6 +114,11 @@ export interface ThreadMessageVM {
 export interface ThreadPeerVM {
   userId: string;
   displayName: string;
+  presenceLabel?: string;
+  verifiedLabel?: string;
+  verified?: boolean;
+  presence?: "online" | "away" | "offline";
+  typing?: boolean;
   silver: boolean;
   avatarUrl: string | null;
   isOnline: boolean;
@@ -133,10 +149,15 @@ export function toConversationRowVM(
     href: href(summary.id),
     displayName: summary.peer?.displayName ?? "Member",
     silver: Boolean(summary.peer?.silver),
+    verified: Boolean(summary.peer?.verified),
+    presence: summary.peer?.presence ?? (summary.peer?.online ? "online" : "offline"),
+    typing: Boolean(summary.peer?.typing),
     avatarUrl: summary.peer?.avatarUrl ?? null,
     preview: previewOf(summary, viewerId),
     time: conversationTime(summary.lastMessage?.createdAt ?? summary.lastMessageAt, now),
     unread: summary.unreadCount,
+    sentByMe:
+      !!summary.lastMessage && viewerId !== null && summary.lastMessage.senderId === viewerId,
     isOnline: summary.peer?.online ?? false,
   };
 }
@@ -151,6 +172,9 @@ export function toThreadPeerVM(
     userId: peer.userId,
     displayName: peer.displayName,
     silver: Boolean(peer.silver),
+    verified: Boolean(peer.verified),
+    presence: peer.presence ?? (peer.online ? "online" : "offline"),
+    typing: Boolean(peer.typing),
     avatarUrl: peer.avatarUrl,
     isOnline: peer.online,
     blockedByMe: peer.blockedByMe,

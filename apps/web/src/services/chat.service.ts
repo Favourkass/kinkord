@@ -70,6 +70,9 @@ export const chatService = {
     return slot.key;
   },
 
+  setTyping: (id: string, typing: boolean) =>
+    api.post<{ ok: true }>(`${thread(id)}/typing`, { typing }),
+
   markRead: async (id: string, messageId: string) => {
     const result = await api.post<{ ok: true }>(`${thread(id)}/read`, { messageId });
     if (typeof window !== "undefined") window.dispatchEvent(new Event(CHAT_READ_EVENT));

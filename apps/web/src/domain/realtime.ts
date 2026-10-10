@@ -16,7 +16,9 @@ export type RealtimeConnectionPM =
 
 /** A chat changed, or the member's notifications did (something new, or read elsewhere). */
 export type RealtimeEventPM =
-  { type: "message"; conversationId: string } | { type: "notification" };
+  | { type: "message"; conversationId: string }
+  | { type: "typing"; conversationId: string; typing: boolean; expiresAt: number }
+  | { type: "notification" };
 
 /** Base64url without padding, as AppSync's handshake header wants it. */
 function base64Url(text: string): string {
@@ -36,7 +38,12 @@ export function eventsFromFrame(frame: unknown): RealtimeEventPM[] {
   const items = Array.isArray(f.event) ? f.event : [f.event];
   const out: RealtimeEventPM[] = [];
   for (const item of items) {
-    let e: { type?: unknown; conversationId?: unknown } | null = null;
+    let e: {
+      type?: unknown;
+      conversationId?: unknown;
+      typing?: unknown;
+      expiresAt?: unknown;
+    } | null = null;
     try {
       e = typeof item === "string" ? JSON.parse(item) : (item as typeof e);
     } catch {
@@ -44,6 +51,19 @@ export function eventsFromFrame(frame: unknown): RealtimeEventPM[] {
     }
     if (e?.type === "message" && typeof e.conversationId === "string") {
       out.push({ type: "message", conversationId: e.conversationId });
+    } else if (
+      e?.type === "typing" &&
+      typeof e.conversationId === "string" &&
+      typeof e.typing === "boolean" &&
+      typeof e.expiresAt === "number" &&
+      Number.isFinite(e.expiresAt)
+    ) {
+      out.push({
+        type: "typing",
+        conversationId: e.conversationId,
+        typing: e.typing,
+        expiresAt: e.expiresAt,
+      });
     } else if (e?.type === "notification") {
       out.push({ type: "notification" });
     }

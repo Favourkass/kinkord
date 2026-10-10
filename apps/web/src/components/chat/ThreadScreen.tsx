@@ -4,6 +4,7 @@ import { useEffect, useRef, type CSSProperties } from "react";
 import Link from "next/link";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import MaskIcon from "@/components/app/MaskIcon";
+import VerifiedCheck from "@/components/app/VerifiedCheck";
 import SilverCheck from "@/components/app/SilverCheck";
 import ConfirmDialog, { type ConfirmDialogProps } from "@/components/feed/ConfirmDialog";
 import MediaLightbox from "@/components/feed/MediaLightbox";
@@ -36,7 +37,10 @@ export interface ThreadScreenProps {
   retryLabel: string;
   onSend: (body: string) => void;
   onRetry: (clientId: string) => void;
-  composer: Pick<MessageComposerProps, "placeholder" | "sendLabel" | "maxLength" | "photo">;
+  composer: Pick<
+    MessageComposerProps,
+    "placeholder" | "sendLabel" | "maxLength" | "photo" | "onTyping"
+  >;
   /** Why photos aren't open yet, after the member tried to add one. */
   photoNotice: string | null;
   photoLabels: MessageBubblePhotoLabels;
@@ -96,7 +100,8 @@ export default function ThreadScreen(p: ThreadScreenProps) {
         />
         <PresenceDot
           online={Boolean(p.peer?.isOnline)}
-          label={p.onlineLabel}
+          status={p.peer?.presence}
+          label={p.peer?.presenceLabel ?? p.onlineLabel}
           className="absolute -bottom-[1px] -right-[1px]"
         />
       </span>
@@ -105,10 +110,17 @@ export default function ThreadScreen(p: ThreadScreenProps) {
           <span className="truncate text-[15px] font-bold text-app-text">
             {p.peer?.displayName ?? (p.loading ? "…" : "Member")}
           </span>
+          {p.peer?.verified && p.peer.verifiedLabel ? (
+            <VerifiedCheck label={p.peer.verifiedLabel} />
+          ) : null}
           {p.peer?.silver ? <SilverCheck size={15} /> : null}
         </span>
-        {p.peer?.isOnline && (
-          <span className="block text-[12px] text-app-online">{p.onlineLabel}</span>
+        {p.peer && (
+          <span
+            className={`block text-[12px] ${p.peer.typing || p.peer.presence === "online" ? "text-app-online" : p.peer.presence === "away" ? "text-amber-400" : "text-app-muted"}`}
+          >
+            {p.peer.presenceLabel ?? p.onlineLabel}
+          </span>
         )}
       </span>
     </>

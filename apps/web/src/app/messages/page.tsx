@@ -15,7 +15,8 @@ export default function MessagesPage() {
 
   return (
     <AppShell
-      brand="KINKORD"
+      brand={CHAT_COPY.inbox.brand}
+      mobileHeader={<></>}
       tagline="THE WORLD'S KINK COMMUNITY"
       greeting={shell.greeting}
       name={shell.name}
@@ -39,12 +40,22 @@ export default function MessagesPage() {
         loading={list.loading}
         error={list.error}
         empty={list.empty}
-        heading={CHAT_COPY.heading}
+        heading={CHAT_COPY.inbox.brand}
         banner={push.prompt && <PushPrompt {...push.prompt} />}
         loadingText={CHAT_COPY.loading}
-        emptyTitle={CHAT_COPY.emptyTitle}
-        emptyBody={CHAT_COPY.emptyBody}
+        emptyTitle={list.emptyTitle}
+        emptyBody={list.emptyBody}
         onlineLabel={CHAT_COPY.online}
+        query={list.query}
+        onQuery={list.setQuery}
+        filters={list.filters}
+        onFilter={list.setFilter}
+        menuOpen={list.menuOpen}
+        onToggleMenu={list.toggleMenu}
+        onNavigation={list.openNavigation}
+        newChatHref={list.newChatHref}
+        settingsHref={list.settingsHref}
+        copy={CHAT_COPY.inbox}
       />
     </AppShell>
   );
