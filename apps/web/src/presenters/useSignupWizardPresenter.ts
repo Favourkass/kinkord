@@ -62,7 +62,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
   const [topError, setTopError] = useState<string | null>(null);
 
   // step 1
-  const [country, setCountry] = useState<string | null>(null);
+  const [country, setCountry] = useState<string | null>("NG");
   const [ageAttested, setAgeAttested] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [stepOneTouched, setStepOneTouched] = useState(false);

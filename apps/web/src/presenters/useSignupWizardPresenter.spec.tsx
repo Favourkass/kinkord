@@ -91,6 +91,13 @@ describe("useSignupWizardPresenter", () => {
     push.mockReset();
   });
 
+  it("defaults to Nigeria and allows selecting USA", () => {
+    const { result } = renderHook(() => useSignupWizardPresenter());
+    expect(result.current.stepOne.country).toBe("NG");
+    act(() => result.current.stepOne.setCountry("US"));
+    expect(result.current.stepOne.country).toBe("US");
+  });
+
   it("blocks step 1 until country + both confirmations are set", () => {
     const { result } = renderHook(() => useSignupWizardPresenter());
     act(() => result.current.stepOne.submit());

@@ -57,7 +57,7 @@ export const FEED_COPY = {
   feedEmptyTitle: "Your feed is quiet",
   feedEmptyBody: "Follow a few kinksters, or write the first post yourself.",
   feedError: "Could not load the feed. Refresh to try again.",
-  peopleHeading: "Kink stars near you",
+  peopleHeading: "Kinksters near you",
   peopleSeeAll: "See all",
   peopleDismiss: "Hide suggestions",
   peopleAdd: "Add friend",

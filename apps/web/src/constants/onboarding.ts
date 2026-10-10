@@ -2,6 +2,7 @@ import type { SignupField } from "@/domain/onboarding";
 
 export const LAUNCH_COUNTRIES = [
   { code: "NG", name: "Nigeria", flag: "🇳🇬", dialCode: "+234" },
+  { code: "US", name: "USA", flag: "🇺🇸", dialCode: "+1" },
 ] as const;
 
 /**

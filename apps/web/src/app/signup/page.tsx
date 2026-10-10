@@ -17,7 +17,6 @@ import {
   Users,
 } from "lucide-react";
 import SignupShell from "@/components/auth/SignupShell";
-import CountryRow from "@/components/auth/CountryRow";
 import CheckRow from "@/components/auth/CheckRow";
 import GoldCta from "@/components/auth/GoldCta";
 import TextField from "@/components/auth/TextField";
@@ -66,6 +65,7 @@ function SignupWizard() {
     resume === "phone" || resume === "profile" ? resume : undefined,
   );
   const [rolesOpen, setRolesOpen] = useState(false);
+  const [countryMenuOpen, setCountryMenuOpen] = useState(false);
 
   // A failed Send OTP says what's wrong by the button; bring the first bad
   // field into view too, since on a phone it's usually scrolled off the top.
@@ -89,17 +89,54 @@ function SignupWizard() {
               </p>
               <div className="mx-auto mt-2 h-[2px] w-[132px] bg-[#966400] opacity-50 lg:w-[264px]" />
             </div>
-            <div className="flex w-full flex-col gap-4">
-              {LAUNCH_COUNTRIES.map((c) => (
-                <CountryRow
-                  key={c.code}
-                  flag={c.flag}
-                  name={c.name}
-                  selected={p.stepOne.country === c.code}
-                  onSelect={() => p.stepOne.setCountry(c.code)}
-                />
-              ))}
-            </div>
+            <details
+              open={countryMenuOpen}
+              onToggle={(event) => setCountryMenuOpen(event.currentTarget.open)}
+              className="relative w-full"
+              onKeyDown={(event) => {
+                if (event.key === "Escape") setCountryMenuOpen(false);
+              }}
+            >
+              <summary
+                aria-label="Select your country"
+                className="flex h-[62px] cursor-pointer list-none items-center justify-between rounded-[18px] border border-kink-line bg-kink-surface px-5 text-[16px] font-semibold text-kink-cream outline-none focus-visible:border-kink-gold-bright lg:h-[68px] lg:text-[20px] [&::-webkit-details-marker]:hidden"
+              >
+                <span>
+                  {LAUNCH_COUNTRIES.find((country) => country.code === p.stepOne.country)?.flag}{" "}
+                  {LAUNCH_COUNTRIES.find((country) => country.code === p.stepOne.country)?.name ??
+                    "Select your country"}
+                </span>
+                <ChevronDown size={22} aria-hidden="true" className="text-kink-gold-bright" />
+              </summary>
+              <div
+                role="radiogroup"
+                aria-label="Country"
+                className="absolute left-0 right-0 top-full z-10 mt-2 overflow-hidden rounded-[18px] border border-kink-gold-bright bg-kink-surface shadow-xl"
+              >
+                {LAUNCH_COUNTRIES.map((country) => (
+                  <label
+                    key={country.code}
+                    className="flex cursor-pointer items-center justify-between gap-3 px-5 py-4 text-[16px] font-semibold text-kink-cream hover:bg-kink-field focus-within:bg-kink-field"
+                  >
+                    <span>
+                      {country.flag} {country.name}
+                    </span>
+                    <input
+                      type="radio"
+                      name="signup-country"
+                      aria-label={country.name}
+                      value={country.code}
+                      checked={p.stepOne.country === country.code}
+                      onChange={() => {
+                        p.stepOne.setCountry(country.code);
+                        setCountryMenuOpen(false);
+                      }}
+                      className="size-4 accent-kink-gold-bright"
+                    />
+                  </label>
+                ))}
+              </div>
+            </details>
 
             <div className="w-full">
               <AgePill lead="18+ Only." rest="You must be 18 or older to join Kinkord." />
@@ -110,7 +147,11 @@ function SignupWizard() {
                 checked={p.stepOne.ageAttested}
                 onChange={p.stepOne.setAgeAttested}
                 error={p.stepOne.touched && !p.stepOne.ageAttested}
-                trailing={<span className="text-[18px] font-bold text-kink-cream">18+</span>}
+                trailing={
+                  <span aria-hidden="true" className="text-[24px] leading-none">
+                    🔞
+                  </span>
+                }
               >
                 I confirm I am over 18.
               </CheckRow>
