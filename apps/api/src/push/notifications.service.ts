@@ -106,6 +106,7 @@ const SEARCH_WORDS: Record<NotificationType, readonly string[]> = {
   like: ["like", "liked", "likes"],
   repost: ["repost", "reposted", "reposts"],
   report: ["report", "reports", "moderation"],
+  verification: ["verification", "verify", "moderation"],
   test: ["notifications", "enabled"],
   payment: ["payment", "payments", "verify"],
   payment_verified: ["payment", "silver", "premium", "subscription"],
@@ -134,6 +135,8 @@ export function notificationUrl(
     case "payment_verified":
     case "payment_rejected":
       return "/subscription";
+    case "verification":
+      return "/moderation/verification";
     case "test":
       return "/settings";
     default:
