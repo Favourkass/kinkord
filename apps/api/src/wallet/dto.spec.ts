@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   walletBankSchema,
   walletDecisionSchema,
+  walletGiftSchema,
   walletSettingsSchema,
   withdrawalSchema,
 } from "./dto";
@@ -70,5 +71,27 @@ describe("withdrawal requests", () => {
     expect(withdrawalSchema.safeParse({ ...request, expectedAmountKobo: 80000 }).success).toBe(
       true,
     );
+  });
+});
+
+describe("wallet ids", () => {
+  it("are lowercased, as Postgres returns them, so a retry compares like for like", () => {
+    const parsed = withdrawalSchema.parse({
+      currency: "coin",
+      quantity: 100,
+      requestKey: "AAAAAAAA-2222-4222-8222-222222222222",
+      bankId: "BBBBBBBB-3333-4333-8333-333333333333",
+      expectedAmountKobo: 80000,
+    });
+    expect(parsed.requestKey).toBe("aaaaaaaa-2222-4222-8222-222222222222");
+    expect(parsed.bankId).toBe("bbbbbbbb-3333-4333-8333-333333333333");
+    expect(
+      walletGiftSchema.parse({
+        currency: "coin",
+        quantity: 1,
+        requestKey: "22222222-2222-4222-8222-222222222222",
+        postId: "CCCCCCCC-1111-4111-8111-111111111111",
+      }).postId,
+    ).toBe("cccccccc-1111-4111-8111-111111111111");
   });
 });
