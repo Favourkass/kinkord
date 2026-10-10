@@ -380,6 +380,29 @@ export class ChatService {
     return Promise.all((opts.after ? rows : rows.reverse()).map((m) => this.toDto(m)));
   }
 
+  /** Ephemeral hints: throttled, authorised, published, never saved as messages. */
+  private readonly typingSignals = new Map<string, { active: boolean; at: number }>();
+
+  async setTyping(userId: string, conversationId: string, typing: boolean): Promise<void> {
+    const key = `${userId}:${conversationId}`;
+    const now = Date.now();
+    const previous = this.typingSignals.get(key);
+    if (previous?.active === typing && now - previous.at < 5_000) return;
+    await this.assertMember(conversationId, userId);
+    const peerId = await this.writablePeer(conversationId, userId);
+    // A bounded cache limits repeated hints on this instance; access is checked
+    // on every hint we publish, even when a member was allowed earlier.
+    if (this.typingSignals.size >= 5_000)
+      this.typingSignals.delete(this.typingSignals.keys().next().value!);
+    this.typingSignals.set(key, { active: typing, at: now });
+    void this.realtime.notify([peerId], {
+      type: "typing",
+      conversationId,
+      typing,
+      expiresAt: typing ? now + 8_000 : now,
+    });
+  }
+
   /**
    * Moves this member's read pointer forward to a message; never backwards.
    * Their inbox row for this chat clears with it.
@@ -498,6 +521,7 @@ export class ChatService {
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
         lastSeenAt: profile.lastSeenAt,
+        verified: sql<boolean>`(${user.emailVerified} and coalesce(${profile.phoneVerified}, false))`,
         blockedByMe: blockedBy(userId, conversationParticipant.userId),
         silver: silverCheck(conversationParticipant.userId),
       })
@@ -556,6 +580,8 @@ export class ChatService {
                   : null,
                 silver: Boolean(p.silver),
                 online: PresenceService.isOnline(p.lastSeenAt),
+                presence: PresenceService.status(p.lastSeenAt),
+                verified: Boolean(p.verified),
                 blockedByMe: Boolean(p.blockedByMe),
               },
             ] as const,

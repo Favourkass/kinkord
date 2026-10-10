@@ -15,6 +15,7 @@ function make() {
     startDm: vi.fn(async () => "c1"),
     history: vi.fn(async () => []),
     sendMessage: vi.fn(async () => ({ id: "m1" })),
+    setTyping: vi.fn(async () => undefined),
     markRead: vi.fn(async () => undefined),
     allowance: vi.fn(async () => ({ newChatsPerDay: 1, usedToday: 0, resetsAt: "x" })),
     presignPhotoUpload: vi.fn(async () => ({ key: "chat/c1/u1/a.jpg" })),
@@ -118,4 +119,13 @@ it("returns the signed-in member's unread message count", async () => {
   const { controller, chat } = make();
   await expect(controller.unreadCount(req)).resolves.toEqual({ count: 4 });
   expect(chat.unreadCount).toHaveBeenCalledWith("u1");
+});
+
+it("validates typing state and uses the authenticated identity", async () => {
+  const { controller, chat } = make();
+  await controller.typing(req, "c1", { typing: true });
+  expect(chat.setTyping).toHaveBeenCalledWith("u1", "c1", true);
+  await expect(controller.typing(req, "c1", { typing: "yes" })).rejects.toBeInstanceOf(
+    BadRequestException,
+  );
 });

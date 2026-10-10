@@ -27,12 +27,21 @@ export class PresenceService {
     void this.db
       .execute(
         sql`update "profile"
-              set "last_seen_at" = now()
+              set "last_seen_at" = timezone('UTC', now())
             where "user_id" = ${userId}
               and ("last_seen_at" is null
-                   or "last_seen_at" < now() - (${sql.raw(String(TOUCH_INTERVAL_SECONDS))} * interval '1 second'))`,
+                   or "last_seen_at" < timezone('UTC', now()) - (${sql.raw(String(TOUCH_INTERVAL_SECONDS))} * interval '1 second'))`,
       )
       .catch((e: unknown) => this.log.warn(`presence touch failed: ${String(e)}`));
+  }
+
+  static status(
+    lastSeenAt: Date | null | undefined,
+    now = new Date(),
+  ): "online" | "away" | "offline" {
+    if (!lastSeenAt) return "offline";
+    const age = now.getTime() - lastSeenAt.getTime();
+    return age < ONLINE_WINDOW_SECONDS * 1000 ? "online" : age < 15 * 60_000 ? "away" : "offline";
   }
 
   static isOnline(lastSeenAt: Date | null | undefined, now = new Date()): boolean {

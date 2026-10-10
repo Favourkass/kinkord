@@ -11,7 +11,10 @@ import { channelFor, REALTIME_TOKEN_TTL_SECONDS, signRealtimeToken } from "./tok
  * through AppSync. "notification": the member's inbox changed (something new,
  * or read on another device).
  */
-export type RealtimeEvent = { type: "message"; conversationId: string } | { type: "notification" };
+export type RealtimeEvent =
+  | { type: "message"; conversationId: string }
+  | { type: "typing"; conversationId: string; typing: boolean; expiresAt: number }
+  | { type: "notification" };
 
 /** What a signed-in member's app needs to open its live connection. */
 export type RealtimeConnection =
