@@ -15,6 +15,7 @@ export interface PostAuthorPM {
   avatarUrl: string | null;
   /** Shows the Silver check beside their name; absent from an older API. */
   silver?: boolean;
+  subscribed?: boolean;
 }
 
 export interface PostMediaPM {
@@ -37,6 +38,10 @@ export interface PostPM {
   author: PostAuthorPM;
   media: PostMediaPM[];
   likes: number;
+  /** Completed shares/link copies; absent from older APIs. */
+  shares?: number;
+  /** Number of completed gift transfers to this post. */
+  gifts?: number;
   comments: number;
   reposts: number;
   likedByMe: boolean;
@@ -130,6 +135,7 @@ export interface PostVM {
   authorName: string;
   /** The Silver check beside the author's name. */
   authorSilver: boolean;
+  authorSubscribed: boolean;
   handle: string | null;
   /** Link to the author's profile, or null for a member with no username yet. */
   authorHref: string | null;
@@ -144,6 +150,8 @@ export interface PostVM {
   expanded: boolean;
   media: PostMediaVM[];
   likes: string;
+  shares: string;
+  gifts: string;
   comments: string;
   reposts: string;
   likedByMe: boolean;
@@ -234,6 +242,7 @@ export function toPostVM(
     isRepost: pm.id !== pm.postId,
     authorName: pm.author.displayName,
     authorSilver: Boolean(pm.author.silver),
+    authorSubscribed: Boolean(pm.author.subscribed),
     handle: handleOf(pm.author.username),
     authorHref: hrefFor(pm.author.username),
     avatarUrl: pm.author.avatarUrl,
@@ -250,6 +259,8 @@ export function toPostVM(
       alt: `Photo ${i + 1} from ${pm.author.displayName}`,
     })),
     likes: compactNumber(pm.likes),
+    shares: compactNumber(pm.shares ?? 0),
+    gifts: compactNumber(pm.gifts ?? 0),
     comments: compactNumber(pm.comments),
     reposts: compactNumber(pm.reposts),
     likedByMe: pm.likedByMe,

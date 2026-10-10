@@ -75,6 +75,8 @@ export const postsApi = {
   remove: (id: string) => api.del<{ deleted: string }>(`/posts/${encodeURIComponent(id)}`),
   like: (id: string) => api.post<LikePM>(`/posts/${encodeURIComponent(id)}/like`, {}),
   unlike: (id: string) => api.del<LikePM>(`/posts/${encodeURIComponent(id)}/like`),
+  share: (id: string) =>
+    api.post<{ postId: string; shares: number }>(`/posts/${encodeURIComponent(id)}/share`, {}),
   repost: (id: string) => api.post<RepostPM>(`/posts/${encodeURIComponent(id)}/repost`, {}),
   unrepost: (id: string) => api.del<RepostPM>(`/posts/${encodeURIComponent(id)}/repost`),
   save: (id: string) => api.post<SavePM>(`/posts/${encodeURIComponent(id)}/save`, {}),

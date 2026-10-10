@@ -20,6 +20,9 @@ import {
   type PostVM,
   type PostVisibility,
 } from "@/domain/post";
+import type { KinkCurrency } from "@/domain/kinkcoins";
+import type { WalletSummaryPM } from "@/domain/wallet";
+import { GIFT_COPY, postGiftsService } from "@/services/post-gifts.service";
 import { ApiError } from "@/services/apiClient";
 import { useMentionSuggestions, type MentionField } from "./useMentionSuggestions";
 import {
@@ -470,10 +473,14 @@ export function useFeedPresenter({
     try {
       if (typeof navigator !== "undefined" && navigator.share) {
         await navigator.share({ url });
-        return;
+      } else {
+        await navigator.clipboard.writeText(url);
+        setShareNote(FEED_COPY.shareCopied);
       }
-      await navigator.clipboard.writeText(url);
-      setShareNote(FEED_COPY.shareCopied);
+      const result = await postsApi.share(postId);
+      setPosts((prev) =>
+        applyToContent(prev, result.postId, (p) => ({ ...p, shares: result.shares })),
+      );
     } catch {
       // A cancelled share sheet lands here too, which is not worth a message.
     }
@@ -662,7 +669,139 @@ export function useFeedPresenter({
     [photos],
   );
 
+  const [giftTarget, setGiftTarget] = useState<{ postId: string; name: string } | null>(null);
+  const [giftCurrency, setGiftCurrency] = useState<KinkCurrency>("coin");
+  const [giftQuantity, setGiftQuantity] = useState("1");
+  const [giftSummary, setGiftSummary] = useState<WalletSummaryPM | null>(null);
+  const [giftLoading, setGiftLoading] = useState(false);
+  const [giftSending, setGiftSending] = useState(false);
+  const [giftError, setGiftError] = useState<string | null>(null);
+  const giftKey = useRef("");
+  const giftBusy = useRef(false);
+  const uncertainGift = useRef<{
+    postId: string;
+    currency: KinkCurrency;
+    quantity: string;
+    key: string;
+  } | null>(null);
+  const [giftLocked, setGiftLocked] = useState(false);
+  const giftLoadVersion = useRef(0);
+  const openGift = async (postId: string, currency: KinkCurrency = "coin") => {
+    if (giftBusy.current) return;
+    const pending = uncertainGift.current;
+    if (pending && pending.postId !== postId) {
+      setShareNote("Retry your previous gift or check Transaction History before sending another.");
+      return;
+    }
+    const target = posts.find((p) => p.postId === postId);
+    if (!target) return;
+    if (target.mine && !target.repostedBy) {
+      setShareNote(GIFT_COPY.self);
+      return;
+    }
+    const version = ++giftLoadVersion.current;
+    setGiftTarget({ postId, name: target.author.displayName });
+    setGiftCurrency(pending?.currency ?? currency);
+    setGiftQuantity(pending?.quantity ?? "1");
+    setGiftLocked(!!pending);
+    setGiftSummary(null);
+    setGiftError(null);
+    giftKey.current = pending?.key ?? crypto.randomUUID();
+    setGiftLoading(true);
+    try {
+      const summary = await postGiftsService.balance();
+      if (version !== giftLoadVersion.current) return;
+      setGiftSummary(summary);
+      if (!summary.settings.enabled) setGiftError(GIFT_COPY.unavailable);
+    } catch (e) {
+      if (version === giftLoadVersion.current)
+        setGiftError(e instanceof Error ? e.message : "Could not load your wallet.");
+    } finally {
+      if (version === giftLoadVersion.current) setGiftLoading(false);
+    }
+  };
+  const sendGift = async () => {
+    const quote = postGiftsService.quote(giftSummary, giftCurrency, giftQuantity);
+    if (giftBusy.current || !giftTarget || (!giftLocked && !quote.valid)) return;
+    giftBusy.current = true;
+    setGiftSending(true);
+    setGiftError(null);
+    try {
+      await postGiftsService.send(giftTarget.postId, giftCurrency, quote.quantity, giftKey.current);
+      uncertainGift.current = null;
+      setGiftLocked(false);
+      setShareNote(postGiftsService.sentLabel(giftQuantity, giftCurrency, giftTarget.name));
+      setGiftTarget(null);
+      // Read the committed count so a retried, idempotent gift never counts twice.
+      const updated = await postsApi.byId(giftTarget.postId).catch(() => null);
+      if (updated)
+        setPosts((prev) =>
+          applyToContent(prev, updated.postId, (p) => ({ ...p, gifts: updated.gifts ?? 0 })),
+        );
+    } catch (e) {
+      const unknown = !(e instanceof ApiError) || e.status === 0 || e.status >= 500;
+      if (unknown) {
+        uncertainGift.current = {
+          postId: giftTarget.postId,
+          currency: giftCurrency,
+          quantity: giftQuantity,
+          key: giftKey.current,
+        };
+        setGiftLocked(true);
+        setGiftError(
+          "Delivery could not be confirmed. Retry this same gift to check it safely, or check Transaction History.",
+        );
+      } else {
+        uncertainGift.current = null;
+        setGiftLocked(false);
+        setGiftError(e.message);
+      }
+    } finally {
+      giftBusy.current = false;
+      setGiftSending(false);
+    }
+  };
+  const giftQuote = postGiftsService.quote(giftSummary, giftCurrency, giftQuantity);
+  const giftDialog = {
+    open: giftTarget !== null,
+    recipient: giftTarget?.name ?? "",
+    currency: giftCurrency,
+    quantity: giftQuantity,
+    copy: GIFT_COPY,
+    buyHref: Routes.kinkcoinsBuy,
+    availableLabel: postGiftsService.availableLabel(giftQuote.available, giftCurrency),
+    confirmLabel: postGiftsService.confirmLabel(giftQuantity, giftCurrency, giftTarget?.name ?? ""),
+    loading: giftLoading,
+    locked: giftLocked,
+    sending: giftSending,
+    error: giftError,
+    canSend: (giftQuote.valid || giftLocked) && !giftLoading && !giftSending,
+    onCurrency: (v: KinkCurrency) => {
+      if (!giftBusy.current && !giftLocked && v !== giftCurrency) {
+        setGiftCurrency(v);
+        giftKey.current = crypto.randomUUID();
+        setGiftError(null);
+      }
+    },
+    onQuantity: (v: string) => {
+      if (!giftBusy.current && !giftLocked && v !== giftQuantity) {
+        setGiftQuantity(v);
+        giftKey.current = crypto.randomUUID();
+        setGiftError(null);
+      }
+    },
+    onSend: sendGift,
+    onClose: () => {
+      if (!giftBusy.current) {
+        giftLoadVersion.current++;
+        setGiftTarget(null);
+      }
+    },
+  };
+
   return {
+    openGift,
+    giftDialog,
     loading,
     error,
     posts: postVMs,

@@ -21,8 +21,13 @@ export default function AppMobileHeader({
   search,
 }: AppMobileHeaderProps) {
   return (
-    <header className="flex h-[80px] shrink-0 items-center gap-[12px] border-b border-mem-hairline bg-mem-header px-[18px] pb-[22px] pt-[22px]">
-      <button type="button" aria-label={menuLabel} onClick={onMenu} className="text-mem-icon">
+    <header className="flex h-[80px] shrink-0 items-center gap-2 border-b border-mem-hairline bg-mem-header px-[18px]">
+      <button
+        type="button"
+        aria-label={menuLabel}
+        onClick={onMenu}
+        className="flex size-11 shrink-0 items-center justify-center text-mem-icon"
+      >
         <MaskIcon name="hamburger" width={35} />
       </button>
       <p className="text-[30px] font-extrabold leading-none text-kink-gold-bright">{brand}</p>

@@ -33,6 +33,7 @@ export const post = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     body: text("body"),
+    shares: integer("shares").notNull().default(0),
     visibility: text("visibility").$type<PostVisibility>().notNull().default("public"),
     /**
      * Set when this row is a repost: it carries no words or photos of its own
@@ -107,6 +108,21 @@ export const postLike = pgTable(
     // "Posts I have liked" reads by member.
     index("post_like_user_idx").on(t.userId),
   ],
+);
+
+/** Who has shared a post, once each: what its share count counts. */
+export const postShare = pgTable(
+  "post_share",
+  {
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => post.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.postId, t.userId] })],
 );
 
 export const postComment = pgTable(

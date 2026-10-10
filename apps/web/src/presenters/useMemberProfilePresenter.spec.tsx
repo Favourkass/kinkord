@@ -144,6 +144,17 @@ describe("useMemberProfilePresenter", () => {
     apiDel.mockReset().mockResolvedValue({});
   });
 
+  it.each([false, true])(
+    "shows coin balance only on your own profile (isSelf=%s)",
+    async (isSelf) => {
+      apiGet.mockImplementation(routeGet({ ...profile, isSelf, coinBalance: 2450 }));
+      const { result } = renderHook(() => useMemberProfilePresenter("nene"));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      if (isSelf) expect(result.current.coinBalance?.amount).toBe("2,450");
+      else expect(result.current.coinBalance).toBeUndefined();
+    },
+  );
+
   it("loads the profile, defaults to the About tab and formats presence", async () => {
     const { result } = renderHook(() => useMemberProfilePresenter("%40Nene"));
     await waitFor(() => expect(result.current.loading).toBe(false));

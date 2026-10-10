@@ -108,6 +108,11 @@ export class PostsController {
     return this.interactions.unlike(parseId(id), req.user.id);
   }
 
+  @HttpPost(":id/share")
+  share(@Req() req: AuthedRequest, @Param("id") id: string) {
+    return this.posts.share(parseId(id), req.user.id);
+  }
+
   @HttpPost(":id/repost")
   repost(@Req() req: AuthedRequest, @Param("id") id: string) {
     return this.posts.repost(parseId(id), req.user.id);

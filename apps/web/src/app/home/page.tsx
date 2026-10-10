@@ -47,6 +47,8 @@ export default function HomePage() {
       onComment={feed.openComments}
       onSave={feed.toggleSave}
       onShare={feed.share}
+      onGift={feed.openGift}
+      giftDialog={feed.giftDialog}
       onOpenMedia={feed.openMedia}
       hasMore={feed.hasMore}
       loadingMore={feed.loadingMore}
