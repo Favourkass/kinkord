@@ -319,6 +319,38 @@ describe("ProfilesService", () => {
     expect(setCalls[0]).toMatchObject({ bio: "hi" });
   });
 
+  it("tells members whether they're verified, and lets them hide the badge", async () => {
+    const verifiedFor = (avatarKey: string) => ({
+      status: "verified",
+      verifiedAvatarKey: avatarKey,
+      verifiedDob: "1998-04-02",
+      verifiedGender: "female",
+    });
+    const row = {
+      ...makeService().row,
+      avatarKey: "avatars/u1/a.jpg",
+      dateOfBirth: "1998-04-02",
+      gender: "female",
+      showVerifiedBadge: false,
+    };
+    // ensureRow reads the profile, then the view reads the verification.
+    const { service: verified } = makeService({
+      selects: [[row], [verifiedFor("avatars/u1/a.jpg")]],
+    });
+    expect(await verified.getOwn("u1", "Favour")).toMatchObject({
+      identityVerified: true,
+      showVerifiedBadge: false,
+    });
+
+    const { service: replaced } = makeService({
+      selects: [[row], [verifiedFor("avatars/u1/old.jpg")]],
+    });
+    expect((await replaced.getOwn("u1", "Favour")).identityVerified).toBe(false);
+    expect(updateProfileSchema.parse({ showVerifiedBadge: true })).toEqual({
+      showVerifiedBadge: true,
+    });
+  });
+
   it("exposes the new fields and lock dates in the own-profile VM", async () => {
     // getOwn reads the clock: pin it, or the 30-day lock below runs out on the
     // real calendar (it did, on 1 Oct 2026).

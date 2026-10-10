@@ -64,6 +64,8 @@ const profile: OwnProfilePM = {
   limits: null,
   socialLinks: { facebook: "https://facebook.com/nene" },
   profileVisibility: "public",
+  identityVerified: false,
+  showVerifiedBadge: true,
   displayNameChangedAt: null,
   canChangeDisplayNameAt: null,
   usernameChangedAt: "2026-09-01T00:00:00.000Z",
@@ -108,6 +110,21 @@ describe("buildEditRows", () => {
       "socialLinks",
       "profileVisibility",
     ]);
+  });
+
+  it("offers the verified badge switch only to a verified member", () => {
+    const verified = { ...ctx, profile: { ...profile, identityVerified: true } };
+    expect(buildEditRows("privacy", verified).map((r) => r.key)).toContain("verifiedBadge");
+    expect(buildEditRow("verifiedBadge", verified)).toMatchObject({
+      value: "show",
+      editor: { kind: "single", value: "show" },
+    });
+    expect(patchFor("verifiedBadge", { kind: "single", value: "hide" }, profile)).toEqual({
+      showVerifiedBadge: false,
+    });
+    expect(patchFor("verifiedBadge", { kind: "single", value: "show" }, profile)).toEqual({
+      showVerifiedBadge: true,
+    });
   });
 
   it("formats the display values from the profile", () => {
