@@ -26,6 +26,7 @@ export default function ModerationMemberPage() {
     >
       <MemberDetailView
         vm={p.vm}
+        verification={p.verification}
         loading={p.loading}
         error={p.error}
         notice={p.notice}
@@ -50,6 +51,8 @@ export default function ModerationMemberPage() {
             />
           ) : null
         }
+        onRevokeVerification={p.onRevokeVerification}
+        onReopenVerification={p.onReopenVerification}
       />
       {c.dialog ? <ConfirmDialog dialog={c.dialog} /> : null}
     </ModerationFrame>

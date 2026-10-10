@@ -344,3 +344,111 @@ export function toAdminReportVM(
     open: pm.status === "open",
   };
 }
+
+// ---- Identity verification (Moderation → Verification) ----
+
+export type AdminVerificationCheck =
+  "governmentId" | "liveness" | "idFace" | "profileFace" | "dateOfBirth" | "gender" | "country";
+
+export type AdminVerificationStatus =
+  "not_started" | "pending" | "failed" | "manual_review" | "verified" | "rejected" | "revoked";
+
+/** GET /admin/verification/reviews item. The photo links expire after 10 minutes. */
+export interface AdminVerificationReviewPM {
+  id: string;
+  userId: string;
+  username: string | null;
+  displayName: string | null;
+  reasonCodes: string[];
+  createdAt: string;
+  /** Look the session up in Didit's console to see the ID and selfie. */
+  providerSessionId: string;
+  checks: Partial<Record<AdminVerificationCheck, boolean>>;
+  /** The photo as members see it, and the original it was made from. */
+  photoUrl: string;
+  originalPhotoUrl: string;
+}
+
+/** GET /admin/verification/members/:id */
+export interface AdminVerificationStatePM {
+  status: AdminVerificationStatus;
+  attemptsUsed: number;
+}
+
+export interface AdminVerificationLabels {
+  noName: string;
+  checks: Record<AdminVerificationCheck, string>;
+  reasons: Record<string, string>;
+}
+
+export interface AdminVerificationReviewVM {
+  id: string;
+  name: string;
+  handle: string | null;
+  memberHref: string;
+  when: string;
+  reasons: string[];
+  checks: { key: AdminVerificationCheck; label: string; passed: boolean }[];
+  photoUrl: string;
+  originalPhotoUrl: string;
+  sessionId: string;
+  /** What only the ID proves has passed; the API refuses to approve otherwise. */
+  canApprove: boolean;
+}
+
+const CHECK_ORDER: AdminVerificationCheck[] = [
+  "governmentId",
+  "liveness",
+  "idFace",
+  "profileFace",
+  "dateOfBirth",
+  "gender",
+  "country",
+];
+
+/** An admin can confirm the photo match and the country; the rest only the ID can prove. */
+const ID_CHECKS: AdminVerificationCheck[] = [
+  "governmentId",
+  "liveness",
+  "idFace",
+  "dateOfBirth",
+  "gender",
+];
+
+export function toAdminVerificationReviewVM(
+  pm: AdminVerificationReviewPM,
+  memberHref: (userId: string) => string,
+  labels: AdminVerificationLabels,
+  now = new Date(),
+): AdminVerificationReviewVM {
+  const handle = pm.username ? `@${pm.username}` : null;
+  return {
+    id: pm.id,
+    name: pm.displayName?.trim() || handle || labels.noName,
+    handle,
+    memberHref: memberHref(pm.userId),
+    when: timeAgo(pm.createdAt, now) ?? "",
+    reasons: pm.reasonCodes.map((code) => labels.reasons[code] ?? code),
+    checks: CHECK_ORDER.map((key) => ({
+      key,
+      label: labels.checks[key],
+      passed: pm.checks[key] === true,
+    })),
+    photoUrl: pm.photoUrl,
+    originalPhotoUrl: pm.originalPhotoUrl,
+    sessionId: pm.providerSessionId,
+    canApprove: ID_CHECKS.every((key) => pm.checks[key] === true),
+  };
+}
+
+/** Which verification actions an admin has on a member's page. */
+export function adminVerificationActions(pm: AdminVerificationStatePM | null): {
+  revoke: boolean;
+  reopen: boolean;
+} {
+  if (!pm) return { revoke: false, reopen: false };
+  return {
+    revoke: pm.status !== "not_started" && pm.status !== "revoked",
+    reopen: pm.status === "rejected" || pm.status === "revoked",
+  };
+}

@@ -4,11 +4,23 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MODERATION_COPY } from "@/constants/moderation";
 import { Routes } from "@/constants/Routes";
-import { toAdminMemberDetailVM, type AdminMemberDetailPM } from "@/domain/moderation";
+import {
+  adminVerificationActions,
+  toAdminMemberDetailVM,
+  type AdminMemberDetailPM,
+  type AdminVerificationStatePM,
+} from "@/domain/moderation";
 import { moderationService } from "@/services/moderation.service";
 import { useAdminAccessPresenter } from "./useAdminAccessPresenter";
 
-export type AdminDialogKind = "block" | "unblock" | "deletePosts" | "deletePost" | "deleteAccount";
+export type AdminDialogKind =
+  | "block"
+  | "unblock"
+  | "deletePosts"
+  | "deletePost"
+  | "deleteAccount"
+  | "revokeVerification"
+  | "reopenVerification";
 
 export interface AdminDialogVM {
   title: string;
@@ -16,6 +28,8 @@ export interface AdminDialogVM {
   confirmLabel: string;
   cancelLabel: string;
   destructive: boolean;
+  /** A short required line above the reason, e.g. an evidence reference. */
+  input?: { label: string; value: string; set: (v: string) => void } | null;
   reason: { label: string; value: string; set: (v: string) => void } | null;
   checkbox: { label: string; checked: boolean; toggle: () => void } | null;
   typeToConfirm: { label: string; value: string; set: (v: string) => void } | null;
@@ -35,6 +49,7 @@ export function useAdminMemberPresenter(id: string) {
   const access = useAdminAccessPresenter();
   const copy = MODERATION_COPY;
   const [member, setMember] = useState<AdminMemberDetailPM | null>(null);
+  const [verification, setVerification] = useState<AdminVerificationStatePM | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -61,6 +76,11 @@ export function useAdminMemberPresenter(id: string) {
       (e: unknown) => {
         if (live) setLoadError(messageOf(e));
       },
+    );
+    // Secondary: the page still works if this one read fails.
+    moderationService.memberVerification(id).then(
+      (v) => live && setVerification(v),
+      () => live && setVerification(null),
     );
     return () => {
       live = false;
@@ -103,6 +123,12 @@ export function useAdminMemberPresenter(id: string) {
       } else if (dialog === "deletePost" && postId) {
         await moderationService.deletePost(postId);
         setNotice(copy.notices.postDeleted);
+      } else if (dialog === "revokeVerification") {
+        await moderationService.revokeVerification(id);
+        setNotice(copy.notices.verificationRevoked);
+      } else if (dialog === "reopenVerification") {
+        await moderationService.reopenVerification(id);
+        setNotice(copy.notices.verificationReopened);
       } else if (dialog === "deleteAccount") {
         await moderationService.deleteMember(id, { block: checked, reason: why });
         router.replace(Routes.moderation);
@@ -148,7 +174,7 @@ export function useAdminMemberPresenter(id: string) {
       body: text.body,
       confirmLabel: text.confirm,
       cancelLabel: copy.dialogs.cancel,
-      destructive: dialog !== "unblock",
+      destructive: dialog !== "unblock" && dialog !== "reopenVerification",
       reason: reasonField,
       checkbox,
       typeToConfirm,
@@ -166,6 +192,14 @@ export function useAdminMemberPresenter(id: string) {
     loading: access.isAdmin && !member && !loadError,
     error: loadError,
     vm,
+    verification: verification
+      ? {
+          label: copy.member.verification,
+          status: copy.member.verificationStatuses[verification.status] ?? verification.status,
+          attempts: copy.member.attemptsUsed(verification.attemptsUsed),
+          ...adminVerificationActions(verification),
+        }
+      : null,
     notice,
     dialog: dialogVM,
     labels: {
@@ -182,5 +216,7 @@ export function useAdminMemberPresenter(id: string) {
     onDeletePosts: () => open("deletePosts"),
     onDeleteAccount: () => open("deleteAccount"),
     onDeletePost: (targetPostId: string) => open("deletePost", targetPostId),
+    onRevokeVerification: () => open("revokeVerification"),
+    onReopenVerification: () => open("reopenVerification"),
   };
 }

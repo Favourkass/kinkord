@@ -10,6 +10,7 @@ export type NotificationKind =
   | "payment"
   | "payment_verified"
   | "payment_rejected"
+  | "verification"
   | "silver_check";
 
 /**
@@ -87,6 +88,11 @@ const KINDS: Record<
     icon: "shield",
     action: () => "A Silver member changed their name or photo. Review their badge.",
   },
+  verification: {
+    category: "Moderation",
+    icon: "shield",
+    action: () => "New verification to review.",
+  },
   test: {
     category: "Notifications enabled",
     icon: "bell",
@@ -103,6 +109,7 @@ const OFFICIAL: ReadonlySet<NotificationKind> = new Set([
   "payment_verified",
   "payment_rejected",
   "silver_check",
+  "verification",
 ]);
 
 /** A kind this version of the app doesn't know yet still shows, as Kinkord's own. */
