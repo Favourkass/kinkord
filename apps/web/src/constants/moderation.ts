@@ -1,7 +1,13 @@
 /** Copy for the admin moderation screens. */
 export const MODERATION_COPY = {
   title: "Admin",
-  tabs: { members: "Members", reports: "Reports", payments: "Payments", blocklist: "Block list" },
+  tabs: {
+    members: "Members",
+    reports: "Reports",
+    payments: "Payments",
+    blocklist: "Block list",
+    admins: "Admins",
+  },
   payments: {
     statuses: {
       submitted: "To verify",
@@ -116,6 +122,32 @@ export const MODERATION_COPY = {
     resolve: "Resolve",
     dismiss: "Dismiss",
     photo: "Photo",
+  },
+  /** Who has the admin tools; the founders add and remove them. */
+  admins: {
+    intro:
+      "Admins can use everything in this area. The founders are admins by their email and can't be removed.",
+    locked: "Only the founders can add or remove admins.",
+    usernameLabel: "Username",
+    usernamePlaceholder: "@username",
+    enterUsername: "Enter their username.",
+    add: "Make admin",
+    remove: "Remove",
+    loading: "Loading admins…",
+    founder: "Founder",
+    since: (date: string) => `Admin since ${date}`,
+    added: (handle: string) => `@${handle} is now an admin.`,
+    removed: (name: string) => `${name} is no longer an admin.`,
+    addDialog: {
+      title: (handle: string) => `Make @${handle} an admin?`,
+      body: "They'll see members' emails and phone numbers, block and delete accounts and posts, handle reports, and verify Silver payments and badges. They're notified when one of those needs review. Wallet payouts and settings stay with the founders.",
+      confirm: "Make admin",
+    },
+    removeDialog: {
+      title: (name: string) => `Remove ${name} as an admin?`,
+      body: "They lose the admin tools straight away. Their account isn't changed otherwise.",
+      confirm: "Remove admin",
+    },
   },
   denied: "This area is for admins only.",
   checking: "Checking access…",
