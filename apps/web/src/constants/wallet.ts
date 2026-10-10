@@ -86,6 +86,8 @@ export const WALLET_COPY = {
   chooseWithdrawalBank: "Withdrawal account",
   available: "Available",
   withdrawable: "Withdrawable (received as gifts)",
+  unanswered:
+    "We didn't hear back about your last withdrawal request. Submitting checks on that one first, before anything new.",
   estimate: "You will receive",
   fee: "Withdrawal fee: ₦0.00",
   confirm: "Submit withdrawal request",

@@ -2,9 +2,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Routes } from "@/constants/Routes";
+import { WALLET_COPY } from "@/constants/wallet";
 import { walletOperationVM, type WalletMode, type WalletOperationPM } from "@/domain/wallet";
 import type { KinkCurrency } from "@/domain/kinkcoins";
 import { bankBadge } from "@/domain/subscription";
+import { ApiError } from "@/services/apiClient";
 import { banksService } from "@/services/banks.service";
 
 /** A bank from the directory, with the initials badge it shows in place of a logo. */
@@ -24,7 +26,7 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     [review, setReview] = useState(false),
     [currency, setCurrency] = useState<KinkCurrency>("coin"),
     [quantity, setQuantity] = useState(""),
-    [bankId, setBankId] = useState("");
+    [picked, setBankId] = useState("");
   const [bankForm, setBankForm] = useState({ bankName: "", accountName: "", accountNumber: "" }),
     [proof, setProof] = useState({ senderAccountName: "", senderReference: "" }),
     [file, setFile] = useState<File | null>(null);
@@ -32,7 +34,15 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     [bankSearch, setBankSearch] = useState("");
   const running = useRef(false),
     keys = useRef(new Map<string, string>());
-  const [unanswered, setUnanswered] = useState<string | null>(null);
+  // Sent but unanswered (a lost response): it may have gone through, reserving the coins.
+  // Until it's answered, it's what gets sent, exactly as it was (same account and key),
+  // whatever the form says now: the server returns the withdrawal it made, or refuses.
+  const [unanswered, setUnanswered] = useState<{
+    currency: KinkCurrency;
+    quantity: string;
+    bankId: string;
+    key: string;
+  } | null>(null);
   const keyFor = (value: string) => {
     const existing = keys.current.get(value);
     if (existing) return existing;
@@ -54,10 +64,6 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
         if (!live) return;
         setData(next);
         if (payment) setOperation(payment);
-        setBankId(
-          (previous) =>
-            previous || next.banks.find((bank) => bank.isDefault)?.id || next.banks[0]?.id || "",
-        );
         setError(null);
       } catch (e) {
         if (live) setError(e instanceof Error ? e.message : "Could not load wallet.");
@@ -92,11 +98,13 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     }
   };
   const chosenBank = banksService.find(bankForm.bankName);
+  // The account picked, while it's still saved: one removed (in another tab, say) falls back
+  // to the default, so a withdrawal never goes to an account that's gone.
+  const savedBanks = data?.banks ?? [];
+  const bankId = savedBanks.some((bank) => bank.id === picked)
+    ? picked
+    : (savedBanks.find((bank) => bank.isDefault)?.id ?? savedBanks[0]?.id ?? "");
   const withdrawal = `withdraw:${currency}:${quantity}:${bankId}`;
-  // Sent but unanswered (a lost response): it may have gone through, reserving the coins, so
-  // the same request can be sent again even when the balance no longer covers it. The server
-  // answers with the withdrawal it already made, or refuses.
-  const retrying = unanswered === withdrawal;
   const quote = walletService.withdrawalQuote(
     data?.summary.settings ?? null,
     currency,
@@ -136,7 +144,8 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     bankId,
     review,
     quote,
-    canSubmitWithdrawal: quote.valid || retrying,
+    canSubmitWithdrawal: quote.valid || unanswered !== null,
+    unansweredNotice: unanswered ? WALLET_COPY.unanswered : null,
     operation: operation ? walletOperationVM(operation) : null,
     selectedBank: vm.banks.find((bank) => bank.id === bankId) ?? null,
     onRefresh: () =>
@@ -184,18 +193,26 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     onCancel: () => setReview(false),
     onWithdraw: () =>
       run(async () => {
-        if (!quote.valid && !retrying)
+        if (!unanswered && !quote.valid)
           throw new Error(
             "Check the quantity, withdrawable balance, minimum and selected bank account.",
           );
-        setUnanswered(withdrawal);
-        const result = await walletService.withdraw(
-          currency,
-          Number(quantity),
-          bankId,
-          keyFor(withdrawal),
-        );
-        keys.current.delete(withdrawal);
+        const request = unanswered ?? { currency, quantity, bankId, key: keyFor(withdrawal) };
+        setUnanswered(request);
+        let result: WalletOperationPM;
+        try {
+          result = await walletService.withdraw(
+            request.currency,
+            Number(request.quantity),
+            request.bankId,
+            request.key,
+          );
+        } catch (e) {
+          // A refusal is an answer: nothing was made, so the form decides what's sent next.
+          if (e instanceof ApiError && e.status < 500) setUnanswered(null);
+          throw e;
+        }
+        keys.current.delete(`withdraw:${request.currency}:${request.quantity}:${request.bankId}`);
         setUnanswered(null);
         setOperation(result);
         setReview(false);

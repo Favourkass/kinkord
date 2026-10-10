@@ -140,7 +140,34 @@ describe("WalletService", () => {
       sql: '"wallet_balance"."earned"-$1',
       params: [100],
     });
+    expect(values[0]).toMatchObject({ kind: "withdrawal", bankId: "bank" });
     expect(values[1]).toMatchObject({ phase: "hold", availableDelta: -100, earnedDelta: -100 });
+  });
+  it("replays a withdrawal whose account has since been removed", async () => {
+    const made = { ...row, kind: "withdrawal" as const, bankId: "bank" };
+    const { service, db } = fixture([[made]]);
+    const again = await service.create("user", "withdrawal", {
+      currency: "coin",
+      quantity: 100,
+      bankId: "bank",
+      requestKey: "key",
+    });
+    expect(again.id).toBe("op");
+    // Not looked up again: the account may be gone.
+    expect(db.select).toHaveBeenCalledOnce();
+    expect(db.update).not.toHaveBeenCalled();
+  });
+  it("refuses a replay that names another account", async () => {
+    const made = { ...row, kind: "withdrawal" as const, bankId: "bank" };
+    const { service } = fixture([[made]]);
+    await expect(
+      service.create("user", "withdrawal", {
+        currency: "coin",
+        quantity: 100,
+        bankId: "other",
+        requestKey: "key",
+      }),
+    ).rejects.toThrow(/different bank/);
   });
   it("gives the coins back, withdrawable again, when a withdrawal is rejected", async () => {
     const pending = { ...row, kind: "withdrawal" as const, status: "pending" as const };
