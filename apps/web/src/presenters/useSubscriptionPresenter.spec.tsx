@@ -96,7 +96,7 @@ describe("planState", () => {
 });
 
 describe("checkNote", () => {
-  const check = { shown: false, reason: null, heldFor: null, showsFrom: null };
+  const check = { shown: false, reason: null, heldFor: null };
 
   it("says the badge shows, or what it waits for", () => {
     expect(checkNote({ ...check, shown: true })).toEqual({
@@ -113,9 +113,6 @@ describe("checkNote", () => {
     expect(checkNote({ ...check, reason: "photos" }).text).toBe(
       "Add a profile photo and a cover photo to show your badge.",
     );
-    expect(
-      checkNote({ ...check, reason: "new_account", showsFrom: "2026-10-20T00:00:00Z" }).text,
-    ).toBe("Your badge shows from 20 Oct 2026.");
   });
 });
 
@@ -175,7 +172,7 @@ describe("useSubscriptionPresenter", () => {
       ...basic,
       plan: "silver",
       silverUntil: "2027-10-06T12:00:00Z",
-      check: { shown: false, reason: "held", heldFor: "name", showsFrom: null },
+      check: { shown: false, reason: "held", heldFor: "name" },
     });
     const { result } = renderHook(() => useSubscriptionPresenter());
     await waitFor(() => expect(result.current.cta.label).toBe("Extend Silver"));
