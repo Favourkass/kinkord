@@ -178,4 +178,47 @@ describe("StorageService", () => {
       Key: "avatars/u1/y.jpg",
     });
   });
+
+  it("remakes a verified photo's smaller sizes from its original, in its own format", async () => {
+    const sharp = (await import("sharp")).default;
+    const original = await sharp({
+      create: { width: 1200, height: 900, channels: 3, background: { r: 180, g: 40, b: 90 } },
+    })
+      .jpeg()
+      .toBuffer();
+    send.mockImplementation(async (cmd: { input: Record<string, unknown> }) =>
+      "Body" in cmd.input
+        ? {}
+        : {
+            Body: (async function* () {
+              yield original;
+            })(),
+          },
+    );
+    const { StorageService } = await import("./storage.service");
+    await new StorageService().regenerateVariants("avatars/u1/a.jpg");
+    const puts = send.mock.calls
+      .map(([cmd]) => (cmd as { input: Record<string, unknown> }).input)
+      .filter((input) => "Body" in input);
+    expect(puts.map((p) => p.Key).sort()).toEqual(["avatars/u1/a_md.jpg", "avatars/u1/a_sm.jpg"]);
+    for (const put of puts) {
+      const meta = await sharp(put.Body as Buffer).metadata();
+      expect(meta.format).toBe("jpeg");
+      expect(Math.max(meta.width ?? 0, meta.height ?? 0)).toBe(
+        put.Key === "avatars/u1/a_sm.jpg" ? 160 : 480,
+      );
+      expect(put.ContentType).toBe("image/jpeg");
+    }
+  });
+
+  it("gives admins ten-minute, uncached links to a member's photo", async () => {
+    const { StorageService } = await import("./storage.service");
+    await new StorageService().presignReviewDownload("avatars/u1/a.jpg", "md");
+    const [, cmd, opts] = lastSign();
+    expect(cmd.input).toMatchObject({
+      Key: "avatars/u1/a_md.jpg",
+      ResponseCacheControl: "no-store",
+    });
+    expect(opts.expiresIn).toBe(600);
+  });
 });

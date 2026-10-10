@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
-import { json, urlencoded } from "express";
+import { json, raw, urlencoded } from "express";
 import cors from "cors";
 import { toNodeHandler } from "better-auth/node";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -52,6 +52,8 @@ async function bootstrap() {
     if (req.url.startsWith("/api/auth")) return void authHandler(req, res);
     next();
   });
+  // Didit signs the exact request bytes; keep this route's body as a Buffer.
+  express.use("/webhooks/didit", raw({ type: "application/json", limit: "512kb" }));
   express.use(json({ limit: "1mb" }));
   express.use(urlencoded({ extended: true }));
 

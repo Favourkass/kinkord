@@ -276,7 +276,15 @@ export class PushService {
     this.toMember(userId, "payment_rejected", paymentId, "We couldn't confirm your payment");
   }
 
-  private toAdmins(type: "report" | "payment" | "silver_check", body: string): void {
+  /** A verification Didit couldn't settle is waiting for an admin; says nothing about whose. */
+  newVerificationReview(): void {
+    this.toAdmins("verification", "New verification to review");
+  }
+
+  private toAdmins(
+    type: "report" | "payment" | "silver_check" | "verification",
+    body: string,
+  ): void {
     void adminUserIds(this.db)
       .then((ids) =>
         Promise.all(
