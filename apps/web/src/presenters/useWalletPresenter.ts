@@ -13,6 +13,10 @@ import type { KinkCurrency } from "@/domain/kinkcoins";
 import { bankBadge } from "@/domain/subscription";
 import { ApiError } from "@/services/apiClient";
 import { banksService } from "@/services/banks.service";
+import {
+  pendingTransfersService,
+  type UnansweredWithdrawal,
+} from "@/services/pendingTransfers.service";
 
 /** A bank from the directory, with the initials badge it shows in place of a logo. */
 const withBadge = <T extends { name: string }>(bank: T) => ({
@@ -42,13 +46,17 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
   // Sent but unanswered (a lost response): it may have gone through, reserving the coins.
   // Until it's answered, it's what gets sent, exactly as it was (same account and key),
   // whatever the form says now: the server returns the withdrawal it made, or refuses.
-  const [unanswered, setUnanswered] = useState<{
-    currency: KinkCurrency;
-    quantity: string;
-    bankId: string;
-    key: string;
-    expectedAmountKobo: number;
-  } | null>(null);
+  const [unanswered, setUnanswered] = useState<UnansweredWithdrawal | null>(null);
+  // Unanswered requests are kept in this browser too, for this member, until answered.
+  const member = data?.summary.userId ?? null;
+  const keepUnanswered = (request: UnansweredWithdrawal) => {
+    setUnanswered(request);
+    if (member) pendingTransfersService.keepWithdrawal(member, request);
+  };
+  const settleUnanswered = () => {
+    setUnanswered(null);
+    if (member) pendingTransfersService.settleWithdrawal(member);
+  };
   const keyFor = (value: string) => {
     const existing = keys.current.get(value);
     if (existing) return existing;
@@ -69,14 +77,15 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     if (asked === reads.current) setData(next);
     return next;
   };
-  // One background read at a time: a poll while one is still out (a slow connection) is
-  // skipped, so slow reads can't keep superseding each other and nothing ever lands.
-  const reading = useRef(false);
   useEffect(() => {
     let live = true;
+    // One background read at a time: a poll while one is still out (a slow connection) is
+    // skipped, so slow reads can't keep superseding each other and nothing ever lands. It's
+    // this setup's own flag, so Strict Mode's second setup still makes its first read.
+    let reading = false;
     const read = async () => {
-      if (reading.current) return;
-      reading.current = true;
+      if (reading) return;
+      reading = true;
       const asked = ++reads.current;
       try {
         const next = await walletService.load();
@@ -84,6 +93,10 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
         if (!live || asked !== reads.current) return;
         setData(next);
         if (payment) setOperation(payment);
+        // One left unanswered on an earlier visit (a reload, say) comes back, key and all.
+        const member = next.summary.userId;
+        const kept = member ? pendingTransfersService.withdrawal(member) : null;
+        if (kept) setUnanswered((current) => current ?? kept);
         // The account shown is pinned once: a default changed elsewhere doesn't move it.
         setBankId(
           (previous) =>
@@ -93,7 +106,7 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
       } catch (e) {
         if (live) setError(e instanceof Error ? e.message : "Could not load wallet.");
       } finally {
-        reading.current = false;
+        reading = false;
         if (live) setLoading(false);
       }
     };
@@ -170,7 +183,7 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     quantity: unanswered?.quantity ?? quantity,
     bankId: unanswered?.bankId ?? bankId,
     fieldsLocked: unanswered !== null,
-    review,
+    review: review || unanswered !== null,
     quote: unanswered
       ? {
           ...quote,
@@ -231,7 +244,11 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     },
     onQuantity: setQuantity,
     onBank: setBankId,
-    onCancel: () => setReview(false),
+    // An unanswered request keeps its review open: its retry lives there.
+    onCancel: () => {
+      if (!unanswered) setReview(false);
+    },
+    canCancel: unanswered === null,
     onWithdraw: () =>
       run(async () => {
         if (!unanswered && !quote.valid)
@@ -246,7 +263,7 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
           key: keyFor(withdrawal),
           expectedAmountKobo: quote.amountKobo,
         };
-        setUnanswered(request);
+        keepUnanswered(request);
         let result: WalletOperationPM;
         try {
           result = await walletService.withdraw(
@@ -262,9 +279,9 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
           // signed out, timed out or rate-limited means this send wasn't read, which settles a
           // first send but says nothing about an earlier one.
           const unread = e instanceof ApiError && [401, 408, 429].includes(e.status);
-          if (unread && !wasUnanswered) setUnanswered(null);
+          if (unread && !wasUnanswered) settleUnanswered();
           if (e instanceof ApiError && e.status >= 400 && e.status < 500 && !unread) {
-            setUnanswered(null);
+            settleUnanswered();
             // A changed rate, say: show what a new request would be. If that load fails too,
             // the refusal stays on screen and the next refresh catches up.
             void refresh().catch(() => undefined);
@@ -272,7 +289,7 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
           throw e;
         }
         keys.current.delete(`withdraw:${request.currency}:${request.quantity}:${request.bankId}`);
-        setUnanswered(null);
+        settleUnanswered();
         supersedeReads();
         setOperation(result);
         setReview(false);

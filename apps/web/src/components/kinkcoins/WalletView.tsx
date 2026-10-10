@@ -332,14 +332,16 @@ export default function WalletView({ vm }: Props) {
                 {copy.confirm}
                 <ArrowRight size={16} />
               </button>
-              <button
-                type="button"
-                disabled={vm.busy}
-                onClick={vm.onCancel}
-                className="w-full text-xs text-app-subtle"
-              >
-                {copy.cancel}
-              </button>
+              {vm.canCancel && (
+                <button
+                  type="button"
+                  disabled={vm.busy}
+                  onClick={vm.onCancel}
+                  className="w-full text-xs text-app-subtle"
+                >
+                  {copy.cancel}
+                </button>
+              )}
             </form>
           )}
           <Link href={vm.banksHref} className="block text-xs font-semibold text-app-members-count">

@@ -24,6 +24,8 @@ export interface WalletSettingsPM {
   canDecide?: boolean;
 }
 export interface WalletSummaryPM {
+  /** Whose wallet this is. Absent from an older API. */
+  userId?: string;
   redemption?: { canRedeem: boolean; reason: string | null };
   settings: WalletSettingsPM;
   balances: Array<{

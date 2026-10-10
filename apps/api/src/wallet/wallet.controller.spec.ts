@@ -16,6 +16,19 @@ describe("wallet boundaries", () => {
       AdminGuard,
     ]);
   });
+  it("says whose wallet the status is", async () => {
+    const wallet = {
+      settings: vi.fn(async () => ({})),
+      balances: vi.fn(async () => []),
+      redemptionEligibility: vi.fn(async () => ({ canRedeem: false, reason: null })),
+    };
+    const status = await new WalletController(
+      wallet as unknown as WalletService,
+      {} as WalletGiftsService,
+    ).status({ user: { id: "self" } } as AuthedRequest);
+    expect(status.userId).toBe("self");
+    expect(wallet.balances).toHaveBeenCalledWith("self");
+  });
   it("scopes bank-account listing to the authenticated member", () => {
     const banks = vi.fn();
     new WalletController({ banks } as unknown as WalletService, {} as WalletGiftsService).banks({

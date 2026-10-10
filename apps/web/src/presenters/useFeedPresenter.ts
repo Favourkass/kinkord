@@ -23,6 +23,7 @@ import {
 import type { KinkCurrency } from "@/domain/kinkcoins";
 import type { WalletSummaryPM } from "@/domain/wallet";
 import { GIFT_COPY, postGiftsService } from "@/services/post-gifts.service";
+import { pendingTransfersService } from "@/services/pendingTransfers.service";
 import { ApiError } from "@/services/apiClient";
 import { useMentionSuggestions, type MentionField } from "./useMentionSuggestions";
 import {
@@ -712,6 +713,25 @@ export function useFeedPresenter({
       const summary = await postGiftsService.balance();
       if (version !== giftLoadVersion.current) return;
       setGiftSummary(summary);
+      // A gift in doubt from an earlier visit (a reload, say) comes back first, key and all.
+      const kept =
+        !uncertainGift.current && summary.userId
+          ? pendingTransfersService.gift(summary.userId)
+          : null;
+      if (kept) {
+        uncertainGift.current = kept;
+        if (kept.postId !== postId) {
+          setGiftTarget(null);
+          setShareNote(
+            "Retry your previous gift or check Transaction History before sending another.",
+          );
+          return;
+        }
+        setGiftCurrency(kept.currency);
+        setGiftQuantity(kept.quantity);
+        setGiftLocked(true);
+        giftKey.current = kept.key;
+      }
       if (!summary.settings.enabled) setGiftError(GIFT_COPY.unavailable);
     } catch (e) {
       if (version === giftLoadVersion.current)
@@ -722,6 +742,7 @@ export function useFeedPresenter({
   };
   const sendGift = async () => {
     const quote = postGiftsService.quote(giftSummary, giftCurrency, giftQuantity);
+    const member = giftSummary?.userId;
     if (giftBusy.current || !giftTarget || (!giftLocked && !quote.valid)) return;
     giftBusy.current = true;
     setGiftSending(true);
@@ -729,6 +750,7 @@ export function useFeedPresenter({
     try {
       await postGiftsService.send(giftTarget.postId, giftCurrency, quote.quantity, giftKey.current);
       uncertainGift.current = null;
+      if (member) pendingTransfersService.settleGift(member);
       setGiftLocked(false);
       setShareNote(postGiftsService.sentLabel(giftQuantity, giftCurrency, giftTarget.name));
       setGiftTarget(null);
@@ -752,12 +774,14 @@ export function useFeedPresenter({
           quantity: giftQuantity,
           key: giftKey.current,
         };
+        if (member) pendingTransfersService.keepGift(member, uncertainGift.current);
         setGiftLocked(true);
         setGiftError(
           "Delivery could not be confirmed. Retry this same gift to check it safely, or check Transaction History.",
         );
       } else {
         uncertainGift.current = null;
+        if (member) pendingTransfersService.settleGift(member);
         setGiftLocked(false);
         setGiftError(e.message);
       }

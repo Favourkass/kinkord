@@ -43,16 +43,28 @@ describe("useWalletAdminPresenter", () => {
     expect(result.current.form).toMatchObject({ coinBuy: "10", minimum: "500", enabled: true });
   });
   it("refreshes after a save with the filters now in force", async () => {
+    vi.mocked(walletAdminService.settings).mockResolvedValue({
+      rates: {
+        coin: { buy: 1000, redeem: 800 },
+        star: { buy: 10000, redeem: 8000 },
+        crown: { buy: 100000, redeem: 80000 },
+      },
+      minimumKobo: 50000,
+      enabled: true,
+      canEdit: true,
+    } as never);
     let saved: () => void = () => undefined;
-    vi.spyOn(walletAdminService, "saveSettings").mockImplementation(
-      () => new Promise((resolve) => (saved = () => resolve({} as never))),
-    );
+    const save = vi
+      .spyOn(walletAdminService, "saveSettings")
+      .mockImplementation(() => new Promise((resolve) => (saved = () => resolve({} as never))));
     const { result } = renderHook(() => useWalletAdminPresenter());
-    await waitFor(() => expect(walletAdminService.queue).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(result.current.form.coinBuy).toBe("10"));
     let saving: Promise<void> = Promise.resolve();
     act(() => {
       saving = result.current.onSave();
     });
+    // The save is out before the filter changes.
+    await waitFor(() => expect(save).toHaveBeenCalled());
     act(() => result.current.onKind("withdrawal"));
     await act(async () => {
       saved();

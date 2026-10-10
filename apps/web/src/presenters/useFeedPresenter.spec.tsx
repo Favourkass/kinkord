@@ -1010,6 +1010,31 @@ describe("post gifting presenter", () => {
     });
     expect(giftSend.mock.calls[0]).toEqual(giftSend.mock.calls[1]);
   });
+  it("brings back a gift left in doubt before a reload, with its key", async () => {
+    localStorage.setItem(
+      "kinkord:unanswered:gift:me",
+      JSON.stringify({ postId: "p1", currency: "star", quantity: "2", key: "kept-key" }),
+    );
+    giftBalance.mockResolvedValue({
+      userId: "me",
+      settings: { enabled: true },
+      balances: [{ currency: "star", available: 5, reserved: 0 }],
+    });
+    giftSend.mockReset().mockResolvedValueOnce({});
+    const { result } = renderHook(() => useFeedPresenter());
+    await waitFor(() => expect(result.current.posts).toHaveLength(1));
+    await act(async () => {
+      await result.current.openGift("p1", "coin");
+    });
+    expect(result.current.giftDialog.locked).toBe(true);
+    expect(result.current.giftDialog.currency).toBe("star");
+    await act(async () => {
+      await result.current.giftDialog.onSend();
+    });
+    expect(giftSend).toHaveBeenCalledWith("p1", "star", 2, "kept-key");
+    expect(localStorage.getItem("kinkord:unanswered:gift:me")).toBeNull();
+    localStorage.clear();
+  });
   it("keeps a gift in doubt when its retry finds them signed out", async () => {
     giftBalance.mockResolvedValue({
       settings: { enabled: true },

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { StrictMode } from "react";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { useWalletPresenter } from "./useWalletPresenter";
@@ -46,6 +47,7 @@ const data: WalletDataPM = {
 describe("useWalletPresenter", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    localStorage.clear();
     vi.spyOn(window, "scrollTo").mockImplementation(() => {});
     router.push.mockReset();
     vi.spyOn(walletService, "load").mockResolvedValue(data);
@@ -199,6 +201,12 @@ describe("useWalletPresenter", () => {
     expect(result.current.bankId).toBe("bank");
     expect(result.current.quote.amountKobo).toBe(80000);
   });
+  it("loads at once under Strict Mode's second setup", async () => {
+    vi.spyOn(walletService, "load").mockResolvedValue(data);
+    const { result } = renderHook(() => useWalletPresenter("withdraw"), { wrapper: StrictMode });
+    await waitFor(() => expect(result.current.currencies[0].available).toBe(200));
+    expect(result.current.loading).toBe(false);
+  });
   it("still loads when reads are slower than the polling", async () => {
     const answers: Array<(value: WalletDataPM) => void> = [];
     const load = vi
@@ -214,6 +222,68 @@ describe("useWalletPresenter", () => {
       answers[0](data);
     });
     expect(result.current.currencies[0].available).toBe(200);
+  });
+  it("brings back a withdrawal left unanswered before a reload, review open, same key", async () => {
+    const kept = {
+      currency: "coin",
+      quantity: "100",
+      bankId: "bank",
+      key: "kept-key",
+      expectedAmountKobo: 80000,
+    };
+    localStorage.setItem("kinkord:unanswered:withdrawal:u", JSON.stringify(kept));
+    vi.spyOn(walletService, "load").mockResolvedValue({
+      ...data,
+      summary: { ...data.summary, userId: "u" },
+    });
+    const withdraw = vi.spyOn(walletService, "withdraw").mockResolvedValue({
+      id: "w1",
+      userId: "u",
+      kind: "withdrawal",
+      currency: "coin",
+      quantity: 100,
+      amountKobo: 80000,
+      status: "pending",
+      reference: "KRD-1",
+      bankName: "Test",
+      accountName: "Test",
+      accountNumber: "1234567890",
+      receiptKey: null,
+      senderReference: null,
+      senderAccountName: null,
+      reviewNote: null,
+      settlementReference: null,
+      createdAt: "2026-10-10T09:00:00.000Z",
+      updatedAt: "2026-10-10T09:00:00.000Z",
+    });
+    const { result } = renderHook(() => useWalletPresenter("withdraw"));
+    await waitFor(() => expect(result.current.unansweredNotice).toBeTruthy());
+    expect(result.current.review).toBe(true);
+    expect(result.current.canCancel).toBe(false);
+    act(() => result.current.onCancel());
+    expect(result.current.review).toBe(true);
+    await act(() => result.current.onWithdraw());
+    expect(withdraw).toHaveBeenCalledWith("coin", 100, "bank", "kept-key", 80000);
+    expect(localStorage.getItem("kinkord:unanswered:withdrawal:u")).toBeNull();
+  });
+  it("never brings back another member's unanswered withdrawal", async () => {
+    localStorage.setItem(
+      "kinkord:unanswered:withdrawal:someone-else",
+      JSON.stringify({
+        currency: "coin",
+        quantity: "100",
+        bankId: "bank",
+        key: "theirs",
+        expectedAmountKobo: 80000,
+      }),
+    );
+    vi.spyOn(walletService, "load").mockResolvedValue({
+      ...data,
+      summary: { ...data.summary, userId: "u" },
+    });
+    const { result } = renderHook(() => useWalletPresenter("withdraw"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.unansweredNotice).toBeNull();
   });
   it("keeps the account shown when the default changes elsewhere", async () => {
     const second = { ...data.banks[0], id: "bank2", isDefault: 0 };
