@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { WalletGiftsService, giftHistoryDto } from "./wallet-gifts.service";
+import { WalletGiftsService, giftFromEarned, giftHistoryDto } from "./wallet-gifts.service";
 import type { Db } from "../db/db.module";
 import type { PostsService } from "../posts/posts.service";
 import { walletGiftSchema } from "./dto";
@@ -23,6 +23,7 @@ function fixture({
     [],
     [{ enabled: 1 }],
     [{ authorId: "b", repostOfId: null }],
+    [{ available: 10, earned: 0 }],
     [{ displayName: "Alice" }],
     [{ displayName: "Bob" }],
   ],
@@ -80,14 +81,27 @@ describe("post wallet gifts", () => {
     const result = await service.send("a", input);
     expect(db.update).toHaveBeenCalledTimes(1);
     expect(db.insert).toHaveBeenCalledTimes(2);
-    expect(values[0]).toMatchObject({ userId: "b", currency: "coin", available: 5, reserved: 0 });
+    // Received as a gift, so the author can withdraw it.
+    expect(values[0]).toMatchObject({
+      userId: "b",
+      currency: "coin",
+      available: 5,
+      reserved: 0,
+      earned: 5,
+    });
     expect(values[1]).toMatchObject({
       senderId: "a",
       recipientId: "b",
       quantity: 5,
+      senderEarned: 0,
       postId: input.postId,
     });
     expect(result).toMatchObject({ kind: "gift_sent", counterpartyName: "Bob" });
+  });
+  it("checks visibility once, before the transaction holds a connection", async () => {
+    const { service, posts } = fixture();
+    await service.send("a", input);
+    expect(posts.byId).toHaveBeenCalledTimes(1);
   });
   it("replays a retry without touching either balance", async () => {
     const { service, db } = fixture({ selects: [[gift]] });
@@ -99,6 +113,34 @@ describe("post wallet gifts", () => {
     const { service, db } = fixture({ selects: [[gift]] });
     await expect(service.send("a", { ...input, quantity: 6 })).rejects.toThrow(/another gift/);
     expect(db.update).not.toHaveBeenCalled();
+  });
+  it("spends the sender's bought coins first, and gift earnings only for the rest", async () => {
+    const { service, values } = fixture({
+      selects: [
+        [],
+        [{ enabled: 1 }],
+        [{ authorId: "b", repostOfId: null }],
+        [{ available: 10, earned: 8 }],
+        [{ displayName: "Alice" }],
+        [{ displayName: "Bob" }],
+      ],
+    });
+    await service.send("a", input);
+    // 2 bought coins cover part of the 5; the other 3 come out of earnings.
+    expect(values[1]).toMatchObject({ quantity: 5, senderEarned: 3 });
+  });
+  it("refuses a gift bigger than the sender's balance before touching it", async () => {
+    const { service, db } = fixture({
+      selects: [
+        [],
+        [{ enabled: 1 }],
+        [{ authorId: "b", repostOfId: null }],
+        [{ available: 3, earned: 0 }],
+      ],
+    });
+    await expect(service.send("a", input)).rejects.toThrow(/Insufficient/);
+    expect(db.update).not.toHaveBeenCalled();
+    expect(db.insert).not.toHaveBeenCalled();
   });
   it("refuses overspending before crediting the author", async () => {
     const { service, db } = fixture({ debit: [] });
@@ -152,4 +194,12 @@ it("rejects gifting to a Basic or expired subscriber before moving funds", async
   await expect(service.send("a", input)).rejects.toThrow(/active Silver/);
   expect(db.update).not.toHaveBeenCalled();
   expect(db.insert).not.toHaveBeenCalled();
+});
+
+describe("giftFromEarned", () => {
+  it("takes gift earnings only for what bought coins can't cover", () => {
+    expect(giftFromEarned({ available: 10, earned: 0 }, 5)).toBe(0);
+    expect(giftFromEarned({ available: 10, earned: 8 }, 5)).toBe(3);
+    expect(giftFromEarned({ available: 10, earned: 10 }, 5)).toBe(5);
+  });
 });

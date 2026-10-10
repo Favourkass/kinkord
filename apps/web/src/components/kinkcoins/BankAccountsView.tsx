@@ -75,7 +75,7 @@ export default function BankAccountsView({ vm }: Props) {
               className={`${field} flex items-center gap-3 text-left`}
             >
               {vm.selectedBankOption && (
-                <BankLogo src={vm.selectedBankOption.logo} className="size-7" />
+                <BankLogo badge={vm.selectedBankOption.badge} className="size-7 text-[9px]" />
               )}
               <span
                 className={`min-w-0 flex-1 truncate ${vm.bankForm.bankName ? "" : "text-app-subtle"}`}
@@ -138,7 +138,7 @@ export default function BankAccountsView({ vm }: Props) {
                       onClick={() => vm.onChooseBank(bank.name)}
                       className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-xs hover:bg-kink-gold-bright/10 focus:bg-kink-gold-bright/10 focus:outline-none"
                     >
-                      <BankLogo src={bank.logo} className="size-9" />
+                      <BankLogo badge={bank.badge} className="size-9 text-[10px]" />
                       <span className="min-w-0 flex-1">{bank.name}</span>
                     </button>
                   ))}
@@ -197,7 +197,7 @@ export default function BankAccountsView({ vm }: Props) {
             key={bank.id}
             className="flex items-center gap-3 rounded-xl border border-app-card-border bg-app-card p-4"
           >
-            <BankLogo src={bank.logo} className="size-14" />
+            <BankLogo badge={bank.badge} className="size-14 text-sm" />
             <div className="min-w-0 flex-1">
               <h3 className="text-xs font-semibold sm:text-sm">{bank.bankName}</h3>
               <p className="mt-1 text-xs text-app-subtle">{bank.maskedNumber}</p>

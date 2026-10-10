@@ -6,7 +6,7 @@ The Buy catalogue displays USD using the configured monthly Silver payment NGN/U
 
 1. Open **Moderation → Payments** and set the receiving bank account using the existing Silver payment settings. Silver and wallet purchases share this bank account, but retain separate payment records, queues and decisions.
 2. Open **Moderation → Wallet**. Set the NGN purchase and redemption rates for each currency and the minimum NGN withdrawal. Enable transactions after checking the values. Redemption rates cannot exceed purchase rates.
-3. Only verified founder accounts can change rates or the receiving bank account. Existing staff admins can review payments and withdrawals. Another admin must review an admin's own wallet transactions.
+3. Only verified founder accounts can change rates or the receiving bank account, verify purchases (which credits coins) and approve, pay or reject withdrawals. Staff admins can see the queue but not decide. Another founder must review a founder's own wallet transactions.
 
 Apply the committed Drizzle migration through the normal release process. The API applies migrations on boot when `RUN_MIGRATIONS=true`. No AWS infrastructure deployment is required for this feature.
 
@@ -38,18 +38,18 @@ Numbers are masked in the saved-account list and transaction history. A withdraw
 
 ## Withdrawal
 
-Buying and sending gifts are available to Basic and Silver members under the normal sign-up/access rules. Only members with an active Silver subscription can receive new gifts. Redemption requires an active Silver subscription **and the existing Silver verification badge**. The API checks `silverCheckStatus` when creating a withdrawal, including the account age, photos and any review hold; the UI shows the requirement and links to Silver when ineligible. Expired subscriptions and held/not-yet-issued badges cannot create withdrawals. Existing withdrawal requests remain reviewable and payable. Purchasing and gifting do not use this eligibility gate.
+Buying and sending gifts are available to Basic and Silver members under the normal sign-up/access rules. Only members with an active Silver subscription can receive new gifts. Only coins received as gifts can be withdrawn: bought coins are for gifting, and a gift spends the sender's bought coins before their gift earnings. Redemption also requires an active Silver subscription **and the existing Silver verification badge**. The API checks `silverCheckStatus` when creating a withdrawal, including the account age, photos and any review hold; the UI shows the requirement and links to Silver when ineligible. Expired subscriptions and held/not-yet-issued badges cannot create withdrawals. Existing withdrawal requests remain reviewable and payable. Purchasing and gifting do not use this eligibility gate.
 
 **Wallet → Withdraw / Redeem → choose currency → review quantity, NGN amount and saved bank → submit.**
 
-The API validates current rates, minimum and available balance. Submission atomically moves the quantity from available to reserved and writes a ledger hold. Reserved coins cannot be spent or withdrawn again.
+The API validates current rates, minimum and the withdrawable (gift-earned) balance. Submission atomically moves the quantity from available and withdrawable to reserved and writes a ledger hold. Reserved coins cannot be spent or withdrawn again.
 
 1. **Pending:** an admin checks the request and destination account.
 2. **Approved:** an admin approves it. This does not send money or remove the reservation.
 3. **Manual transfer:** the admin sends the displayed NGN amount to the saved destination using the bank.
 4. **Paid:** after confirming the bank transfer succeeded, the admin selects **Mark paid** and records the actual transfer reference. The reserved quantity is consumed.
 
-A pending or approved request can be rejected with a reason, which returns the reserved quantity to available. Do not reject a transfer already sent; record it paid. Verified purchases and paid withdrawals cannot be decided again. There is no automatic payout integration, cancellation after submission, guaranteed settlement time or withdrawal fee in this version.
+A pending or approved request can be rejected with a reason, which returns the reserved quantity to available, withdrawable again. Do not reject a transfer already sent; record it paid. Verified purchases and paid withdrawals cannot be decided again. There is no automatic payout integration, cancellation after submission, guaranteed settlement time or withdrawal fee in this version.
 
 ## Consistency and audit
 
@@ -65,8 +65,8 @@ Test with separate member and admin accounts: buy a bundle, upload a dummy image
 
 Unit tests cover validators, amounts, status transitions, ownership, retry behavior and presentation. The manual local integration check also covers receipt upload to MinIO and simultaneous PostgreSQL withdrawals. Existing Silver subscription tests remain passing.
 
-The bank picker uses the pinned Nigerian Bank Logos directory (660 institutions, including OPay and Kuda). The source and MIT license are in `apps/web/public/banks`. It is a maintained directory snapshot, not live account-name resolution or proof that every listed institution currently accepts transfers. Refresh the snapshot when bank coverage changes.
+The bank picker uses the pinned Nigerian Bank Logos directory's names, aliases and codes (660 institutions, including OPay and Kuda), and shows each bank's initials rather than loading logos from a third party. The source and MIT license are in `apps/web/public/banks`. It is a maintained directory snapshot, not live account-name resolution or proof that every listed institution currently accepts transfers. Refresh the snapshot when bank coverage changes.
 
-Timeline actions display like, comment, share and gift counts. Gift counts reflect completed transfer records on the original post, not the quantity of currency sent; retried deliveries count once. Share counts record completed native shares or successful link copies, starting from deployment; they do not claim delivery or count cancelled share sheets. Counts persist on the original post, including when displayed through a repost.
+Timeline actions display like, comment, share and gift counts. Gift counts reflect completed transfer records on the original post, not the quantity of currency sent; retried deliveries count once. Share counts record completed native shares or successful link copies, starting from deployment, once per member per post; they do not claim delivery or count cancelled share sheets. Counts persist on the original post, including when displayed through a repost.
 
 Gift actions appear only on subscribed authors’ posts; receiving is also checked by the API before funds move. Expiry does not prevent replaying an already delivered gift. Post names and profiles show the Silver shield only under the existing silver/silverSince verification rules (including account age, email verification and review holds). The independent subscription flag controls gift eligibility, not the shield.

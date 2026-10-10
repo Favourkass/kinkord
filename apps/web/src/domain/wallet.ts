@@ -20,11 +20,19 @@ export interface WalletSettingsPM {
   bank: { name: string; accountName: string; accountNumber: string } | null;
   packs: Record<KinkCurrency, number[]>;
   canEdit?: boolean;
+  /** Whether this admin may credit coins and approve payouts: the founders only. */
+  canDecide?: boolean;
 }
 export interface WalletSummaryPM {
   redemption?: { canRedeem: boolean; reason: string | null };
   settings: WalletSettingsPM;
-  balances: Array<{ currency: KinkCurrency; available: number; reserved: number }>;
+  balances: Array<{
+    currency: KinkCurrency;
+    available: number;
+    reserved: number;
+    /** What can be withdrawn: coins received as gifts. Absent from an older API. */
+    withdrawable?: number;
+  }>;
 }
 export interface WalletOperationPM {
   id: string;

@@ -107,20 +107,24 @@ export class AdminWalletController {
     return this.wallet.queue(q.kind, q.status);
   }
   @Get("settings") settings(@Req() req: AuthedRequest) {
+    const founder = isSuperAdmin(req.user);
     return this.wallet
       .settings()
-      .then((settings) => ({ ...settings, canEdit: isSuperAdmin(req.user) }));
+      .then((settings) => ({ ...settings, canEdit: founder, canDecide: founder }));
   }
   @Put("settings") save(@Req() req: AuthedRequest, @Body() body: unknown) {
     if (!isSuperAdmin(req.user))
       throw new ForbiddenException("Only the founders can change wallet rates.");
     return this.wallet.saveSettings(req.user.id, parse(walletSettingsSchema, body));
   }
+  /** Crediting coins and paying out money: the founders only, while payouts are manual. */
   @Post(":id/decision") decide(
     @Req() req: AuthedRequest,
     @Param("id") id: string,
     @Body() body: unknown,
   ) {
+    if (!isSuperAdmin(req.user))
+      throw new ForbiddenException("Only the founders can credit coins or approve payouts.");
     return this.wallet.decide(req.user.id, paymentId(id), parse(walletDecisionSchema, body));
   }
 }

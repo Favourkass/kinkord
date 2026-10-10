@@ -692,13 +692,23 @@ describe("repost notifications", () => {
 });
 
 describe("share counts", () => {
-  it("increments the original post count after visibility is checked", async () => {
-    const db = makeDb([[{ shares: 3 }]]);
+  const withTx = (db: ReturnType<typeof makeDb>) =>
+    Object.assign(db, { transaction: vi.fn(async (cb: (tx: unknown) => unknown) => cb(db)) });
+  it("counts a member's first share of the original post, after visibility is checked", async () => {
+    const db = withTx(makeDb([[{ postId: "original" }], [{ shares: 4 }]]));
     const svc = service(db);
     vi.spyOn(svc, "byId").mockResolvedValue({ postId: "original" } as never);
-    expect(await svc.share("repost", "viewer")).toEqual({ postId: "original", shares: 3 });
+    expect(await svc.share("repost", "viewer")).toEqual({ postId: "original", shares: 4 });
     expect(svc.byId).toHaveBeenCalledWith("repost", "viewer");
+    expect(db.insert).toHaveBeenCalledOnce();
     expect(db.update).toHaveBeenCalledOnce();
+  });
+  it("doesn't count the same member sharing it again", async () => {
+    const db = withTx(makeDb([[], [{ shares: 4 }]]));
+    const svc = service(db);
+    vi.spyOn(svc, "byId").mockResolvedValue({ postId: "original" } as never);
+    expect(await svc.share("original", "viewer")).toEqual({ postId: "original", shares: 4 });
+    expect(db.update).not.toHaveBeenCalled();
   });
   it("does not count shares of inaccessible posts", async () => {
     const db = makeDb();

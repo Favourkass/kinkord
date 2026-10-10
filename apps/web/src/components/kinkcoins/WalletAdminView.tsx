@@ -27,6 +27,7 @@ export default function WalletAdminView({
       <Link href={vm.bankHref} className="block text-sm font-semibold text-app-members-count">
         {copy.paymentBank} →
       </Link>
+      {!vm.canDecide && <p className="text-xs text-app-subtle">{copy.foundersOnly}</p>}
       {vm.canEdit && (
         <form
           className={`${card} space-y-4`}
@@ -158,51 +159,53 @@ export default function WalletAdminView({
               {copy.bankReference}: {row.settlementReference}
             </p>
           )}
-          <div className="flex flex-wrap gap-2">
-            {row.kind === "purchase" && row.status === "submitted" && (
-              <button
-                disabled={vm.busy}
-                type="button"
-                onClick={() => vm.onAsk(row.id, "verify")}
-                className={button}
-              >
-                {copy.verify}
-              </button>
-            )}
-            {row.kind === "withdrawal" && row.status === "pending" && (
-              <button
-                disabled={vm.busy}
-                type="button"
-                onClick={() => vm.onAsk(row.id, "approve")}
-                className={button}
-              >
-                {copy.approve}
-              </button>
-            )}
-            {row.kind === "withdrawal" && row.status === "approved" && (
-              <button
-                disabled={vm.busy}
-                type="button"
-                onClick={() => vm.onAsk(row.id, "paid")}
-                className={button}
-              >
-                {copy.markPaid}
-              </button>
-            )}
-            {((row.kind === "purchase" &&
-              (row.status === "submitted" || row.status === "pending")) ||
-              (row.kind === "withdrawal" &&
-                (row.status === "pending" || row.status === "approved"))) && (
-              <button
-                disabled={vm.busy}
-                type="button"
-                onClick={() => vm.onAsk(row.id, "reject")}
-                className="rounded-full border border-red-500/40 px-4 py-2 text-xs text-red-500"
-              >
-                {copy.reject}
-              </button>
-            )}
-          </div>
+          {vm.canDecide && (
+            <div className="flex flex-wrap gap-2">
+              {row.kind === "purchase" && row.status === "submitted" && (
+                <button
+                  disabled={vm.busy}
+                  type="button"
+                  onClick={() => vm.onAsk(row.id, "verify")}
+                  className={button}
+                >
+                  {copy.verify}
+                </button>
+              )}
+              {row.kind === "withdrawal" && row.status === "pending" && (
+                <button
+                  disabled={vm.busy}
+                  type="button"
+                  onClick={() => vm.onAsk(row.id, "approve")}
+                  className={button}
+                >
+                  {copy.approve}
+                </button>
+              )}
+              {row.kind === "withdrawal" && row.status === "approved" && (
+                <button
+                  disabled={vm.busy}
+                  type="button"
+                  onClick={() => vm.onAsk(row.id, "paid")}
+                  className={button}
+                >
+                  {copy.markPaid}
+                </button>
+              )}
+              {((row.kind === "purchase" &&
+                (row.status === "submitted" || row.status === "pending")) ||
+                (row.kind === "withdrawal" &&
+                  (row.status === "pending" || row.status === "approved"))) && (
+                <button
+                  disabled={vm.busy}
+                  type="button"
+                  onClick={() => vm.onAsk(row.id, "reject")}
+                  className="rounded-full border border-red-500/40 px-4 py-2 text-xs text-red-500"
+                >
+                  {copy.reject}
+                </button>
+              )}
+            </div>
+          )}
         </article>
       ))}
       {vm.dialog && (

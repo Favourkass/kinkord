@@ -85,6 +85,7 @@ export const WALLET_COPY = {
   quantity: "Quantity to redeem",
   chooseWithdrawalBank: "Withdrawal account",
   available: "Available",
+  withdrawable: "Withdrawable (received as gifts)",
   estimate: "You will receive",
   fee: "Withdrawal fee: ₦0.00",
   confirm: "Submit withdrawal request",
@@ -92,7 +93,7 @@ export const WALLET_COPY = {
     "An active Silver subscription and Silver verification badge are required to redeem.",
   manageSubscription: "View Silver subscription",
   withdrawNotice:
-    "Submitting reserves your coins. An admin must approve the request and transfer funds manually. A rejected request releases the coins back to your available balance.",
+    "Only coins you've received as gifts can be withdrawn. Submitting reserves your coins. An admin must approve the request and transfer funds manually. A rejected request releases the coins back to your available balance.",
   submitted: "Withdrawal Submitted",
   processing:
     "Your request is awaiting admin approval. Funds are sent manually after approval. Timing depends on the team and your bank.",
@@ -101,7 +102,7 @@ export const WALLET_COPY = {
   history: "View transaction history",
   cancel: "Back",
   buyHint:
-    "Prices are shown in USD. The payment page shows the naira equivalent to transfer. Coins are credited after payment verification.",
+    "Prices are shown in USD. The payment page shows the naira equivalent to transfer. Coins are credited after payment verification. Bought coins are for gifting and can't be withdrawn.",
   transfer:
     "Transfer the exact amount to this account, then upload proof. Your wallet is credited only after an admin verifies the payment.",
   amount: "Amount to transfer",
@@ -117,6 +118,8 @@ export const WALLET_COPY = {
   adminTitle: "Wallet Payments & Withdrawals",
   adminHint:
     "Verify incoming bank transfers, review withdrawals, and mark transfers paid after sending them manually.",
+  foundersOnly:
+    "Only the founders can credit coins or approve payouts. You can review requests here.",
   settings: "Wallet rates (NGN per unit)",
   minimumSetting: "Minimum withdrawal (NGN)",
   enabled: "Enable purchases and withdrawals",

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { toPostVM, type PostPM } from "@/domain/post";
 import PostCard from "./PostCard";
 
@@ -81,5 +81,71 @@ describe("post Silver badge and gift eligibility", () => {
   it("shows the badge only when the API's silver eligibility is true", () => {
     show(true, true);
     expect(screen.getByRole("img", { name: "Silver Premium" })).toBeTruthy();
+  });
+});
+
+function menuOf(over: Partial<PostPM>) {
+  const pm: PostPM = {
+    id: "p1",
+    postId: "p1",
+    body: "A post",
+    visibility: "public",
+    createdAt: new Date().toISOString(),
+    author: { userId: "u2", username: "member", displayName: "Member", avatarUrl: null },
+    media: [],
+    likes: 0,
+    comments: 0,
+    reposts: 0,
+    likedByMe: false,
+    repostedByMe: false,
+    savedByMe: false,
+    repostedBy: null,
+    mine: false,
+    ...over,
+  };
+  const on = { close: vi.fn(), repost: vi.fn(), save: vi.fn(), remove: vi.fn() };
+  const noop = vi.fn();
+  render(
+    <PostCard
+      post={toPostVM(pm, false, () => null)}
+      labels={labels}
+      menuOpen
+      onMenu={noop}
+      onCloseMenu={on.close}
+      onDelete={on.remove}
+      onToggleBody={noop}
+      onLike={noop}
+      onRepost={on.repost}
+      onComment={noop}
+      onSave={on.save}
+      onShare={noop}
+      onGift={noop}
+      onOpenMedia={noop}
+    />,
+  );
+  return on;
+}
+
+describe("the post menu", () => {
+  it("keeps repost and save on anyone's post, and closes once one is picked", () => {
+    const on = menuOf({});
+    expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(on.save).toHaveBeenCalledOnce();
+    expect(on.close).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "Repost" }));
+    expect(on.repost).toHaveBeenCalledOnce();
+  });
+  it("offers unsave and undo once they're done", () => {
+    menuOf({ savedByMe: true, repostedByMe: true });
+    expect(screen.getByRole("button", { name: "Unsave" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Undo repost" })).toBeTruthy();
+  });
+  it("undoes your own repost once, not twice", () => {
+    const on = menuOf({ id: "r1", mine: true, repostedByMe: true });
+    const undo = screen.getAllByRole("button", { name: "Undo repost" });
+    expect(undo).toHaveLength(1);
+    fireEvent.click(undo[0]);
+    expect(on.remove).toHaveBeenCalledOnce();
   });
 });

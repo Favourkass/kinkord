@@ -16,6 +16,17 @@ import { hasSilver } from "../subscriptions/plans";
 import { walletGiftSchema } from "./dto";
 
 type Gift = typeof walletGift.$inferSelect;
+
+/**
+ * How much of a gift comes out of the sender's gift earnings: bought coins are
+ * spent first, so only what they can't cover.
+ */
+export function giftFromEarned(
+  balance: { available: number; earned: number },
+  quantity: number,
+): number {
+  return Math.max(0, quantity - (balance.available - balance.earned));
+}
 export function giftHistoryDto(row: Gift, viewerId: string) {
   const sent = row.senderId === viewerId;
   return {
@@ -104,27 +115,40 @@ export class WalletGiftsService {
         .for("share");
       if (!target || target.authorId !== recipientId || target.repostOfId)
         throw new NotFoundException("Choose the original post to send a gift.");
-      if (!(await this.posts.byId(input.postId, senderId)))
-        throw new NotFoundException("This post is no longer available.");
+      // Visibility was checked before the transaction, and the share lock above keeps the post
+      // from being deleted or changed until the gift lands. Checking again here would take a
+      // second pool connection while this one waits: enough gifts at once would exhaust the pool.
       if (!(await this.canReceive(recipientId, tx as unknown as Db)))
         throw new ForbiddenException(
           "Only members with an active Silver subscription can receive gifts.",
         );
+      const insufficient = () =>
+        new ConflictException("Insufficient available balance. Buy more or choose a smaller gift.");
+      const [from] = await tx
+        .select()
+        .from(walletBalance)
+        .where(and(eq(walletBalance.userId, senderId), eq(walletBalance.currency, input.currency)));
+      if (!from || from.available < input.quantity) throw insufficient();
+      // Bought coins go first, so a gift spends the sender's gift earnings (all they can
+      // withdraw) only once the bought ones run out.
+      const senderEarned = giftFromEarned(from, input.quantity);
       const debited = await tx
         .update(walletBalance)
-        .set({ available: sql`${walletBalance.available} - ${input.quantity}` })
+        .set({
+          available: sql`${walletBalance.available} - ${input.quantity}`,
+          earned: sql`${walletBalance.earned} - ${senderEarned}`,
+        })
         .where(
           and(
             eq(walletBalance.userId, senderId),
             eq(walletBalance.currency, input.currency),
             gte(walletBalance.available, input.quantity),
+            gte(walletBalance.earned, senderEarned),
           ),
         )
         .returning();
-      if (!debited.length)
-        throw new ConflictException(
-          "Insufficient available balance. Buy more or choose a smaller gift.",
-        );
+      if (!debited.length) throw insufficient();
+      // Received as a gift: the recipient can withdraw it.
       const credited = await tx
         .insert(walletBalance)
         .values({
@@ -132,10 +156,14 @@ export class WalletGiftsService {
           currency: input.currency,
           available: input.quantity,
           reserved: 0,
+          earned: input.quantity,
         })
         .onConflictDoUpdate({
           target: [walletBalance.userId, walletBalance.currency],
-          set: { available: sql`${walletBalance.available} + ${input.quantity}` },
+          set: {
+            available: sql`${walletBalance.available} + ${input.quantity}`,
+            earned: sql`${walletBalance.earned} + ${input.quantity}`,
+          },
           setWhere: sql`${walletBalance.available} <= ${2147483647 - input.quantity}`,
         })
         .returning();
@@ -151,6 +179,7 @@ export class WalletGiftsService {
           postId: input.postId,
           currency: input.currency,
           quantity: input.quantity,
+          senderEarned,
           requestKey: input.requestKey,
           senderName: sender?.displayName ?? "Member",
           recipientName: recipient?.displayName ?? "Member",

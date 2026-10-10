@@ -44,6 +44,8 @@ const maxReceipt = 10 * 1024 * 1024;
 const receiptPrefix = (userId: string, id: string) => `wallet-receipts/${userId}/${id}/`;
 const lock = (tx: Tx, userId: string) =>
   tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"wallet:" + userId}))`);
+/** Decided for good: nothing more to do, so the newest matter most. */
+const SETTLED: Operation["status"][] = ["verified", "paid", "rejected"];
 export function walletOperationDto(row: Operation) {
   return { ...row, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
 }
@@ -107,11 +109,16 @@ export class WalletService {
   }
   async balances(userId: string) {
     const rows = await this.db.select().from(walletBalance).where(eq(walletBalance.userId, userId));
-    return (["coin", "star", "crown"] as const).map((currency) => ({
-      currency,
-      available: rows.find((row) => row.currency === currency)?.available ?? 0,
-      reserved: rows.find((row) => row.currency === currency)?.reserved ?? 0,
-    }));
+    return (["coin", "star", "crown"] as const).map((currency) => {
+      const row = rows.find((r) => r.currency === currency);
+      return {
+        currency,
+        available: row?.available ?? 0,
+        reserved: row?.reserved ?? 0,
+        // Only coins received as gifts can be withdrawn; bought coins are for spending.
+        withdrawable: row?.earned ?? 0,
+      };
+    });
   }
   async banks(userId: string) {
     return this.db
@@ -262,21 +269,27 @@ export class WalletService {
           .where(and(eq(walletBank.id, input.bankId!), eq(walletBank.userId, userId)));
         if (!saved) throw new NotFoundException("Choose one of your saved bank accounts.");
         bank = saved;
+        // Only coins received as gifts can be withdrawn: bought coins are for spending.
         const changed = await tx
           .update(walletBalance)
           .set({
             available: sql`${walletBalance.available}-${input.quantity}`,
             reserved: sql`${walletBalance.reserved}+${input.quantity}`,
+            earned: sql`${walletBalance.earned}-${input.quantity}`,
           })
           .where(
             and(
               eq(walletBalance.userId, userId),
               eq(walletBalance.currency, input.currency),
               gte(walletBalance.available, input.quantity),
+              gte(walletBalance.earned, input.quantity),
             ),
           )
           .returning();
-        if (!changed.length) throw new ConflictException("Insufficient available balance.");
+        if (!changed.length)
+          throw new ConflictException(
+            "Only coins you've received as gifts can be withdrawn, and you don't have that many.",
+          );
       }
       let reference = `KRD-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${randomUUID().slice(0, 8).toUpperCase()}`;
       if (kind === "purchase") {
@@ -315,6 +328,7 @@ export class WalletService {
           phase: "hold",
           availableDelta: -input.quantity,
           reservedDelta: input.quantity,
+          earnedDelta: -input.quantity,
         });
       return row;
     });
@@ -370,7 +384,13 @@ export class WalletService {
           status ? eq(walletOperation.status, status) : undefined,
         ),
       )
-      .orderBy(asc(walletOperation.createdAt))
+      // Waiting requests oldest first, as a queue; settled ones (and all) newest first, so
+      // the latest are always within the 200.
+      .orderBy(
+        status && !SETTLED.includes(status)
+          ? asc(walletOperation.createdAt)
+          : desc(walletOperation.createdAt),
+      )
       .limit(200);
     return Promise.all(
       rows.map(async (row) => ({
@@ -429,12 +449,14 @@ export class WalletService {
           });
         }
         if (row.kind === "withdrawal" && (status === "paid" || status === "rejected")) {
+          // A rejected request gives the coins back, withdrawable again; a paid one spends them.
           const released = status === "rejected" ? row.quantity : 0;
           const changed = await tx
             .update(walletBalance)
             .set({
               available: sql`${walletBalance.available}+${released}`,
               reserved: sql`${walletBalance.reserved}-${row.quantity}`,
+              earned: sql`${walletBalance.earned}+${released}`,
             })
             .where(
               and(
@@ -455,6 +477,7 @@ export class WalletService {
             phase: status === "paid" ? "paid" : "release",
             availableDelta: released,
             reservedDelta: -row.quantity,
+            earnedDelta: released,
           });
         }
         await tx.insert(moderationLog).values({

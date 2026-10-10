@@ -4,6 +4,7 @@ import { GUARDS_METADATA } from "@nestjs/common/constants";
 import type { WalletGiftsService } from "./wallet-gifts.service";
 import { AuthGuard } from "../auth/auth.guard";
 import { AdminGuard } from "../moderation/admin.guard";
+import { SUPER_ADMIN_EMAILS } from "../moderation/admins";
 import { AdminWalletController, WalletController } from "./wallet.controller";
 import type { WalletService } from "./wallet.service";
 import type { AuthedRequest } from "../auth/auth.guard";
@@ -21,6 +22,34 @@ describe("wallet boundaries", () => {
       user: { id: "self" },
     } as AuthedRequest);
     expect(banks).toHaveBeenCalledWith("self");
+  });
+  it("refuses coin credits and payouts from an ordinary staff account", () => {
+    const decide = vi.fn();
+    const controller = new AdminWalletController({ decide } as unknown as WalletService);
+    expect(() =>
+      controller.decide(
+        {
+          user: { id: "staff", email: "staff@example.test", emailVerified: true },
+        } as AuthedRequest,
+        "33333333-3333-4333-8333-333333333333",
+        { action: "verify", bankReference: "REF123" },
+      ),
+    ).toThrow(/founders/);
+    expect(decide).not.toHaveBeenCalled();
+  });
+  it("lets a founder credit coins and pay out", () => {
+    const decide = vi.fn();
+    const controller = new AdminWalletController({ decide } as unknown as WalletService);
+    controller.decide(
+      {
+        user: { id: "founder", email: SUPER_ADMIN_EMAILS[0], emailVerified: true },
+      } as AuthedRequest,
+      "33333333-3333-4333-8333-333333333333",
+      { action: "approve" },
+    );
+    expect(decide).toHaveBeenCalledWith("founder", "33333333-3333-4333-8333-333333333333", {
+      action: "approve",
+    });
   });
   it("refuses rate changes from an ordinary staff account before calling the service", () => {
     const saveSettings = vi.fn();

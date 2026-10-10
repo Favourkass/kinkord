@@ -1,31 +1,18 @@
-import Image from "next/image";
-import { Landmark } from "lucide-react";
+/** A bank's initials on its colour, where a logo would go (as on the Silver payment page). */
 export default function BankLogo({
-  src,
-  className = "size-12",
+  badge,
+  className = "size-12 text-xs",
 }: {
-  src: string | null;
+  badge: { text: string; colour: string };
   className?: string;
 }) {
   return (
     <span
-      className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-app-card-border ${className}`}
+      aria-hidden="true"
+      className={`grid shrink-0 place-items-center rounded-xl font-bold text-white ${className}`}
+      style={{ backgroundColor: badge.colour }}
     >
-      <Landmark size={23} className="text-app-members-count" aria-hidden="true" />
-      {src && (
-        <Image
-          src={src}
-          alt=""
-          width={64}
-          height={64}
-          unoptimized
-          loading="lazy"
-          className="absolute inset-0 size-full object-contain"
-          onError={(event) => {
-            event.currentTarget.style.display = "none";
-          }}
-        />
-      )}
+      {badge.text}
     </span>
   );
 }

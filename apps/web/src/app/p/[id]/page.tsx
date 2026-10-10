@@ -18,7 +18,7 @@ export default function PostPage() {
   return (
     <PostListScreen
       shell={{
-        brand: "Kinkord",
+        brand: "KINKORD",
         greeting: home.greeting,
         name: home.name,
         avatarUrl: home.avatarUrl,

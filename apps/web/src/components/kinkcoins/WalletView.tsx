@@ -251,6 +251,9 @@ export default function WalletView({ vm }: Props) {
                   <p className="mt-1 text-xs text-app-subtle">
                     {copy.available}: {currency.available.toLocaleString()}
                   </p>
+                  <p className="mt-1 text-xs text-app-subtle">
+                    {copy.withdrawable}: {currency.withdrawable.toLocaleString()}
+                  </p>
                   <p className="mt-1 text-[10px] text-app-subtle">
                     {currency.reserved} {copy.reserved}
                   </p>
@@ -260,7 +263,7 @@ export default function WalletView({ vm }: Props) {
                     vm.busy ||
                     !vm.enabled ||
                     !vm.canRedeem ||
-                    !currency.available ||
+                    !currency.withdrawable ||
                     !vm.banks.length
                   }
                   type="button"
@@ -318,7 +321,7 @@ export default function WalletView({ vm }: Props) {
                 <strong className="text-xl text-app-members-count">{vm.quote.amount}</strong>
               </p>
               <p className="text-xs text-app-subtle">{copy.fee}</p>
-              <button disabled={vm.busy || !vm.quote.valid} className={`${button} w-full`}>
+              <button disabled={vm.busy || !vm.canSubmitWithdrawal} className={`${button} w-full`}>
                 {copy.confirm}
                 <ArrowRight size={16} />
               </button>

@@ -24,7 +24,7 @@ const data: WalletDataPM = {
       bank: null,
       packs: { coin: [100], star: [], crown: [] },
     },
-    balances: [{ currency: "coin", available: 200, reserved: 0 }],
+    balances: [{ currency: "coin", available: 200, reserved: 0, withdrawable: 150 }],
   },
   banks: [
     {
@@ -50,11 +50,72 @@ describe("useWalletPresenter", () => {
     const { result } = renderHook(() => useWalletPresenter("withdraw"));
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.currencies[0].available).toBe(200);
+    expect(result.current.currencies[0].withdrawable).toBe(150);
     expect(result.current.bankId).toBe("bank");
     expect(result.current.review).toBe(false);
     act(() => result.current.onRedeem("coin"));
     expect(result.current.quantity).toBe("100");
     expect(result.current.quote.valid).toBe(true);
+  });
+  it("sends a withdrawal again as it was when its answer was lost, though the balance dropped", async () => {
+    const load = vi.spyOn(walletService, "load").mockResolvedValue(data);
+    const withdraw = vi
+      .spyOn(walletService, "withdraw")
+      .mockRejectedValueOnce(new Error("connection lost"))
+      .mockResolvedValue({
+        id: "w1",
+        userId: "u",
+        kind: "withdrawal",
+        currency: "coin",
+        quantity: 100,
+        amountKobo: 80000,
+        status: "pending",
+        reference: "KRD-20261010-ABCD1234",
+        bankName: "Test",
+        accountName: "Test",
+        accountNumber: "1234567890",
+        receiptKey: null,
+        senderReference: null,
+        senderAccountName: null,
+        reviewNote: null,
+        settlementReference: null,
+        createdAt: "2026-10-10T09:00:00.000Z",
+        updatedAt: "2026-10-10T09:00:00.000Z",
+      });
+    const { result } = renderHook(() => useWalletPresenter("withdraw"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => result.current.onRedeem("coin"));
+    await act(() => result.current.onWithdraw());
+    expect(result.current.error).toBe("connection lost");
+    // It went through after all: the refreshed balance no longer covers it.
+    load.mockResolvedValue({
+      ...data,
+      summary: {
+        ...data.summary,
+        balances: [{ currency: "coin", available: 100, reserved: 100, withdrawable: 50 }],
+      },
+    });
+    await act(() => result.current.onRefresh());
+    expect(result.current.quote.valid).toBe(false);
+    expect(result.current.canSubmitWithdrawal).toBe(true);
+    await act(() => result.current.onWithdraw());
+    expect(withdraw).toHaveBeenCalledTimes(2);
+    expect(withdraw.mock.calls[1][3]).toBe(withdraw.mock.calls[0][3]);
+    expect(result.current.canSubmitWithdrawal).toBe(false);
+  });
+  it("won't withdraw bought coins: only what was received as gifts", async () => {
+    vi.spyOn(walletService, "load").mockResolvedValue({
+      ...data,
+      summary: {
+        ...data.summary,
+        balances: [{ currency: "coin", available: 200, reserved: 0, withdrawable: 50 }],
+      },
+    });
+    const { result } = renderHook(() => useWalletPresenter("withdraw"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => result.current.onRedeem("coin"));
+    expect(result.current.quantity).toBe("100");
+    expect(result.current.quote.valid).toBe(false);
   });
   it("keeps the same request key when a purchase response fails, then permits a new purchase after success", async () => {
     const buy = vi
@@ -83,7 +144,7 @@ it("selects a bank from search and refuses a name outside the directory", async 
   expect(result.current.bankOptions[0].name).toContain("OPay");
   act(() => result.current.onChooseBank(result.current.bankOptions[0].name));
   expect(result.current.bankPickerOpen).toBe(false);
-  expect(result.current.selectedBankOption?.logo).toBeTruthy();
+  expect(result.current.selectedBankOption?.badge).toEqual({ text: "ODS", colour: "#3F3F46" });
   act(() => result.current.onBankField("bankName", "unknown bank"));
   await act(() => result.current.onSaveBank());
   expect(add).toHaveBeenCalled();

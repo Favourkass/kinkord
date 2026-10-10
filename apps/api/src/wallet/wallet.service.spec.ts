@@ -1,4 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
+import { PgDialect } from "drizzle-orm/pg-core";
+import type { SQL } from "drizzle-orm";
 import { WalletService, walletOperationDto } from "./wallet.service";
 import type { Db } from "../db/db.module";
 import type { StorageService } from "../storage/storage.service";
@@ -30,7 +32,13 @@ const row = {
   createdAt: new Date("2026-10-07T10:00:00Z"),
   updatedAt: new Date("2026-10-07T10:00:00Z"),
 };
-function fixture(results: unknown[][], updates: unknown[][] = []) {
+/** What a balance write sets a column to, as SQL. */
+const setSql = (value: unknown) => new PgDialect().sqlToQuery(value as SQL);
+function fixture(results: unknown[][], updates: unknown[][] = [], inserts: unknown[][] = []) {
+  // Every .set(...) and .values(...), in order, so a test can read what was written.
+  const sets: Record<string, unknown>[] = [];
+  const values: Record<string, unknown>[] = [];
+  const orders: unknown[] = [];
   const chain = (rows: unknown[]) => {
     const obj: Record<string, unknown> = {
       then: (resolve: (v: unknown[]) => unknown) => Promise.resolve(rows).then(resolve),
@@ -40,21 +48,30 @@ function fixture(results: unknown[][], updates: unknown[][] = []) {
       "innerJoin",
       "leftJoin",
       "where",
-      "orderBy",
       "limit",
       "for",
-      "set",
-      "values",
       "onConflictDoUpdate",
       "returning",
     ])
       obj[name] = () => obj;
+    obj.orderBy = (o: unknown) => {
+      orders.push(o);
+      return obj;
+    };
+    obj.set = (v: Record<string, unknown>) => {
+      sets.push(v);
+      return obj;
+    };
+    obj.values = (v: Record<string, unknown>) => {
+      values.push(v);
+      return obj;
+    };
     return obj;
   };
   const db = {
     select: vi.fn(() => chain(results.shift() ?? [])),
     update: vi.fn(() => chain(updates.shift() ?? [])),
-    insert: vi.fn(() => chain([])),
+    insert: vi.fn(() => chain(inserts.shift() ?? [])),
     execute: vi.fn(async () => []),
     transaction: vi.fn(),
   };
@@ -66,7 +83,7 @@ function fixture(results: unknown[][], updates: unknown[][] = []) {
   };
   const service = new WalletService(db as unknown as Db, storage as unknown as StorageService);
   vi.spyOn(service, "redemptionEligibility").mockResolvedValue({ canRedeem: true, reason: null });
-  return { db, storage, service };
+  return { db, storage, service, sets, values, orders };
 }
 describe("WalletService", () => {
   it("does not reveal a transaction that was not returned by the ownership-scoped query", async () => {
@@ -97,8 +114,68 @@ describe("WalletService", () => {
         bankId: "bank",
         requestKey: "key",
       }),
-    ).rejects.toThrow(/Insufficient/);
+    ).rejects.toThrow(/received as gifts/);
     expect(db.insert).not.toHaveBeenCalled();
+  });
+  it("holds only coins received as gifts for a withdrawal", async () => {
+    const bank = {
+      id: "bank",
+      userId: "user",
+      bankName: "Test",
+      accountName: "Test",
+      accountNumber: "1234567890",
+    };
+    const { service, sets, values } = fixture(
+      [[], [{ rates, enabled: 1, minimumKobo: 80000 }], [bank]],
+      [[{ userId: "user" }]],
+      [[{ ...row, kind: "withdrawal" }]],
+    );
+    await service.create("user", "withdrawal", {
+      currency: "coin",
+      quantity: 100,
+      bankId: "bank",
+      requestKey: "key",
+    });
+    expect(setSql(sets[0].earned)).toMatchObject({
+      sql: '"wallet_balance"."earned"-$1',
+      params: [100],
+    });
+    expect(values[1]).toMatchObject({ phase: "hold", availableDelta: -100, earnedDelta: -100 });
+  });
+  it("gives the coins back, withdrawable again, when a withdrawal is rejected", async () => {
+    const pending = { ...row, kind: "withdrawal" as const, status: "pending" as const };
+    const { service, sets, values } = fixture(
+      [[pending], [pending]],
+      [[{ ...pending, status: "rejected" }], [{ userId: "user" }]],
+    );
+    await service.decide("admin", "op", { action: "reject", note: "Wrong account" });
+    expect(setSql(sets[1].earned)).toMatchObject({
+      sql: '"wallet_balance"."earned"+$1',
+      params: [100],
+    });
+    expect(values[0]).toMatchObject({ phase: "release", availableDelta: 100, earnedDelta: 100 });
+  });
+  it("lists waiting requests oldest first, and settled ones newest first", async () => {
+    for (const [status, order] of [
+      ["submitted", "asc"],
+      ["approved", "asc"],
+      ["verified", "desc"],
+      ["paid", "desc"],
+      ["rejected", "desc"],
+      [undefined, "desc"],
+    ] as const) {
+      const { service, orders } = fixture([[]]);
+      await service.queue("withdrawal", status);
+      expect(setSql(orders[0]).sql).toBe(`"wallet_operation"."created_at" ${order}`);
+    }
+  });
+  it("says how much of each balance can be withdrawn", async () => {
+    const { service } = fixture([[{ currency: "coin", available: 50, reserved: 5, earned: 20 }]]);
+    expect(await service.balances("user")).toEqual([
+      { currency: "coin", available: 50, reserved: 5, withdrawable: 20 },
+      { currency: "star", available: 0, reserved: 0, withdrawable: 0 },
+      { currency: "crown", available: 0, reserved: 0, withdrawable: 0 },
+    ]);
   });
   it("returns an idempotent request without touching balances or duplicating a ledger entry", async () => {
     const { service, db } = fixture([[row]]);

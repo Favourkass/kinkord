@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { banksService } from "./banks.service";
 describe("Nigerian bank directory", () => {
-  it("includes commercial banks, OPay and Kuda with pinned logo assets", () => {
+  it("includes commercial banks, OPay and Kuda, with nothing to fetch from elsewhere", () => {
     expect(banksService.count).toBeGreaterThan(600);
     for (const query of ["OPay", "Kuda", "UBA", "Zenith"]) {
       const banks = banksService.options(query);
       expect(banks.length).toBeGreaterThan(0);
-      expect(banks[0].logo).toMatch(/@d564612d7f439ac129c8b4fe64828a33f28811e3\//);
+      expect(JSON.stringify(banks[0])).not.toMatch(/https?:/);
     }
   });
   it("searches aliases and codes without case or punctuation sensitivity", () => {

@@ -5,7 +5,7 @@
  * infinite scroll, coming-soon search) follow the CEO briefs of 2026-09-08.
  */
 export const MEMBERS_COPY = {
-  header: { brand: "Kinkord", menu: "Open menu" },
+  header: { brand: "KINKORD", menu: "Open menu" },
   common: {
     loading: "Loading…",
     error: "Something went wrong. Please try again.",
@@ -60,7 +60,7 @@ export const MEMBERS_COPY = {
     unknownState: "We don’t know that state yet.",
   },
   profile: {
-    brand: "Kinkord",
+    brand: "KINKORD",
     actions: { search: "Search", more: "More options", share: "Share profile" },
     tabs: { posts: "Posts", about: "About", media: "Media", people: "People" },
     follow: "Follow",

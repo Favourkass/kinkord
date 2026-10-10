@@ -13,6 +13,7 @@ import {
   type WalletSummaryPM,
 } from "@/domain/wallet";
 import { compressImage, IMAGE_UPLOAD_PRESETS } from "@/util/image";
+import { bankBadge } from "@/domain/subscription";
 import { api, uploadToPresignedUrl } from "./apiClient";
 export interface WalletDataPM {
   summary: WalletSummaryPM;
@@ -105,7 +106,7 @@ export const walletService = {
     banks:
       data?.banks.map((bank) => ({
         ...walletBankVM(bank),
-        logo: banksService.find(bank.bankName)?.logo ?? null,
+        badge: bankBadge(bank.bankName),
       })) ?? [],
     history:
       data?.history.map((row) => ({
@@ -117,6 +118,7 @@ export const walletService = {
       label: WALLET_COPY.labels[kind],
       available: data?.summary.balances.find((b) => b.currency === kind)?.available ?? 0,
       reserved: data?.summary.balances.find((b) => b.currency === kind)?.reserved ?? 0,
+      withdrawable: data?.summary.balances.find((b) => b.currency === kind)?.withdrawable ?? 0,
       redeemRate: data?.summary.settings.rates?.[kind].redeem ?? 0,
       buyRate: data?.summary.settings.rates?.[kind].buy
         ? walletPurchaseUsd(data.summary.settings.rates[kind].buy, data.summary.settings, true)
@@ -140,7 +142,8 @@ export const walletService = {
     settings: WalletSettingsPM | null,
     currency: KinkCurrency,
     quantity: string,
-    available: number,
+    /** Coins received as gifts: the only ones that can be withdrawn. */
+    withdrawable: number,
     bankId: string,
     canRedeem: boolean,
   ) => {
@@ -155,7 +158,7 @@ export const walletService = {
         !!bankId &&
         /^[1-9]\d*$/.test(quantity) &&
         Number.isSafeInteger(count) &&
-        count <= available &&
+        count <= withdrawable &&
         count <= 1_000_000 &&
         amount > 0 &&
         amount <= 1_000_000_000 &&

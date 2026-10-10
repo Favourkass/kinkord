@@ -110,6 +110,21 @@ export const postLike = pgTable(
   ],
 );
 
+/** Who has shared a post, once each: what its share count counts. */
+export const postShare = pgTable(
+  "post_share",
+  {
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => post.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.postId, t.userId] })],
+);
+
 export const postComment = pgTable(
   "post_comment",
   {

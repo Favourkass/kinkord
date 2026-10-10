@@ -91,6 +91,7 @@ export function useWalletAdminPresenter() {
     busy,
     form,
     canEdit: settings?.canEdit ?? false,
+    canDecide: settings?.canDecide ?? false,
     bankHref: Routes.moderationPayments,
     rows: rows.map(walletOperationVM),
     dialog: dialog

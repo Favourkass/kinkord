@@ -50,7 +50,7 @@ describe("appShellProps", () => {
       },
       nav,
     );
-    expect(props).toMatchObject({ brand: "Kinkord", greeting: "Hi Tega", membersCount: "128" });
+    expect(props).toMatchObject({ brand: "KINKORD", greeting: "Hi Tega", membersCount: "128" });
     expect(props.onMenu).toBe(openDrawer);
     expect(props.links).toBe(nav.links);
   });

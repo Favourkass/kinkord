@@ -4,7 +4,14 @@ import { useRouter } from "next/navigation";
 import { Routes } from "@/constants/Routes";
 import { walletOperationVM, type WalletMode, type WalletOperationPM } from "@/domain/wallet";
 import type { KinkCurrency } from "@/domain/kinkcoins";
+import { bankBadge } from "@/domain/subscription";
 import { banksService } from "@/services/banks.service";
+
+/** A bank from the directory, with the initials badge it shows in place of a logo. */
+const withBadge = <T extends { name: string }>(bank: T) => ({
+  ...bank,
+  badge: bankBadge(bank.name),
+});
 import { walletService, type WalletDataPM } from "@/services/wallet.service";
 export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
   const router = useRouter();
@@ -25,6 +32,7 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     [bankSearch, setBankSearch] = useState("");
   const running = useRef(false),
     keys = useRef(new Map<string, string>());
+  const [unanswered, setUnanswered] = useState<string | null>(null);
   const keyFor = (value: string) => {
     const existing = keys.current.get(value);
     if (existing) return existing;
@@ -83,11 +91,17 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
       setBusy(false);
     }
   };
+  const chosenBank = banksService.find(bankForm.bankName);
+  const withdrawal = `withdraw:${currency}:${quantity}:${bankId}`;
+  // Sent but unanswered (a lost response): it may have gone through, reserving the coins, so
+  // the same request can be sent again even when the balance no longer covers it. The server
+  // answers with the withdrawal it already made, or refuses.
+  const retrying = unanswered === withdrawal;
   const quote = walletService.withdrawalQuote(
     data?.summary.settings ?? null,
     currency,
     quantity,
-    data?.summary.balances.find((b) => b.currency === currency)?.available ?? 0,
+    data?.summary.balances.find((b) => b.currency === currency)?.withdrawable ?? 0,
     bankId,
     vm.canRedeem,
   );
@@ -101,8 +115,8 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     bankForm,
     bankPickerOpen,
     bankSearch,
-    bankOptions: banksService.options(bankSearch),
-    selectedBankOption: banksService.find(bankForm.bankName),
+    bankOptions: banksService.options(bankSearch).map(withBadge),
+    selectedBankOption: chosenBank ? withBadge(chosenBank) : null,
     bankDirectoryCount: banksService.count,
     onOpenBankPicker: () => {
       setBankPickerOpen(true);
@@ -122,6 +136,7 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     bankId,
     review,
     quote,
+    canSubmitWithdrawal: quote.valid || retrying,
     operation: operation ? walletOperationVM(operation) : null,
     selectedBank: vm.banks.find((bank) => bank.id === bankId) ?? null,
     onRefresh: () =>
@@ -169,17 +184,19 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     onCancel: () => setReview(false),
     onWithdraw: () =>
       run(async () => {
-        if (!quote.valid)
+        if (!quote.valid && !retrying)
           throw new Error(
-            "Check the quantity, available balance, minimum and selected bank account.",
+            "Check the quantity, withdrawable balance, minimum and selected bank account.",
           );
+        setUnanswered(withdrawal);
         const result = await walletService.withdraw(
           currency,
           Number(quantity),
           bankId,
-          keyFor(`withdraw:${currency}:${quantity}:${bankId}`),
+          keyFor(withdrawal),
         );
-        keys.current.delete(`withdraw:${currency}:${quantity}:${bankId}`);
+        keys.current.delete(withdrawal);
+        setUnanswered(null);
         setOperation(result);
         setReview(false);
         await refresh();

@@ -26,7 +26,7 @@ function Search() {
   return (
     <SearchScreen
       shell={{
-        brand: "Kinkord",
+        brand: "KINKORD",
         greeting: home.greeting,
         name: home.name,
         avatarUrl: home.avatarUrl,

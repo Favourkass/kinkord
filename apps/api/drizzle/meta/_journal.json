@@ -155,6 +155,13 @@
       "when": 1791533943234,
       "tag": "0021_post_share_count",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1791621612605,
+      "tag": "0022_wallet_earned_post_shares",
+      "breakpoints": true
     }
   ]
 }

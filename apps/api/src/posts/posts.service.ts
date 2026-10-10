@@ -20,6 +20,7 @@ import {
   post,
   postComment,
   postLike,
+  postShare,
   postMedia,
   postSave,
   profile,
@@ -532,17 +533,30 @@ export class PostsService {
   }
 
   /** Usernames are stored lowercase by the username plugin; accept "@Handle" too. */
-  /** Counts a completed native share or link copy, against the original visible post. */
+  /**
+   * Counts a completed native share or link copy, against the original visible
+   * post. Each member counts once per post, however often they share it.
+   */
   async share(postId: string, viewerId: string) {
     const visible = await this.byId(postId, viewerId);
     if (!visible) throw new NotFoundException("Post not found");
-    const [updated] = await this.db
-      .update(post)
-      .set({ shares: sql`${post.shares} + 1` })
-      .where(and(eq(post.id, visible.postId), isNull(post.deletedAt)))
-      .returning({ shares: post.shares });
-    if (!updated) throw new NotFoundException("Post not found");
-    return { postId: visible.postId, shares: updated.shares };
+    return this.db.transaction(async (tx) => {
+      const [first] = await tx
+        .insert(postShare)
+        .values({ postId: visible.postId, userId: viewerId })
+        .onConflictDoNothing()
+        .returning({ postId: postShare.postId });
+      const live = and(eq(post.id, visible.postId), isNull(post.deletedAt));
+      const [row] = first
+        ? await tx
+            .update(post)
+            .set({ shares: sql`${post.shares} + 1` })
+            .where(live)
+            .returning({ shares: post.shares })
+        : await tx.select({ shares: post.shares }).from(post).where(live);
+      if (!row) throw new NotFoundException("Post not found");
+      return { postId: visible.postId, shares: row.shares };
+    });
   }
 
   private async resolveAuthor(username: string): Promise<string> {
