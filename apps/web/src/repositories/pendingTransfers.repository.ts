@@ -36,6 +36,16 @@ const isCurrency = (v: unknown): v is KinkCurrency => v === "coin" || v === "sta
 const isText = (v: unknown): v is string => typeof v === "string" && v.length > 0;
 
 export const pendingTransfersRepository = {
+  /** Whether this browser keeps requests at all (storage is off in some private modes). */
+  canKeep(): boolean {
+    try {
+      localStorage.setItem("kinkord:unanswered:probe", "1");
+      localStorage.removeItem("kinkord:unanswered:probe");
+      return true;
+    } catch {
+      return false;
+    }
+  },
   /** An unanswered withdrawal kept for this member, if a whole one is. */
   withdrawal(memberId: string): UnansweredWithdrawal | null {
     const v = read("withdrawal", memberId);

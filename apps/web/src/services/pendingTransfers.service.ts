@@ -33,6 +33,7 @@ export const pendingTransfersService = {
       return "unread";
     return e.status >= 400 ? "refused" : "unknown";
   },
+  canKeep: () => store.canKeep(),
   withdrawal: (memberId: string): UnansweredWithdrawal | null => store.withdrawal(memberId),
   keepWithdrawal: (memberId: string, request: UnansweredWithdrawal) =>
     store.keepWithdrawal(memberId, request),

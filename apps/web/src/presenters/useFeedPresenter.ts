@@ -711,6 +711,17 @@ export function useFeedPresenter({
     settleGift(gift.member, gift.key);
     return true;
   };
+  /**
+   * This member's gift in doubt, if any. The kept copy is the truth across tabs: another tab may
+   * have settled the one this page remembers, or kept a newer one. Only when this browser keeps
+   * nothing (storage off) does this page's own record count.
+   */
+  const giftInDoubt = (member: string): (GiftInDoubt & { member: string }) | null => {
+    const kept = pendingTransfersService.gift(member);
+    if (kept) return { ...kept, member };
+    const own = uncertainGift.current;
+    return own && own.member === member && !pendingTransfersService.canKeep() ? own : null;
+  };
   const openGift = async (postId: string, currency: KinkCurrency = "coin") => {
     if (giftBusy.current) return;
     const target = posts.find((p) => p.postId === postId);
@@ -735,31 +746,31 @@ export function useFeedPresenter({
       if (version !== giftLoadVersion.current) return;
       setGiftSummary(summary);
       const member = summary.userId ?? null;
-      let pending =
-        uncertainGift.current && uncertainGift.current.member === member
-          ? uncertainGift.current
-          : null;
-      if (!pending) {
-        // Another account's stays kept for them; this member's may be kept from a reload.
-        uncertainGift.current = null;
-        const kept = member ? pendingTransfersService.gift(member) : null;
-        if (kept && member) pending = { ...kept, member };
-      }
-      if (pending && pending.postId !== postId) {
-        // Settled first, wherever its post is, so it can't be sent twice or hold this one up.
+      let pending = member ? giftInDoubt(member) : null;
+      // Earlier ones (for other posts) are settled first, wherever their posts are, so none can
+      // be sent twice or hold this one up. Each settled, it's checked again: another tab may
+      // have kept a newer one meanwhile.
+      let settledAny = false;
+      for (let rounds = 0; pending && pending.postId !== postId && rounds < 3; rounds++) {
         giftBusy.current = true;
-        const settled = await settleEarlierGift(pending).finally(() => {
+        const earlier: GiftInDoubt & { member: string } = pending;
+        const settled = await settleEarlierGift(earlier).finally(() => {
           giftBusy.current = false;
         });
         if (version !== giftLoadVersion.current) return;
-        if (!settled) {
-          uncertainGift.current = pending;
-          setGiftTarget(null);
-          setShareNote(GIFT_COPY.earlierUnconfirmed);
-          return;
-        }
-        pending = null;
-        // It may have just been sent: read the balance again before offering this one.
+        if (!settled) break;
+        settledAny = true;
+        pending = member ? giftInDoubt(member) : null;
+      }
+      if (pending && pending.postId !== postId) {
+        uncertainGift.current = pending;
+        setGiftTarget(null);
+        setShareNote(GIFT_COPY.earlierUnconfirmed);
+        return;
+      }
+      uncertainGift.current = pending;
+      if (settledAny) {
+        // One may have just been sent: read the balance again before offering this one.
         const after = await postGiftsService.balance();
         if (version !== giftLoadVersion.current) return;
         setGiftSummary(after);
@@ -786,6 +797,11 @@ export function useFeedPresenter({
     // A gift is only sent knowing whose wallet it comes from.
     if (giftBusy.current || !giftTarget || !member || (!giftLocked && !quote.valid)) return;
     const wasInDoubt = uncertainGift.current !== null;
+    const kept = pendingTransfersService.gift(member);
+    if (kept && kept.key !== giftKey.current) {
+      setGiftError(GIFT_COPY.earlierUnconfirmed);
+      return;
+    }
     giftBusy.current = true;
     setGiftSending(true);
     setGiftError(null);

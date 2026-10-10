@@ -1088,6 +1088,69 @@ describe("post gifting presenter", () => {
     });
     expect(localStorage.getItem("kinkord:unanswered:gift:me")).toBeNull();
   });
+  it("takes the kept copy over its own memory: another tab may have settled it or kept a newer one", async () => {
+    giftBalance.mockReset().mockResolvedValue({
+      userId: "me",
+      settings: { enabled: true },
+      balances: [{ currency: "coin", available: 5, reserved: 0 }],
+    });
+    giftSend.mockReset().mockRejectedValueOnce(new ApiError(0, "Network problem"));
+    const { result } = renderHook(() => useFeedPresenter());
+    await waitFor(() => expect(result.current.posts).toHaveLength(1));
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    await act(async () => {
+      await result.current.giftDialog.onSend();
+    });
+    act(() => {
+      result.current.giftDialog.onClose();
+    });
+    // Another tab settled that one and kept a newer gift, still in doubt.
+    localStorage.setItem(
+      "kinkord:unanswered:gift:me",
+      JSON.stringify({ postId: "p1", currency: "coin", quantity: "3", key: "newer" }),
+    );
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    expect(result.current.giftDialog.locked).toBe(true);
+    expect(result.current.giftDialog.quantity).toBe("3");
+    giftSend.mockResolvedValueOnce({});
+    await act(async () => {
+      await result.current.giftDialog.onSend();
+    });
+    expect(giftSend.mock.calls.at(-1)?.[3]).toBe("newer");
+    // And once it's settled elsewhere, nothing is in doubt here.
+    localStorage.clear();
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    expect(result.current.giftDialog.locked).toBe(false);
+  });
+  it("won't start a gift over another tab's one still in doubt", async () => {
+    giftBalance.mockReset().mockResolvedValue({
+      userId: "me",
+      settings: { enabled: true },
+      balances: [{ currency: "coin", available: 5, reserved: 0 }],
+    });
+    giftSend.mockReset();
+    const { result } = renderHook(() => useFeedPresenter());
+    await waitFor(() => expect(result.current.posts).toHaveLength(1));
+    await act(async () => {
+      await result.current.openGift("p1");
+    });
+    localStorage.setItem(
+      "kinkord:unanswered:gift:me",
+      JSON.stringify({ postId: "p1", currency: "coin", quantity: "1", key: "other-tab" }),
+    );
+    await act(async () => {
+      await result.current.giftDialog.onSend();
+    });
+    expect(giftSend).not.toHaveBeenCalled();
+    expect(result.current.giftDialog.error).toMatch(/earlier gift/);
+    localStorage.clear();
+  });
   it("sends nothing while it can't tell whose wallet it is", async () => {
     giftBalance.mockReset().mockRejectedValue(new Error("offline"));
     giftSend.mockReset();

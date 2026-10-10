@@ -66,11 +66,13 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     setData(next);
     const owner = next.summary.userId;
     const kept = owner ? pendingTransfersService.withdrawal(owner) : null;
+    // The kept copy is the truth across tabs (another may have settled this page's request, or
+    // kept a newer one); only with storage off does this page's own record count.
     setUnanswered((current) =>
-      current && current.member === owner
-        ? current
-        : kept && owner
-          ? { ...kept, member: owner }
+      kept && owner
+        ? { ...kept, member: owner }
+        : current && current.member === owner && !pendingTransfersService.canKeep()
+          ? current
           : null,
     );
     // The account shown is pinned once: a default changed elsewhere doesn't move it.
@@ -284,15 +286,33 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
             "Check the quantity, withdrawable balance, minimum and selected bank account.",
           );
         if (!member) throw new Error(WALLET_COPY.stillLoading);
-        const wasUnanswered = unanswered !== null;
-        const request = unanswered ?? {
+        // Reconciled with the kept copy first: another tab may have settled the request this
+        // page remembers, or kept a newer one, which is then the one to send (never overwritten).
+        const own = unanswered && unanswered.member === member ? unanswered : null;
+        const kept = pendingTransfersService.withdrawal(member);
+        const inDoubt = kept
+          ? { ...kept, member }
+          : own && !pendingTransfersService.canKeep()
+            ? own
+            : null;
+        if (inDoubt && inDoubt.key !== own?.key) {
+          // Not what this page showed: shown first, then sent.
+          setUnanswered(inDoubt);
+          throw new Error(WALLET_COPY.unanswered);
+        }
+        if (own && !inDoubt) {
+          setUnanswered(null);
+          throw new Error(WALLET_COPY.settledElsewhere);
+        }
+        const wasUnanswered = inDoubt !== null;
+        const request = inDoubt ?? {
           currency,
           quantity,
           bankId,
           key: keyFor(withdrawal),
           expectedAmountKobo: quote.amountKobo,
         };
-        const sender = unanswered?.member ?? member;
+        const sender = inDoubt?.member ?? member;
         keepUnanswered(request, sender);
         let result: WalletOperationPM;
         try {

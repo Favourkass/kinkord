@@ -319,6 +319,60 @@ describe("useWalletPresenter", () => {
     expect(result.current.operationTitle).toBe("Paid");
     expect(result.current.operationNote).toBe("The admin has recorded your bank transfer as paid.");
   });
+  it("takes the kept copy over its own memory: another tab's newer one, or settled elsewhere", async () => {
+    vi.spyOn(walletService, "load").mockResolvedValue(data);
+    const withdraw = vi
+      .spyOn(walletService, "withdraw")
+      .mockRejectedValueOnce(new ApiError(0, { message: "connection lost" }));
+    const { result } = renderHook(() => useWalletPresenter("withdraw"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => result.current.onRedeem("coin"));
+    await act(() => result.current.onWithdraw());
+    // Another tab settled that one and kept a newer withdrawal, still unanswered.
+    localStorage.setItem(
+      "kinkord:unanswered:withdrawal:u",
+      JSON.stringify({
+        currency: "coin",
+        quantity: "120",
+        bankId: "bank",
+        key: "newer",
+        expectedAmountKobo: 96000,
+      }),
+    );
+    await act(() => result.current.onWithdraw());
+    expect(withdraw).toHaveBeenCalledOnce();
+    expect(result.current.quantity).toBe("120");
+    withdraw.mockRejectedValueOnce(new ApiError(0, { message: "connection lost" }));
+    await act(() => result.current.onWithdraw());
+    expect(withdraw.mock.calls[1][3]).toBe("newer");
+    // Then it's answered in that other tab: nothing is sent from here.
+    localStorage.clear();
+    await act(() => result.current.onWithdraw());
+    expect(withdraw).toHaveBeenCalledTimes(2);
+    expect(result.current.error).toMatch(/another tab/);
+    expect(result.current.unansweredNotice).toBeNull();
+  });
+  it("won't start a withdrawal over another tab's one still unanswered", async () => {
+    vi.spyOn(walletService, "load").mockResolvedValue(data);
+    const withdraw = vi.spyOn(walletService, "withdraw");
+    const { result } = renderHook(() => useWalletPresenter("withdraw"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => result.current.onRedeem("coin"));
+    // Another tab sent one that got no answer, after this page loaded.
+    localStorage.setItem(
+      "kinkord:unanswered:withdrawal:u",
+      JSON.stringify({
+        currency: "coin",
+        quantity: "100",
+        bankId: "bank",
+        key: "other-tab",
+        expectedAmountKobo: 80000,
+      }),
+    );
+    await act(() => result.current.onWithdraw());
+    expect(withdraw).not.toHaveBeenCalled();
+    expect(result.current.unansweredNotice).toBeTruthy();
+  });
   it("never brings back another member's unanswered withdrawal", async () => {
     localStorage.setItem(
       "kinkord:unanswered:withdrawal:someone-else",
