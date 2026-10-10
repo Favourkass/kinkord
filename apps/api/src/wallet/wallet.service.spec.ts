@@ -86,6 +86,36 @@ function fixture(results: unknown[][], updates: unknown[][] = [], inserts: unkno
   return { db, storage, service, sets, values, orders };
 }
 describe("WalletService", () => {
+  it("uses independent USD pricing even when Silver prices and the old NGN cache differ", async () => {
+    const usdRates = {
+      coin: { buy: 10, redeem: 8 },
+      star: { buy: 100, redeem: 80 },
+      crown: { buy: 1000, redeem: 800 },
+    };
+    const payment = {
+      bankName: "Test Bank",
+      accountName: "Test",
+      accountNumber: "1234567890",
+      monthlyKobo: 560000,
+      monthlyUsdCents: 400,
+      yearlyKobo: 3360000,
+      yearlyUsdCents: 2400,
+    };
+    const config = { rates, usdRates, exchangeRateKobo: 140000, minimumKobo: 10000000, enabled: 1 };
+    const { service } = fixture([[config], [payment]]);
+    expect(await service.settings()).toMatchObject({
+      usdConversion: { kobo: 140000, usdCents: 100 },
+      rates: { coin: { buy: 14000, redeem: 11200 } },
+    });
+    const purchase = fixture([[], [config], [payment], []], [], [[row]]);
+    await purchase.service.create("user", "purchase", {
+      currency: "coin",
+      quantity: 100,
+      requestKey: "new",
+    });
+    expect(purchase.values[0]).toMatchObject({ quantity: 100, amountKobo: 1400000 });
+  });
+
   it("does not reveal a transaction that was not returned by the ownership-scoped query", async () => {
     const { service } = fixture([[]]);
     await expect(service.operation("other", "op")).rejects.toThrow(/not found/);
@@ -94,7 +124,7 @@ describe("WalletService", () => {
     const { service, db } = fixture(
       [
         [],
-        [{ rates, enabled: 1, minimumKobo: 80000 }],
+        [{ rates, enabled: 1, minimumKobo: 10_000_000 }],
         [
           {
             id: "bank",
@@ -110,7 +140,7 @@ describe("WalletService", () => {
     await expect(
       service.create("user", "withdrawal", {
         currency: "coin",
-        quantity: 100,
+        quantity: 12500,
         bankId: "bank",
         requestKey: "key",
       }),
@@ -126,29 +156,29 @@ describe("WalletService", () => {
       accountNumber: "1234567890",
     };
     const { service, sets, values } = fixture(
-      [[], [{ rates, enabled: 1, minimumKobo: 80000 }], [bank]],
+      [[], [{ rates, enabled: 1, minimumKobo: 10_000_000 }], [bank]],
       [[{ userId: "user" }]],
       [[{ ...row, kind: "withdrawal" }]],
     );
     await service.create("user", "withdrawal", {
       currency: "coin",
-      quantity: 100,
+      quantity: 12500,
       bankId: "bank",
       requestKey: "key",
     });
     expect(setSql(sets[0].earned)).toMatchObject({
       sql: '"wallet_balance"."earned"-$1',
-      params: [100],
+      params: [12500],
     });
     expect(values[0]).toMatchObject({ kind: "withdrawal", bankId: "bank" });
-    expect(values[1]).toMatchObject({ phase: "hold", availableDelta: -100, earnedDelta: -100 });
+    expect(values[1]).toMatchObject({ phase: "hold", availableDelta: -12500, earnedDelta: -12500 });
   });
   it("refuses a withdrawal sent as someone other than who is signed in", async () => {
     const { service, db } = fixture([]);
     await expect(
       service.create("user", "withdrawal", {
         currency: "coin",
-        quantity: 100,
+        quantity: 12500,
         bankId: "bank",
         requestKey: "key",
         senderId: "someone-else",
@@ -157,11 +187,11 @@ describe("WalletService", () => {
     expect(db.transaction).not.toHaveBeenCalled();
   });
   it("refuses a withdrawal whose rate changed after the member reviewed it", async () => {
-    const { service, db } = fixture([[], [{ rates, enabled: 1, minimumKobo: 80000 }]]);
+    const { service, db } = fixture([[], [{ rates, enabled: 1, minimumKobo: 10_000_000 }]]);
     await expect(
       service.create("user", "withdrawal", {
         currency: "coin",
-        quantity: 100,
+        quantity: 12500,
         bankId: "bank",
         requestKey: "key",
         // Reviewed at ₦4.00 a coin; it's ₦8.00 now.

@@ -11,8 +11,9 @@ const pair = z
   .object({ buy: rate, redeem: rate })
   .refine((v) => v.redeem <= v.buy, "Redemption rate cannot exceed purchase rate.");
 export const walletSettingsSchema = z.object({
-  rates: z.object({ coin: pair, star: pair, crown: pair }),
-  minimumKobo: z.number().int().min(100).max(1_000_000_000),
+  usdRates: z.object({ coin: pair, star: pair, crown: pair }),
+  exchangeRateKobo: z.number().int().min(100).max(10_000_000).multipleOf(100),
+  minimumKobo: z.number().int().min(10_000_000).max(1_000_000_000),
   enabled: z.boolean(),
 });
 export const walletBankSchema = z.object({

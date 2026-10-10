@@ -16,7 +16,7 @@ export const WALLET_COPY = {
   loading: "Loading your wallet…",
   retry: "Refresh",
   unavailable:
-    "Transactions are unavailable until the lead configures NGN rates and the payment bank account.",
+    "Transactions are unavailable until the lead configures wallet USD prices, the exchange rate and the payment bank account.",
   actions: [
     {
       key: "buy",
@@ -108,8 +108,14 @@ export const WALLET_COPY = {
   home: "Back to home",
   history: "View transaction history",
   cancel: "Back",
+  purchasePrice: "Purchase price (USD)",
+  customPurchase: "Choose your own amount",
+  purchaseQuantity: "Number to buy",
+  purchaseBudget: "Amount available (NGN)",
+  purchaseBudgetHint:
+    "Whole units only. Your payment amount is shown below; any unused budget stays with you.",
   buyHint:
-    "Prices are shown in USD. The payment page shows the naira equivalent to transfer. Coins are credited after payment verification. Bought coins are for gifting and can't be withdrawn.",
+    "Prices are shown in USD. The payment page shows the exact naira amount to transfer. Minimum purchase is ₦1,000. Coins are credited after payment verification. Bought coins are for gifting and can't be withdrawn.",
   transfer:
     "Transfer the exact amount to this account, then upload proof. Your wallet is credited only after an admin verifies the payment.",
   amount: "Amount to transfer",
@@ -127,7 +133,8 @@ export const WALLET_COPY = {
     "Verify incoming bank transfers, review withdrawals, and mark transfers paid after sending them manually.",
   foundersOnly:
     "Only the founders can credit coins or approve payouts. You can review requests here.",
-  settings: "Wallet rates (NGN per unit)",
+  settings: "Wallet prices (USD per unit)",
+  walletExchangeRate: "Wallet exchange rate (NGN per USD)",
   minimumSetting: "Minimum withdrawal (NGN)",
   enabled: "Enable purchases and withdrawals",
   saveSettings: "Save wallet settings",
@@ -153,7 +160,7 @@ export const WALLET_COPY = {
   saved: "Saved successfully.",
   defaultUpdated: "Default bank account updated.",
   bankRemoved: "Bank account removed.",
-  purchaseRate: "Purchase",
-  redeemRate: "Redemption",
+  purchaseRate: "Purchase (USD)",
+  redeemRate: "Redemption (USD)",
   disabled: "Wallet transactions are disabled.",
 } as const;

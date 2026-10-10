@@ -29,6 +29,7 @@ import {
   PACKS,
   sameSender,
   walletAmount,
+  walletNairaRates,
   walletDisabled,
   walletPaymentReference,
 } from "./rules";
@@ -77,9 +78,13 @@ export class WalletService {
     const payment = await readSettings(this.db);
     return {
       currency: "NGN" as const,
-      usdConversion: payment.bank ? payment.prices.monthly : null,
+      usdConversion: row?.exchangeRateKobo ? { kobo: row.exchangeRateKobo, usdCents: 100 } : null,
+      usdRates: row?.usdRates ?? null,
+      exchangeRateKobo: row?.exchangeRateKobo ?? null,
       enabled: !!row?.enabled && !!payment.bank,
-      rates: row?.rates ?? null,
+      rates: row?.usdRates
+        ? walletNairaRates(row.usdRates, row.exchangeRateKobo)
+        : (row?.rates ?? null),
       minimumKobo: row?.minimumKobo ?? null,
       bank: payment.bank,
       packs: PACKS,
@@ -93,7 +98,9 @@ export class WalletService {
         .insert(walletSettings)
         .values({
           id: 1,
-          rates: input.rates,
+          rates: walletNairaRates(input.usdRates, input.exchangeRateKobo),
+          usdRates: input.usdRates,
+          exchangeRateKobo: input.exchangeRateKobo,
           minimumKobo: input.minimumKobo,
           enabled: input.enabled ? 1 : 0,
           updatedBy: actorId,
@@ -101,7 +108,9 @@ export class WalletService {
         .onConflictDoUpdate({
           target: walletSettings.id,
           set: {
-            rates: input.rates,
+            rates: walletNairaRates(input.usdRates, input.exchangeRateKobo),
+            usdRates: input.usdRates,
+            exchangeRateKobo: input.exchangeRateKobo,
             minimumKobo: input.minimumKobo,
             enabled: input.enabled ? 1 : 0,
             updatedBy: actorId,
@@ -253,7 +262,7 @@ export class WalletService {
       const [config] = await tx.select().from(walletSettings).where(eq(walletSettings.id, 1));
       if (!config?.enabled) throw walletDisabled();
       const amountKobo = walletAmount(
-        config.rates,
+        config.usdRates ? walletNairaRates(config.usdRates, config.exchangeRateKobo) : config.rates,
         input.currency,
         input.quantity,
         kind,
