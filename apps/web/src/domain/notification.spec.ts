@@ -26,6 +26,7 @@ describe("notification presentation", () => {
     "like",
     "repost",
     "report",
+    "verification",
     "test",
     "payment",
     "payment_verified",
@@ -77,6 +78,10 @@ describe("notification presentation", () => {
       official: true,
       category: "Silver badges",
       body: "A Silver member changed their name or photo. Review their badge.",
+    });
+    expect(toNotificationVM({ ...item, type: "verification", actor: null })).toMatchObject({
+      official: true,
+      body: "New verification to review.",
     });
   });
 

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import MaskIcon from "@/components/app/MaskIcon";
+import VerifiedMark from "@/components/brand/VerifiedMark";
 import type { PublicProfileVM, SocialPlatform } from "@/domain/member";
 
 export interface AboutLabels {
@@ -23,7 +24,8 @@ export interface AboutLabels {
   noSocial: string;
   platforms: Record<SocialPlatform, string>;
   verification: string;
-  verified: { basic: string; none: string };
+  verified: { identity: string; basic: string; none: string };
+  identityDetail: string;
   verifiedDetail: (email: boolean, phone: boolean) => string;
   tagline: string;
   memberSince: (date: string) => string;
@@ -217,15 +219,21 @@ export default function AboutTab({ vm, labels }: AboutTabProps) {
 
       <Card icon={ICONS.verification} title={labels.verification}>
         <div className="flex items-center gap-[12px] rounded-[12px] border border-kink-gold-bright/30 bg-kink-gold-bright/10 p-[12px]">
-          <span className="grid size-[36px] shrink-0 place-items-center rounded-full bg-kink-gold-bright text-black">
-            <MaskIcon src={ICONS.verified} width={18} />
-          </span>
+          {vm.verification.level === "identity" ? (
+            <VerifiedMark size={36} />
+          ) : (
+            <span className="grid size-[36px] shrink-0 place-items-center rounded-full bg-kink-gold-bright text-black">
+              <MaskIcon src={ICONS.verified} width={18} />
+            </span>
+          )}
           <span className="flex min-w-0 flex-col">
             <span className="text-[13px] font-semibold text-pf-text">
               {labels.verified[vm.verification.level]}
             </span>
             <span className="text-[12px] text-pf-muted">
-              {labels.verifiedDetail(vm.verification.email, vm.verification.phone)}
+              {vm.verification.level === "identity"
+                ? labels.identityDetail
+                : labels.verifiedDetail(vm.verification.email, vm.verification.phone)}
             </span>
           </span>
         </div>

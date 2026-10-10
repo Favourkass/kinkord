@@ -16,6 +16,9 @@ const svc = {
   deleteMember: vi.fn(),
   deleteMemberPosts: vi.fn(),
   deletePost: vi.fn(),
+  memberVerification: vi.fn(),
+  revokeVerification: vi.fn(),
+  reopenVerification: vi.fn(),
 };
 vi.mock("@/services/moderation.service", () => ({
   moderationService: new Proxy(
@@ -75,6 +78,8 @@ describe("useAdminMemberPresenter", () => {
     svc.block.mockResolvedValue({ blocked: "u9", postsRemoved: 1 });
     svc.deleteMember.mockResolvedValue({ deleted: "u9" });
     svc.deletePost.mockResolvedValue({ deleted: "p1" });
+    svc.memberVerification.mockResolvedValue({ status: "verified", attemptsUsed: 0 });
+    svc.revokeVerification.mockResolvedValue({ status: "revoked" });
   });
   afterEach(cleanup);
 
@@ -126,5 +131,31 @@ describe("useAdminMemberPresenter", () => {
     act(() => result.current.onBlock());
     await act(async () => result.current.dialog?.confirm());
     expect(result.current.dialog?.error).toBe("Admins can't be blocked or deleted here.");
+  });
+
+  it("shows the member's verification and revokes it after confirming", async () => {
+    const { result } = await ready();
+    await waitFor(() => expect(result.current.verification).not.toBeNull());
+    expect(result.current.verification).toMatchObject({
+      status: "Verified",
+      revoke: true,
+      reopen: false,
+    });
+
+    act(() => result.current.onRevokeVerification());
+    expect(result.current.dialog?.destructive).toBe(true);
+    svc.memberVerification.mockResolvedValue({ status: "revoked", attemptsUsed: 0 });
+    await act(async () => result.current.dialog?.confirm());
+
+    expect(svc.revokeVerification).toHaveBeenCalledWith("u9");
+    expect(result.current.notice).toBe("Verification revoked.");
+    await waitFor(() => expect(result.current.verification?.reopen).toBe(true));
+  });
+
+  it("still shows the member when their verification can't be read", async () => {
+    svc.memberVerification.mockRejectedValue(new Error("boom"));
+    const { result } = await ready();
+    expect(result.current.vm?.id).toBe("u9");
+    expect(result.current.verification).toBeNull();
   });
 });
