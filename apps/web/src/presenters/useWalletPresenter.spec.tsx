@@ -16,6 +16,7 @@ vi.mock("@/services/apiClient", async (importOriginal) => ({
 }));
 const data: WalletDataPM = {
   summary: {
+    userId: "u",
     redemption: { canRedeem: true, reason: null },
     settings: {
       currency: "NGN",
@@ -317,6 +318,36 @@ describe("useWalletPresenter", () => {
     await act(() => result.current.onWithdraw());
     expect(result.current.unansweredNotice).toBeTruthy();
     expect(result.current.canSubmitWithdrawal).toBe(true);
+  });
+  it("won't send an unanswered withdrawal under another account", async () => {
+    const load = vi.spyOn(walletService, "load").mockResolvedValue(data);
+    const withdraw = vi
+      .spyOn(walletService, "withdraw")
+      .mockRejectedValueOnce(new ApiError(0, { message: "connection lost" }));
+    const { result } = renderHook(() => useWalletPresenter("withdraw"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => result.current.onRedeem("coin"));
+    await act(() => result.current.onWithdraw());
+    // Another tab signs in as someone else before the retry.
+    load.mockResolvedValue({ ...data, summary: { ...data.summary, userId: "someone-else" } });
+    await act(() => result.current.onWithdraw());
+    expect(withdraw).toHaveBeenCalledOnce();
+    expect(result.current.error).toMatch(/someone else/);
+    expect(localStorage.getItem("kinkord:unanswered:withdrawal:u")).not.toBeNull();
+  });
+  it("keeps an unanswered withdrawal when the retry meets a sign-up step", async () => {
+    vi.spyOn(walletService, "load").mockResolvedValue(data);
+    vi.spyOn(walletService, "withdraw")
+      .mockRejectedValueOnce(new ApiError(0, { message: "connection lost" }))
+      .mockRejectedValueOnce(
+        new ApiError(403, { code: "PROFILE_PHOTOS_REQUIRED", message: "Add your photos" }),
+      );
+    const { result } = renderHook(() => useWalletPresenter("withdraw"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => result.current.onRedeem("coin"));
+    await act(() => result.current.onWithdraw());
+    await act(() => result.current.onWithdraw());
+    expect(result.current.unansweredNotice).toBeTruthy();
   });
   it("settles a first send that was turned away unread", async () => {
     vi.spyOn(walletService, "load").mockResolvedValue(data);

@@ -102,3 +102,20 @@ export function walletOperationVM(row: WalletOperationPM) {
           }[row.status],
   };
 }
+
+/** A withdrawal sent but not answered: sent again exactly as it was. */
+export interface UnansweredWithdrawal {
+  currency: KinkCurrency;
+  quantity: string;
+  bankId: string;
+  key: string;
+  expectedAmountKobo: number;
+}
+
+/** A gift sent but not answered: sent again exactly as it was. */
+export interface GiftInDoubt {
+  postId: string;
+  currency: KinkCurrency;
+  quantity: string;
+  key: string;
+}

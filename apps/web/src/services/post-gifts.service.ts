@@ -3,6 +3,11 @@ import type { WalletOperationPM, WalletSummaryPM } from "@/domain/wallet";
 import { api } from "./apiClient";
 export const GIFT_COPY = {
   title: "Send a gift",
+  earlierSent: "Your earlier gift went through.",
+  otherAccount:
+    "You're signed in as someone else now. Sign back in to the account that sent this gift to check it.",
+  earlierUnconfirmed:
+    "Your earlier gift isn't confirmed yet. Check your connection, then try again.",
   currency: "Choose currency",
   amount: "Amount",
   close: "Cancel",

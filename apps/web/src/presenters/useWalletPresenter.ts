@@ -6,17 +6,14 @@ import { WALLET_COPY } from "@/constants/wallet";
 import {
   walletMoney,
   walletOperationVM,
+  type UnansweredWithdrawal,
   type WalletMode,
   type WalletOperationPM,
 } from "@/domain/wallet";
 import type { KinkCurrency } from "@/domain/kinkcoins";
 import { bankBadge } from "@/domain/subscription";
-import { ApiError } from "@/services/apiClient";
 import { banksService } from "@/services/banks.service";
-import {
-  pendingTransfersService,
-  type UnansweredWithdrawal,
-} from "@/services/pendingTransfers.service";
+import { pendingTransfersService } from "@/services/pendingTransfers.service";
 
 /** A bank from the directory, with the initials badge it shows in place of a logo. */
 const withBadge = <T extends { name: string }>(bank: T) => ({
@@ -46,16 +43,19 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
   // Sent but unanswered (a lost response): it may have gone through, reserving the coins.
   // Until it's answered, it's what gets sent, exactly as it was (same account and key),
   // whatever the form says now: the server returns the withdrawal it made, or refuses.
-  const [unanswered, setUnanswered] = useState<UnansweredWithdrawal | null>(null);
+  // With its sender: it's only ever sent again by them.
+  const [unanswered, setUnanswered] = useState<(UnansweredWithdrawal & { member: string }) | null>(
+    null,
+  );
   // Unanswered requests are kept in this browser too, for this member, until answered.
   const member = data?.summary.userId ?? null;
-  const keepUnanswered = (request: UnansweredWithdrawal) => {
-    setUnanswered(request);
-    if (member) pendingTransfersService.keepWithdrawal(member, request);
+  const keepUnanswered = (request: UnansweredWithdrawal, sender: string) => {
+    setUnanswered({ ...request, member: sender });
+    pendingTransfersService.keepWithdrawal(sender, request);
   };
-  const settleUnanswered = () => {
+  const settleUnanswered = (sender: string) => {
     setUnanswered(null);
-    if (member) pendingTransfersService.settleWithdrawal(member);
+    pendingTransfersService.settleWithdrawal(sender);
   };
   const keyFor = (value: string) => {
     const existing = keys.current.get(value);
@@ -94,9 +94,16 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
         setData(next);
         if (payment) setOperation(payment);
         // One left unanswered on an earlier visit (a reload, say) comes back, key and all.
-        const member = next.summary.userId;
-        const kept = member ? pendingTransfersService.withdrawal(member) : null;
-        if (kept) setUnanswered((current) => current ?? kept);
+        // Only this member's: another account's (a switch in another tab) stays kept for them.
+        const owner = next.summary.userId;
+        const kept = owner ? pendingTransfersService.withdrawal(owner) : null;
+        setUnanswered((current) =>
+          current && current.member === owner
+            ? current
+            : kept && owner
+              ? { ...kept, member: owner }
+              : null,
+        );
         // The account shown is pinned once: a default changed elsewhere doesn't move it.
         setBankId(
           (previous) =>
@@ -255,7 +262,14 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
           throw new Error(
             "Check the quantity, withdrawable balance, minimum and selected bank account.",
           );
+        if (!member) throw new Error(WALLET_COPY.stillLoading);
         const wasUnanswered = unanswered !== null;
+        if (unanswered) {
+          // Sent again only by its sender: whoever is signed in now (another tab may have
+          // switched accounts) is checked first.
+          const now = await walletService.load();
+          if (now.summary.userId !== unanswered.member) throw new Error(WALLET_COPY.otherAccount);
+        }
         const request = unanswered ?? {
           currency,
           quantity,
@@ -263,7 +277,8 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
           key: keyFor(withdrawal),
           expectedAmountKobo: quote.amountKobo,
         };
-        keepUnanswered(request);
+        const sender = unanswered?.member ?? member;
+        keepUnanswered(request, sender);
         let result: WalletOperationPM;
         try {
           result = await walletService.withdraw(
@@ -274,14 +289,13 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
             request.expectedAmountKobo,
           );
         } catch (e) {
-          // A refusal (4xx) is an answer: nothing was made, so the form decides what's sent
-          // next. A dropped connection (status 0) or a server error is not: keep it. Being
-          // signed out, timed out or rate-limited means this send wasn't read, which settles a
-          // first send but says nothing about an earlier one.
-          const unread = e instanceof ApiError && [401, 408, 429].includes(e.status);
-          if (unread && !wasUnanswered) settleUnanswered();
-          if (e instanceof ApiError && e.status >= 400 && e.status < 500 && !unread) {
-            settleUnanswered();
+          // Refused: nothing was made, so the form decides what's sent next. Unread (signed
+          // out, a sign-up step owed, timed out, rate-limited): settles a first send, never an
+          // earlier one. No answer: it may have gone through, so it's kept.
+          const failure = pendingTransfersService.failure(e);
+          if (failure === "unread" && !wasUnanswered) settleUnanswered(sender);
+          if (failure === "refused") {
+            settleUnanswered(sender);
             // A changed rate, say: show what a new request would be. If that load fails too,
             // the refusal stays on screen and the next refresh catches up.
             void refresh().catch(() => undefined);
@@ -289,7 +303,7 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
           throw e;
         }
         keys.current.delete(`withdraw:${request.currency}:${request.quantity}:${request.bankId}`);
-        settleUnanswered();
+        settleUnanswered(sender);
         supersedeReads();
         setOperation(result);
         setReview(false);
