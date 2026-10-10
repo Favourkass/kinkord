@@ -50,6 +50,7 @@ export interface ProfilePatch {
   languages?: string[];
   socialLinks?: SocialLinks;
   profileVisibility?: ProfileVisibility;
+  showVerifiedBadge?: boolean;
   avatarKey?: string;
   coverKey?: string;
 }
@@ -97,7 +98,7 @@ export const SECTION_ROWS: Record<EditSectionKey, EditRowKey[]> = {
   ],
   kinks: ["roles", "kinks", "lookingFor", "limits"],
   location: ["country", "state", "city", "occupation", "languages"],
-  privacy: ["socialLinks", "profileVisibility"],
+  privacy: ["socialLinks", "profileVisibility", "verifiedBadge"],
 };
 
 /** Same rule as the API / Better Auth username plugin. */
@@ -290,11 +291,17 @@ export function buildEditRow(key: EditRowKey, ctx: EditRowsContext): EditRowPM {
         value: profile.profileVisibility,
         editor: single(profile.profileVisibility, plain(options.visibilities)),
       };
+    case "verifiedBadge": {
+      const value = profile.showVerifiedBadge ? "show" : "hide";
+      return { key, value, editor: single(value, plain(["show", "hide"])) };
+    }
   }
 }
 
 export function buildEditRows(section: EditSectionKey, ctx: EditRowsContext): EditRowPM[] {
-  return SECTION_ROWS[section].map((key) => buildEditRow(key, ctx));
+  return SECTION_ROWS[section]
+    .filter((key) => key !== "verifiedBadge" || ctx.profile.identityVerified)
+    .map((key) => buildEditRow(key, ctx));
 }
 
 export function initialDraft(editor: EditorSpec): EditorDraft {
@@ -398,6 +405,8 @@ export function patchFor(key: EditRowKey, draft: EditorDraft, profile: OwnProfil
     }
     case "profileVisibility":
       return { profileVisibility: (t || "public") as ProfileVisibility };
+    case "verifiedBadge":
+      return { showVerifiedBadge: t !== "hide" };
   }
 }
 
