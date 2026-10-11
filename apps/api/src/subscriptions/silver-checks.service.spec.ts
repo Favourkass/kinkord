@@ -104,7 +104,6 @@ describe("SilverChecksService.forMember", () => {
         {
           heldAt: new Date(),
           heldFor: "photo",
-          createdAt: new Date("2026-01-01T00:00:00Z"),
           avatarKey: "a",
           coverKey: "c",
         },
@@ -115,7 +114,6 @@ describe("SilverChecksService.forMember", () => {
       shown: false,
       reason: "held",
       heldFor: "photo",
-      showsFrom: null,
     });
   });
 });

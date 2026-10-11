@@ -96,7 +96,6 @@ export const MODERATION_COPY = {
       admin: "Removed by an admin. Hidden until approved.",
     },
     photos: "Hidden until they add a profile photo and a cover photo.",
-    newAccount: (date: string) => `Hidden until ${date}, when the account is 30 days old.`,
     approve: "Approve badge",
     remove: "Remove badge",
     approved: "Approved. Their badge shows again.",
