@@ -51,6 +51,9 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     [currency, setCurrency] = useState<KinkCurrency>("coin"),
     [quantity, setQuantity] = useState(""),
     [picked, setBankId] = useState("");
+  const [buyCurrency, setBuyCurrency] = useState<KinkCurrency>("coin");
+  const [buyQuantity, setBuyQuantity] = useState("100");
+  const [buyBudget, setBuyBudget] = useState<string | null>(null);
   const [bankForm, setBankForm] = useState({ bankName: "", accountName: "", accountNumber: "" }),
     [proof, setProof] = useState({ senderAccountName: "", senderReference: "" }),
     [file, setFile] = useState<File | null>(null);
@@ -204,8 +207,33 @@ export function useWalletPresenter(mode: WalletMode, paymentId?: string) {
     bankId,
     vm.canRedeem,
   );
+  // A typed budget is worked out again at the latest prices, so it never buys more than it holds.
+  const buyCount =
+    buyBudget === null
+      ? buyQuantity
+      : walletService.quantityForBudget(data?.summary.settings ?? null, buyCurrency, buyBudget);
+  const purchaseQuote = walletService.purchaseQuote(
+    data?.summary.settings ?? null,
+    buyCurrency,
+    buyCount,
+  );
   return {
     ...vm,
+    purchaseQuote,
+    buyCurrency,
+    buyQuantity: buyCount,
+    buyBudget: buyBudget ?? purchaseQuote.amountNgn,
+    onBuyCurrency: (kind: KinkCurrency) => {
+      // The count carries over to the new currency, whichever field set it.
+      setBuyQuantity(buyCount);
+      setBuyCurrency(kind);
+      setBuyBudget(null);
+    },
+    onBuyQuantity: (value: string) => {
+      setBuyQuantity(value);
+      setBuyBudget(null);
+    },
+    onBuyBudget: (value: string) => setBuyBudget(value),
     mode,
     loading,
     error,
