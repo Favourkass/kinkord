@@ -76,6 +76,33 @@ describe("useWalletPresenter", () => {
       problem: "The minimum purchase is ₦1,000.00.",
     });
   });
+  it("works a typed budget out again when the prices change, so it never buys more", async () => {
+    const { result } = renderHook(() => useWalletPresenter("buy"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => result.current.onBuyBudget("1400"));
+    expect(result.current.buyQuantity).toBe("140");
+    // The rate goes up while the form is open: ₦10 a coin becomes ₦12.
+    const dearer = {
+      ...data,
+      summary: {
+        ...data.summary,
+        settings: {
+          ...data.summary.settings,
+          rates: { ...data.summary.settings.rates!, coin: { buy: 1200, redeem: 960 } },
+        },
+      },
+    };
+    vi.mocked(walletService.load).mockResolvedValue(dearer);
+    act(() => {
+      window.dispatchEvent(new Event("focus"));
+    });
+    await waitFor(() => expect(result.current.buyQuantity).toBe("116"));
+    expect(result.current.buyBudget).toBe("1400");
+    expect(result.current.purchaseQuote.amountNgn).toBe("1392");
+    // Switching currency keeps the count the budget bought.
+    act(() => result.current.onBuyCurrency("star"));
+    expect(result.current.buyQuantity).toBe("116");
+  });
   it("loads server balances and requires an explicit withdrawal review", async () => {
     const { result } = renderHook(() => useWalletPresenter("withdraw"));
     await waitFor(() => expect(result.current.loading).toBe(false));

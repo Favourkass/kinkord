@@ -30,6 +30,7 @@ import {
   nextWalletStatus,
   MIN_PURCHASE_KOBO,
   PACKS,
+  purchasablePacks,
   sameSender,
   walletAmount,
   walletNairaRates,
@@ -104,17 +105,18 @@ export class WalletService {
   async settings() {
     const [row] = await this.db.select().from(walletSettings).where(eq(walletSettings.id, 1));
     const payment = await readSettings(this.db);
+    const rates = row ? walletNairaRates(row.usdRates, row.exchangeRateKobo) : null;
     return {
       currency: "NGN" as const,
       usdConversion: row?.exchangeRateKobo ? { kobo: row.exchangeRateKobo, usdCents: 100 } : null,
       usdRates: row?.usdRates ?? null,
       exchangeRateKobo: row?.exchangeRateKobo ?? null,
       enabled: !!row?.enabled && !!payment.bank,
-      rates: row ? walletNairaRates(row.usdRates, row.exchangeRateKobo) : null,
+      rates,
       minimumKobo: row?.minimumKobo ?? null,
       minimumPurchaseKobo: MIN_PURCHASE_KOBO,
       bank: payment.bank,
-      packs: PACKS,
+      packs: rates ? purchasablePacks(rates) : PACKS,
     };
   }
   async saveSettings(actorId: string, input: z.infer<typeof walletSettingsSchema>) {

@@ -58,6 +58,15 @@ export const PACKS = {
   star: [10, 50, 100, 250],
   crown: [1, 3, 5, 10],
 };
+/** The bundles worth offering at these prices: the ones inside the purchase limits. */
+export function purchasablePacks(rates: WalletRates) {
+  const inRange = (currency: WalletCurrency) =>
+    PACKS[currency].filter((quantity) => {
+      const amount = quantity * rates[currency].buy;
+      return amount >= MIN_PURCHASE_KOBO && amount <= 1_000_000_000;
+    });
+  return { coin: inRange("coin"), star: inRange("star"), crown: inRange("crown") };
+}
 export function walletAmount(
   rates: WalletRates,
   currency: WalletCurrency,

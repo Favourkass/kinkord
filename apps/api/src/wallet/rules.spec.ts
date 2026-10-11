@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import { paymentReference } from "../subscriptions/plans";
 import {
   nextWalletStatus,
+  PACKS,
+  purchasablePacks,
   sameSender,
   walletAmount,
   walletNairaRates,
@@ -33,6 +35,22 @@ describe("independent USD standard", () => {
     expect(walletAmount(converted, "coin", 893, "withdrawal", 10000000)).toBe(10001600);
     expect(() => walletAmount(converted, "coin", 892, "withdrawal", 10000000)).toThrow(/minimum/);
     expect(walletNairaRates(usd, 150000).coin.buy).toBe(15000);
+  });
+});
+describe("purchasablePacks", () => {
+  it("offers every bundle at the USD prices, and drops one under the minimum", () => {
+    const usd = walletNairaRates(
+      {
+        coin: { buy: 10, redeem: 8 },
+        star: { buy: 100, redeem: 80 },
+        crown: { buy: 1000, redeem: 800 },
+      },
+      140000,
+    );
+    expect(purchasablePacks(usd)).toEqual(PACKS);
+    // A crown at $0.50 is ₦700: one alone is under the ₦1,000 minimum.
+    const cheap = { ...usd, crown: { buy: 70000, redeem: 56000 } };
+    expect(purchasablePacks(cheap).crown).toEqual([3, 5, 10]);
   });
 });
 describe("wallet monetary rules", () => {
