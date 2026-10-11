@@ -50,6 +50,9 @@ export function walletNairaRates(usdRates: WalletRates, exchangeRateKobo: number
   return { coin: pair("coin"), star: pair("star"), crown: pair("crown") };
 }
 
+/** The smallest purchase, in kobo: ₦1,000. */
+export const MIN_PURCHASE_KOBO = 100_000;
+
 export const PACKS = {
   coin: [100, 500, 1000, 2500],
   star: [10, 50, 100, 250],
@@ -67,9 +70,11 @@ export function walletAmount(
   const amount = quantity * rates[currency][kind === "purchase" ? "buy" : "redeem"];
   if (!Number.isSafeInteger(amount) || amount > 1_000_000_000)
     throw new BadRequestException("Amount exceeds the wallet limit.");
-  if (kind === "purchase" && amount < 100_000)
-    throw new BadRequestException("Minimum purchase is ₦1,000.");
-  if (kind === "withdrawal" && amount < Math.max(minimum, 10_000_000))
+  if (kind === "purchase" && amount < MIN_PURCHASE_KOBO)
+    throw new BadRequestException(
+      `Minimum purchase is ₦${(MIN_PURCHASE_KOBO / 100).toLocaleString("en-NG")}.`,
+    );
+  if (kind === "withdrawal" && amount < minimum)
     throw new BadRequestException("Withdrawal is below the configured minimum.");
   return amount;
 }

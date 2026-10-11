@@ -28,6 +28,7 @@ import { readSettings } from "../subscriptions/subscriptions.service";
 import { silverCheckStatus } from "../subscriptions/plans";
 import {
   nextWalletStatus,
+  MIN_PURCHASE_KOBO,
   PACKS,
   sameSender,
   walletAmount,
@@ -109,10 +110,9 @@ export class WalletService {
       usdRates: row?.usdRates ?? null,
       exchangeRateKobo: row?.exchangeRateKobo ?? null,
       enabled: !!row?.enabled && !!payment.bank,
-      rates: row?.usdRates
-        ? walletNairaRates(row.usdRates, row.exchangeRateKobo)
-        : (row?.rates ?? null),
+      rates: row ? walletNairaRates(row.usdRates, row.exchangeRateKobo) : null,
       minimumKobo: row?.minimumKobo ?? null,
+      minimumPurchaseKobo: MIN_PURCHASE_KOBO,
       bank: payment.bank,
       packs: PACKS,
     };
@@ -289,7 +289,7 @@ export class WalletService {
       const [config] = await tx.select().from(walletSettings).where(eq(walletSettings.id, 1));
       if (!config?.enabled) throw walletDisabled();
       const amountKobo = walletAmount(
-        config.usdRates ? walletNairaRates(config.usdRates, config.exchangeRateKobo) : config.rates,
+        walletNairaRates(config.usdRates, config.exchangeRateKobo),
         input.currency,
         input.quantity,
         kind,

@@ -28,6 +28,7 @@ const data: WalletDataPM = {
         crown: { buy: 100000, redeem: 80000 },
       },
       minimumKobo: 10_000_000,
+      minimumPurchaseKobo: 100_000,
       bank: null,
       packs: { coin: [12500], star: [], crown: [] },
     },
@@ -67,6 +68,13 @@ describe("useWalletPresenter", () => {
     expect(result.current.buyBudget).toBe("12300");
     act(() => result.current.onBuyBudget("999"));
     expect(result.current.purchaseQuote.valid).toBe(false);
+    // A budget that buys less than the minimum says so, rather than just greying out Buy.
+    act(() => result.current.onBuyCurrency("coin"));
+    act(() => result.current.onBuyBudget("999"));
+    expect(result.current.purchaseQuote).toMatchObject({
+      valid: false,
+      problem: "The minimum purchase is ₦1,000.00.",
+    });
   });
   it("loads server balances and requires an explicit withdrawal review", async () => {
     const { result } = renderHook(() => useWalletPresenter("withdraw"));

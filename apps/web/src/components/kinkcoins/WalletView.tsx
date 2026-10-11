@@ -193,6 +193,11 @@ export default function WalletView({ vm }: Props) {
             <p className="font-bold text-app-members-count">
               {copy.purchasePrice}: {vm.purchaseQuote.amount}
             </p>
+            {vm.purchaseQuote.problem ? (
+              <p role="status" className="text-xs text-app-danger">
+                {vm.purchaseQuote.problem}
+              </p>
+            ) : null}
             <button className={button} disabled={vm.busy || !vm.purchaseQuote.valid}>
               {copy.buy}
             </button>

@@ -51,11 +51,17 @@ describe("wallet monetary rules", () => {
       ["crown", 1, 125],
     ] as const) {
       expect(walletAmount(rates, currency, purchase, "purchase", 0)).toBe(100_000);
-      expect(walletAmount(rates, currency, redeem, "withdrawal", 0)).toBe(10_000_000);
-      expect(() => walletAmount(rates, currency, redeem - 1, "withdrawal", 0)).toThrow(/minimum/);
+      expect(walletAmount(rates, currency, redeem, "withdrawal", 10_000_000)).toBe(10_000_000);
+      expect(() => walletAmount(rates, currency, redeem - 1, "withdrawal", 10_000_000)).toThrow(
+        /minimum/,
+      );
     }
     expect(walletAmount(rates, "coin", 123, "purchase", 0)).toBe(123_000);
-    expect(() => walletAmount(rates, "star", 9, "purchase", 0)).toThrow(/Minimum purchase/);
+    expect(() => walletAmount(rates, "star", 9, "purchase", 0)).toThrow(
+      "Minimum purchase is ₦1,000.",
+    );
+    // The withdrawal minimum is whatever the founders set, with no floor of its own.
+    expect(walletAmount(rates, "coin", 10, "withdrawal", 8_000)).toBe(8_000);
   });
   it("requires proof before credit and approval before recording a manual payout", () => {
     expect(nextWalletStatus("purchase", "submitted", "verify")).toBe("verified");

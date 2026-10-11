@@ -118,7 +118,7 @@ export const walletService = {
     bankLimitReached: (data?.banks.length ?? 0) >= 2,
     enabled: data?.summary.settings.enabled ?? false,
     minimum: data?.summary.settings.minimumKobo
-      ? walletMoney(Math.max(data.summary.settings.minimumKobo, 10_000_000))
+      ? walletMoney(data.summary.settings.minimumKobo)
       : "—",
     banks:
       data?.banks.map((bank) => ({
@@ -142,8 +142,7 @@ export const walletService = {
         : "—",
       minimumWithdrawalUnits: data?.summary.settings.rates?.[kind].redeem
         ? Math.ceil(
-            Math.max(data.summary.settings.minimumKobo ?? 0, 10_000_000) /
-              data.summary.settings.rates[kind].redeem,
+            (data.summary.settings.minimumKobo ?? 0) / data.summary.settings.rates[kind].redeem,
           ).toLocaleString("en-NG")
         : "—",
       buyRate: data?.summary.settings.rates?.[kind].buy
@@ -163,17 +162,22 @@ export const walletService = {
   purchaseQuote: (settings: WalletSettingsPM | null, currency: KinkCurrency, quantity: string) => {
     const count = Number(quantity);
     const amountKobo = count * (settings?.rates?.[currency].buy ?? 0);
+    const minimum = settings?.minimumPurchaseKobo ?? 0;
+    const whole = /^[1-9]\d*$/.test(quantity) && Number.isSafeInteger(count) && count <= 1_000_000;
+    const priced = whole && Number.isSafeInteger(amountKobo) && amountKobo > 0;
+    // Say why Buy is off for an amount out of range, rather than leave it greyed out.
+    const problem = !priced
+      ? null
+      : amountKobo < minimum
+        ? WALLET_COPY.purchaseMinimum(walletMoney(minimum))
+        : amountKobo > 1_000_000_000
+          ? WALLET_COPY.purchaseMaximum(walletMoney(1_000_000_000))
+          : null;
     return {
       amount: walletPurchaseUsd(Number.isSafeInteger(amountKobo) ? amountKobo : 0, settings),
       amountNgn: Number.isSafeInteger(amountKobo) && amountKobo > 0 ? String(amountKobo / 100) : "",
-      valid:
-        !!settings?.enabled &&
-        /^[1-9]\d*$/.test(quantity) &&
-        Number.isSafeInteger(count) &&
-        count <= 1_000_000 &&
-        Number.isSafeInteger(amountKobo) &&
-        amountKobo >= 100_000 &&
-        amountKobo <= 1_000_000_000,
+      problem,
+      valid: !!settings?.enabled && priced && !problem,
     };
   },
   quantityForBudget: (
@@ -191,11 +195,7 @@ export const walletService = {
   },
   minimumQuantity: (settings: WalletSettingsPM | null, currency: KinkCurrency) =>
     settings?.rates?.[currency].redeem
-      ? String(
-          Math.ceil(
-            Math.max(settings.minimumKobo ?? 0, 10_000_000) / settings.rates[currency].redeem,
-          ),
-        )
+      ? String(Math.ceil((settings.minimumKobo ?? 0) / settings.rates[currency].redeem))
       : "",
   withdrawalQuote: (
     settings: WalletSettingsPM | null,
@@ -223,7 +223,7 @@ export const walletService = {
         count <= 1_000_000 &&
         amount > 0 &&
         amount <= 1_000_000_000 &&
-        amount >= Math.max(settings.minimumKobo ?? Infinity, 10_000_000),
+        amount >= (settings.minimumKobo ?? Infinity),
     };
   },
 };
@@ -248,12 +248,15 @@ export const walletAdminService = {
     },
   ) => api.post<WalletOperationPM>(`/admin/wallet/${encodeURIComponent(id)}/decision`, input),
 };
-export function ngnToKobo(value: string) {
+/** "1,400.50"-style money in a field, as hundredths: kobo for naira, cents for dollars. */
+function toHundredths(value: string, currency: "NGN" | "USD") {
   if (!/^\d+(\.\d{1,2})?$/.test(value.trim()))
-    throw new Error("Enter a valid NGN amount with no more than two decimal places.");
+    throw new Error(`Enter a valid ${currency} amount with no more than two decimal places.`);
   const [whole, fraction = ""] = value.trim().split(".");
   const result = Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
   if (!Number.isSafeInteger(result) || result < 1 || result > 1_000_000_000)
     throw new Error("Amount is outside the supported range.");
   return result;
 }
+export const ngnToKobo = (value: string) => toHundredths(value, "NGN");
+export const usdToCents = (value: string) => toHundredths(value, "USD");

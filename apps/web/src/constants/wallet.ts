@@ -112,10 +112,12 @@ export const WALLET_COPY = {
   customPurchase: "Choose your own amount",
   purchaseQuantity: "Number to buy",
   purchaseBudget: "Amount available (NGN)",
+  purchaseMinimum: (amount: string) => `The minimum purchase is ${amount}.`,
+  purchaseMaximum: (amount: string) => `The most you can buy at once is ${amount}.`,
   purchaseBudgetHint:
     "Whole units only. Your payment amount is shown below; any unused budget stays with you.",
   buyHint:
-    "Prices are shown in USD. The payment page shows the exact naira amount to transfer. Minimum purchase is ₦1,000. Coins are credited after payment verification. Bought coins are for gifting and can't be withdrawn.",
+    "Prices are shown in USD. The payment page shows the exact naira amount to transfer. Coins are credited after payment verification. Bought coins are for gifting and can't be withdrawn.",
   transfer:
     "Transfer the exact amount to this account, then upload proof. Your wallet is credited only after an admin verifies the payment.",
   amount: "Amount to transfer",

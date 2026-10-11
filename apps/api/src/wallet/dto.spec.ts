@@ -55,6 +55,9 @@ describe("wallet request validation", () => {
       }).success,
     ).toBe(false);
     expect(walletSettingsSchema.safeParse({ ...input, minimumKobo: 10.5 }).success).toBe(false);
+    // Any minimum from ₦1 up: the founders choose it on the Wallet screen.
+    expect(walletSettingsSchema.safeParse({ ...input, minimumKobo: 500_000 }).success).toBe(true);
+    expect(walletSettingsSchema.safeParse({ ...input, minimumKobo: 99 }).success).toBe(false);
   });
 });
 

@@ -9,6 +9,18 @@ const rates = {
   star: { buy: 10000, redeem: 8000 },
   crown: { buy: 100000, redeem: 80000 },
 };
+/** A saved wallet setup whose prices come to `rates` above, at ₦100 to the dollar. */
+const savedSettings = {
+  rates,
+  usdRates: {
+    coin: { buy: 10, redeem: 8 },
+    star: { buy: 100, redeem: 80 },
+    crown: { buy: 1000, redeem: 800 },
+  },
+  exchangeRateKobo: 10_000,
+  enabled: 1,
+  minimumKobo: 10_000_000,
+};
 const row = {
   id: "op",
   userId: "user",
@@ -124,7 +136,7 @@ describe("WalletService", () => {
     const { service, db } = fixture(
       [
         [],
-        [{ rates, enabled: 1, minimumKobo: 10_000_000 }],
+        [savedSettings],
         [
           {
             id: "bank",
@@ -156,7 +168,7 @@ describe("WalletService", () => {
       accountNumber: "1234567890",
     };
     const { service, sets, values } = fixture(
-      [[], [{ rates, enabled: 1, minimumKobo: 10_000_000 }], [bank]],
+      [[], [savedSettings], [bank]],
       [[{ userId: "user" }]],
       [[{ ...row, kind: "withdrawal" }]],
     );
@@ -187,7 +199,7 @@ describe("WalletService", () => {
     expect(db.transaction).not.toHaveBeenCalled();
   });
   it("refuses a withdrawal whose rate changed after the member reviewed it", async () => {
-    const { service, db } = fixture([[], [{ rates, enabled: 1, minimumKobo: 10_000_000 }]]);
+    const { service, db } = fixture([[], [savedSettings]]);
     await expect(
       service.create("user", "withdrawal", {
         currency: "coin",

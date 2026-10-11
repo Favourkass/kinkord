@@ -13,7 +13,7 @@ const pair = z
 export const walletSettingsSchema = z.object({
   usdRates: z.object({ coin: pair, star: pair, crown: pair }),
   exchangeRateKobo: z.number().int().min(100).max(10_000_000).multipleOf(100),
-  minimumKobo: z.number().int().min(10_000_000).max(1_000_000_000),
+  minimumKobo: z.number().int().min(100).max(1_000_000_000),
   enabled: z.boolean(),
 });
 export const walletBankSchema = z.object({

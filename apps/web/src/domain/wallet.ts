@@ -20,6 +20,8 @@ export interface WalletSettingsPM {
   enabled: boolean;
   rates: Record<KinkCurrency, { buy: number; redeem: number }> | null;
   minimumKobo: number | null;
+  /** The smallest purchase, in kobo. */
+  minimumPurchaseKobo?: number;
   bank: { name: string; accountName: string; accountNumber: string } | null;
   packs: Record<KinkCurrency, number[]>;
   canEdit?: boolean;

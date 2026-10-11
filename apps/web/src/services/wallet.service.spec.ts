@@ -1,5 +1,5 @@
 import { beforeEach, describe, it, expect, vi } from "vitest";
-import { ngnToKobo, walletService, walletPurchaseUsd } from "./wallet.service";
+import { ngnToKobo, usdToCents, walletService, walletPurchaseUsd } from "./wallet.service";
 import type { WalletSettingsPM } from "@/domain/wallet";
 const post = vi.hoisted(() => vi.fn());
 vi.mock("./apiClient", () => ({ api: { post }, uploadToPresignedUrl: vi.fn() }));
@@ -13,6 +13,7 @@ const settings: WalletSettingsPM = {
     crown: { buy: 100000, redeem: 80000 },
   },
   minimumKobo: 10_000_000,
+  minimumPurchaseKobo: 100_000,
   bank: null,
   packs: { coin: [100], star: [10], crown: [1] },
 };
@@ -21,6 +22,12 @@ describe("wallet rules at the client boundary", () => {
   it("parses NGN without floating point drift and refuses fractions of a kobo", () => {
     expect(ngnToKobo("12.34")).toBe(1234);
     for (const bad of ["1.234", "-1", "NaN", "0", "1e4"]) expect(() => ngnToKobo(bad)).toThrow();
+  });
+  it("reads dollar prices as cents, and says dollars when one is mistyped", () => {
+    expect(usdToCents("0.08")).toBe(8);
+    expect(usdToCents("10")).toBe(1000);
+    expect(() => usdToCents("0.105")).toThrow("Enter a valid USD amount");
+    expect(() => ngnToKobo("1,400")).toThrow("Enter a valid NGN amount");
   });
   it("uses the configured minimum and never allows reserved or missing funds", () => {
     expect(walletService.minimumQuantity(settings, "coin")).toBe("12500");
@@ -101,8 +108,18 @@ describe("dollar catalogue and naira custom purchase budgets", () => {
       valid: true,
       amountNgn: "1230",
     });
-    expect(walletService.purchaseQuote(settings, "coin", "99").valid).toBe(false);
-    expect(walletService.purchaseQuote(settings, "coin", "100.5").valid).toBe(false);
+    expect(walletService.purchaseQuote(settings, "coin", "99")).toMatchObject({
+      valid: false,
+      problem: "The minimum purchase is ₦1,000.00.",
+    });
+    expect(walletService.purchaseQuote(settings, "coin", "100.5")).toMatchObject({
+      valid: false,
+      problem: null,
+    });
+    expect(walletService.purchaseQuote(settings, "crown", "10001")).toMatchObject({
+      valid: false,
+      problem: "The most you can buy at once is ₦10,000,000.00.",
+    });
   });
 });
 

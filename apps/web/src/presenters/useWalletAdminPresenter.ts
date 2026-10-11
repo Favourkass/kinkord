@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { WALLET_COPY } from "@/constants/wallet";
 import { Routes } from "@/constants/Routes";
 import { walletOperationVM, type WalletOperationPM, type WalletSettingsPM } from "@/domain/wallet";
-import { ngnToKobo, walletAdminService } from "@/services/wallet.service";
+import { ngnToKobo, usdToCents, walletAdminService } from "@/services/wallet.service";
 import { useAdminAccessPresenter } from "./useAdminAccessPresenter";
 type Action = "verify" | "approve" | "reject" | "paid";
 const blank = {
@@ -176,9 +176,9 @@ export function useWalletAdminPresenter() {
       run(async () => {
         await walletAdminService.saveSettings({
           usdRates: {
-            coin: { buy: ngnToKobo(form.coinBuy), redeem: ngnToKobo(form.coinRedeem) },
-            star: { buy: ngnToKobo(form.starBuy), redeem: ngnToKobo(form.starRedeem) },
-            crown: { buy: ngnToKobo(form.crownBuy), redeem: ngnToKobo(form.crownRedeem) },
+            coin: { buy: usdToCents(form.coinBuy), redeem: usdToCents(form.coinRedeem) },
+            star: { buy: usdToCents(form.starBuy), redeem: usdToCents(form.starRedeem) },
+            crown: { buy: usdToCents(form.crownBuy), redeem: usdToCents(form.crownRedeem) },
           },
           exchangeRateKobo: ngnToKobo(form.exchangeRate),
           minimumKobo: ngnToKobo(form.minimum),
