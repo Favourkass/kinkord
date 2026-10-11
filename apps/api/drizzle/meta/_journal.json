@@ -169,6 +169,13 @@
       "when": 1791623598188,
       "tag": "0023_wallet_operation_bank",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791705280160,
+      "tag": "0024_wallet_usd_prices",
+      "breakpoints": true
     }
   ]
 }

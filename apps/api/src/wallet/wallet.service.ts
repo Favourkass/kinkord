@@ -28,9 +28,12 @@ import { readSettings } from "../subscriptions/subscriptions.service";
 import { silverCheckStatus } from "../subscriptions/plans";
 import {
   nextWalletStatus,
+  MIN_PURCHASE_KOBO,
   PACKS,
+  purchasablePacks,
   sameSender,
   walletAmount,
+  walletNairaRates,
   walletDisabled,
   walletPaymentReference,
 } from "./rules";
@@ -102,14 +105,18 @@ export class WalletService {
   async settings() {
     const [row] = await this.db.select().from(walletSettings).where(eq(walletSettings.id, 1));
     const payment = await readSettings(this.db);
+    const rates = row ? walletNairaRates(row.usdRates, row.exchangeRateKobo) : null;
     return {
       currency: "NGN" as const,
-      usdConversion: payment.bank ? payment.prices.monthly : null,
+      usdConversion: row?.exchangeRateKobo ? { kobo: row.exchangeRateKobo, usdCents: 100 } : null,
+      usdRates: row?.usdRates ?? null,
+      exchangeRateKobo: row?.exchangeRateKobo ?? null,
       enabled: !!row?.enabled && !!payment.bank,
-      rates: row?.rates ?? null,
+      rates,
       minimumKobo: row?.minimumKobo ?? null,
+      minimumPurchaseKobo: MIN_PURCHASE_KOBO,
       bank: payment.bank,
-      packs: PACKS,
+      packs: rates ? purchasablePacks(rates) : PACKS,
     };
   }
   async saveSettings(actorId: string, input: z.infer<typeof walletSettingsSchema>) {
@@ -120,7 +127,9 @@ export class WalletService {
         .insert(walletSettings)
         .values({
           id: 1,
-          rates: input.rates,
+          rates: walletNairaRates(input.usdRates, input.exchangeRateKobo),
+          usdRates: input.usdRates,
+          exchangeRateKobo: input.exchangeRateKobo,
           minimumKobo: input.minimumKobo,
           enabled: input.enabled ? 1 : 0,
           updatedBy: actorId,
@@ -128,7 +137,9 @@ export class WalletService {
         .onConflictDoUpdate({
           target: walletSettings.id,
           set: {
-            rates: input.rates,
+            rates: walletNairaRates(input.usdRates, input.exchangeRateKobo),
+            usdRates: input.usdRates,
+            exchangeRateKobo: input.exchangeRateKobo,
             minimumKobo: input.minimumKobo,
             enabled: input.enabled ? 1 : 0,
             updatedBy: actorId,
@@ -280,7 +291,7 @@ export class WalletService {
       const [config] = await tx.select().from(walletSettings).where(eq(walletSettings.id, 1));
       if (!config?.enabled) throw walletDisabled();
       const amountKobo = walletAmount(
-        config.rates,
+        walletNairaRates(config.usdRates, config.exchangeRateKobo),
         input.currency,
         input.quantity,
         kind,

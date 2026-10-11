@@ -12,11 +12,16 @@ export interface WalletBankPM {
 }
 export interface WalletSettingsPM {
   currency: "NGN";
-  /** Shared configured NGN/USD conversion from Silver payment settings. */
+  /** Independent wallet prices in USD cents and kobo per USD. */
+  usdRates?: Record<KinkCurrency, { buy: number; redeem: number }> | null;
+  exchangeRateKobo?: number | null;
+  /** Wallet-only NGN/USD conversion; independent of Silver pricing. */
   usdConversion?: { kobo: number; usdCents: number } | null;
   enabled: boolean;
   rates: Record<KinkCurrency, { buy: number; redeem: number }> | null;
   minimumKobo: number | null;
+  /** The smallest purchase, in kobo. */
+  minimumPurchaseKobo?: number;
   bank: { name: string; accountName: string; accountNumber: string } | null;
   packs: Record<KinkCurrency, number[]>;
   canEdit?: boolean;

@@ -19,7 +19,19 @@ export interface WalletRates {
 }
 export const walletSettings = pgTable("wallet_settings", {
   id: integer("id").primaryKey(),
+  /** Naira per unit as last saved. Prices are read from usd_rates and the exchange rate. */
   rates: jsonb("rates").$type<WalletRates>().notNull(),
+  /** The prices: US cents per unit. */
+  usdRates: jsonb("usd_rates")
+    .$type<WalletRates>()
+    .notNull()
+    .default({
+      coin: { buy: 10, redeem: 8 },
+      star: { buy: 100, redeem: 80 },
+      crown: { buy: 1000, redeem: 800 },
+    }),
+  /** Kobo per US dollar, for the wallet only (Silver has its own prices). */
+  exchangeRateKobo: integer("exchange_rate_kobo").notNull().default(140000),
   minimumKobo: integer("minimum_kobo").notNull(),
   enabled: integer("enabled").notNull().default(0),
   updatedBy: text("updated_by").notNull(),

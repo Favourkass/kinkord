@@ -14,7 +14,7 @@ describe("useWalletAdminPresenter", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.spyOn(walletAdminService, "settings").mockResolvedValue({
-      rates: null,
+      usdRates: null,
       minimumKobo: null,
       enabled: false,
       canEdit: false,
@@ -29,26 +29,33 @@ describe("useWalletAdminPresenter", () => {
   });
   it("fills the settings form when a refresh succeeds after a failed first load", async () => {
     const rates = {
-      coin: { buy: 1000, redeem: 800 },
-      star: { buy: 10000, redeem: 8000 },
-      crown: { buy: 100000, redeem: 80000 },
+      coin: { buy: 10, redeem: 8 },
+      star: { buy: 100, redeem: 80 },
+      crown: { buy: 1000, redeem: 800 },
     };
     vi.mocked(walletAdminService.settings)
       .mockRejectedValueOnce(new Error("Settings are down."))
-      .mockResolvedValue({ rates, minimumKobo: 50000, enabled: true, canEdit: true } as never);
+      .mockResolvedValue({
+        usdRates: rates,
+        exchangeRateKobo: 140000,
+        minimumKobo: 50000,
+        enabled: true,
+        canEdit: true,
+      } as never);
     const { result } = renderHook(() => useWalletAdminPresenter());
     await waitFor(() => expect(result.current.error).toBe("Settings are down."));
     await act(() => result.current.onRefresh());
     expect(result.current.error).toBeNull();
-    expect(result.current.form).toMatchObject({ coinBuy: "10", minimum: "500", enabled: true });
+    expect(result.current.form).toMatchObject({ coinBuy: "0.1", minimum: "500", enabled: true });
   });
   it("refreshes after a save with the filters now in force", async () => {
     vi.mocked(walletAdminService.settings).mockResolvedValue({
-      rates: {
-        coin: { buy: 1000, redeem: 800 },
-        star: { buy: 10000, redeem: 8000 },
-        crown: { buy: 100000, redeem: 80000 },
+      usdRates: {
+        coin: { buy: 10, redeem: 8 },
+        star: { buy: 100, redeem: 80 },
+        crown: { buy: 1000, redeem: 800 },
       },
+      exchangeRateKobo: 140000,
       minimumKobo: 50000,
       enabled: true,
       canEdit: true,
@@ -58,13 +65,23 @@ describe("useWalletAdminPresenter", () => {
       .spyOn(walletAdminService, "saveSettings")
       .mockImplementation(() => new Promise((resolve) => (saved = () => resolve({} as never))));
     const { result } = renderHook(() => useWalletAdminPresenter());
-    await waitFor(() => expect(result.current.form.coinBuy).toBe("10"));
+    await waitFor(() => expect(result.current.form.coinBuy).toBe("0.1"));
     let saving: Promise<void> = Promise.resolve();
     act(() => {
       saving = result.current.onSave();
     });
     // The save is out before the filter changes.
     await waitFor(() => expect(save).toHaveBeenCalled());
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        usdRates: {
+          coin: { buy: 10, redeem: 8 },
+          star: { buy: 100, redeem: 80 },
+          crown: { buy: 1000, redeem: 800 },
+        },
+        exchangeRateKobo: 140000,
+      }),
+    );
     act(() => result.current.onKind("withdrawal"));
     await act(async () => {
       saved();

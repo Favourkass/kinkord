@@ -64,6 +64,16 @@ export default function WalletAdminView({
             ))}
           </div>
           <label className="block text-xs">
+            {copy.walletExchangeRate}
+            <input
+              required
+              inputMode="numeric"
+              value={vm.form.exchangeRate}
+              onChange={(event) => vm.onField("exchangeRate", event.target.value)}
+              className={input}
+            />
+          </label>
+          <label className="block text-xs">
             {copy.minimumSetting}
             <input
               required
