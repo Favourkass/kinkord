@@ -19,6 +19,7 @@ export default function ThreadPage({ params }: { params: Promise<{ id: string }>
     safety,
     backHref,
     send,
+    onTyping,
     retry,
     loadMore,
     attachPhoto,
@@ -68,6 +69,7 @@ export default function ThreadPage({ params }: { params: Promise<{ id: string }>
         onSend={send}
         onRetry={retry}
         composer={{
+          onTyping,
           placeholder: CHAT_COPY.placeholder,
           sendLabel: CHAT_COPY.send,
           maxLength: MESSAGE_BODY_MAX,
