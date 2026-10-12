@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { z } from "zod";
+import { fromNodeHeaders } from "better-auth/node";
 import { AuthGuard, type AuthedRequest } from "../auth/auth.guard";
 import { AdminGuard } from "../moderation/admin.guard";
 import { BronzeService } from "./bronze.service";
@@ -66,6 +67,13 @@ const decisionSchema = z.object({
 });
 const uuid = z.string().uuid();
 const userId = z.string().trim().min(1).max(64);
+const stepUpSchema = z.object({ code: z.string().regex(/^\d{6}$/) });
+const actionSchema = z.object({ reason: z.string().trim().min(10).max(1000) });
+const admin = (req: AuthedRequest) => ({
+  id: req.user.id,
+  twoFactorEnabled: req.user.twoFactorEnabled,
+  sessionId: req.session.id,
+});
 
 /** Verification reviews, for the same admins who moderate. */
 @Controller("admin/verification")
@@ -73,8 +81,14 @@ const userId = z.string().trim().min(1).max(64);
 export class BronzeAdminController {
   constructor(private readonly bronze: BronzeService) {}
 
+  @Post("step-up") stepUp(@Req() req: AuthedRequest, @Body() body: unknown) {
+    const parsed = stepUpSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException("A valid six-digit code is required.");
+    return this.bronze.stepUp(admin(req), parsed.data.code, fromNodeHeaders(req.headers));
+  }
+
   @Get("reviews") reviews(@Req() req: AuthedRequest) {
-    return this.bronze.reviews(req.user);
+    return this.bronze.reviews(admin(req));
   }
 
   @Post("reviews/:id/decision") decide(
@@ -85,7 +99,7 @@ export class BronzeAdminController {
     const parsed = decisionSchema.safeParse(body);
     if (!uuid.safeParse(id).success || !parsed.success)
       throw new BadRequestException("A decision, an evidence reference and a reason are required.");
-    return this.bronze.decideReview(req.user, { id, ...parsed.data });
+    return this.bronze.decideReview(admin(req), { id, ...parsed.data });
   }
 
   @Get("members/:userId") member(@Param("userId") id: string) {
@@ -93,13 +107,25 @@ export class BronzeAdminController {
     return this.bronze.adminStatus(id);
   }
 
-  @Post("members/:userId/revoke") revoke(@Req() req: AuthedRequest, @Param("userId") id: string) {
-    if (!userId.safeParse(id).success) throw new BadRequestException("Invalid member.");
-    return this.bronze.revoke(req.user, id);
+  @Post("members/:userId/revoke") revoke(
+    @Req() req: AuthedRequest,
+    @Param("userId") id: string,
+    @Body() body: unknown,
+  ) {
+    const parsed = actionSchema.safeParse(body);
+    if (!userId.safeParse(id).success || !parsed.success)
+      throw new BadRequestException("A valid member and reason are required.");
+    return this.bronze.revoke(admin(req), id, parsed.data.reason);
   }
 
-  @Post("members/:userId/reopen") reopen(@Req() req: AuthedRequest, @Param("userId") id: string) {
-    if (!userId.safeParse(id).success) throw new BadRequestException("Invalid member.");
-    return this.bronze.reopen(req.user, id);
+  @Post("members/:userId/reopen") reopen(
+    @Req() req: AuthedRequest,
+    @Param("userId") id: string,
+    @Body() body: unknown,
+  ) {
+    const parsed = actionSchema.safeParse(body);
+    if (!userId.safeParse(id).success || !parsed.success)
+      throw new BadRequestException("A valid member and reason are required.");
+    return this.bronze.reopen(admin(req), id, parsed.data.reason);
   }
 }

@@ -343,8 +343,9 @@ export class ModerationService {
     const target = await this.moderatable(actorId, id);
     const reason = opts.reason?.trim() || null;
     if (opts.block) await this.writeRules(id, target, await this.contactTrail(id), reason);
-    // Didit holds their ID and selfies; erase those before the references go.
-    await this.verification.forgetMember(id).catch(() => undefined);
+    // Queue Didit's ID/selfie erasure before the attempt rows cascade away.
+    // If this durable write fails, keep the account so the deletion can be retried safely.
+    await this.verification.forgetMember(id);
     const keys = await this.storedKeysOf(id);
     await Promise.all(
       keys.flatMap((k) => [

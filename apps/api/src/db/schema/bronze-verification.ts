@@ -10,7 +10,7 @@ import {
   uuid,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
-import { user } from "./auth";
+import { session, user } from "./auth";
 
 export type BronzeStatus =
   | "not_started"
@@ -197,4 +197,20 @@ export const verificationErasure = pgTable(
     uniqueIndex("verification_erasure_provider_session_unique").on(t.provider, t.providerSessionId),
     index("verification_erasure_due_idx").on(t.completedAt, t.nextAttemptAt),
   ],
+);
+
+/** A recent TOTP proof for one exact admin session, never for the whole account. */
+export const verificationAdminStepUp = pgTable(
+  "verification_admin_step_up",
+  {
+    sessionId: text("session_id")
+      .primaryKey()
+      .references(() => session.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    verifiedAt: at("verified_at").defaultNow().notNull(),
+    expiresAt: at("expires_at").notNull(),
+  },
+  (t) => [index("verification_admin_step_up_user_idx").on(t.userId, t.expiresAt)],
 );

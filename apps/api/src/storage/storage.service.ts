@@ -14,6 +14,9 @@ import { verificationImage, VERIFICATION_IMAGE_MAX_BYTES } from "./verification-
 
 /** Download URLs are identical within this window, so browsers can cache them. */
 export const DOWNLOAD_URL_WINDOW_S = 3600;
+/** Bound libvips work and decoded image memory on the 1 GB API instance. */
+export const VERIFICATION_IMAGE_MAX_PIXELS = 20_000_000;
+sharp.concurrency(1);
 
 /**
  * Stored sizes for every uploaded photo. The original is kept as-is; `sm` and
@@ -86,31 +89,32 @@ export class StorageService {
    */
   async regenerateVariants(key: string): Promise<void> {
     const original = await this.readVerificationImage(key);
-    await Promise.all(
-      IMAGE_VARIANTS.map(async (variant) => {
-        const resized = sharp(original.bytes)
-          .rotate()
-          .resize(VARIANT_MAX_DIM[variant], VARIANT_MAX_DIM[variant], {
-            fit: "inside",
-            withoutEnlargement: true,
-          });
-        const body = await (
-          original.contentType === "image/png"
-            ? resized.png()
-            : original.contentType === "image/webp"
-              ? resized.webp({ quality: 82 })
-              : resized.jpeg({ quality: 82 })
-        ).toBuffer();
-        await this.s3.send(
-          new PutObjectCommand({
-            Bucket: this.bucket,
-            Key: variantKey(key, variant),
-            Body: body,
-            ContentType: original.contentType,
-          }),
-        );
-      }),
-    );
+    for (const variant of IMAGE_VARIANTS) {
+      const resized = sharp(original.bytes, {
+        limitInputPixels: VERIFICATION_IMAGE_MAX_PIXELS,
+        sequentialRead: true,
+      })
+        .rotate()
+        .resize(VARIANT_MAX_DIM[variant], VARIANT_MAX_DIM[variant], {
+          fit: "inside",
+          withoutEnlargement: true,
+        });
+      const body = await (
+        original.contentType === "image/png"
+          ? resized.png()
+          : original.contentType === "image/webp"
+            ? resized.webp({ quality: 82 })
+            : resized.jpeg({ quality: 82 })
+      ).toBuffer();
+      await this.s3.send(
+        new PutObjectCommand({
+          Bucket: this.bucket,
+          Key: variantKey(key, variant),
+          Body: body,
+          ContentType: original.contentType,
+        }),
+      );
+    }
   }
 
   /** A short-lived, uncached link for an admin checking a member's photo. */

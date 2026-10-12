@@ -3,6 +3,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -12,6 +13,7 @@ import {
 } from "@nestjs/common";
 import { PushService } from "../push/push.service";
 import { StorageService } from "../storage/storage.service";
+import { AUTH, type Auth } from "../auth/auth.instance";
 import { BronzeRepository } from "./bronze.repository";
 import {
   BRONZE_MAX_ATTEMPTS,
@@ -38,10 +40,12 @@ export const SESSION_EXPIRY_MS = 24 * 60 * 60_000;
 const RECONCILE_EVERY_MS = 5 * 60_000;
 /** How often a member's own status check may ask Didit about a pending session. */
 const REFRESH_EVERY_MS = 60_000;
+export const ADMIN_STEP_UP_MS = 10 * 60_000;
 
 export interface Admin {
   id: string;
   twoFactorEnabled?: boolean | null;
+  sessionId: string;
 }
 
 /** Sanitised for logs: the error's kind, never a message that might carry details. */
@@ -65,6 +69,7 @@ export class BronzeService implements OnModuleInit, OnModuleDestroy {
     private readonly profileMatch: ProfileMatchService,
     private readonly push: PushService,
     private readonly config: VerificationConfig,
+    @Inject(AUTH) private readonly auth: Auth,
   ) {}
 
   onModuleInit() {
@@ -144,20 +149,33 @@ export class BronzeService implements OnModuleInit, OnModuleDestroy {
 
   /** Withdrawing ends the check and the badge, and erases the member's sessions at Didit. */
   async withdraw(userId: string) {
-    const sessions = await this.repo.withdrawConsent(userId);
-    await this.eraseAtDidit(sessions);
+    await this.repo.withdrawConsent(userId);
+    await this.processErasures();
     return this.status(userId);
   }
 
-  /** Before an account is deleted: erase what Didit holds about the member. */
+  /** Before an account is deleted: durably queue every provider session. */
   async forgetMember(userId: string) {
-    await this.eraseAtDidit(await this.repo.diditSessionsOf(userId));
+    await this.repo.queueErasuresForUser(userId);
   }
 
-  private async eraseAtDidit(sessions: string[]) {
-    const results = await Promise.allSettled(sessions.map((id) => this.didit.deleteSession(id)));
-    const failed = results.filter((r) => r.status === "rejected").length;
-    if (failed) this.logger.warn(`${failed} Didit session(s) couldn't be erased; retry by hand`);
+  private async processErasures() {
+    let due: Awaited<ReturnType<BronzeRepository["claimErasures"]>>;
+    try {
+      due = await this.repo.claimErasures(20);
+    } catch (e) {
+      this.logger.warn(`Verification erasure queue skipped (${kind(e)})`);
+      return;
+    }
+    for (const erasure of due) {
+      try {
+        await this.didit.deleteSession(erasure.providerSessionId);
+        await this.repo.completeErasure(erasure.id);
+      } catch (e) {
+        await this.repo.failErasure(erasure.id, kind(e)).catch(() => undefined);
+        this.logger.warn(`Provider erasure deferred (${kind(e)})`);
+      }
+    }
   }
 
   async start(userId: string) {
@@ -193,22 +211,29 @@ export class BronzeService implements OnModuleInit, OnModuleDestroy {
       this.logger.warn(`Photo preparation failed (${kind(e)})`);
       throw new ServiceUnavailableException("Couldn't prepare your photo. Please try again.");
     }
-    // Opened before the attempt is reserved, so a Didit outage never uses one up.
-    const session = await this.didit.createSession(userId);
-    const attemptId = await this.repo.reserve(
-      userId,
-      {
-        avatarKey: snapshot.avatarKey,
-        dob: snapshot.dob,
-        gender: snapshot.gender,
-        country: snapshot.country,
-        nationality: snapshot.nationality,
-      },
-      `didit:${session.sessionId}`,
-    );
-    if (!attemptId)
+    const reservation = await this.repo.reserve(userId, {
+      avatarKey: snapshot.avatarKey,
+      dob: snapshot.dob,
+      gender: snapshot.gender,
+      country: snapshot.country,
+      nationality: snapshot.nationality,
+    });
+    if (!reservation)
       throw new ConflictException("Verification state changed. Refresh and try again.");
-    return { attemptId, provider: "didit" as const, url: session.url };
+    let session: Awaited<ReturnType<DiditService["createSession"]>>;
+    try {
+      session = await this.didit.createSession(userId);
+    } catch (error) {
+      await this.repo.cancelReservation(reservation.attemptId);
+      throw error;
+    }
+    if (!(await this.repo.attachProviderSession(reservation.attemptId, session.sessionId))) {
+      await this.repo.queueErasure(session.sessionId);
+      await this.repo.cancelReservation(reservation.attemptId);
+      await this.processErasures();
+      throw new ConflictException("Verification state changed. Refresh and try again.");
+    }
+    return { attemptId: reservation.attemptId, provider: "didit" as const, url: session.url };
   }
 
   diditCallback(
@@ -236,6 +261,7 @@ export class BronzeService implements OnModuleInit, OnModuleDestroy {
 
   /** Background safety net: settles attempts whose webhook was missed or failed. */
   async reconcile(now = Date.now()) {
+    await this.processErasures();
     if (!this.didit.configured) return;
     let due: Awaited<ReturnType<BronzeRepository["claimForReconcile"]>>;
     try {
@@ -255,6 +281,8 @@ export class BronzeService implements OnModuleInit, OnModuleDestroy {
           await this.repo.expireAttempt(attempt.id);
       } catch (e) {
         this.logger.warn(`Verification reconcile failed for one attempt (${kind(e)})`);
+        if (attempt.createdAt.getTime() < now - SESSION_EXPIRY_MS)
+          await this.repo.expireAttempt(attempt.id).catch(() => undefined);
       }
     }
   }
@@ -342,15 +370,28 @@ export class BronzeService implements OnModuleInit, OnModuleDestroy {
 
   // ---- Admins (routes are behind AdminGuard; decisions also need 2FA) ----
 
-  private requireTwoFactor(admin: Admin) {
+  async stepUp(admin: Admin, code: string, headers: Headers, now = Date.now()) {
     if (!admin.twoFactorEnabled)
       throw new ForbiddenException(
         "Turn on two-factor authentication (Settings, Security & 2FA) to review verifications.",
       );
+    await this.auth.api.verifyTOTP({ body: { code, trustDevice: false }, headers });
+    const expiresAt = new Date(now + ADMIN_STEP_UP_MS);
+    await this.repo.recordAdminStepUp(admin.sessionId, admin.id, expiresAt);
+    return { verifiedUntil: expiresAt.toISOString() };
+  }
+
+  private async requireTwoFactor(admin: Admin) {
+    if (!admin.twoFactorEnabled)
+      throw new ForbiddenException(
+        "Turn on two-factor authentication (Settings, Security & 2FA) to review verifications.",
+      );
+    if (!(await this.repo.hasActiveAdminStepUp(admin.sessionId, admin.id)))
+      throw new ForbiddenException("Confirm a current two-factor code for this admin session.");
   }
 
   async reviews(admin: Admin) {
-    this.requireTwoFactor(admin);
+    await this.requireTwoFactor(admin);
     const rows = await this.repo.openReviews();
     return Promise.all(
       rows.map(async (row) => ({
@@ -378,7 +419,7 @@ export class BronzeService implements OnModuleInit, OnModuleDestroy {
       reason: string;
     },
   ) {
-    this.requireTwoFactor(admin);
+    await this.requireTwoFactor(admin);
     const result = await this.repo.decideReview({ ...input, reviewerId: admin.id });
     if (!result.ok) {
       if (result.reason === "own")
@@ -397,22 +438,40 @@ export class BronzeService implements OnModuleInit, OnModuleDestroy {
     return { status: result.status };
   }
 
-  async revoke(admin: Admin, userId: string) {
-    this.requireTwoFactor(admin);
-    if (!(await this.repo.revoke(userId))) throw new NotFoundException("Nothing to revoke.");
+  async revoke(admin: Admin, userId: string, reason: string) {
+    await this.requireTwoFactor(admin);
+    if (admin.id === userId)
+      throw new ForbiddenException("You can't revoke your own verification.");
+    if (!(await this.repo.revoke(userId, admin.id, reason)))
+      throw new NotFoundException("Nothing to revoke.");
     return { status: "revoked" as const };
   }
 
-  async reopen(admin: Admin, userId: string) {
-    this.requireTwoFactor(admin);
-    if (!(await this.repo.reopen(userId)))
+  async reopen(admin: Admin, userId: string, reason: string) {
+    await this.requireTwoFactor(admin);
+    if (admin.id === userId)
+      throw new ForbiddenException("You can't reopen your own verification.");
+    if (!(await this.repo.reopen(userId, admin.id, reason)))
       throw new ConflictException("Only a rejected or revoked verification can be reopened.");
     return { status: "not_started" as const };
   }
 
   /** What Moderation shows on a member's page. */
   async adminStatus(userId: string) {
-    const state = await this.repo.state(userId);
-    return { status: state?.status ?? "not_started", attemptsUsed: state?.attemptsUsed ?? 0 };
+    const [state, snapshot] = await Promise.all([
+      this.repo.state(userId),
+      this.repo.snapshot(userId),
+    ]);
+    const outdated =
+      state?.status === "verified" &&
+      !stillVerified(state, {
+        avatarKey: snapshot?.avatarKey ?? null,
+        dateOfBirth: snapshot?.dob ?? null,
+        gender: snapshot?.gender ?? null,
+      });
+    return {
+      status: outdated ? ("outdated" as const) : (state?.status ?? "not_started"),
+      attemptsUsed: state?.attemptsUsed ?? 0,
+    };
   }
 }

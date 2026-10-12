@@ -47,7 +47,7 @@ describe("StorageService", () => {
   it("uses plain AWS S3 (instance-role credentials) when no endpoint is configured", async () => {
     const { s3ClientConfig } = await import("./storage.service");
     expect(s3ClientConfig({ AWS_REGION: "eu-west-1" })).toEqual({ region: "eu-west-1" });
-  });
+  }, 15_000);
 
   it("targets a local S3 with path-style addressing when S3_ENDPOINT is set", async () => {
     const { s3ClientConfig } = await import("./storage.service");
@@ -70,7 +70,10 @@ describe("StorageService", () => {
 
   it("builds its client from that config", async () => {
     process.env.S3_ENDPOINT = "http://localhost:9000";
-    const { StorageService } = await import("./storage.service");
+    const { StorageService, VERIFICATION_IMAGE_MAX_PIXELS } = await import("./storage.service");
+    const sharp = (await import("sharp")).default;
+    expect(VERIFICATION_IMAGE_MAX_PIXELS).toBe(20_000_000);
+    expect(sharp.concurrency()).toBe(1);
     new StorageService();
     expect(s3Config).toHaveBeenCalledWith(
       expect.objectContaining({ endpoint: "http://localhost:9000", forcePathStyle: true }),

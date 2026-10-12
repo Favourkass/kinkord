@@ -183,6 +183,20 @@
       "when": 1791834291331,
       "tag": "0025_hesitant_dragon_lord",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791817252127,
+      "tag": "0025_peaceful_greymalkin",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1791835071065,
+      "tag": "0026_glorious_scarlet_spider",
+      "breakpoints": true
     }
   ]
 }

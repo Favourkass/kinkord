@@ -8,7 +8,11 @@ import {
 } from "./bronze.controller";
 import type { BronzeService } from "./bronze.service";
 
-const req = { user: { id: "user-1", twoFactorEnabled: true } } as unknown as AuthedRequest;
+const req = {
+  user: { id: "user-1", twoFactorEnabled: true },
+  session: { id: "session-1" },
+  headers: {},
+} as unknown as AuthedRequest;
 const ID = "11111111-1111-4111-8111-111111111111";
 
 function service() {
@@ -23,6 +27,7 @@ function service() {
     adminStatus: vi.fn(async () => ({ status: "verified" })),
     revoke: vi.fn(async () => ({ status: "revoked" })),
     reopen: vi.fn(async () => ({ status: "not_started" })),
+    stepUp: vi.fn(async () => ({ verifiedUntil: new Date().toISOString() })),
   };
 }
 const as = (bronze: ReturnType<typeof service>) => bronze as unknown as BronzeService;
@@ -69,7 +74,7 @@ describe("verification routes", () => {
       reason: "Photo and ID country checked in Didit.",
     });
     expect(bronze.decideReview).toHaveBeenCalledWith(
-      req.user,
+      expect.objectContaining({ id: "user-1", sessionId: "session-1" }),
       expect.objectContaining({ id: ID, decision: "approve" }),
     );
   });
@@ -77,10 +82,30 @@ describe("verification routes", () => {
   it("let admins revoke or reopen a member's verification", async () => {
     const bronze = service();
     const controller = new BronzeAdminController(as(bronze));
-    await controller.revoke(req, "member-9");
-    await controller.reopen(req, "member-9");
-    expect(bronze.revoke).toHaveBeenCalledWith(req.user, "member-9");
-    expect(bronze.reopen).toHaveBeenCalledWith(req.user, "member-9");
-    expect(() => controller.revoke(req, "")).toThrow(BadRequestException);
+    await controller.revoke(req, "member-9", { reason: "Confirmed policy breach." });
+    await controller.reopen(req, "member-9", { reason: "Support approved another try." });
+    expect(bronze.revoke).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "user-1", sessionId: "session-1" }),
+      "member-9",
+      "Confirmed policy breach.",
+    );
+    expect(bronze.reopen).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "user-1", sessionId: "session-1" }),
+      "member-9",
+      "Support approved another try.",
+    );
+    expect(() => controller.revoke(req, "", {})).toThrow(BadRequestException);
+  });
+
+  it("binds a successful TOTP step-up to the current session", async () => {
+    const bronze = service();
+    const controller = new BronzeAdminController(as(bronze));
+    await controller.stepUp(req, { code: "123456" });
+    expect(bronze.stepUp).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "user-1", sessionId: "session-1" }),
+      "123456",
+      expect.any(Headers),
+    );
+    expect(() => controller.stepUp(req, { code: "123" })).toThrow(BadRequestException);
   });
 });

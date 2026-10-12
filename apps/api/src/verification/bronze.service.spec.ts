@@ -7,7 +7,12 @@ import {
 } from "@nestjs/common";
 import type { PushService } from "../push/push.service";
 import type { StorageService } from "../storage/storage.service";
-import { BronzeService, PHOTO_SETTLE_MS, SESSION_EXPIRY_MS } from "./bronze.service";
+import {
+  ADMIN_STEP_UP_MS,
+  BronzeService,
+  PHOTO_SETTLE_MS,
+  SESSION_EXPIRY_MS,
+} from "./bronze.service";
 import { BRONZE_POLICY_VERSION } from "./bronze-policy";
 import type { BronzeRepository } from "./bronze.repository";
 import type { DiditService } from "./didit.service";
@@ -67,8 +72,17 @@ function setup(configured = true) {
     hasConsent: vi.fn(async () => true),
     consent: vi.fn(async () => undefined),
     withdrawConsent: vi.fn(async () => ["s1", "s2"]),
-    diditSessionsOf: vi.fn(async () => ["s1"]),
-    reserve: vi.fn(async (): Promise<string | null> => "attempt-1"),
+    queueErasuresForUser: vi.fn(async () => ["s1"]),
+    reserve: vi.fn(async (): Promise<unknown> => ({
+      attemptId: "attempt-1",
+      reservationJobId: "reservation:attempt-1",
+    })),
+    attachProviderSession: vi.fn(async () => true),
+    cancelReservation: vi.fn(async () => true),
+    queueErasure: vi.fn(async () => undefined),
+    claimErasures: vi.fn(async (): Promise<unknown[]> => []),
+    completeErasure: vi.fn(async () => undefined),
+    failErasure: vi.fn(async () => undefined),
     attempt: vi.fn(async (): Promise<unknown> => attempt()),
     findAttempt: vi.fn(async (): Promise<unknown> => attempt()),
     claimForReconcile: vi.fn(async (): Promise<unknown[]> => []),
@@ -82,6 +96,8 @@ function setup(configured = true) {
     decideReview: vi.fn(async (): Promise<unknown> => ({ ok: true, status: "verified" })),
     revoke: vi.fn(async () => true),
     reopen: vi.fn(async () => true),
+    recordAdminStepUp: vi.fn(async () => undefined),
+    hasActiveAdminStepUp: vi.fn(async () => true),
   };
   const didit = {
     configured,
@@ -105,6 +121,9 @@ function setup(configured = true) {
   const config = VerificationConfig.fixed(
     parseVerificationSettings({ bindingSecret: "b".repeat(40) }),
   );
+  const auth = {
+    api: { verifyTOTP: vi.fn(async () => ({ token: "session-token", user: { id: "admin-1" } })) },
+  };
   const service = new BronzeService(
     repo as unknown as BronzeRepository,
     didit as unknown as DiditService,
@@ -112,8 +131,9 @@ function setup(configured = true) {
     profileMatch as unknown as ProfileMatchService,
     push as unknown as PushService,
     config,
+    auth as never,
   );
-  return { service, repo, didit, storage, profileMatch, push };
+  return { service, repo, didit, storage, profileMatch, push, auth };
 }
 
 beforeEach(() => vi.useRealTimers());
@@ -168,12 +188,18 @@ describe("BronzeService consent", () => {
     expect(repo.consent).toHaveBeenCalledWith("u1");
   });
 
-  it("withdrawing erases every session at Didit, and survives one failing", async () => {
+  it("withdrawal processes durable erasures and retains a failed one for retry", async () => {
     const { service, repo, didit } = setup();
+    repo.claimErasures.mockResolvedValueOnce([
+      { id: "e1", providerSessionId: "s1" },
+      { id: "e2", providerSessionId: "s2" },
+    ]);
     didit.deleteSession.mockRejectedValueOnce(new Error("down"));
     await service.withdraw("u1");
     expect(repo.withdrawConsent).toHaveBeenCalledWith("u1");
     expect(didit.deleteSession.mock.calls.map((c) => c[0])).toEqual(["s1", "s2"]);
+    expect(repo.failErasure).toHaveBeenCalledWith("e1", "Error");
+    expect(repo.completeErasure).toHaveBeenCalledWith("e2");
   });
 });
 
@@ -210,11 +236,14 @@ describe("BronzeService.start", () => {
     expect(repo.reserve).toHaveBeenCalledWith(
       "u1",
       expect.objectContaining({ dob: "1998-04-02", nationality: null }),
-      "didit:s1",
     );
+    expect(repo.reserve.mock.invocationCallOrder[0]).toBeLessThan(
+      didit.createSession.mock.invocationCallOrder[0],
+    );
+    expect(repo.attachProviderSession).toHaveBeenCalledWith("attempt-1", "s1");
   });
 
-  it("uses no attempt when the photo or Didit is unavailable", async () => {
+  it("releases its local reservation when the photo or Didit is unavailable", async () => {
     const { service, repo, didit, storage } = setup();
     repo.snapshot.mockResolvedValue(
       snapshot({ avatarUploadedAt: new Date(Date.now() - 3600_000) }),
@@ -223,7 +252,16 @@ describe("BronzeService.start", () => {
     await expect(service.start("u1")).rejects.toThrow(ServiceUnavailableException);
     didit.createSession.mockRejectedValueOnce(new ServiceUnavailableException("down"));
     await expect(service.start("u1")).rejects.toThrow(ServiceUnavailableException);
-    expect(repo.reserve).not.toHaveBeenCalled();
+    expect(repo.reserve).toHaveBeenCalledOnce();
+    expect(repo.cancelReservation).toHaveBeenCalledWith("attempt-1");
+  });
+
+  it("queues a paid session for deletion if attaching it loses the reservation", async () => {
+    const { service, repo } = setup();
+    repo.attachProviderSession.mockResolvedValueOnce(false);
+    await expect(service.start("u1")).rejects.toThrow(ConflictException);
+    expect(repo.queueErasure).toHaveBeenCalledWith("s1");
+    expect(repo.cancelReservation).toHaveBeenCalledWith("attempt-1");
   });
 });
 
@@ -317,6 +355,19 @@ describe("BronzeService.reconcile", () => {
     expect(repo.expireAttempt).not.toHaveBeenCalled();
   });
 
+  it("expires an old attempt even when Didit's result can't be fetched", async () => {
+    const { service, repo, didit } = setup();
+    const old = {
+      id: "attempt-1",
+      providerJobId: "didit:s1",
+      createdAt: new Date(NOW - SESSION_EXPIRY_MS - 1),
+    };
+    repo.claimForReconcile.mockResolvedValueOnce([old]);
+    didit.decision.mockRejectedValueOnce(new ServiceUnavailableException("down"));
+    await service.reconcile(NOW);
+    expect(repo.expireAttempt).toHaveBeenCalledWith("attempt-1");
+  });
+
   it("does nothing while verification is off", async () => {
     const { service, repo } = setup(false);
     await service.reconcile(NOW);
@@ -325,7 +376,7 @@ describe("BronzeService.reconcile", () => {
 });
 
 describe("BronzeService for admins", () => {
-  const admin = { id: "admin-1", twoFactorEnabled: true };
+  const admin = { id: "admin-1", twoFactorEnabled: true, sessionId: "session-1" };
   const input = {
     id: "review-1",
     decision: "approve" as const,
@@ -334,9 +385,28 @@ describe("BronzeService for admins", () => {
   };
 
   it("needs two-factor authentication", async () => {
-    const { service } = setup();
-    await expect(service.reviews({ id: "admin-1", twoFactorEnabled: false })).rejects.toThrow(
-      ForbiddenException,
+    const { service, repo } = setup();
+    await expect(
+      service.reviews({ id: "admin-1", twoFactorEnabled: false, sessionId: "session-1" }),
+    ).rejects.toThrow(ForbiddenException);
+    repo.hasActiveAdminStepUp.mockResolvedValueOnce(false);
+    await expect(service.reviews(admin)).rejects.toThrow(/current two-factor code/);
+  });
+
+  it("records a successful TOTP proof for this session only", async () => {
+    const { service, repo, auth } = setup();
+    const headers = new Headers({ cookie: "session=x" });
+    await expect(service.stepUp(admin, "123456", headers, NOW)).resolves.toEqual({
+      verifiedUntil: new Date(NOW + ADMIN_STEP_UP_MS).toISOString(),
+    });
+    expect(auth.api.verifyTOTP).toHaveBeenCalledWith({
+      body: { code: "123456", trustDevice: false },
+      headers,
+    });
+    expect(repo.recordAdminStepUp).toHaveBeenCalledWith(
+      "session-1",
+      "admin-1",
+      new Date(NOW + ADMIN_STEP_UP_MS),
     );
   });
 
@@ -375,8 +445,25 @@ describe("BronzeService for admins", () => {
 
   it("revokes and reopens", async () => {
     const { service, repo } = setup();
-    await expect(service.revoke(admin, "u9")).resolves.toEqual({ status: "revoked" });
+    await expect(service.revoke(admin, "u9", "Confirmed document fraud.")).resolves.toEqual({
+      status: "revoked",
+    });
+    expect(repo.revoke).toHaveBeenCalledWith("u9", "admin-1", "Confirmed document fraud.");
     repo.reopen.mockResolvedValueOnce(false);
-    await expect(service.reopen(admin, "u9")).rejects.toThrow(ConflictException);
+    await expect(service.reopen(admin, "u9", "Support approved a retry.")).rejects.toThrow(
+      ConflictException,
+    );
+  });
+
+  it("does not let an admin revoke or reopen their own verification", async () => {
+    const { service, repo } = setup();
+    await expect(service.revoke(admin, "admin-1", "Trying this on myself.")).rejects.toThrow(
+      ForbiddenException,
+    );
+    await expect(service.reopen(admin, "admin-1", "Trying this on myself.")).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(repo.revoke).not.toHaveBeenCalled();
+    expect(repo.reopen).not.toHaveBeenCalled();
   });
 });

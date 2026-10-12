@@ -183,7 +183,7 @@ describe("ModerationService.deleteMember", () => {
         "posts/u9/a_sm.jpg",
       ].sort(),
     );
-    // What Didit holds is erased while the account still exists to find it by.
+    // What Didit holds is durably queued while the account still exists to find it by.
     expect(verification.forgetMember).toHaveBeenCalledWith("u9");
     // The rules are written while the account still exists to read them from.
     expect(indexOf("insert", signupBlock)).toBeLessThan(indexOf("delete", user));
@@ -191,6 +191,13 @@ describe("ModerationService.deleteMember", () => {
       action: "delete+block",
       detail: "@downtoearth x@y.com",
     });
+  });
+
+  it("keeps the account when durable provider-erasure queuing fails", async () => {
+    const { service, verification, indexOf } = make([[member], []]);
+    verification.forgetMember.mockRejectedValueOnce(new Error("database unavailable"));
+    await expect(service.deleteMember("admin1", "u9", {})).rejects.toThrow("database unavailable");
+    expect(indexOf("delete", user)).toBe(-1);
   });
 });
 
