@@ -4,6 +4,7 @@ import { BillingStack } from "../lib/billing-stack";
 import { NetworkStack } from "../lib/network-stack";
 import { DataStack } from "../lib/data-stack";
 import { ApiBaseStack, ApiStack } from "../lib/api-stack";
+import { BACKUP_COPY_REGION, BackupCopiesStack, BackupStack } from "../lib/backup-stack";
 import { DnsRecordsStack } from "../lib/dns-records-stack";
 import { RealtimeStack } from "../lib/realtime-stack";
 import { WebStack } from "../lib/web-stack";
@@ -47,6 +48,17 @@ new RealtimeStack(app, "KinkordRealtime", {
 });
 
 new WebStack(app, "KinkordWeb", { env: primary });
+
+// Backups of the database and members' photos, copied to Frankfurt. They attach
+// by ARN, so they deploy without KinkordData or KinkordFoundation.
+new BackupCopiesStack(app, "KinkordBackupCopies", {
+  env: { account, region: BACKUP_COPY_REGION },
+});
+new BackupStack(app, "KinkordBackup", {
+  env: primary,
+  databaseArn: `arn:aws:rds:eu-west-1:${account}:db:kinkorddata-postgres9dc8bb04-1d7wx6y6fzq6`,
+  mediaBucketArn: `arn:aws:s3:::kinkord-media-${account}`,
+});
 
 // Records in the kinkord.com zone, attached by id so they deploy without
 // KinkordFoundation (which has drifted from the code).
