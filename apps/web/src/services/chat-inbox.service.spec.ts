@@ -53,6 +53,16 @@ describe("selectChatInbox", () => {
     // The loaded Ada is fresher than the API's copy: 4 unread, not 0.
     expect(result.items[0].unreadCount).toBe(4);
     expect(result.counts.all).toBe(2);
+    // The API's counts, of every chat, win over the loaded page's once they're in.
+    expect(
+      selectChatInbox(summaries, "", "all", null, { all: 73, unread: 4, online: 9 }).counts,
+    ).toEqual({ all: 73, unread: 4, online: 9 });
+    // A tab keeps only chats that belong to it, even ones the API sent.
+    expect(
+      selectChatInbox(summaries, "", "unread", [older, { ...stale, unreadCount: 3 }]).items.map(
+        (s) => s.id,
+      ),
+    ).toEqual(["a"]);
     // An answer for another search, or none yet, changes nothing.
     expect(selectChatInbox(summaries, "ada", "all").items.map((s) => s.id)).toEqual(["a"]);
   });

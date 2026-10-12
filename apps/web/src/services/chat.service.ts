@@ -8,6 +8,8 @@ import type {
   ConversationSummaryPM,
   ConversationThreadPM,
   SentMessagePM,
+  ChatInboxFilter,
+  InboxCountsPM,
 } from "@/domain/chat";
 import { IMAGE_VARIANTS, buildUploadSet, type ImageVariant } from "@/util/image";
 import { api, uploadToPresignedUrl } from "./apiClient";
@@ -28,12 +30,19 @@ export function listenForChatRead(onRead: () => void): () => void {
 
 export const chatService = {
   unreadCount: () => api.get<{ count: number }>("/chat/unread-count"),
-  /** The inbox; with a search, chats whose member or messages match, from every chat. */
-  list: (query?: string) =>
-    api.get<ConversationSummaryPM[]>(
-      query?.trim()
-        ? `/chat/conversations?q=${encodeURIComponent(query.trim())}`
-        : "/chat/conversations",
+  /** The inbox, newest first. A search or a tab looks through every chat, not just the latest. */
+  list: (view: { q?: string; filter?: ChatInboxFilter } = {}) => {
+    const params = new URLSearchParams();
+    if (view.q?.trim()) params.set("q", view.q.trim());
+    if (view.filter && view.filter !== "all") params.set("filter", view.filter);
+    const query = params.toString();
+    return api.get<ConversationSummaryPM[]>(`/chat/conversations${query ? `?${query}` : ""}`);
+  },
+
+  /** How many chats each tab holds, for a search or none. */
+  counts: (q = "") =>
+    api.get<InboxCountsPM>(
+      `/chat/conversations/counts${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ""}`,
     ),
 
   conversation: (id: string) => api.get<ConversationThreadPM>(thread(id)),

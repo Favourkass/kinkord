@@ -52,7 +52,14 @@ export class ChatController {
 
   @Get("conversations")
   list(@Req() req: AuthedRequest, @Query() query: unknown) {
-    return this.chat.listConversations(req.user.id, parse(inboxQuerySchema, query ?? {}).q);
+    const { q, filter } = parse(inboxQuerySchema, query ?? {});
+    return this.chat.listConversations(req.user.id, q, filter);
+  }
+
+  /** Each tab's count, every chat counted. Declared before conversations/:id. */
+  @Get("conversations/counts")
+  counts(@Req() req: AuthedRequest, @Query() query: unknown) {
+    return this.chat.inboxCounts(req.user.id, parse(inboxQuerySchema, query ?? {}).q);
   }
 
   @Post("conversations")

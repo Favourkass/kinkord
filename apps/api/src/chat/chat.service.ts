@@ -24,12 +24,13 @@ import {
   ne,
   or,
   sql,
+  type SQL,
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { DRIZZLE, type Db } from "../db/db.module";
 import { conversation, conversationParticipant, message, profile, user } from "../db/schema";
 import { notBanned } from "../moderation/admins";
-import { PresenceService } from "../presence/presence.service";
+import { ONLINE_WINDOW_SECONDS, PresenceService } from "../presence/presence.service";
 import { containsPattern } from "../push/notifications.service";
 import { PushService } from "../push/push.service";
 import { RealtimeService } from "../realtime/realtime.service";
@@ -45,6 +46,8 @@ import { chatDay, NEW_CHAT_LIMIT, newChatsPerDay } from "./allowance";
 import type {
   ChatAllowanceDto,
   ChatPeerDto,
+  InboxCountsDto,
+  InboxFilter,
   ChatPhotoDto,
   ConversationSummaryDto,
   ConversationThreadDto,
@@ -68,11 +71,14 @@ const TYPING_MIN_GAP_MS = 1_000;
  */
 const TYPING_REPEAT_MS = 4_000;
 
-// Aliased so the inbox search can look at a chat's other member and messages from inside the inbox query.
+// Aliased so the inbox can look at a chat's other member and its messages from inside the inbox query.
 const searchParticipant = alias(conversationParticipant, "search_participant");
 const searchUser = alias(user, "search_user");
 const searchProfile = alias(profile, "search_profile");
 const searchMessage = alias(message, "search_message");
+const inboxPeer = alias(conversationParticipant, "inbox_peer");
+const inboxPeerProfile = alias(profile, "inbox_peer_profile");
+const inboxMessage = alias(message, "inbox_message");
 
 /** A chat photo opens full screen, so it gets the same budget as a post photo. */
 export const CHAT_PHOTO_MAX_MB = 10;
@@ -424,13 +430,22 @@ export class ChatService {
       if (previous.active === typing && since < TYPING_REPEAT_MS) return;
       if (typing && since < TYPING_MIN_GAP_MS) return;
     }
-    await this.assertMember(conversationId, userId);
-    const peerId = await this.writablePeer(conversationId, userId);
-    // A bounded cache limits repeated hints on this instance; access is checked
-    // on every hint we publish, even when a member was allowed earlier.
+    // Claimed before any await, so requests sent all at once can't all get past the
+    // checks above. A bounded cache limits repeated hints on this instance.
     if (this.typingSignals.size >= 5_000)
       this.typingSignals.delete(this.typingSignals.keys().next().value!);
     this.typingSignals.set(key, { active: typing, at: now });
+    let peerId: string;
+    try {
+      // Access is checked on every hint we publish, even when a member was allowed earlier.
+      await this.assertMember(conversationId, userId);
+      peerId = await this.writablePeer(conversationId, userId);
+    } catch (e) {
+      // Nothing was sent: the slot goes back to how it was.
+      if (previous) this.typingSignals.set(key, previous);
+      else this.typingSignals.delete(key);
+      throw e;
+    }
     void this.realtime.notify([peerId], { type: "typing", conversationId, typing });
   }
 
@@ -490,8 +505,12 @@ export class ChatService {
    * nobody has written in yet belongs to whoever opened it: the other member
    * first hears of it with the first message, which the daily allowance counts.
    */
-  async listConversations(userId: string, query = ""): Promise<ConversationSummaryDto[]> {
-    const rows = await this.summaries(userId, null, query.trim());
+  async listConversations(
+    userId: string,
+    query = "",
+    filter: InboxFilter = "all",
+  ): Promise<ConversationSummaryDto[]> {
+    const rows = await this.summaries(userId, null, this.inbox(userId, query.trim(), filter));
     return rows
       .filter(
         ({ summary, openedBy }) =>
@@ -516,6 +535,98 @@ export class ChatService {
       ((lastMessage !== null && lastMessage.senderId !== userId) ||
         (await this.peerHasWritten(conversationId, userId)));
     return { ...row.summary, canSendPhotos };
+  }
+
+  /**
+   * The chats a member's inbox shows, as SQL, so the tabs, the search and the
+   * counts all apply before the page limit rather than to the latest page only.
+   * The other member is still here (not suspended, not blocking them), and the
+   * thread has been written in or was opened by this member.
+   */
+  private inbox(userId: string, query: string, filter: InboxFilter): SQL {
+    return and(
+      exists(
+        this.db
+          .select({ one: sql`1` })
+          .from(inboxPeer)
+          .where(
+            and(
+              eq(inboxPeer.conversationId, conversation.id),
+              ne(inboxPeer.userId, userId),
+              notBanned(inboxPeer.userId),
+              notBlocking(inboxPeer.userId, userId),
+            ),
+          ),
+      ),
+      or(
+        eq(conversation.createdBy, userId),
+        exists(
+          this.db
+            .select({ one: sql`1` })
+            .from(inboxMessage)
+            .where(
+              and(eq(inboxMessage.conversationId, conversation.id), isNull(inboxMessage.deletedAt)),
+            ),
+        ),
+      ),
+      query ? this.matching(userId, containsPattern(query)) : undefined,
+      filter === "unread" ? this.unread(userId) : undefined,
+      filter === "online" ? this.peerOnline(userId) : undefined,
+    )!;
+  }
+
+  /** Written by the other member after this member's read pointer. */
+  private unread(userId: string): SQL {
+    return exists(
+      this.db
+        .select({ one: sql`1` })
+        .from(inboxMessage)
+        .where(
+          and(
+            eq(inboxMessage.conversationId, conversation.id),
+            isNull(inboxMessage.deletedAt),
+            ne(inboxMessage.senderId, userId),
+            sql`${inboxMessage.createdAt} > coalesce(${conversationParticipant.lastReadAt}, 'epoch')`,
+          ),
+        ),
+    );
+  }
+
+  /** The other member was around in the last few minutes, as presence counts online. */
+  private peerOnline(userId: string): SQL {
+    return exists(
+      this.db
+        .select({ one: sql`1` })
+        .from(inboxPeer)
+        .innerJoin(inboxPeerProfile, eq(inboxPeerProfile.userId, inboxPeer.userId))
+        .where(
+          and(
+            eq(inboxPeer.conversationId, conversation.id),
+            ne(inboxPeer.userId, userId),
+            sql`${inboxPeerProfile.lastSeenAt} > timezone('UTC', now()) - (${sql.raw(String(ONLINE_WINDOW_SECONDS))} * interval '1 second')`,
+          ),
+        ),
+    );
+  }
+
+  /** How many chats each inbox tab holds, every chat counted, for the search in force. */
+  async inboxCounts(userId: string, query = ""): Promise<InboxCountsDto> {
+    const [row] = await this.db
+      .select({
+        all: count(),
+        unread: sql<number>`count(*) filter (where ${this.unread(userId)})`,
+        online: sql<number>`count(*) filter (where ${this.peerOnline(userId)})`,
+      })
+      .from(conversationParticipant)
+      .innerJoin(conversation, eq(conversation.id, conversationParticipant.conversationId))
+      .where(
+        and(eq(conversationParticipant.userId, userId), this.inbox(userId, query.trim(), "all")),
+      );
+    return {
+      all: Number(row?.all ?? 0),
+      unread: Number(row?.unread ?? 0),
+      online: Number(row?.online ?? 0),
+    };
   }
 
   /**
@@ -561,7 +672,7 @@ export class ChatService {
   private async summaries(
     userId: string,
     only: string | null,
-    query = "",
+    inbox?: SQL,
   ): Promise<Array<{ summary: ConversationSummaryDto; openedBy: string | null }>> {
     const mine = await this.db
       .select({
@@ -576,7 +687,7 @@ export class ChatService {
         and(
           eq(conversationParticipant.userId, userId),
           only ? eq(conversation.id, only) : undefined,
-          query ? this.matching(userId, containsPattern(query)) : undefined,
+          inbox,
         ),
       )
       .orderBy(desc(conversation.lastMessageAt))

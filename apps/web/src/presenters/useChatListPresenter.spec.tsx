@@ -21,9 +21,14 @@ vi.mock("./useRealtime", () => ({
 }));
 
 const list = vi.fn();
+const counts = vi.fn();
 const me = vi.fn();
 vi.mock("@/services/chat.service", () => ({
-  chatService: { list: (q?: string) => list(q), me: () => me() },
+  chatService: {
+    list: (view?: { q?: string; filter?: string }) => list(view),
+    counts: (q?: string) => counts(q),
+    me: () => me(),
+  },
 }));
 
 const row: ConversationSummaryPM = {
@@ -55,6 +60,8 @@ describe("useChatListPresenter", () => {
     polls.clear();
     live.up = false;
     list.mockReset().mockResolvedValue([row]);
+    // Counts from the API are off unless a test turns them on: the loaded chats count.
+    counts.mockReset().mockRejectedValue(new Error("offline"));
     me.mockReset().mockResolvedValue({ id: "u1" });
   });
   afterEach(cleanup);
@@ -150,12 +157,12 @@ describe("useChatListPresenter", () => {
       await act(async () => {
         vi.advanceTimersByTime(300);
       });
-      expect(list).toHaveBeenCalledWith("ada");
+      expect(list).toHaveBeenCalledWith({ q: "ada", filter: "all" });
       expect(result.current.list.rows.map((r) => r.id)).toEqual(["c1", "c9"]);
       // The next inbox refresh asks again: a chat that's gone since (a block, say) drops out.
-      list.mockImplementation(async (q?: string) => (q ? [] : [row]));
+      list.mockImplementation(async (view?: { q?: string }) => (view?.q ? [] : [row]));
       await act(async () => polls.get(LIST_POLL_MS)?.());
-      expect(list).toHaveBeenCalledWith("ada");
+      expect(list).toHaveBeenLastCalledWith(undefined);
       expect(result.current.list.rows.map((r) => r.id)).toEqual(["c1"]);
       // Clearing the search shows the inbox as it was.
       act(() => result.current.list.setQuery(""));
@@ -163,6 +170,29 @@ describe("useChatListPresenter", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+  it("fills a tab from every chat, and counts every chat, once the API answers", async () => {
+    const olderUnread: ConversationSummaryPM = {
+      ...row,
+      id: "c7",
+      unreadCount: 2,
+      lastMessageAt: "2026-07-01T10:00:00.000Z",
+      peer: { ...row.peer!, userId: "u7", username: "tolu", displayName: "Tolu", online: false },
+    };
+    counts.mockResolvedValue({ all: 73, unread: 4, online: 9 });
+    const { result } = renderHook(() => useChatListPresenter());
+    await act(async () => polls.get(LIST_POLL_MS)?.());
+    expect(counts).toHaveBeenCalledWith("");
+    await waitFor(() =>
+      expect(result.current.list.filters.map((f) => f.count)).toEqual(["73", "4", "9"]),
+    );
+    list.mockImplementation(async (view?: { filter?: string }) =>
+      view?.filter === "unread" ? [olderUnread] : [row],
+    );
+    act(() => result.current.list.setFilter("unread"));
+    await waitFor(() => expect(list).toHaveBeenCalledWith({ q: "", filter: "unread" }));
+    // Ada's chat, the newest, has nothing unread; Tolu's older one is found by the API.
+    await waitFor(() => expect(result.current.list.rows.map((r) => r.id)).toEqual(["c7"]));
   });
   it("updates typing from live events without reloading conversations", async () => {
     live.up = true;

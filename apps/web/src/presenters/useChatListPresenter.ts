@@ -8,6 +8,7 @@ import {
   toConversationRowVM,
   type ConversationSummaryPM,
   type ChatInboxFilter,
+  type InboxCountsPM,
 } from "@/domain/chat";
 import type { RealtimeEventPM } from "@/domain/realtime";
 import { chatService } from "@/services/chat.service";
@@ -36,25 +37,35 @@ export function useChatListPresenter() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<ChatInboxFilter>("all");
   const [menuOpen, setMenuOpen] = useState(false);
-  // The API's answer to the search, across every chat, for the words it was asked.
-  const [found, setFound] = useState<{ term: string; items: ConversationSummaryPM[] } | null>(null);
   const term = query.trim();
-
+  // A tab and search: the API's answer across every chat, and its counts.
+  const view = `${filter}|${term}`;
+  const [found, setFound] = useState<{ view: string; items: ConversationSummaryPM[] } | null>(null);
+  const [counts, setCounts] = useState<{ term: string; value: InboxCountsPM } | null>(null);
+  // What's on screen, for answers that land later: an answer for another view is dropped.
+  const wanted = useRef({ term, filter, view });
   useEffect(() => {
-    if (!term) return;
-    let live = true;
-    const timer = setTimeout(() => {
-      chatService.list(term).then(
-        (items) => live && setFound({ term, items }),
-        // The loaded chats still match while the wider search is unavailable.
+    wanted.current = { term, filter, view };
+  }, [term, filter, view]);
+  const fetchView = useCallback((w: { term: string; filter: ChatInboxFilter; view: string }) => {
+    // The loaded chats still answer while these are on their way, or unavailable.
+    if (w.term || w.filter !== "all")
+      chatService.list({ q: w.term, filter: w.filter }).then(
+        (items) => wanted.current.view === w.view && setFound({ view: w.view, items }),
         () => undefined,
       );
-    }, SEARCH_DEBOUNCE_MS);
-    return () => {
-      live = false;
-      clearTimeout(timer);
-    };
-  }, [term]);
+    chatService.counts(w.term).then(
+      (value) => wanted.current.term === w.term && setCounts({ term: w.term, value }),
+      () => undefined,
+    );
+  }, []);
+  useEffect(() => {
+    const timer = setTimeout(
+      () => fetchView({ term, filter, view }),
+      term ? SEARCH_DEBOUNCE_MS : 0,
+    );
+    return () => clearTimeout(timer);
+  }, [term, filter, view, fetchView]);
   const [error, setError] = useState<string | null>(null);
 
   // Whose message a preview shows ("You: …") depends on who is looking.
@@ -69,27 +80,17 @@ export function useChatListPresenter() {
     };
   }, []);
 
-  // The search in force, for refreshes that run outside a render.
-  const searching = useRef(term);
-  useEffect(() => {
-    searching.current = term;
-  }, [term]);
   const refresh = useCallback(async () => {
-    // A search's answer is refreshed with the inbox, so a chat that's gone (a
-    // block, say) or has changed doesn't linger in it.
-    const words = searching.current;
-    if (words)
-      void chatService.list(words).then(
-        (items) => searching.current === words && setFound({ term: words, items }),
-        () => undefined,
-      );
+    // The tab's and search's answers are refreshed with the inbox, so a chat
+    // that's gone (a block, say) or has changed doesn't linger, and counts stay true.
+    fetchView(wanted.current);
     try {
       setSummaries(await chatService.list());
       setError(null);
     } catch (e) {
       setError(messageOf(e));
     }
-  }, []);
+  }, [fetchView]);
   // Only chat events: inbox ones (likes, follows) don't change this list.
   const onRealtime = useCallback(
     (e: RealtimeEventPM) => {
@@ -110,9 +111,10 @@ export function useChatListPresenter() {
         summaries ?? [],
         query,
         filter,
-        found && found.term === term ? found.items : null,
+        found && found.view === view ? found.items : null,
+        counts && counts.term === term ? counts.value : null,
       ),
-    [summaries, query, filter, found, term],
+    [summaries, query, filter, found, counts, term, view],
   );
   const rows = useMemo(
     () =>

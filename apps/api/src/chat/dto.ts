@@ -35,8 +35,22 @@ export const photoUploadSchema = z.object({
 
 export const typingSchema = z.object({ typing: z.boolean() });
 
-/** The inbox search: a name, a username, or words from a message. */
-export const inboxQuerySchema = z.object({ q: z.string().trim().max(100).optional() });
+/** The inbox's tabs. */
+export const INBOX_FILTERS = ["all", "unread", "online"] as const;
+export type InboxFilter = (typeof INBOX_FILTERS)[number];
+
+/** The inbox search (a name, a username, or words from a message) and tab. */
+export const inboxQuerySchema = z.object({
+  q: z.string().trim().max(100).optional(),
+  filter: z.enum(INBOX_FILTERS).optional(),
+});
+
+/** How many chats each inbox tab holds. */
+export interface InboxCountsDto {
+  all: number;
+  unread: number;
+  online: number;
+}
 
 export const markReadSchema = z.object({
   messageId: z.string().uuid(),

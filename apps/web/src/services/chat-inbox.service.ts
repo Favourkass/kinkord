@@ -1,18 +1,26 @@
-import type { ChatInboxFilter, ConversationSummaryPM } from "@/domain/chat";
+import type { ChatInboxFilter, ConversationSummaryPM, InboxCountsPM } from "@/domain/chat";
 
 const latest = (s: ConversationSummaryPM) =>
   Date.parse(s.lastMessage?.createdAt ?? s.lastMessageAt ?? "") || 0;
 
+const inTab: Record<ChatInboxFilter, (s: ConversationSummaryPM) => boolean> = {
+  all: () => true,
+  unread: (s) => s.unreadCount > 0,
+  online: (s) => Boolean(s.peer?.online),
+};
+
 /**
  * The inbox as the tabs and the search show it, without changing saved data.
- * A search matches the loaded chats at once; `found` is the API's answer for
- * the same search across every chat, which adds older ones it turned up.
+ * The loaded chats (the latest page) answer at once. `found` is the API's
+ * answer for the same tab and search across every chat, which adds older ones;
+ * `counts` is its count of every chat, used once it's in.
  */
 export function selectChatInbox(
   summaries: ConversationSummaryPM[],
   query: string,
   filter: ChatInboxFilter,
   found: ConversationSummaryPM[] | null = null,
+  counts: InboxCountsPM | null = null,
 ) {
   const term = query.trim().toLocaleLowerCase();
   const loaded = summaries.filter(
@@ -22,25 +30,20 @@ export function selectChatInbox(
         value?.toLocaleLowerCase().includes(term),
       ),
   );
-  let matches = loaded;
-  if (term && found) {
+  let pool = loaded;
+  if (found) {
     const shown = new Set(loaded.map((s) => s.id));
     // A chat that's loaded is shown as loaded: that copy is the freshest.
     const byId = new Map(summaries.map((s) => [s.id, s]));
     const more = found.filter((s) => !shown.has(s.id)).map((s) => byId.get(s.id) ?? s);
-    matches = [...loaded, ...more].sort((a, b) => latest(b) - latest(a));
+    pool = [...loaded, ...more].sort((a, b) => latest(b) - latest(a));
   }
-  const buckets = {
-    all: matches,
-    unread: matches.filter((s) => s.unreadCount > 0),
-    online: matches.filter((s) => s.peer?.online),
-  };
   return {
-    items: buckets[filter],
-    counts: {
-      all: buckets.all.length,
-      unread: buckets.unread.length,
-      online: buckets.online.length,
+    items: pool.filter(inTab[filter]),
+    counts: counts ?? {
+      all: pool.length,
+      unread: pool.filter(inTab.unread).length,
+      online: pool.filter(inTab.online).length,
     },
   };
 }

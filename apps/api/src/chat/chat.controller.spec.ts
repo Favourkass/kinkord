@@ -17,6 +17,7 @@ function make() {
     sendMessage: vi.fn(async () => ({ id: "m1" })),
     setTyping: vi.fn(async () => undefined),
     listConversations: vi.fn(async () => []),
+    inboxCounts: vi.fn(async () => ({ all: 3, unread: 1, online: 2 })),
     markRead: vi.fn(async () => undefined),
     allowance: vi.fn(async () => ({ newChatsPerDay: 1, usedToday: 0, resetsAt: "x" })),
     presignPhotoUpload: vi.fn(async () => ({ key: "chat/c1/u1/a.jpg" })),
@@ -131,11 +132,22 @@ it("validates typing state and uses the authenticated identity", async () => {
   );
 });
 
-it("searches the inbox with a trimmed query, and refuses a very long one", async () => {
+it("searches the inbox with a trimmed query and a tab, and refuses bad ones", async () => {
   const { controller, chat } = make();
-  await controller.list(req, { q: "  ada " });
-  expect(chat.listConversations).toHaveBeenLastCalledWith("u1", "ada");
+  await controller.list(req, { q: "  ada ", filter: "unread" });
+  expect(chat.listConversations).toHaveBeenLastCalledWith("u1", "ada", "unread");
   await controller.list(req, {});
-  expect(chat.listConversations).toHaveBeenLastCalledWith("u1", undefined);
+  expect(chat.listConversations).toHaveBeenLastCalledWith("u1", undefined, undefined);
   expect(() => controller.list(req, { q: "x".repeat(101) })).toThrow(BadRequestException);
+  expect(() => controller.list(req, { filter: "groups" })).toThrow(BadRequestException);
+});
+
+it("counts each tab for the search in force", async () => {
+  const { controller, chat } = make();
+  await expect(controller.counts(req, { q: " ada " })).resolves.toEqual({
+    all: 3,
+    unread: 1,
+    online: 2,
+  });
+  expect(chat.inboxCounts).toHaveBeenCalledWith("u1", "ada");
 });

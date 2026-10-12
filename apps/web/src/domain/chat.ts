@@ -72,6 +72,13 @@ export interface PendingMessage {
 
 export type ChatInboxFilter = "all" | "unread" | "online";
 
+/** How many chats each inbox tab holds, every chat counted. */
+export interface InboxCountsPM {
+  all: number;
+  unread: number;
+  online: number;
+}
+
 export interface ConversationRowVM {
   id: string;
   href: string;

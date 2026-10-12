@@ -800,9 +800,24 @@ describe("blocks in chat", () => {
       [],
     ]);
     await expect(service.listConversations("u1")).resolves.toEqual([]);
-    expect(whereSql(calls, 1)).toContain(
-      '"member_block"."blocker_id" = "conversation_participant"."user_id"',
-    );
+    // The peers query leaves them out, and so does the inbox's own condition, before the limit.
+    const wheres = calls
+      .filter((c) => c.op === "where")
+      .map((c) => {
+        try {
+          return new PgDialect().sqlToQuery(c.args[0] as SQL).sql;
+        } catch {
+          return "";
+        }
+      });
+    expect(
+      wheres.some((w) =>
+        w.includes('"member_block"."blocker_id" = "conversation_participant"."user_id"'),
+      ),
+    ).toBe(true);
+    expect(
+      wheres.some((w) => w.includes('"member_block"."blocker_id" = "inbox_peer"."user_id"')),
+    ).toBe(true);
   });
 });
 
@@ -874,6 +889,24 @@ describe("ChatService.setTyping", () => {
       vi.useRealTimers();
     }
   });
+  it("sends one hint for many sent at once", async () => {
+    const { service, realtime } = make([
+      [{ userId: "u1" }],
+      [{ userId: "u2", blockedByMe: false }],
+    ]);
+    await Promise.all(Array.from({ length: 25 }, () => service.setTyping("u1", "c1", true)));
+    expect(realtime.notify).toHaveBeenCalledTimes(1);
+  });
+  it("gives the slot back when the member isn't allowed, so nothing is held for them", async () => {
+    const { service, realtime } = make([
+      [],
+      [{ userId: "u1" }],
+      [{ userId: "u2", blockedByMe: false }],
+    ]);
+    await expect(service.setTyping("u1", "c1", true)).rejects.toBeInstanceOf(NotFoundException);
+    await service.setTyping("u1", "c1", true);
+    expect(realtime.notify).toHaveBeenCalledTimes(1);
+  });
   it("can't be flipped between typing and not to flood the other member", async () => {
     const answers = Array.from({ length: 20 }, (_, i) =>
       i % 2 ? [{ userId: "u2", blockedByMe: false }] : [{ userId: "u1" }],
@@ -892,6 +925,37 @@ describe("ChatService.setTyping", () => {
       ForbiddenException,
     );
     expect(blocked.realtime.notify).not.toHaveBeenCalled();
+  });
+});
+
+describe("ChatService inbox tabs", () => {
+  const service = () =>
+    new ChatService(
+      drizzle.mock() as never,
+      {} as StorageService,
+      {} as RealtimeService,
+      {} as PushService,
+    );
+  const render = (where: SQL) => new PgDialect().sqlToQuery(where).sql.replace(/\s+/g, " ");
+  const inbox = (s: ChatService, filter: "all" | "unread" | "online") =>
+    (s as unknown as { inbox(u: string, q: string, f: string): SQL }).inbox("u1", "", filter);
+
+  it("applies who's still here, and the tab, before the page limit", () => {
+    const all = render(inbox(service(), "all"));
+    expect(all).toContain('"inbox_peer"."conversation_id" = "conversation"."id"');
+    expect(all).toContain('"member_ban"."user_id" = "inbox_peer"."user_id"');
+    expect(all).toContain('"member_block"."blocker_id" = "inbox_peer"."user_id"');
+    expect(all).toContain('"conversation"."created_by" = $');
+    expect(all).not.toContain("last_read_at");
+    const unread = render(inbox(service(), "unread"));
+    expect(unread).toContain('"inbox_message"."sender_id" <> $');
+    expect(unread).toContain(
+      `"inbox_message"."created_at" > coalesce("conversation_participant"."last_read_at", 'epoch')`,
+    );
+    const online = render(inbox(service(), "online"));
+    expect(online).toContain(
+      `"inbox_peer_profile"."last_seen_at" > timezone('UTC', now()) - (300 * interval '1 second')`,
+    );
   });
 });
 
