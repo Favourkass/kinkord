@@ -20,6 +20,8 @@ import {
   photoUploadSchema,
   sendMessageSchema,
   startDmSchema,
+  typingSchema,
+  inboxQuerySchema,
 } from "./dto";
 
 function parse<S extends z.ZodTypeAny>(schema: S, input: unknown): z.infer<S> {
@@ -49,8 +51,15 @@ export class ChatController {
   }
 
   @Get("conversations")
-  list(@Req() req: AuthedRequest) {
-    return this.chat.listConversations(req.user.id);
+  list(@Req() req: AuthedRequest, @Query() query: unknown) {
+    const { q, filter } = parse(inboxQuerySchema, query ?? {});
+    return this.chat.listConversations(req.user.id, q, filter);
+  }
+
+  /** Each tab's count, every chat counted. Declared before conversations/:id. */
+  @Get("conversations/counts")
+  counts(@Req() req: AuthedRequest, @Query() query: unknown) {
+    return this.chat.inboxCounts(req.user.id, parse(inboxQuerySchema, query ?? {}).q);
   }
 
   @Post("conversations")
@@ -110,6 +119,16 @@ export class ChatController {
   ) {
     const { contentType, contentLength } = parse(photoUploadSchema, body);
     return this.chat.presignPhotoUpload(req.user.id, id, contentType, contentLength);
+  }
+
+  @Post("conversations/:id/typing")
+  async typing(
+    @Req() req: AuthedRequest,
+    @Param("id", new ParseUUIDPipe()) id: string,
+    @Body() body: unknown,
+  ) {
+    await this.chat.setTyping(req.user.id, id, parse(typingSchema, body).typing);
+    return { ok: true };
   }
 
   @Post("conversations/:id/read")

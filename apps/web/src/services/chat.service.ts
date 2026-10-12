@@ -8,6 +8,8 @@ import type {
   ConversationSummaryPM,
   ConversationThreadPM,
   SentMessagePM,
+  ChatInboxFilter,
+  InboxCountsPM,
 } from "@/domain/chat";
 import { IMAGE_VARIANTS, buildUploadSet, type ImageVariant } from "@/util/image";
 import { api, uploadToPresignedUrl } from "./apiClient";
@@ -28,7 +30,20 @@ export function listenForChatRead(onRead: () => void): () => void {
 
 export const chatService = {
   unreadCount: () => api.get<{ count: number }>("/chat/unread-count"),
-  list: () => api.get<ConversationSummaryPM[]>("/chat/conversations"),
+  /** The inbox, newest first. A search or a tab looks through every chat, not just the latest. */
+  list: (view: { q?: string; filter?: ChatInboxFilter } = {}) => {
+    const params = new URLSearchParams();
+    if (view.q?.trim()) params.set("q", view.q.trim());
+    if (view.filter && view.filter !== "all") params.set("filter", view.filter);
+    const query = params.toString();
+    return api.get<ConversationSummaryPM[]>(`/chat/conversations${query ? `?${query}` : ""}`);
+  },
+
+  /** How many chats each tab holds, for a search or none. */
+  counts: (q = "") =>
+    api.get<InboxCountsPM>(
+      `/chat/conversations/counts${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ""}`,
+    ),
 
   conversation: (id: string) => api.get<ConversationThreadPM>(thread(id)),
 
@@ -69,6 +84,9 @@ export const chatService = {
     await uploadToPresignedUrl(slot.uploadUrl, original);
     return slot.key;
   },
+
+  setTyping: (id: string, typing: boolean) =>
+    api.post<{ ok: true }>(`${thread(id)}/typing`, { typing }),
 
   markRead: async (id: string, messageId: string) => {
     const result = await api.post<{ ok: true }>(`${thread(id)}/read`, { messageId });

@@ -186,7 +186,8 @@ export class MembersService {
     const viewerFollow = alias(follow, "viewer_follow");
     const followers = sql<number>`coalesce(${followerCounts.followers}, 0)`;
     // Presence: active within the online window. Online members always list first.
-    const isOnline = sql<boolean>`coalesce(${profile.lastSeenAt} > now() - (${sql.raw(
+    // last_seen_at holds UTC wall time (see PresenceService.touch), so "now" is UTC too.
+    const isOnline = sql<boolean>`coalesce(${profile.lastSeenAt} > timezone('UTC', now()) - (${sql.raw(
       String(ONLINE_WINDOW_SECONDS),
     )} * interval '1 second'), false)`;
 

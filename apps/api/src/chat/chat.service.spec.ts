@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { type SQL } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { conversation, conversationParticipant, message } from "../db/schema";
 import type { PushService } from "../push/push.service";
@@ -450,6 +451,7 @@ describe("ChatService.listConversations", () => {
         displayName: "Ada",
         avatarUrl: "https://media/avatars/u2/a.png?sm",
         online: true,
+        presence: "online",
         silver: true,
       },
       lastMessage: { id: "m1", body: "hello" },
@@ -798,9 +800,24 @@ describe("blocks in chat", () => {
       [],
     ]);
     await expect(service.listConversations("u1")).resolves.toEqual([]);
-    expect(whereSql(calls, 1)).toContain(
-      '"member_block"."blocker_id" = "conversation_participant"."user_id"',
-    );
+    // The peers query leaves them out, and so does the inbox's own condition, before the limit.
+    const wheres = calls
+      .filter((c) => c.op === "where")
+      .map((c) => {
+        try {
+          return new PgDialect().sqlToQuery(c.args[0] as SQL).sql;
+        } catch {
+          return "";
+        }
+      });
+    expect(
+      wheres.some((w) =>
+        w.includes('"member_block"."blocker_id" = "conversation_participant"."user_id"'),
+      ),
+    ).toBe(true);
+    expect(
+      wheres.some((w) => w.includes('"member_block"."blocker_id" = "inbox_peer"."user_id"')),
+    ).toBe(true);
   });
 });
 
@@ -820,5 +837,153 @@ describe("chat unread badge", () => {
   });
   it("returns zero when no messages are unread", async () => {
     await expect(make([[{ total: 0 }]]).service.unreadCount("u1")).resolves.toEqual({ count: 0 });
+  });
+});
+
+describe("ChatService.setTyping", () => {
+  it("publishes only to the authorised peer without writing to the database", async () => {
+    const { service, realtime, calls } = make([
+      [{ userId: "u1" }],
+      [{ userId: "u2", blockedByMe: false }],
+    ]);
+    await service.setTyping("u1", "c1", true);
+    expect(realtime.notify).toHaveBeenCalledWith(["u2"], {
+      type: "typing",
+      conversationId: "c1",
+      typing: true,
+    });
+    expect(calls.some((c) => ["update", "insert", "delete"].includes(c.op))).toBe(false);
+  });
+  it("suppresses repeated hints but sends stop immediately", async () => {
+    const { service, realtime, calls } = make([
+      [{ userId: "u1" }],
+      [{ userId: "u2", blockedByMe: false }],
+      [{ userId: "u1" }],
+      [{ userId: "u2", blockedByMe: false }],
+    ]);
+    await service.setTyping("u1", "c1", true);
+    const count = calls.length;
+    await service.setTyping("u1", "c1", true);
+    expect(calls).toHaveLength(count);
+    await service.setTyping("u1", "c1", false);
+    expect(realtime.notify).toHaveBeenCalledTimes(2);
+    expect(realtime.notify).toHaveBeenLastCalledWith(
+      ["u2"],
+      expect.objectContaining({ typing: false }),
+    );
+  });
+  it("passes the app's 5-second heartbeat even when it arrives a little early", async () => {
+    vi.useFakeTimers();
+    try {
+      const { service, realtime } = make([
+        [{ userId: "u1" }],
+        [{ userId: "u2", blockedByMe: false }],
+        [{ userId: "u1" }],
+        [{ userId: "u2", blockedByMe: false }],
+      ]);
+      await service.setTyping("u1", "c1", true);
+      vi.advanceTimersByTime(4_950);
+      await service.setTyping("u1", "c1", true);
+      expect(realtime.notify).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("sends one hint for many sent at once", async () => {
+    const { service, realtime } = make([
+      [{ userId: "u1" }],
+      [{ userId: "u2", blockedByMe: false }],
+    ]);
+    await Promise.all(Array.from({ length: 25 }, () => service.setTyping("u1", "c1", true)));
+    expect(realtime.notify).toHaveBeenCalledTimes(1);
+  });
+  it("gives the slot back when the member isn't allowed, so nothing is held for them", async () => {
+    const { service, realtime } = make([
+      [],
+      [{ userId: "u1" }],
+      [{ userId: "u2", blockedByMe: false }],
+    ]);
+    await expect(service.setTyping("u1", "c1", true)).rejects.toBeInstanceOf(NotFoundException);
+    await service.setTyping("u1", "c1", true);
+    expect(realtime.notify).toHaveBeenCalledTimes(1);
+  });
+  it("can't be flipped between typing and not to flood the other member", async () => {
+    const answers = Array.from({ length: 20 }, (_, i) =>
+      i % 2 ? [{ userId: "u2", blockedByMe: false }] : [{ userId: "u1" }],
+    );
+    const { service, realtime } = make(answers);
+    for (let i = 0; i < 10; i++) await service.setTyping("u1", "c1", i % 2 === 0);
+    // One start and one stop inside the same second; the other eight are dropped.
+    expect(realtime.notify).toHaveBeenCalledTimes(2);
+  });
+  it("rejects non-members and blocked peers", async () => {
+    await expect(make([[]]).service.setTyping("u1", "c1", true)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    const blocked = make([[{ userId: "u1" }], [{ userId: "u2", blockedByMe: true }]]);
+    await expect(blocked.service.setTyping("u1", "c1", true)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(blocked.realtime.notify).not.toHaveBeenCalled();
+  });
+});
+
+describe("ChatService inbox tabs", () => {
+  const service = () =>
+    new ChatService(
+      drizzle.mock() as never,
+      {} as StorageService,
+      {} as RealtimeService,
+      {} as PushService,
+    );
+  const render = (where: SQL) => new PgDialect().sqlToQuery(where).sql.replace(/\s+/g, " ");
+  const inbox = (s: ChatService, filter: "all" | "unread" | "online") =>
+    (s as unknown as { inbox(u: string, q: string, f: string): SQL }).inbox("u1", "", filter);
+
+  it("applies who's still here, and the tab, before the page limit", () => {
+    const all = render(inbox(service(), "all"));
+    expect(all).toContain('"inbox_peer"."conversation_id" = "conversation"."id"');
+    expect(all).toContain('"member_ban"."user_id" = "inbox_peer"."user_id"');
+    expect(all).toContain('"member_block"."blocker_id" = "inbox_peer"."user_id"');
+    expect(all).toContain('"conversation"."created_by" = $');
+    expect(all).not.toContain("last_read_at");
+    const unread = render(inbox(service(), "unread"));
+    expect(unread).toContain('"inbox_message"."sender_id" <> $');
+    expect(unread).toContain(
+      `"inbox_message"."created_at" > coalesce("conversation_participant"."last_read_at", 'epoch')`,
+    );
+    const online = render(inbox(service(), "online"));
+    expect(online).toContain(
+      `"inbox_peer_profile"."last_seen_at" > timezone('UTC', now()) - (300 * interval '1 second')`,
+    );
+  });
+});
+
+describe("ChatService inbox search", () => {
+  it("looks through every chat: the other member's names, or any message still there", () => {
+    const db = drizzle.mock();
+    const service = new ChatService(
+      db as never,
+      {} as StorageService,
+      {} as RealtimeService,
+      {} as PushService,
+    );
+    const where = (service as unknown as { matching(u: string, p: string): SQL }).matching(
+      "u1",
+      "%ada\\_%",
+    );
+    const { sql, params } = new PgDialect().sqlToQuery(where);
+    expect(sql).toContain('from "conversation_participant" "search_participant"');
+    expect(sql).toContain('"search_participant"."conversation_id" = "conversation"."id"');
+    expect(sql).toContain('"search_participant"."user_id" <> $');
+    expect(sql).toContain('"search_profile"."display_name" ilike $');
+    expect(sql).toContain('"search_user"."username" ilike $');
+    // The account name only when it's what the inbox shows: no display name, no username.
+    expect(sql).toContain(
+      '("search_profile"."display_name" is null and "search_user"."username" is null and "search_user"."name" ilike $',
+    );
+    expect(sql).toContain('"search_message"."deleted_at" is null');
+    expect(sql).toContain('"search_message"."body" ilike $');
+    expect(params).toEqual(["u1", "%ada\\_%", "%ada\\_%", "%ada\\_%", "%ada\\_%"]);
   });
 });
