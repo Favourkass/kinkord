@@ -70,6 +70,7 @@ function setup(configured = true) {
     state: vi.fn(async (): Promise<unknown> => null),
     snapshot: vi.fn(async (): Promise<unknown> => snapshot()),
     hasConsent: vi.fn(async () => true),
+    hasAnyConsent: vi.fn(async () => true),
     consent: vi.fn(async () => undefined),
     withdrawConsent: vi.fn(async () => ["s1", "s2"]),
     queueErasuresForUser: vi.fn(async () => ["s1"]),
@@ -153,6 +154,17 @@ describe("BronzeService.status", () => {
     expect(status.missing).toEqual(["gender"]);
     expect(status.photoReadyAt).toBe(new Date(NOW - 2 * 60_000 + PHOTO_SETTLE_MS).toISOString());
     expect(status.policyVersion).toBe(BRONZE_POLICY_VERSION);
+    expect(status.withdrawable).toBe(true);
+  });
+
+  it("keeps withdrawal available when only an older notice version was accepted", async () => {
+    const { service, repo } = setup();
+    repo.hasConsent.mockResolvedValueOnce(false);
+    repo.hasAnyConsent.mockResolvedValueOnce(true);
+    await expect(service.status("u1", NOW)).resolves.toMatchObject({
+      consented: false,
+      withdrawable: true,
+    });
   });
 
   it("asks for a new check once the verified birth date changes", async () => {

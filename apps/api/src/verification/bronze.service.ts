@@ -100,9 +100,10 @@ export class BronzeService implements OnModuleInit, OnModuleDestroy {
         }
       }
     }
-    const [snapshot, consented] = await Promise.all([
+    const [snapshot, consented, withdrawable] = await Promise.all([
       this.repo.snapshot(userId),
       this.repo.hasConsent(userId),
+      this.repo.hasAnyConsent(userId),
     ]);
     const uploadedAt = snapshot?.avatarUploadedAt?.getTime() ?? 0;
     const missing = [
@@ -126,6 +127,7 @@ export class BronzeService implements OnModuleInit, OnModuleDestroy {
       attemptsUsed,
       attemptsRemaining: Math.max(0, BRONZE_MAX_ATTEMPTS - attemptsUsed),
       consented,
+      withdrawable,
       policyVersion: BRONZE_POLICY_VERSION,
       policyUrl: this.didit.policyUrl || null,
       missing,

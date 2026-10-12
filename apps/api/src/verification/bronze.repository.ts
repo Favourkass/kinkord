@@ -99,6 +99,16 @@ export class BronzeRepository {
     return Boolean(row);
   }
 
+  /** Any standing consent, including an older notice version, may be withdrawn. */
+  async hasAnyConsent(userId: string) {
+    const [row] = await this.db
+      .select({ id: bronzeConsent.id })
+      .from(bronzeConsent)
+      .where(and(eq(bronzeConsent.userId, userId), isNull(bronzeConsent.withdrawnAt)))
+      .limit(1);
+    return Boolean(row);
+  }
+
   async recordAdminStepUp(sessionId: string, userId: string, expiresAt: Date) {
     const now = new Date();
     await this.db
