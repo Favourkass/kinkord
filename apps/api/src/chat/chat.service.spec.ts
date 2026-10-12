@@ -857,6 +857,23 @@ describe("ChatService.setTyping", () => {
       expect.objectContaining({ typing: false }),
     );
   });
+  it("passes the app's 5-second heartbeat even when it arrives a little early", async () => {
+    vi.useFakeTimers();
+    try {
+      const { service, realtime } = make([
+        [{ userId: "u1" }],
+        [{ userId: "u2", blockedByMe: false }],
+        [{ userId: "u1" }],
+        [{ userId: "u2", blockedByMe: false }],
+      ]);
+      await service.setTyping("u1", "c1", true);
+      vi.advanceTimersByTime(4_950);
+      await service.setTyping("u1", "c1", true);
+      expect(realtime.notify).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it("can't be flipped between typing and not to flood the other member", async () => {
     const answers = Array.from({ length: 20 }, (_, i) =>
       i % 2 ? [{ userId: "u2", blockedByMe: false }] : [{ userId: "u1" }],

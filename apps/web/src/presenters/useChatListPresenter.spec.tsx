@@ -152,6 +152,11 @@ describe("useChatListPresenter", () => {
       });
       expect(list).toHaveBeenCalledWith("ada");
       expect(result.current.list.rows.map((r) => r.id)).toEqual(["c1", "c9"]);
+      // The next inbox refresh asks again: a chat that's gone since (a block, say) drops out.
+      list.mockImplementation(async (q?: string) => (q ? [] : [row]));
+      await act(async () => polls.get(LIST_POLL_MS)?.());
+      expect(list).toHaveBeenCalledWith("ada");
+      expect(result.current.list.rows.map((r) => r.id)).toEqual(["c1"]);
       // Clearing the search shows the inbox as it was.
       act(() => result.current.list.setQuery(""));
       expect(result.current.list.rows.map((r) => r.id)).toEqual(["c1"]);

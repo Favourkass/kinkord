@@ -73,6 +73,19 @@ it("offers working navigation actions in the overflow menu", () => {
   expect(props.onNavigation).toHaveBeenCalled();
 });
 
+it("keeps the menu open for a tap inside it, though the shell mounts the screen twice", () => {
+  const onCloseMenu = vi.fn();
+  render(
+    <>
+      <ChatListScreen {...props} menuOpen onCloseMenu={onCloseMenu} />
+      <div hidden>
+        <ChatListScreen {...props} menuOpen onCloseMenu={onCloseMenu} />
+      </div>
+    </>,
+  );
+  fireEvent.pointerDown(screen.getAllByRole("link", { name: "New message" })[0]);
+  expect(onCloseMenu).not.toHaveBeenCalled();
+});
 it("closes the menu on a tap outside it or Escape, but not on a tap inside", () => {
   const onCloseMenu = vi.fn();
   render(<ChatListScreen {...props} menuOpen onCloseMenu={onCloseMenu} />);

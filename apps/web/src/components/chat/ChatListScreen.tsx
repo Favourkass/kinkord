@@ -43,13 +43,14 @@ export interface ChatListScreenProps {
 
 export default function ChatListScreen(p: ChatListScreenProps) {
   const input = useRef<HTMLInputElement>(null);
-  const menu = useRef<HTMLDivElement>(null);
   const { menuOpen, onCloseMenu } = p;
-  // The menu closes on a tap anywhere else, or Escape, like any other menu.
+  // The menu closes on a tap anywhere else, or Escape, like any other menu. The
+  // app shell mounts this screen twice (one copy hidden), so "inside" means
+  // inside either copy's menu: the hidden one mustn't close the visible one.
   useEffect(() => {
     if (!menuOpen) return;
     const away = (e: PointerEvent) => {
-      if (!menu.current?.contains(e.target as Node)) onCloseMenu();
+      if (!(e.target instanceof Element) || !e.target.closest("[data-chat-menu]")) onCloseMenu();
     };
     const escape = (e: KeyboardEvent) => {
       if (e.key === "Escape") onCloseMenu();
@@ -70,7 +71,7 @@ export default function ChatListScreen(p: ChatListScreenProps) {
           <h1 className="text-[28px] font-bold tracking-tight text-kink-gold-bright">
             {p.heading}
           </h1>
-          <div ref={menu} className="relative flex items-center gap-[6px]">
+          <div data-chat-menu="" className="relative flex items-center gap-[6px]">
             <button
               type="button"
               className={tool}

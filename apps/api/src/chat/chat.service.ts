@@ -62,8 +62,11 @@ export const MAX_MESSAGES_PER_MINUTE = 30;
 const LIST_LIMIT = 50;
 /** A typing start reaches the other member at most this often. */
 const TYPING_MIN_GAP_MS = 1_000;
-/** A repeat of the same hint is only sent again after this long. */
-const TYPING_REPEAT_MS = 5_000;
+/**
+ * A repeat of the same hint is only sent again after this long: under the
+ * app's 5s heartbeat, so ordinary network jitter never drops a renewal.
+ */
+const TYPING_REPEAT_MS = 4_000;
 
 // Aliased so the inbox search can look at a chat's other member and messages from inside the inbox query.
 const searchParticipant = alias(conversationParticipant, "search_participant");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CHAT_COPY } from "@/constants/chat";
 import { selectChatInbox } from "@/services/chat-inbox.service";
 import { Routes } from "@/constants/Routes";
@@ -69,7 +69,20 @@ export function useChatListPresenter() {
     };
   }, []);
 
+  // The search in force, for refreshes that run outside a render.
+  const searching = useRef(term);
+  useEffect(() => {
+    searching.current = term;
+  }, [term]);
   const refresh = useCallback(async () => {
+    // A search's answer is refreshed with the inbox, so a chat that's gone (a
+    // block, say) or has changed doesn't linger in it.
+    const words = searching.current;
+    if (words)
+      void chatService.list(words).then(
+        (items) => searching.current === words && setFound({ term: words, items }),
+        () => undefined,
+      );
     try {
       setSummaries(await chatService.list());
       setError(null);
