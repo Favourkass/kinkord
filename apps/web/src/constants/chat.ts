@@ -1,3 +1,6 @@
+/** The longest inbox search the API takes. */
+export const INBOX_SEARCH_MAX = 100;
+
 /** Copy for the chat screens. */
 export const CHAT_COPY = {
   heading: "Messages",

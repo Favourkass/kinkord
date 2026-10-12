@@ -63,6 +63,14 @@ describe("selectChatInbox", () => {
         (s) => s.id,
       ),
     ).toEqual(["a"]);
+    // When the API's answer is newer, its copy wins: Bola came online since the inbox loaded.
+    const online = { ...summaries[1], peer: { ...summaries[1].peer!, online: true } };
+    expect(
+      selectChatInbox(summaries, "", "online", [online], null, true).items.map((s) => s.id),
+    ).toEqual(["a", "b"]);
+    expect(
+      selectChatInbox(summaries, "", "online", [online], null, false).items.map((s) => s.id),
+    ).toEqual(["a"]);
     // An answer for another search, or none yet, changes nothing.
     expect(selectChatInbox(summaries, "ada", "all").items.map((s) => s.id)).toEqual(["a"]);
   });

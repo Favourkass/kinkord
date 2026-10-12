@@ -19,6 +19,8 @@ export interface ChatListScreenProps {
   onlineLabel: string;
   query: string;
   onQuery: (value: string) => void;
+  /** The longest search the API takes. */
+  searchMaxLength: number;
   filters: { key: ChatInboxFilter; label: string; count: string; active: boolean }[];
   onFilter: (filter: ChatInboxFilter) => void;
   menuOpen: boolean;
@@ -103,9 +105,10 @@ export default function ChatListScreen(p: ChatListScreenProps) {
                 >
                   {p.copy.settings}
                 </Link>
+                {/* The drawer only exists on phones; desktop has the sidebar instead. */}
                 <button
                   type="button"
-                  className="w-full rounded-lg px-[12px] py-[10px] text-left hover:bg-app-input"
+                  className="w-full rounded-lg px-[12px] py-[10px] text-left hover:bg-app-input lg:hidden"
                   onClick={p.onNavigation}
                 >
                   {p.copy.navigation}
@@ -121,6 +124,7 @@ export default function ChatListScreen(p: ChatListScreenProps) {
             type="search"
             aria-label={p.copy.searchLabel}
             placeholder={p.copy.search}
+            maxLength={p.searchMaxLength}
             value={p.query}
             onChange={(e) => p.onQuery(e.target.value)}
             className="min-w-0 flex-1 bg-transparent text-[14px] text-app-text outline-none [&::-webkit-search-cancel-button]:appearance-none"

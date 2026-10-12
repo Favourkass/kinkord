@@ -40,7 +40,13 @@ export function useChatListPresenter() {
   const term = query.trim();
   // A tab and search: the API's answer across every chat, and its counts.
   const view = `${filter}|${term}`;
-  const [found, setFound] = useState<{ view: string; items: ConversationSummaryPM[] } | null>(null);
+  const [found, setFound] = useState<{
+    view: string;
+    items: ConversationSummaryPM[];
+    at: number;
+  } | null>(null);
+  // When the inbox last arrived, to tell which copy of a chat is newer.
+  const [loadedAt, setLoadedAt] = useState(0);
   const [counts, setCounts] = useState<{ term: string; value: InboxCountsPM } | null>(null);
   // What's on screen, for answers that land later: an answer for another view is dropped.
   const wanted = useRef({ term, filter, view });
@@ -51,7 +57,8 @@ export function useChatListPresenter() {
     // The loaded chats still answer while these are on their way, or unavailable.
     if (w.term || w.filter !== "all")
       chatService.list({ q: w.term, filter: w.filter }).then(
-        (items) => wanted.current.view === w.view && setFound({ view: w.view, items }),
+        (items) =>
+          wanted.current.view === w.view && setFound({ view: w.view, items, at: Date.now() }),
         () => undefined,
       );
     chatService.counts(w.term).then(
@@ -86,6 +93,7 @@ export function useChatListPresenter() {
     fetchView(wanted.current);
     try {
       setSummaries(await chatService.list());
+      setLoadedAt(Date.now());
       setError(null);
     } catch (e) {
       setError(messageOf(e));
@@ -113,8 +121,9 @@ export function useChatListPresenter() {
         filter,
         found && found.view === view ? found.items : null,
         counts && counts.term === term ? counts.value : null,
+        found !== null && found.at >= loadedAt,
       ),
-    [summaries, query, filter, found, counts, term, view],
+    [summaries, query, filter, found, counts, term, view, loadedAt],
   );
   const rows = useMemo(
     () =>

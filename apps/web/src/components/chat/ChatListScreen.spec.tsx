@@ -33,6 +33,7 @@ const props: ChatListScreenProps = {
   onlineLabel: "Online",
   query: "",
   onQuery: vi.fn(),
+  searchMaxLength: 100,
   filters: [
     { key: "all", label: "All", count: "1", active: true },
     { key: "unread", label: "Unread", count: "1", active: false },
@@ -61,6 +62,7 @@ it("renders unread counts and passes search and filter interactions to the scree
   render(<ChatListScreen {...props} />);
   expect(screen.getByLabelText("12 unread messages").textContent).toBe("12");
   expect(screen.getByRole("link", { name: /Ada/ }).getAttribute("href")).toBe("/messages/a");
+  expect(screen.getByRole("searchbox").getAttribute("maxlength")).toBe("100");
   fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Ada" } });
   expect(props.onQuery).toHaveBeenCalledWith("Ada");
   fireEvent.click(screen.getByRole("button", { name: "Unread 1" }));

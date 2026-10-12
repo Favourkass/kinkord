@@ -13,7 +13,8 @@ const inTab: Record<ChatInboxFilter, (s: ConversationSummaryPM) => boolean> = {
  * The inbox as the tabs and the search show it, without changing saved data.
  * The loaded chats (the latest page) answer at once. `found` is the API's
  * answer for the same tab and search across every chat, which adds older ones;
- * `counts` is its count of every chat, used once it's in.
+ * `counts` is its count of every chat, used once it's in. `foundIsNewer` says
+ * which copy of a chat in both is the truer one: whichever was fetched last.
  */
 export function selectChatInbox(
   summaries: ConversationSummaryPM[],
@@ -21,6 +22,7 @@ export function selectChatInbox(
   filter: ChatInboxFilter,
   found: ConversationSummaryPM[] | null = null,
   counts: InboxCountsPM | null = null,
+  foundIsNewer = false,
 ) {
   const term = query.trim().toLocaleLowerCase();
   const loaded = summaries.filter(
@@ -32,11 +34,14 @@ export function selectChatInbox(
   );
   let pool = loaded;
   if (found) {
-    const shown = new Set(loaded.map((s) => s.id));
-    // A chat that's loaded is shown as loaded: that copy is the freshest.
-    const byId = new Map(summaries.map((s) => [s.id, s]));
-    const more = found.filter((s) => !shown.has(s.id)).map((s) => byId.get(s.id) ?? s);
-    pool = [...loaded, ...more].sort((a, b) => latest(b) - latest(a));
+    const loadedById = new Map(summaries.map((s) => [s.id, s]));
+    const foundById = new Map(found.map((s) => [s.id, s]));
+    const freshest = (id: string) =>
+      foundIsNewer
+        ? (foundById.get(id) ?? loadedById.get(id)!)
+        : (loadedById.get(id) ?? foundById.get(id)!);
+    const ids = new Set([...loaded.map((s) => s.id), ...found.map((s) => s.id)]);
+    pool = [...ids].map(freshest).sort((a, b) => latest(b) - latest(a));
   }
   return {
     items: pool.filter(inTab[filter]),

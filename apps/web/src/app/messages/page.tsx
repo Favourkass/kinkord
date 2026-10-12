@@ -3,7 +3,7 @@
 import AppShell from "@/components/app/AppShell";
 import ChatListScreen from "@/components/chat/ChatListScreen";
 import PushPrompt from "@/components/chat/PushPrompt";
-import { CHAT_COPY } from "@/constants/chat";
+import { CHAT_COPY, INBOX_SEARCH_MAX } from "@/constants/chat";
 import { getAppShellNav } from "@/presenters/getAppShellNav";
 import { useChatListPresenter } from "@/presenters/useChatListPresenter";
 import { usePushPresenter } from "@/presenters/usePushPresenter";
@@ -48,6 +48,7 @@ export default function MessagesPage() {
         onlineLabel={CHAT_COPY.online}
         query={list.query}
         onQuery={list.setQuery}
+        searchMaxLength={INBOX_SEARCH_MAX}
         filters={list.filters}
         onFilter={list.setFilter}
         menuOpen={list.menuOpen}
