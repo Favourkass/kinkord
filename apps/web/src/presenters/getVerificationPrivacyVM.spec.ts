@@ -11,6 +11,8 @@ describe("getVerificationPrivacyVM", () => {
     );
     const text = vm.sections.flatMap((section) => section.paragraphs).join(" ");
     expect(text).toContain("sensitive biometric data");
+    expect(text).toContain("Authorized Kinkord reviewers");
+    expect(text).toContain("retries it if Didit is temporarily unavailable");
     expect(text).toContain("Settings → Verification");
     // Only Didit: no other provider or stage is described.
     expect(text).not.toMatch(/Smile|Mono|bank-connection|residence|GPS/);

@@ -124,7 +124,7 @@ export const PROFILE_EDIT_COPY = {
     profileVisibility: { title: "Profile Visibility", help: null },
     verifiedBadge: {
       title: "Verified Badge",
-      help: "Members who can see your profile see the badge. Your ID and selfie are never shown.",
+      help: "Members who can see your profile see only the badge, not your ID or selfie.",
     },
   } satisfies Record<EditRowKey, { title: string; help: string | null }>,
   verifiedBadge: {

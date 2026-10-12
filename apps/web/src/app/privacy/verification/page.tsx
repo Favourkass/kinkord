@@ -6,7 +6,8 @@ export const metadata: Metadata = {
   title: "Identity Verification Privacy Notice | Kinkord",
   description:
     "How Kinkord and Didit handle ID, selfie and profile-photo information when you verify your identity.",
-  robots: { index: true, follow: true },
+  // Keep the draft out of search results until Kinkord's legal sign-off.
+  robots: { index: false, follow: false },
 };
 
 export default function VerificationPrivacyRoute() {

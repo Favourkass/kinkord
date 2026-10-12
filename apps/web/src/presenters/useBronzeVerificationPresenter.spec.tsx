@@ -30,6 +30,7 @@ const pm = (over: Partial<BronzeVerificationPM> = {}): BronzeVerificationPM => (
   attemptsUsed: 0,
   attemptsRemaining: 3,
   consented: false,
+  withdrawable: false,
   policyVersion: POLICY,
   policyUrl: "https://kinkord.com/privacy/verification",
   missing: [],
@@ -101,7 +102,7 @@ describe("useBronzeVerificationPresenter", () => {
   });
 
   it("asks before withdrawing consent, then shows the result", async () => {
-    status.mockResolvedValue(pm({ consented: true, status: "verified" }));
+    status.mockResolvedValue(pm({ consented: true, withdrawable: true, status: "verified" }));
     const { result } = await loaded();
     expect(result.current.view?.badgeHint?.href).toBe("/profile/edit/privacy");
 
@@ -113,6 +114,14 @@ describe("useBronzeVerificationPresenter", () => {
     expect(result.current.view?.status.label).toBe("Not verified");
     expect(result.current.view?.withdraw).toBeNull();
     expect(result.current.view?.notice).toMatch(/withdrawn/);
+  });
+
+  it("keeps withdrawal visible after the privacy notice version changes", async () => {
+    status.mockResolvedValue(
+      pm({ consented: false, withdrawable: true, policyVersion: "bronze-2027-01-01-v4" }),
+    );
+    const { result } = await loaded();
+    expect(result.current.view?.withdraw).not.toBeNull();
   });
 
   it("lists what the profile still needs and holds the button", async () => {

@@ -81,7 +81,7 @@ export function getVerificationPrivacyVM(): VerificationPrivacyVM {
         id: "visibility",
         title: "What other members see",
         paragraphs: [
-          'A gold "Identity verified" badge on your profile, and "ID and selfie checked by Kinkord" in your About tab. Nobody sees your ID, ID number, selfie, scores or review notes.',
+          'A gold "Identity verified" badge on your profile, and "ID and selfie checked by Kinkord" in your About tab. Other members do not see your ID, ID number, selfie, scores or review notes. Authorized Kinkord reviewers may access verification evidence when a manual review is required.',
           "The badge only shows while your profile photo, date of birth and gender are the ones that were verified. Change any of them and it disappears until you verify again.",
           "You can hide the badge in Edit profile → Privacy. If your profile is friends-only, only your friends see it.",
         ],
@@ -98,8 +98,8 @@ export function getVerificationPrivacyVM(): VerificationPrivacyVM {
         id: "retention",
         title: "How long we keep it",
         paragraphs: [
-          "Didit keeps session data under the retention settings Kinkord has configured with Didit, and deletes it sooner when you withdraw consent or your account is deleted.",
-          "Kinkord keeps your consent record, attempts, check results, reason codes, face-comparison scores and review decisions (who decided, why, and when) for as long as your account exists. When your account is deleted, they're deleted with it, and Kinkord asks Didit to delete your sessions.",
+          "Didit keeps session data under the retention settings Kinkord has configured with Didit. When you withdraw consent or your account is deleted, Kinkord queues a deletion request and retries it if Didit is temporarily unavailable.",
+          "Kinkord keeps your consent record, attempts, check results, reason codes, face-comparison scores and review decisions (who decided, why, and when) for as long as your account exists. When your account is deleted, those account-linked records are deleted and the separate provider-erasure request remains until it succeeds.",
         ],
       },
       {

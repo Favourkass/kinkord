@@ -9,7 +9,7 @@ export const bronzeVerificationApi = {
       accepted: true,
       policyVersion,
     }),
-  /** Ends any check and the badge, and erases the member's sessions at Didit. */
+  /** Ends any check and badge, and durably queues the provider-erasure request. */
   withdraw: () => api.post<BronzeVerificationPM>("/verification/bronze/consent/withdraw", {}),
   start: () => api.post<BronzeLaunchPM>("/verification/bronze/attempts", {}),
 };

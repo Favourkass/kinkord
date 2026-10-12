@@ -15,6 +15,7 @@ const pm = (over: Partial<BronzeVerificationPM> = {}): BronzeVerificationPM => (
   attemptsUsed: 0,
   attemptsRemaining: 3,
   consented: false,
+  withdrawable: false,
   policyVersion: "bronze-2026-10-03-identity-v3",
   policyUrl: "https://kinkord.com/privacy/verification",
   missing: [],

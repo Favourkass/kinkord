@@ -25,6 +25,8 @@ export interface BronzeVerificationPM {
   attemptsUsed: number;
   attemptsRemaining: number;
   consented: boolean;
+  /** Any active consent version exists and can always be withdrawn. */
+  withdrawable: boolean;
   /** The consent wording the API expects; consent is recorded against it. */
   policyVersion: string;
   policyUrl: string | null;

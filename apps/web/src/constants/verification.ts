@@ -4,7 +4,7 @@ import type { BronzeRequirement, BronzeStatus } from "@/domain/bronzeVerificatio
 export const VERIFICATION_COPY = {
   title: "Verification",
   intro:
-    "Verify your identity to get Kinkord's gold seal on your profile. Your ID and selfie are never shown to anyone.",
+    "Verify your identity to get Kinkord's gold seal on your profile. Didit processes your ID and selfie; authorized Kinkord reviewers may access verification evidence when a manual review is needed.",
   loading: "Loading…",
   statusHeading: "Status",
   statuses: {
@@ -82,10 +82,10 @@ export const VERIFICATION_COPY = {
   withdraw: {
     button: "Withdraw consent",
     title: "Withdraw your consent?",
-    body: "This stops any check in progress, removes your verified badge and asks Didit to delete your ID and selfie. You can verify again later.",
+    body: "This stops any check in progress, removes your verified badge and queues a request for Didit to delete your verification session. Failed deletion requests are retried. You can verify again later.",
     confirm: "Withdraw",
     cancel: "Keep",
-    done: "Consent withdrawn. Your verification data is being deleted.",
+    done: "Consent withdrawn. Your provider-deletion request has been recorded and will be retried if Didit is temporarily unavailable.",
   },
   errors: {
     load: "Couldn't load your verification. Try again.",

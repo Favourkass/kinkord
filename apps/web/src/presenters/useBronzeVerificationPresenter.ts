@@ -208,7 +208,7 @@ export function useBronzeVerificationPresenter() {
         pm.status === "pending" || pm.status === "manual_review"
           ? { label: copy.refresh, onClick: reload }
           : null,
-      withdraw: pm.consented
+      withdraw: pm.withdrawable
         ? {
             label: copy.withdraw.button,
             onClick: () => {
