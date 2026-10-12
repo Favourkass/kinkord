@@ -26,6 +26,10 @@ export function useAdminVerificationPresenter() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
+  const [stepUpComplete, setStepUpComplete] = useState(false);
+  const [stepUpCode, setStepUpCode] = useState("");
+  const [stepUpBusy, setStepUpBusy] = useState(false);
+  const [stepUpError, setStepUpError] = useState<string | null>(null);
 
   const [pending, setPending] = useState<{ id: string; decision: Decision } | null>(null);
   const [evidence, setEvidence] = useState("");
@@ -34,7 +38,7 @@ export function useAdminVerificationPresenter() {
   const [dialogError, setDialogError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!access.isAdmin) return;
+    if (!access.isAdmin || !stepUpComplete) return;
     let live = true;
     moderationService.verificationReviews().then(
       (rows) => {
@@ -47,7 +51,23 @@ export function useAdminVerificationPresenter() {
     return () => {
       live = false;
     };
-  }, [access.isAdmin, version]);
+  }, [access.isAdmin, stepUpComplete, version]);
+
+  const confirmStepUp = useCallback(async () => {
+    if (!/^\d{6}$/.test(stepUpCode) || stepUpBusy) return;
+    setStepUpBusy(true);
+    setStepUpError(null);
+    try {
+      await moderationService.stepUpVerification(stepUpCode);
+      setStepUpCode("");
+      setReviews(null);
+      setStepUpComplete(true);
+    } catch (e) {
+      setStepUpError(messageOf(e));
+    } finally {
+      setStepUpBusy(false);
+    }
+  }, [stepUpBusy, stepUpCode]);
 
   const rows = useMemo(
     () =>
@@ -127,12 +147,26 @@ export function useAdminVerificationPresenter() {
   return {
     checking: access.checking,
     isAdmin: access.isAdmin,
-    loading: access.isAdmin && reviews === null && loadError === null,
+    loading: access.isAdmin && stepUpComplete && reviews === null && loadError === null,
     error: loadError,
     empty: reviews !== null && reviews.length === 0,
     rows,
     notice,
     dialog,
+    stepUp: !stepUpComplete
+      ? {
+          title: copy.stepUp.title,
+          body: copy.stepUp.body,
+          label: copy.stepUp.label,
+          action: stepUpBusy ? copy.stepUp.confirming : copy.stepUp.action,
+          code: stepUpCode,
+          setCode: (value: string) => setStepUpCode(value.replace(/\D/g, "").slice(0, 6)),
+          submit: () => void confirmStepUp(),
+          canSubmit: /^\d{6}$/.test(stepUpCode) && !stepUpBusy,
+          busy: stepUpBusy,
+          error: stepUpError,
+        }
+      : null,
     onApprove: (id: string) => open(id, "approve"),
     onReject: (id: string) => open(id, "reject"),
     onRefresh: () => setVersion((v) => v + 1),

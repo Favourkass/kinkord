@@ -10,6 +10,18 @@ export interface VerificationReviewViewProps {
   rows: AdminVerificationReviewVM[];
   notice: string | null;
   dialog: AdminDialogVM | null;
+  stepUp: {
+    title: string;
+    body: string;
+    label: string;
+    action: string;
+    code: string;
+    setCode: (value: string) => void;
+    submit: () => void;
+    canSubmit: boolean;
+    busy: boolean;
+    error: string | null;
+  } | null;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   onRefresh: () => void;
@@ -38,15 +50,51 @@ export default function VerificationReviewView(p: VerificationReviewViewProps) {
   return (
     <div>
       <p className="text-[14px] leading-[20px] text-app-subtle">{labels.intro}</p>
-      <button
-        type="button"
-        onClick={p.onRefresh}
-        className="mt-[10px] text-[13px] font-bold text-app-subtle underline underline-offset-4"
-      >
-        {labels.refresh}
-      </button>
+      {!p.stepUp ? (
+        <button
+          type="button"
+          onClick={p.onRefresh}
+          className="mt-[10px] text-[13px] font-bold text-app-subtle underline underline-offset-4"
+        >
+          {labels.refresh}
+        </button>
+      ) : null}
 
-      {p.notice ? (
+      {p.stepUp ? (
+        <form
+          className="mt-[16px] rounded-[16px] border border-app-card-border bg-app-card p-[14px]"
+          onSubmit={(event) => {
+            event.preventDefault();
+            p.stepUp?.submit();
+          }}
+        >
+          <h2 className="text-[16px] font-bold text-app-value">{p.stepUp.title}</h2>
+          <p className="pt-[4px] text-[14px] leading-[20px] text-app-subtle">{p.stepUp.body}</p>
+          <label className="block pt-[12px] text-[13px] font-bold text-app-text">
+            {p.stepUp.label}
+            <input
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              value={p.stepUp.code}
+              onChange={(event) => p.stepUp?.setCode(event.target.value)}
+              maxLength={6}
+              className="mt-[6px] h-[44px] w-full rounded-[12px] border border-app-input-border bg-app-input px-[10px] font-mono text-[16px] tracking-[0.2em] text-app-value focus:border-kink-amber focus:outline-none"
+            />
+          </label>
+          {p.stepUp.error ? (
+            <p className="pt-[8px] text-[14px] text-app-danger">{p.stepUp.error}</p>
+          ) : null}
+          <button
+            type="submit"
+            disabled={!p.stepUp.canSubmit}
+            className="mt-[12px] h-[44px] rounded-[12px] bg-kink-amber px-[16px] text-[14px] font-bold text-black disabled:opacity-40"
+          >
+            {p.stepUp.action}
+          </button>
+        </form>
+      ) : null}
+
+      {!p.stepUp && p.notice ? (
         <p
           role="status"
           className="mt-[12px] rounded-[12px] bg-app-input px-[14px] py-[10px] text-[14px] text-app-value"
@@ -54,11 +102,17 @@ export default function VerificationReviewView(p: VerificationReviewViewProps) {
           {p.notice}
         </p>
       ) : null}
-      {p.error ? <p className="pt-[16px] text-[14px] text-app-danger">{p.error}</p> : null}
-      {p.loading ? <p className="pt-[16px] text-[14px] text-app-muted">{labels.loading}</p> : null}
-      {p.empty ? <p className="pt-[16px] text-[14px] text-app-subtle">{labels.empty}</p> : null}
+      {!p.stepUp && p.error ? (
+        <p className="pt-[16px] text-[14px] text-app-danger">{p.error}</p>
+      ) : null}
+      {!p.stepUp && p.loading ? (
+        <p className="pt-[16px] text-[14px] text-app-muted">{labels.loading}</p>
+      ) : null}
+      {!p.stepUp && p.empty ? (
+        <p className="pt-[16px] text-[14px] text-app-subtle">{labels.empty}</p>
+      ) : null}
 
-      <ul className="flex flex-col gap-[12px] pt-[16px]">
+      <ul className={p.stepUp ? "hidden" : "flex flex-col gap-[12px] pt-[16px]"}>
         {p.rows.map((r) => (
           <li
             key={r.id}

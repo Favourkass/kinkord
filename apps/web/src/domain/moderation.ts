@@ -405,7 +405,14 @@ export type AdminVerificationCheck =
   "governmentId" | "liveness" | "idFace" | "profileFace" | "dateOfBirth" | "gender" | "country";
 
 export type AdminVerificationStatus =
-  "not_started" | "pending" | "failed" | "manual_review" | "verified" | "rejected" | "revoked";
+  | "not_started"
+  | "pending"
+  | "failed"
+  | "manual_review"
+  | "verified"
+  | "outdated"
+  | "rejected"
+  | "revoked";
 
 /** GET /admin/verification/reviews item. The photo links expire after 10 minutes. */
 export interface AdminVerificationReviewPM {

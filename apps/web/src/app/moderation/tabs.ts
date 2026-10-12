@@ -3,14 +3,7 @@ import { Routes } from "@/constants/Routes";
 import type { ModerationTab } from "@/components/moderation/ModerationFrame";
 
 export function moderationTabs(
-  active:
-    | "members"
-    | "reports"
-    | "payments"
-    | "wallet"
-    | "verification"
-    | "blocklist"
-    | "admins",
+  active: "members" | "reports" | "payments" | "wallet" | "verification" | "blocklist" | "admins",
 ): ModerationTab[] {
   return [
     { label: "Wallet", href: Routes.moderationWallet, active: active === "wallet" },

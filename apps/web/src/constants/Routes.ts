@@ -20,6 +20,7 @@ export const Routes = {
   moderationBlocklist: "/moderation/blocklist",
   moderationReports: "/moderation/reports",
   moderationPayments: "/moderation/payments",
+  moderationVerification: "/moderation/verification",
   moderationAdmins: "/moderation/admins",
   signup: "/signup",
   login: "/login",

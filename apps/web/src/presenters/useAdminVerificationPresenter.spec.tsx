@@ -5,11 +5,13 @@ import type { AdminVerificationReviewPM } from "@/domain/moderation";
 import { useAdminVerificationPresenter } from "./useAdminVerificationPresenter";
 
 const access = vi.fn();
+const stepUpVerification = vi.fn();
 const verificationReviews = vi.fn();
 const decideVerification = vi.fn();
 vi.mock("@/services/moderation.service", () => ({
   moderationService: {
     access: () => access(),
+    stepUpVerification: (...a: unknown[]) => stepUpVerification(...a),
     verificationReviews: () => verificationReviews(),
     decideVerification: (...a: unknown[]) => decideVerification(...a),
   },
@@ -39,6 +41,9 @@ const review = (id: string, over: Partial<AdminVerificationReviewPM> = {}) => ({
 
 async function loaded() {
   const hook = renderHook(() => useAdminVerificationPresenter());
+  await waitFor(() => expect(hook.result.current.checking).toBe(false));
+  act(() => hook.result.current.stepUp?.setCode("123456"));
+  await act(async () => hook.result.current.stepUp?.submit());
   await waitFor(() => expect(hook.result.current.rows).toHaveLength(2));
   return hook;
 }
@@ -46,6 +51,7 @@ async function loaded() {
 describe("useAdminVerificationPresenter", () => {
   beforeEach(() => {
     access.mockReset().mockResolvedValue({ isAdmin: true });
+    stepUpVerification.mockReset().mockResolvedValue({ verifiedUntil: "2026-10-12T12:10:00Z" });
     verificationReviews.mockReset().mockResolvedValue([review("v1"), review("v2")]);
     decideVerification.mockReset().mockResolvedValue({ status: "verified" });
   });
@@ -53,6 +59,7 @@ describe("useAdminVerificationPresenter", () => {
 
   it("loads the queue for an admin, linking each review to the member", async () => {
     const { result } = await loaded();
+    expect(stepUpVerification).toHaveBeenCalledWith("123456");
     expect(result.current.rows[0]).toMatchObject({
       name: "Ada",
       memberHref: "/moderation/members/u2",
@@ -64,7 +71,21 @@ describe("useAdminVerificationPresenter", () => {
     access.mockResolvedValue({ isAdmin: false });
     const { result } = renderHook(() => useAdminVerificationPresenter());
     await waitFor(() => expect(result.current.checking).toBe(false));
+    expect(result.current.stepUp).not.toBeNull();
     expect(verificationReviews).not.toHaveBeenCalled();
+  });
+
+  it("does not read sensitive reviews until this session passes 2FA", async () => {
+    const { result } = renderHook(() => useAdminVerificationPresenter());
+    await waitFor(() => expect(result.current.checking).toBe(false));
+    expect(verificationReviews).not.toHaveBeenCalled();
+    expect(result.current.stepUp?.canSubmit).toBe(false);
+
+    act(() => result.current.stepUp?.setCode("12ab3456"));
+    expect(result.current.stepUp?.code).toBe("123456");
+    expect(result.current.stepUp?.canSubmit).toBe(true);
+    await act(async () => result.current.stepUp?.submit());
+    await waitFor(() => expect(verificationReviews).toHaveBeenCalledOnce());
   });
 
   it("needs evidence and a reason before a decision, then removes the review", async () => {

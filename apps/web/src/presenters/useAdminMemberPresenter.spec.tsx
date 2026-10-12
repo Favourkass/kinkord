@@ -17,6 +17,7 @@ const svc = {
   deleteMemberPosts: vi.fn(),
   deletePost: vi.fn(),
   memberVerification: vi.fn(),
+  stepUpVerification: vi.fn(),
   revokeVerification: vi.fn(),
   reopenVerification: vi.fn(),
 };
@@ -79,6 +80,7 @@ describe("useAdminMemberPresenter", () => {
     svc.deleteMember.mockResolvedValue({ deleted: "u9" });
     svc.deletePost.mockResolvedValue({ deleted: "p1" });
     svc.memberVerification.mockResolvedValue({ status: "verified", attemptsUsed: 0 });
+    svc.stepUpVerification.mockResolvedValue({ verifiedUntil: "2026-10-12T12:10:00Z" });
     svc.revokeVerification.mockResolvedValue({ status: "revoked" });
   });
   afterEach(cleanup);
@@ -144,12 +146,24 @@ describe("useAdminMemberPresenter", () => {
 
     act(() => result.current.onRevokeVerification());
     expect(result.current.dialog?.destructive).toBe(true);
+    expect(result.current.dialog?.canConfirm).toBe(false);
+    act(() => result.current.dialog?.input?.set("123456"));
+    act(() => result.current.dialog?.reason?.set("Confirmed document fraud."));
+    expect(result.current.dialog?.canConfirm).toBe(true);
     svc.memberVerification.mockResolvedValue({ status: "revoked", attemptsUsed: 0 });
     await act(async () => result.current.dialog?.confirm());
 
-    expect(svc.revokeVerification).toHaveBeenCalledWith("u9");
+    expect(svc.stepUpVerification).toHaveBeenCalledWith("123456");
+    expect(svc.revokeVerification).toHaveBeenCalledWith("u9", "Confirmed document fraud.");
     expect(result.current.notice).toBe("Verification revoked.");
     await waitFor(() => expect(result.current.verification?.reopen).toBe(true));
+  });
+
+  it("shows an expired badge as outdated rather than verified", async () => {
+    svc.memberVerification.mockResolvedValue({ status: "outdated", attemptsUsed: 1 });
+    const { result } = await ready();
+    await waitFor(() => expect(result.current.verification).not.toBeNull());
+    expect(result.current.verification?.status).toBe("Verification lapsed after a profile change");
   });
 
   it("still shows the member when their verification can't be read", async () => {

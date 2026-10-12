@@ -56,6 +56,7 @@ export function useAdminMemberPresenter(id: string) {
   const [dialog, setDialog] = useState<AdminDialogKind | null>(null);
   const [postId, setPostId] = useState<string | null>(null);
   const [reason, setReason] = useState("");
+  const [twoFactorCode, setTwoFactorCode] = useState("");
   const [checked, setChecked] = useState(false);
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
@@ -93,6 +94,7 @@ export function useAdminMemberPresenter(id: string) {
     setDialog(kind);
     setPostId(targetPostId ?? null);
     setReason("");
+    setTwoFactorCode("");
     // Deleting an account also blocks by default: a deleted member who can
     // sign straight back up hasn't really been removed.
     setChecked(kind === "deleteAccount");
@@ -124,10 +126,12 @@ export function useAdminMemberPresenter(id: string) {
         await moderationService.deletePost(postId);
         setNotice(copy.notices.postDeleted);
       } else if (dialog === "revokeVerification") {
-        await moderationService.revokeVerification(id);
+        await moderationService.stepUpVerification(twoFactorCode);
+        await moderationService.revokeVerification(id, reason.trim());
         setNotice(copy.notices.verificationRevoked);
       } else if (dialog === "reopenVerification") {
-        await moderationService.reopenVerification(id);
+        await moderationService.stepUpVerification(twoFactorCode);
+        await moderationService.reopenVerification(id, reason.trim());
         setNotice(copy.notices.verificationReopened);
       } else if (dialog === "deleteAccount") {
         await moderationService.deleteMember(id, { block: checked, reason: why });
@@ -141,15 +145,23 @@ export function useAdminMemberPresenter(id: string) {
     } finally {
       setBusy(false);
     }
-  }, [checked, copy.notices, dialog, id, postId, reason, router]);
+  }, [checked, copy.notices, dialog, id, postId, reason, router, twoFactorCode]);
 
   const dialogVM = useMemo((): AdminDialogVM | null => {
     if (!dialog || !vm) return null;
     const text = copy.dialogs[dialog];
+    const verificationAction = dialog === "revokeVerification" || dialog === "reopenVerification";
     const reasonField =
-      dialog === "block" || dialog === "deleteAccount"
+      dialog === "block" || dialog === "deleteAccount" || verificationAction
         ? { label: copy.dialogs.reasonLabel, value: reason, set: setReason }
         : null;
+    const input = verificationAction
+      ? {
+          label: copy.dialogs.twoFactorCodeLabel,
+          value: twoFactorCode,
+          set: (value: string) => setTwoFactorCode(value.replace(/\D/g, "").slice(0, 6)),
+        }
+      : null;
     const checkbox =
       dialog === "block" || dialog === "deleteAccount"
         ? {
@@ -175,16 +187,32 @@ export function useAdminMemberPresenter(id: string) {
       confirmLabel: text.confirm,
       cancelLabel: copy.dialogs.cancel,
       destructive: dialog !== "unblock" && dialog !== "reopenVerification",
+      input,
       reason: reasonField,
       checkbox,
       typeToConfirm,
-      canConfirm: phraseOk && !busy,
+      canConfirm:
+        phraseOk &&
+        !busy &&
+        (!verificationAction || (/^\d{6}$/.test(twoFactorCode) && reason.trim().length >= 10)),
       busy,
       error: dialogError,
       confirm: () => void confirm(),
       cancel,
     };
-  }, [busy, cancel, checked, confirm, copy.dialogs, dialog, dialogError, reason, typed, vm]);
+  }, [
+    busy,
+    cancel,
+    checked,
+    confirm,
+    copy.dialogs,
+    dialog,
+    dialogError,
+    reason,
+    twoFactorCode,
+    typed,
+    vm,
+  ]);
 
   return {
     checking: access.checking,

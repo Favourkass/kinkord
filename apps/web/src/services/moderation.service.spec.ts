@@ -66,18 +66,20 @@ describe("moderationService", () => {
       reason: "Not the same person.",
     };
     await moderationService.verificationReviews();
+    await moderationService.stepUpVerification("123456");
     await moderationService.decideVerification("v/1", body);
     await moderationService.memberVerification("u9");
-    await moderationService.revokeVerification("u9");
-    await moderationService.reopenVerification("u9");
+    await moderationService.revokeVerification("u9", "Confirmed policy breach.");
+    await moderationService.reopenVerification("u9", "Support approved a retry.");
     expect(get.mock.calls).toEqual([
       ["/admin/verification/reviews"],
       ["/admin/verification/members/u9"],
     ]);
     expect(post.mock.calls).toEqual([
+      ["/admin/verification/step-up", { code: "123456" }],
       ["/admin/verification/reviews/v%2F1/decision", body],
-      ["/admin/verification/members/u9/revoke", {}],
-      ["/admin/verification/members/u9/reopen", {}],
+      ["/admin/verification/members/u9/revoke", { reason: "Confirmed policy breach." }],
+      ["/admin/verification/members/u9/reopen", { reason: "Support approved a retry." }],
     ]);
   });
 });

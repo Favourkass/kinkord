@@ -36,10 +36,7 @@ export default function ModerationFrame({
         <p className="pt-[24px] text-[15px] text-app-subtle">{deniedLabel}</p>
       ) : (
         <>
-          <nav
-            className="-mx-[16px] flex gap-[8px] overflow-x-auto px-[16px] pt-[16px] [scrollbar-width:none] md:mx-0 md:px-0 [&::-webkit-scrollbar]:hidden"
-            aria-label={title}
-          >
+          <nav className="flex flex-wrap gap-[8px] pt-[16px]" aria-label={title}>
             {tabs.map((t) => (
               <Link
                 key={t.href}
