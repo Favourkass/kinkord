@@ -9,11 +9,28 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from "@nestjs/common";
-import { and, asc, count, desc, eq, gt, gte, inArray, isNull, ne, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  exists,
+  gt,
+  gte,
+  ilike,
+  inArray,
+  isNull,
+  ne,
+  or,
+  sql,
+} from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { DRIZZLE, type Db } from "../db/db.module";
 import { conversation, conversationParticipant, message, profile, user } from "../db/schema";
 import { notBanned } from "../moderation/admins";
 import { PresenceService } from "../presence/presence.service";
+import { containsPattern } from "../push/notifications.service";
 import { PushService } from "../push/push.service";
 import { RealtimeService } from "../realtime/realtime.service";
 import { blockedBy, notBlocking } from "../safety/blocks";
@@ -43,6 +60,16 @@ export const MAX_NEW_CONVERSATIONS_PER_DAY = 30;
 /** Messages a member may send per minute, across all their threads. */
 export const MAX_MESSAGES_PER_MINUTE = 30;
 const LIST_LIMIT = 50;
+/** A typing start reaches the other member at most this often. */
+const TYPING_MIN_GAP_MS = 1_000;
+/** A repeat of the same hint is only sent again after this long. */
+const TYPING_REPEAT_MS = 5_000;
+
+// Aliased so the inbox search can look at a chat's other member and messages from inside the inbox query.
+const searchParticipant = alias(conversationParticipant, "search_participant");
+const searchUser = alias(user, "search_user");
+const searchProfile = alias(profile, "search_profile");
+const searchMessage = alias(message, "search_message");
 
 /** A chat photo opens full screen, so it gets the same budget as a post photo. */
 export const CHAT_PHOTO_MAX_MB = 10;
@@ -387,7 +414,13 @@ export class ChatService {
     const key = `${userId}:${conversationId}`;
     const now = Date.now();
     const previous = this.typingSignals.get(key);
-    if (previous?.active === typing && now - previous.at < 5_000) return;
+    if (previous) {
+      const since = now - previous.at;
+      // The same hint again only after a while, and a start at most once a second, so
+      // flipping between the two can't flood the other member. A stop goes at once.
+      if (previous.active === typing && since < TYPING_REPEAT_MS) return;
+      if (typing && since < TYPING_MIN_GAP_MS) return;
+    }
     await this.assertMember(conversationId, userId);
     const peerId = await this.writablePeer(conversationId, userId);
     // A bounded cache limits repeated hints on this instance; access is checked
@@ -395,12 +428,7 @@ export class ChatService {
     if (this.typingSignals.size >= 5_000)
       this.typingSignals.delete(this.typingSignals.keys().next().value!);
     this.typingSignals.set(key, { active: typing, at: now });
-    void this.realtime.notify([peerId], {
-      type: "typing",
-      conversationId,
-      typing,
-      expiresAt: typing ? now + 8_000 : now,
-    });
+    void this.realtime.notify([peerId], { type: "typing", conversationId, typing });
   }
 
   /**
@@ -459,8 +487,8 @@ export class ChatService {
    * nobody has written in yet belongs to whoever opened it: the other member
    * first hears of it with the first message, which the daily allowance counts.
    */
-  async listConversations(userId: string): Promise<ConversationSummaryDto[]> {
-    const rows = await this.summaries(userId, null);
+  async listConversations(userId: string, query = ""): Promise<ConversationSummaryDto[]> {
+    const rows = await this.summaries(userId, null, query.trim());
     return rows
       .filter(
         ({ summary, openedBy }) =>
@@ -487,10 +515,50 @@ export class ChatService {
     return { ...row.summary, canSendPhotos };
   }
 
+  /**
+   * The inbox search, across every chat rather than the latest page: the other
+   * member's name or username, or any message still in the chat.
+   */
+  private matching(userId: string, pattern: string) {
+    return or(
+      exists(
+        this.db
+          .select({ one: sql`1` })
+          .from(searchParticipant)
+          .innerJoin(searchUser, eq(searchUser.id, searchParticipant.userId))
+          .leftJoin(searchProfile, eq(searchProfile.userId, searchParticipant.userId))
+          .where(
+            and(
+              eq(searchParticipant.conversationId, conversation.id),
+              ne(searchParticipant.userId, userId),
+              or(
+                ilike(searchProfile.displayName, pattern),
+                ilike(searchUser.username, pattern),
+                ilike(searchUser.name, pattern),
+              ),
+            ),
+          ),
+      ),
+      exists(
+        this.db
+          .select({ one: sql`1` })
+          .from(searchMessage)
+          .where(
+            and(
+              eq(searchMessage.conversationId, conversation.id),
+              isNull(searchMessage.deletedAt),
+              ilike(searchMessage.body, pattern),
+            ),
+          ),
+      ),
+    );
+  }
+
   /** A fixed handful of queries however many threads there are, not one per row. */
   private async summaries(
     userId: string,
     only: string | null,
+    query = "",
   ): Promise<Array<{ summary: ConversationSummaryDto; openedBy: string | null }>> {
     const mine = await this.db
       .select({
@@ -505,6 +573,7 @@ export class ChatService {
         and(
           eq(conversationParticipant.userId, userId),
           only ? eq(conversation.id, only) : undefined,
+          query ? this.matching(userId, containsPattern(query)) : undefined,
         ),
       )
       .orderBy(desc(conversation.lastMessageAt))
@@ -521,7 +590,6 @@ export class ChatService {
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
         lastSeenAt: profile.lastSeenAt,
-        verified: sql<boolean>`(${user.emailVerified} and coalesce(${profile.phoneVerified}, false))`,
         blockedByMe: blockedBy(userId, conversationParticipant.userId),
         silver: silverCheck(conversationParticipant.userId),
       })
@@ -581,7 +649,6 @@ export class ChatService {
                 silver: Boolean(p.silver),
                 online: PresenceService.isOnline(p.lastSeenAt),
                 presence: PresenceService.status(p.lastSeenAt),
-                verified: Boolean(p.verified),
                 blockedByMe: Boolean(p.blockedByMe),
               },
             ] as const,

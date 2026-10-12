@@ -23,7 +23,7 @@ vi.mock("./useRealtime", () => ({
 const list = vi.fn();
 const me = vi.fn();
 vi.mock("@/services/chat.service", () => ({
-  chatService: { list: () => list(), me: () => me() },
+  chatService: { list: (q?: string) => list(q), me: () => me() },
 }));
 
 const row: ConversationSummaryPM = {
@@ -131,24 +131,43 @@ describe("useChatListPresenter", () => {
     act(() => result.current.list.setQuery("nobody"));
     expect(result.current.list.empty).toBe(true);
   });
+  it("asks the API to search every chat, and adds the older chats it finds", async () => {
+    const older: ConversationSummaryPM = {
+      ...row,
+      id: "c9",
+      lastMessageAt: "2026-08-01T10:00:00.000Z",
+      peer: { ...row.peer!, userId: "u9", username: "adaeze", displayName: "Adaeze" },
+    };
+    const { result } = renderHook(() => useChatListPresenter());
+    await act(async () => polls.get(LIST_POLL_MS)?.());
+    list.mockClear().mockResolvedValue([older]);
+    vi.useFakeTimers();
+    try {
+      act(() => result.current.list.setQuery(" ada "));
+      // The loaded chat matches at once, before the API answers.
+      expect(result.current.list.rows.map((r) => r.id)).toEqual(["c1"]);
+      expect(list).not.toHaveBeenCalled();
+      await act(async () => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(list).toHaveBeenCalledWith("ada");
+      expect(result.current.list.rows.map((r) => r.id)).toEqual(["c1", "c9"]);
+      // Clearing the search shows the inbox as it was.
+      act(() => result.current.list.setQuery(""));
+      expect(result.current.list.rows.map((r) => r.id)).toEqual(["c1"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it("updates typing from live events without reloading conversations", async () => {
     live.up = true;
     const { result } = renderHook(() => useChatListPresenter());
     await act(async () => polls.get(LIST_FALLBACK_POLL_MS)?.());
     list.mockClear();
-    act(() =>
-      live.hear?.({
-        type: "typing",
-        conversationId: "c1",
-        typing: true,
-        expiresAt: Date.now() + 8000,
-      }),
-    );
+    act(() => live.hear?.({ type: "typing", conversationId: "c1", typing: true }));
     expect(result.current.list.rows[0].preview).toBe("Is typing…");
     expect(list).not.toHaveBeenCalled();
-    act(() =>
-      live.hear?.({ type: "typing", conversationId: "c1", typing: false, expiresAt: Date.now() }),
-    );
+    act(() => live.hear?.({ type: "typing", conversationId: "c1", typing: false }));
     expect(result.current.list.rows[0].typing).toBe(false);
     expect(list).not.toHaveBeenCalled();
   });

@@ -21,6 +21,7 @@ import {
   sendMessageSchema,
   startDmSchema,
   typingSchema,
+  inboxQuerySchema,
 } from "./dto";
 
 function parse<S extends z.ZodTypeAny>(schema: S, input: unknown): z.infer<S> {
@@ -50,8 +51,8 @@ export class ChatController {
   }
 
   @Get("conversations")
-  list(@Req() req: AuthedRequest) {
-    return this.chat.listConversations(req.user.id);
+  list(@Req() req: AuthedRequest, @Query() query: unknown) {
+    return this.chat.listConversations(req.user.id, parse(inboxQuerySchema, query ?? {}).q);
   }
 
   @Post("conversations")

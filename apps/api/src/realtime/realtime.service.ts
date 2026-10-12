@@ -13,7 +13,7 @@ import { channelFor, REALTIME_TOKEN_TTL_SECONDS, signRealtimeToken } from "./tok
  */
 export type RealtimeEvent =
   | { type: "message"; conversationId: string }
-  | { type: "typing"; conversationId: string; typing: boolean; expiresAt: number }
+  | { type: "typing"; conversationId: string; typing: boolean }
   | { type: "notification" };
 
 /** What a signed-in member's app needs to open its live connection. */

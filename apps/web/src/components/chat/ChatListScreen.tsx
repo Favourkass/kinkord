@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { MoreVertical, Search, X } from "lucide-react";
 import ConversationRow from "./ConversationRow";
@@ -23,6 +23,7 @@ export interface ChatListScreenProps {
   onFilter: (filter: ChatInboxFilter) => void;
   menuOpen: boolean;
   onToggleMenu: () => void;
+  onCloseMenu: () => void;
   onNavigation: () => void;
   newChatHref: string;
   settingsHref: string;
@@ -42,6 +43,24 @@ export interface ChatListScreenProps {
 
 export default function ChatListScreen(p: ChatListScreenProps) {
   const input = useRef<HTMLInputElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const { menuOpen, onCloseMenu } = p;
+  // The menu closes on a tap anywhere else, or Escape, like any other menu.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const away = (e: PointerEvent) => {
+      if (!menu.current?.contains(e.target as Node)) onCloseMenu();
+    };
+    const escape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCloseMenu();
+    };
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [menuOpen, onCloseMenu]);
   const tool =
     "grid size-[34px] place-items-center rounded-full bg-app-input text-kink-gold-bright transition-colors hover:bg-app-line focus-visible:outline focus-visible:outline-2 focus-visible:outline-kink-gold-bright";
   return (
@@ -51,7 +70,7 @@ export default function ChatListScreen(p: ChatListScreenProps) {
           <h1 className="text-[28px] font-bold tracking-tight text-kink-gold-bright">
             {p.heading}
           </h1>
-          <div className="relative flex items-center gap-[6px]">
+          <div ref={menu} className="relative flex items-center gap-[6px]">
             <button
               type="button"
               className={tool}

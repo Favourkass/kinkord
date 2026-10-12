@@ -28,7 +28,13 @@ export function listenForChatRead(onRead: () => void): () => void {
 
 export const chatService = {
   unreadCount: () => api.get<{ count: number }>("/chat/unread-count"),
-  list: () => api.get<ConversationSummaryPM[]>("/chat/conversations"),
+  /** The inbox; with a search, chats whose member or messages match, from every chat. */
+  list: (query?: string) =>
+    api.get<ConversationSummaryPM[]>(
+      query?.trim()
+        ? `/chat/conversations?q=${encodeURIComponent(query.trim())}`
+        : "/chat/conversations",
+    ),
 
   conversation: (id: string) => api.get<ConversationThreadPM>(thread(id)),
 

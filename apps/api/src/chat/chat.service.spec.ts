@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { type SQL } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { conversation, conversationParticipant, message } from "../db/schema";
 import type { PushService } from "../push/push.service";
@@ -436,7 +437,6 @@ describe("ChatService.listConversations", () => {
           avatarKey: "avatars/u2/a.png",
           lastSeenAt: new Date(),
           silver: true,
-          verified: true,
         },
       ],
       [row("m1")],
@@ -452,7 +452,6 @@ describe("ChatService.listConversations", () => {
         avatarUrl: "https://media/avatars/u2/a.png?sm",
         online: true,
         presence: "online",
-        verified: true,
         silver: true,
       },
       lastMessage: { id: "m1", body: "hello" },
@@ -837,7 +836,6 @@ describe("ChatService.setTyping", () => {
       type: "typing",
       conversationId: "c1",
       typing: true,
-      expiresAt: expect.any(Number),
     });
     expect(calls.some((c) => ["update", "insert", "delete"].includes(c.op))).toBe(false);
   });
@@ -859,6 +857,15 @@ describe("ChatService.setTyping", () => {
       expect.objectContaining({ typing: false }),
     );
   });
+  it("can't be flipped between typing and not to flood the other member", async () => {
+    const answers = Array.from({ length: 20 }, (_, i) =>
+      i % 2 ? [{ userId: "u2", blockedByMe: false }] : [{ userId: "u1" }],
+    );
+    const { service, realtime } = make(answers);
+    for (let i = 0; i < 10; i++) await service.setTyping("u1", "c1", i % 2 === 0);
+    // One start and one stop inside the same second; the other eight are dropped.
+    expect(realtime.notify).toHaveBeenCalledTimes(2);
+  });
   it("rejects non-members and blocked peers", async () => {
     await expect(make([[]]).service.setTyping("u1", "c1", true)).rejects.toBeInstanceOf(
       NotFoundException,
@@ -868,5 +875,30 @@ describe("ChatService.setTyping", () => {
       ForbiddenException,
     );
     expect(blocked.realtime.notify).not.toHaveBeenCalled();
+  });
+});
+
+describe("ChatService inbox search", () => {
+  it("looks through every chat: the other member's names, or any message still there", () => {
+    const db = drizzle.mock();
+    const service = new ChatService(
+      db as never,
+      {} as StorageService,
+      {} as RealtimeService,
+      {} as PushService,
+    );
+    const where = (service as unknown as { matching(u: string, p: string): SQL }).matching(
+      "u1",
+      "%ada\\_%",
+    );
+    const { sql, params } = new PgDialect().sqlToQuery(where);
+    expect(sql).toContain('from "conversation_participant" "search_participant"');
+    expect(sql).toContain('"search_participant"."conversation_id" = "conversation"."id"');
+    expect(sql).toContain('"search_participant"."user_id" <> $');
+    expect(sql).toContain('"search_profile"."display_name" ilike $');
+    expect(sql).toContain('"search_user"."username" ilike $');
+    expect(sql).toContain('"search_message"."deleted_at" is null');
+    expect(sql).toContain('"search_message"."body" ilike $');
+    expect(params).toEqual(["u1", "%ada\\_%", "%ada\\_%", "%ada\\_%", "%ada\\_%"]);
   });
 });

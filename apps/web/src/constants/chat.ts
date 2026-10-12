@@ -2,7 +2,6 @@
 export const CHAT_COPY = {
   heading: "Messages",
   inbox: {
-    brand: "Kinkord",
     search: "Search chats…",
     searchLabel: "Search chats",
     clear: "Clear search",
@@ -13,11 +12,9 @@ export const CHAT_COPY = {
     settings: "Settings",
     sent: "Sent",
     unread: "unread messages",
-    filters: { all: "All", unread: "Unread", online: "Online", groups: "Groups" },
+    filters: { all: "All", unread: "Unread", online: "Online" },
     filteredEmpty: "No chats found",
     filteredBody: "Try another search or choose a different filter.",
-    groupsEmpty: "No group chats yet",
-    groupsBody: "Your group conversations will appear here.",
   },
   loading: "Loading conversations…",
   emptyTitle: "No messages yet",
@@ -25,7 +22,6 @@ export const CHAT_COPY = {
   online: "Online",
   presence: { online: "Online", away: "Away", offline: "Offline" },
   typing: "Is typing…",
-  verified: "Email and phone verified",
   back: "Back",
   threadEmpty: "Say hi — this is the start of your conversation.",
   unavailable: "This member is no longer on Kinkord.",

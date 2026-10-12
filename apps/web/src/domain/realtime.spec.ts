@@ -44,14 +44,18 @@ describe("eventsFromFrame", () => {
 });
 
 it("accepts only valid transient typing hints", () => {
-  const event = { type: "typing", conversationId: "c1", typing: true, expiresAt: 12345 };
+  const event = { type: "typing", conversationId: "c1", typing: true };
   expect(eventsFromFrame({ type: "data", event: [JSON.stringify(event)] })).toEqual([event]);
+  // An older API's expiry is ignored: hints are timed on arrival.
+  expect(
+    eventsFromFrame({ type: "data", event: [JSON.stringify({ ...event, expiresAt: 1 })] }),
+  ).toEqual([event]);
   expect(
     eventsFromFrame({
       type: "data",
       event: [
-        { ...event, expiresAt: "bad" },
         { ...event, typing: "yes" },
+        { ...event, conversationId: 7 },
       ],
     }),
   ).toEqual([]);

@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
 import AvatarCircle from "@/components/app/AvatarCircle";
-import VerifiedCheck from "@/components/app/VerifiedCheck";
 import SilverCheck from "@/components/app/SilverCheck";
 import type { ConversationRowVM } from "@/domain/chat";
 import PresenceDot from "./PresenceDot";
@@ -41,9 +40,6 @@ export default function ConversationRow({
               <span className="truncate text-[15px] font-bold text-app-text">
                 {row.displayName}
               </span>
-              {row.verified && row.verifiedLabel ? (
-                <VerifiedCheck label={row.verifiedLabel} />
-              ) : null}
               {row.silver ? <SilverCheck size={15} /> : null}
             </span>
             <span className="shrink-0 text-[12px] text-app-muted">{row.time}</span>

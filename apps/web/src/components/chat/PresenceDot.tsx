@@ -12,7 +12,7 @@ export default function PresenceDot({ online, status, label, className = "" }: P
     (status ?? "online") === "online"
       ? "bg-app-online"
       : status === "away"
-        ? "bg-amber-400"
+        ? "bg-kink-amber"
         : "bg-app-muted";
   return (
     <span

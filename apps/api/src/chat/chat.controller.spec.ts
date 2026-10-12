@@ -16,6 +16,7 @@ function make() {
     history: vi.fn(async () => []),
     sendMessage: vi.fn(async () => ({ id: "m1" })),
     setTyping: vi.fn(async () => undefined),
+    listConversations: vi.fn(async () => []),
     markRead: vi.fn(async () => undefined),
     allowance: vi.fn(async () => ({ newChatsPerDay: 1, usedToday: 0, resetsAt: "x" })),
     presignPhotoUpload: vi.fn(async () => ({ key: "chat/c1/u1/a.jpg" })),
@@ -128,4 +129,13 @@ it("validates typing state and uses the authenticated identity", async () => {
   await expect(controller.typing(req, "c1", { typing: "yes" })).rejects.toBeInstanceOf(
     BadRequestException,
   );
+});
+
+it("searches the inbox with a trimmed query, and refuses a very long one", async () => {
+  const { controller, chat } = make();
+  await controller.list(req, { q: "  ada " });
+  expect(chat.listConversations).toHaveBeenLastCalledWith("u1", "ada");
+  await controller.list(req, {});
+  expect(chat.listConversations).toHaveBeenLastCalledWith("u1", undefined);
+  expect(() => controller.list(req, { q: "x".repeat(101) })).toThrow(BadRequestException);
 });

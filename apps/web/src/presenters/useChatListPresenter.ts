@@ -16,6 +16,9 @@ import { usePolling } from "./usePolling";
 import { useTypingIndicators } from "./useTypingIndicators";
 import { useRealtime } from "./useRealtime";
 
+/** Typing pauses this long before the search asks the API, so each keystroke isn't a request. */
+const SEARCH_DEBOUNCE_MS = 300;
+
 /** How often the inbox re-reads itself while it's on screen without a live connection. */
 export const LIST_POLL_MS = 10_000;
 /** With one, any message re-reads it at once and polling is only a safety net. */
@@ -33,6 +36,25 @@ export function useChatListPresenter() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<ChatInboxFilter>("all");
   const [menuOpen, setMenuOpen] = useState(false);
+  // The API's answer to the search, across every chat, for the words it was asked.
+  const [found, setFound] = useState<{ term: string; items: ConversationSummaryPM[] } | null>(null);
+  const term = query.trim();
+
+  useEffect(() => {
+    if (!term) return;
+    let live = true;
+    const timer = setTimeout(() => {
+      chatService.list(term).then(
+        (items) => live && setFound({ term, items }),
+        // The loaded chats still match while the wider search is unavailable.
+        () => undefined,
+      );
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [term]);
   const [error, setError] = useState<string | null>(null);
 
   // Whose message a preview shows ("You: …") depends on who is looking.
@@ -70,8 +92,14 @@ export function useChatListPresenter() {
   usePolling(refresh, live ? LIST_FALLBACK_POLL_MS : LIST_POLL_MS, true);
 
   const selected = useMemo(
-    () => selectChatInbox(summaries ?? [], query, filter),
-    [summaries, query, filter],
+    () =>
+      selectChatInbox(
+        summaries ?? [],
+        query,
+        filter,
+        found && found.term === term ? found.items : null,
+      ),
+    [summaries, query, filter, found, term],
   );
   const rows = useMemo(
     () =>
@@ -81,7 +109,6 @@ export function useChatListPresenter() {
         return {
           ...row,
           presenceLabel: CHAT_COPY.presence[row.presence ?? "offline"],
-          verifiedLabel: CHAT_COPY.verified,
           typing: isTyping,
           preview: isTyping ? CHAT_COPY.typing : row.preview,
         };
@@ -97,6 +124,7 @@ export function useChatListPresenter() {
       setQuery,
       menuOpen,
       toggleMenu: () => setMenuOpen((v) => !v),
+      closeMenu: () => setMenuOpen(false),
       openNavigation: () => {
         setMenuOpen(false);
         shell.openDrawer();
@@ -110,18 +138,8 @@ export function useChatListPresenter() {
         active: key === filter,
       })),
       setFilter,
-      emptyTitle:
-        filter === "groups"
-          ? CHAT_COPY.inbox.groupsEmpty
-          : query || filter !== "all"
-            ? CHAT_COPY.inbox.filteredEmpty
-            : CHAT_COPY.emptyTitle,
-      emptyBody:
-        filter === "groups"
-          ? CHAT_COPY.inbox.groupsBody
-          : query || filter !== "all"
-            ? CHAT_COPY.inbox.filteredBody
-            : CHAT_COPY.emptyBody,
+      emptyTitle: term || filter !== "all" ? CHAT_COPY.inbox.filteredEmpty : CHAT_COPY.emptyTitle,
+      emptyBody: term || filter !== "all" ? CHAT_COPY.inbox.filteredBody : CHAT_COPY.emptyBody,
       loading: summaries === null && !error,
       error: summaries === null ? error : null,
       empty: summaries !== null && rows.length === 0,

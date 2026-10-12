@@ -316,7 +316,6 @@ export function useChatThreadPresenter(conversationId: string) {
           ...vm,
           typing: isTyping,
           presenceLabel: isTyping ? CHAT_COPY.typing : CHAT_COPY.presence[vm.presence ?? "offline"],
-          verifiedLabel: CHAT_COPY.verified,
         }
       : null;
   }, [summary, typing, conversationId]);

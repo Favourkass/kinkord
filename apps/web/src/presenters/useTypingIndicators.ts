@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import type { RealtimeEventPM } from "@/domain/realtime";
 
+/** How long "typing…" shows after the last hint: the sender repeats it every 5s while typing. */
+export const TYPING_HINT_MS = 8_000;
+
 /** Live hints belong to this screen, not saved conversation data. */
 export function useTypingIndicators() {
   const [active, setActive] = useState<ReadonlyMap<string, number>>(new Map());
@@ -11,11 +14,11 @@ export function useTypingIndicators() {
     if (event.type !== "typing" && event.type !== "message") return;
     setActive((current) => {
       const next = new Map(current);
-      const now = Date.now();
-      if (event.type === "typing" && event.typing && event.expiresAt > now) {
-        // Never let a malformed or clock-skewed hint linger indefinitely.
-        next.set(event.conversationId, Math.min(event.expiresAt, now + 8_000));
-      } else next.delete(event.conversationId);
+      // Timed from when it arrives, by this device's clock, so a phone whose clock
+      // runs fast or slow still shows it for the same few seconds.
+      if (event.type === "typing" && event.typing)
+        next.set(event.conversationId, Date.now() + TYPING_HINT_MS);
+      else next.delete(event.conversationId);
       return next;
     });
   }, []);

@@ -23,7 +23,7 @@ const props: ChatListScreenProps = {
       isOnline: true,
     },
   ],
-  heading: "Kinkord",
+  heading: "Messages",
   loading: false,
   error: null,
   empty: false,
@@ -40,6 +40,7 @@ const props: ChatListScreenProps = {
   onFilter: vi.fn(),
   menuOpen: false,
   onToggleMenu: vi.fn(),
+  onCloseMenu: vi.fn(),
   onNavigation: vi.fn(),
   newChatHref: "/search",
   settingsHref: "/settings",
@@ -72,15 +73,24 @@ it("offers working navigation actions in the overflow menu", () => {
   expect(props.onNavigation).toHaveBeenCalled();
 });
 
-it("keeps basic verification and Silver badges separate and shows typing", () => {
+it("closes the menu on a tap outside it or Escape, but not on a tap inside", () => {
+  const onCloseMenu = vi.fn();
+  render(<ChatListScreen {...props} menuOpen onCloseMenu={onCloseMenu} />);
+  fireEvent.pointerDown(screen.getByRole("link", { name: "New message" }));
+  expect(onCloseMenu).not.toHaveBeenCalled();
+  fireEvent.pointerDown(document.body);
+  expect(onCloseMenu).toHaveBeenCalledTimes(1);
+  fireEvent.keyDown(document, { key: "Escape" });
+  expect(onCloseMenu).toHaveBeenCalledTimes(2);
+});
+
+it("shows the Silver badge, presence and typing", () => {
   render(
     <ChatListScreen
       {...props}
       rows={[
         {
           ...props.rows[0],
-          verified: true,
-          verifiedLabel: "Email and phone verified",
           silver: true,
           typing: true,
           preview: "Is typing…",
@@ -90,7 +100,6 @@ it("keeps basic verification and Silver badges separate and shows typing", () =>
       ]}
     />,
   );
-  expect(screen.getByRole("img", { name: "Email and phone verified" })).toBeDefined();
   expect(screen.getByRole("img", { name: "Silver Premium" })).toBeDefined();
   expect(screen.getByRole("img", { name: "Away" })).toBeDefined();
   expect(screen.getByText("Is typing…")).toBeDefined();

@@ -473,7 +473,6 @@ describe("useChatThreadPresenter", () => {
           type: "typing",
           conversationId: "c1",
           typing: true,
-          expiresAt: Date.now() + 8000,
         }),
       );
       expect(result.current.thread.peer?.typing).toBe(true);

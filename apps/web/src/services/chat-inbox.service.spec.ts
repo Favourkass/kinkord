@@ -33,32 +33,34 @@ const summaries: ConversationSummaryPM[] = [
     lastMessage: null,
     unreadCount: 0,
   },
-  {
-    id: "g",
-    kind: "group",
-    lastMessageAt: "2026-10-09T10:00:00Z",
-    peer: null,
-    lastMessage: null,
-    unreadCount: 2,
-  },
 ];
 describe("selectChatInbox", () => {
   it("counts conversations rather than messages and filters each category", () => {
-    expect(selectChatInbox(summaries, "", "all").counts).toEqual({
-      all: 3,
-      unread: 2,
-      online: 1,
-      groups: 1,
-    });
-    expect(selectChatInbox(summaries, "", "unread").items.map((s) => s.id)).toEqual(["a", "g"]);
+    expect(selectChatInbox(summaries, "", "all").counts).toEqual({ all: 2, unread: 1, online: 1 });
+    expect(selectChatInbox(summaries, "", "unread").items.map((s) => s.id)).toEqual(["a"]);
     expect(selectChatInbox(summaries, "", "online").items.map((s) => s.id)).toEqual(["a"]);
-    expect(selectChatInbox(summaries, "", "groups").items.map((s) => s.id)).toEqual(["g"]);
+  });
+  it("adds older chats the API's search found, newest first, keeping the loaded copies", () => {
+    const older: ConversationSummaryPM = {
+      ...summaries[1],
+      id: "c",
+      lastMessageAt: "2026-09-01T10:00:00Z",
+      peer: { ...summaries[1].peer!, userId: "c", username: "adaeze", displayName: "Adaeze" },
+    };
+    const stale = { ...summaries[0], unreadCount: 0 };
+    const result = selectChatInbox(summaries, "ada", "all", [stale, older]);
+    expect(result.items.map((s) => s.id)).toEqual(["a", "c"]);
+    // The loaded Ada is fresher than the API's copy: 4 unread, not 0.
+    expect(result.items[0].unreadCount).toBe(4);
+    expect(result.counts.all).toBe(2);
+    // An answer for another search, or none yet, changes nothing.
+    expect(selectChatInbox(summaries, "ada", "all").items.map((s) => s.id)).toEqual(["a"]);
   });
   it("searches names and usernames without changing saved data or order", () => {
     const before = structuredClone(summaries);
     expect(selectChatInbox(summaries, "  BoLA  ", "all").items.map((s) => s.id)).toEqual(["b"]);
     expect(selectChatInbox(summaries, "missing", "all").counts.all).toBe(0);
-    expect(selectChatInbox(summaries, "", "all").items.map((s) => s.id)).toEqual(["a", "b", "g"]);
+    expect(selectChatInbox(summaries, "", "all").items.map((s) => s.id)).toEqual(["a", "b"]);
     expect(summaries).toEqual(before);
   });
 });
