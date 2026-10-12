@@ -10,16 +10,22 @@ export const BACKUP_COPY_VAULT_NAME = "kinkord-backup-copies";
 const BACKUP_VAULT_NAME = "kinkord-backups";
 
 /**
- * Nobody but the account's root user may delete a backup or cut its retention
- * short, so a stolen admin login can't wipe the backups along with the data.
- * AWS Backup still removes each one when its retention ends.
+ * Nobody but the account's root user may delete a backup, cut its retention
+ * short, or change or remove this policy, so a stolen admin login can't wipe the
+ * backups along with the data. AWS Backup still removes each one when its
+ * retention ends. Changing the policy later takes the root user.
  */
 function protectRecoveryPoints(vault: backup.BackupVault, account: string) {
   vault.addToAccessPolicy(
     new iam.PolicyStatement({
       effect: iam.Effect.DENY,
       principals: [new iam.AnyPrincipal()],
-      actions: ["backup:DeleteRecoveryPoint", "backup:UpdateRecoveryPointLifecycle"],
+      actions: [
+        "backup:DeleteRecoveryPoint",
+        "backup:UpdateRecoveryPointLifecycle",
+        "backup:PutBackupVaultAccessPolicy",
+        "backup:DeleteBackupVaultAccessPolicy",
+      ],
       resources: ["*"],
       conditions: { StringNotLike: { "aws:PrincipalArn": `arn:aws:iam::${account}:root` } },
     }),
@@ -51,10 +57,12 @@ export interface BackupStackProps extends cdk.StackProps {
  * the database and the bucket by ARN, so it deploys without touching their stacks.
  *
  * - The database: daily (kept 14 days), weekly (8 weeks) and monthly (a year).
- * - Photos: daily (14 days) and weekly (5 weeks), no longer. A deleted photo (an
- *   account closed, illegal content removed) must not outlive that by much.
+ * - Photos: daily (14 days) and weekly (4 weeks), no longer. A deleted photo (an
+ *   account closed, illegal content removed) must not outlive its deletion by
+ *   much: backups take every version, and the bucket keeps a deleted one 7 days,
+ *   so it's gone from everywhere within about five weeks.
  *
- * The photo backups need versioning on the bucket, turned on with a 30-day expiry
+ * The photo backups need versioning on the bucket, turned on with a 7-day expiry
  * for replaced and deleted photos (see FoundationStack's MediaBucket).
  */
 export class BackupStack extends cdk.Stack {
@@ -114,7 +122,7 @@ export class BackupStack extends cdk.Stack {
       backupVault: vault,
       backupPlanRules: [
         rule("daily", { hour: "1", minute: "30" }, 14),
-        rule("weekly", { weekDay: "SUN", hour: "2", minute: "30" }, 35),
+        rule("weekly", { weekDay: "SUN", hour: "2", minute: "30" }, 28),
       ],
     });
     photos.addSelection("Photos", {

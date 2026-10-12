@@ -31,14 +31,14 @@ export class FoundationStack extends cdk.Stack {
         },
       ],
       // Versioned for the photo backups (KinkordBackup) and as a safety net: a
-      // replaced or deleted photo stays recoverable for 30 days, then is gone for
+      // replaced or deleted photo stays recoverable for 7 days, then is gone for
       // good, so deletions (an account closed, content removed) still hold. Turned
       // on in production by API on 2026-10-12, as this stack can't be deployed
       // until its drift is reconciled.
       versioned: true,
       lifecycleRules: [
         { abortIncompleteMultipartUploadAfter: cdk.Duration.days(7) },
-        { noncurrentVersionExpiration: cdk.Duration.days(30), expiredObjectDeleteMarker: true },
+        { noncurrentVersionExpiration: cdk.Duration.days(7), expiredObjectDeleteMarker: true },
       ],
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
