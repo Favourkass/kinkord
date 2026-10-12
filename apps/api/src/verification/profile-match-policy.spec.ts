@@ -83,7 +83,7 @@ describe("Badge outcome safety", () => {
   it("awards only complete, current-profile results", () => {
     expect(bronzeCallbackOutcome(input).status).toBe("verified");
     expect(bronzeCallbackOutcome({ ...input, profileUnchanged: false })).toMatchObject({
-      status: "manual_review",
+      status: "failed",
       checks: { profileFace: false },
       failureCodes: ["PROFILE_CHANGED_DURING_VERIFICATION"],
     });

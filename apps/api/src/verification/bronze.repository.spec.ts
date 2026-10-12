@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Db } from "../db/db.module";
-import { bronzeAttempt, bronzeReview, bronzeVerification } from "../db/schema";
+import { bronzeAttempt, bronzeReview, bronzeVerification, verificationErasure } from "../db/schema";
 import { BronzeRepository } from "./bronze.repository";
 
 /**
@@ -30,7 +30,11 @@ function queuedDb(answers: unknown[]) {
     const at = calls.findIndex((c) => c.op === "update" && c.args[0] === table);
     return at < 0 ? undefined : calls.slice(at + 1).find((c) => c.op === "set")?.args[0];
   };
-  return { repo: new BronzeRepository(chain() as Db), calls, setOn };
+  const valuesOn = (table: unknown) => {
+    const at = calls.findIndex((c) => c.op === "insert" && c.args[0] === table);
+    return at < 0 ? undefined : calls.slice(at + 1).find((c) => c.op === "values")?.args[0];
+  };
+  return { repo: new BronzeRepository(chain() as Db), calls, setOn, valuesOn };
 }
 
 const passedChecks = {
@@ -56,7 +60,12 @@ describe("BronzeRepository", () => {
 
   describe("revoke", () => {
     it("ends anything still in flight, so no later result or approval restores it", async () => {
-      const { repo, setOn } = queuedDb([[{ userId: "u1" }], undefined, undefined]);
+      const { repo, setOn } = queuedDb([
+        [{ userId: "u1" }],
+        [{ userId: "u1" }],
+        undefined,
+        undefined,
+      ]);
       await expect(repo.revoke("u1")).resolves.toBe(true);
       expect(setOn(bronzeVerification)).toMatchObject({
         status: "revoked",
@@ -74,6 +83,62 @@ describe("BronzeRepository", () => {
       const { repo, setOn } = queuedDb([[]]);
       await expect(repo.revoke("u1")).resolves.toBe(false);
       expect(setOn(bronzeAttempt)).toBeUndefined();
+    });
+  });
+
+  describe("start reservation", () => {
+    const snapshot = {
+      avatarKey: "avatars/u1/a.jpg",
+      dob: "1998-04-02",
+      gender: "female",
+      country: "NG",
+      nationality: null,
+    };
+
+    it("reserves locally before a paid provider session is created", async () => {
+      const { repo, valuesOn } = queuedDb([
+        undefined,
+        [{ status: "not_started", attemptsUsed: 0 }],
+        [{ number: 0 }],
+        undefined,
+        undefined,
+      ]);
+      const reservation = await repo.reserve("u1", snapshot);
+      expect(reservation).toEqual({
+        attemptId: expect.any(String),
+        reservationJobId: expect.stringMatching(/^reservation:/),
+      });
+      expect(valuesOn(bronzeAttempt)).toMatchObject({
+        userId: "u1",
+        providerJobId: reservation?.reservationJobId,
+      });
+    });
+
+    it("does not reserve a second session while one is pending", async () => {
+      const { repo, valuesOn } = queuedDb([undefined, [{ status: "pending", attemptsUsed: 1 }]]);
+      await expect(repo.reserve("u1", snapshot)).resolves.toBeNull();
+      expect(valuesOn(bronzeAttempt)).toBeUndefined();
+    });
+  });
+
+  it("queues provider erasure durably and resets the attempt cap on withdrawal", async () => {
+    const { repo, setOn, valuesOn } = queuedDb([
+      undefined,
+      [{ userId: "u1" }],
+      [{ jobId: "didit:session-1" }, { jobId: "reservation:local-only" }],
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    ]);
+    await expect(repo.withdrawConsent("u1")).resolves.toEqual(["session-1"]);
+    expect(valuesOn(verificationErasure)).toEqual([{ providerSessionId: "session-1" }]);
+    expect(setOn(bronzeVerification)).toMatchObject({
+      status: "not_started",
+      attemptsUsed: 0,
+      currentAttemptId: null,
     });
   });
 
@@ -95,9 +160,10 @@ describe("BronzeRepository", () => {
 
     it("treats a review as closed once the verification stopped waiting on it", async () => {
       const { repo, setOn } = queuedDb([
+        [{ userId: "u1" }],
+        [{ currentAttemptId: "a1", status: "revoked", attemptsUsed: 1 }],
         [review],
         [attempt],
-        [{ currentAttemptId: "a1", status: "revoked", attemptsUsed: 1 }],
       ]);
       await expect(repo.decideReview(decision)).resolves.toEqual({ ok: false, reason: "closed" });
       expect(setOn(bronzeVerification)).toBeUndefined();
@@ -105,9 +171,10 @@ describe("BronzeRepository", () => {
 
     it("refuses to approve an attempt whose ID checks failed", async () => {
       const { repo } = queuedDb([
+        [{ userId: "u1" }],
+        [{ currentAttemptId: "a1", status: "manual_review", attemptsUsed: 1 }],
         [review],
         [{ ...attempt, checks: { ...passedChecks, liveness: false } }],
-        [{ currentAttemptId: "a1", status: "manual_review", attemptsUsed: 1 }],
       ]);
       await expect(repo.decideReview(decision)).resolves.toEqual({ ok: false, reason: "checks" });
     });

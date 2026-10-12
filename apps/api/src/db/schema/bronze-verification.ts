@@ -174,3 +174,27 @@ export const bronzeReview = pgTable(
     index("bronze_review_reviewer_idx").on(t.reviewerId),
   ],
 );
+
+/**
+ * Durable provider-erasure work. It deliberately has no user/attempt foreign
+ * key, so a failed Didit deletion can still be retried after account removal
+ * cascades every member-owned verification row.
+ */
+export const verificationErasure = pgTable(
+  "verification_erasure",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    provider: text("provider").notNull().default("didit"),
+    providerSessionId: text("provider_session_id").notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    lastError: text("last_error"),
+    nextAttemptAt: at("next_attempt_at").defaultNow().notNull(),
+    claimedAt: at("claimed_at"),
+    completedAt: at("completed_at"),
+    createdAt: at("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("verification_erasure_provider_session_unique").on(t.provider, t.providerSessionId),
+    index("verification_erasure_due_idx").on(t.completedAt, t.nextAttemptAt),
+  ],
+);

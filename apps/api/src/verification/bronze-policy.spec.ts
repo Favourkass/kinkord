@@ -119,6 +119,21 @@ describe("Bronze policy", () => {
     });
   });
 
+  it("fails a changed profile instead of opening an impossible review", () => {
+    const outcome = bronzeCallbackOutcome({
+      checks: { ...allButPhoto, profileFace: true },
+      status: "verified",
+      failureCodes: [],
+      attemptNumber: 1,
+      profileUnchanged: false,
+    });
+    expect(outcome).toMatchObject({
+      status: "failed",
+      checks: { profileFace: false },
+      failureCodes: ["PROFILE_CHANGED_DURING_VERIFICATION"],
+    });
+  });
+
   it("keeps the badge only while the verified photo, birth date and gender stay", () => {
     const state = {
       status: "verified",

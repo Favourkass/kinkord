@@ -59,7 +59,8 @@ export function bronzeCallbackOutcome(input: {
   if (!input.profileUnchanged)
     return {
       checks,
-      status: "manual_review" as const,
+      status:
+        input.attemptNumber >= BRONZE_MAX_ATTEMPTS ? ("rejected" as const) : ("failed" as const),
       failureCodes: ["PROFILE_CHANGED_DURING_VERIFICATION"],
     };
   if (input.status === "manual_review")

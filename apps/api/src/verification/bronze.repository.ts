@@ -12,6 +12,7 @@ import {
   profile,
   profileMedia,
   user,
+  verificationErasure,
   type BronzeStatus,
 } from "../db/schema";
 import {
@@ -110,11 +111,27 @@ export class BronzeRepository {
   /**
    * Withdrawing consent ends everything that rested on it: the badge, a check
    * in progress, a waiting review and the identity fingerprint. Returns the
-   * member's Didit sessions so the caller can erase them there too.
+   * member's Didit sessions so the caller can also attempt immediate erasure.
+   * Durable erasure work is queued in this same transaction, before any later
+   * account deletion can cascade the member-owned rows away.
    */
   async withdrawConsent(userId: string): Promise<string[]> {
     return this.db.transaction(async (tx) => {
       const now = new Date();
+      await tx.insert(bronzeVerification).values({ userId }).onConflictDoNothing();
+      await tx
+        .select({ userId: bronzeVerification.userId })
+        .from(bronzeVerification)
+        .where(eq(bronzeVerification.userId, userId))
+        .for("update");
+      const sessions = await this.diditSessions(tx, userId);
+      if (sessions.length)
+        await tx
+          .insert(verificationErasure)
+          .values(sessions.map((providerSessionId) => ({ providerSessionId })))
+          .onConflictDoNothing({
+            target: [verificationErasure.provider, verificationErasure.providerSessionId],
+          });
       await tx
         .update(bronzeConsent)
         .set({ withdrawnAt: now })
@@ -141,6 +158,7 @@ export class BronzeRepository {
         .set({
           status: "not_started",
           currentAttemptId: null,
+          attemptsUsed: 0,
           verifiedAt: null,
           verifiedAvatarKey: null,
           verifiedDob: null,
@@ -149,8 +167,79 @@ export class BronzeRepository {
         .where(
           and(eq(bronzeVerification.userId, userId), ne(bronzeVerification.status, "revoked")),
         );
-      return this.diditSessions(tx, userId);
+      return sessions;
     });
+  }
+
+  /** Queue provider erasure before deleting a member and their attempts. */
+  async queueErasuresForUser(userId: string): Promise<string[]> {
+    return this.db.transaction(async (tx) => {
+      const sessions = await this.diditSessions(tx, userId);
+      if (sessions.length)
+        await tx
+          .insert(verificationErasure)
+          .values(sessions.map((providerSessionId) => ({ providerSessionId })))
+          .onConflictDoNothing({
+            target: [verificationErasure.provider, verificationErasure.providerSessionId],
+          });
+      return sessions;
+    });
+  }
+
+  /** Queue one newly-created provider session that could not be attached locally. */
+  async queueErasure(providerSessionId: string) {
+    await this.db
+      .insert(verificationErasure)
+      .values({ providerSessionId })
+      .onConflictDoNothing({
+        target: [verificationErasure.provider, verificationErasure.providerSessionId],
+      });
+  }
+
+  /** Claim retryable provider erasures without two workers taking the same row. */
+  async claimErasures(limit: number) {
+    const due = this.db
+      .select({ id: verificationErasure.id })
+      .from(verificationErasure)
+      .where(
+        and(
+          isNull(verificationErasure.completedAt),
+          sql`${verificationErasure.nextAttemptAt} <= now()`,
+          sql`(${verificationErasure.claimedAt} is null or ${verificationErasure.claimedAt} < now() - interval '5 minutes')`,
+        ),
+      )
+      .orderBy(verificationErasure.nextAttemptAt)
+      .limit(limit)
+      .for("update", { skipLocked: true });
+    return this.db
+      .update(verificationErasure)
+      .set({ claimedAt: new Date() })
+      .where(inArray(verificationErasure.id, due))
+      .returning({
+        id: verificationErasure.id,
+        provider: verificationErasure.provider,
+        providerSessionId: verificationErasure.providerSessionId,
+        attempts: verificationErasure.attempts,
+      });
+  }
+
+  async completeErasure(id: string) {
+    await this.db
+      .update(verificationErasure)
+      .set({ completedAt: new Date(), claimedAt: null, lastError: null })
+      .where(eq(verificationErasure.id, id));
+  }
+
+  async failErasure(id: string, error: string) {
+    await this.db
+      .update(verificationErasure)
+      .set({
+        attempts: sql`${verificationErasure.attempts} + 1`,
+        claimedAt: null,
+        lastError: error.slice(0, 1_000),
+        nextAttemptAt: sql`now() + least(interval '24 hours', interval '1 minute' * power(2, least(${verificationErasure.attempts}, 10)))`,
+      })
+      .where(eq(verificationErasure.id, id));
   }
 
   /** Every Didit session the member ever opened, for erasing at Didit. */
@@ -166,8 +255,11 @@ export class BronzeRepository {
     return rows.filter((r) => r.jobId.startsWith("didit:")).map((r) => r.jobId.slice(6));
   }
 
-  /** The row lock serializes simultaneous starts and makes the attempt cap atomic. */
-  async reserve(userId: string, snapshot: ProfileSnapshot, jobId: string) {
+  /**
+   * Reserve locally before opening a paid provider session. The verification
+   * row lock makes a double tap return one reservation and one null.
+   */
+  async reserve(userId: string, snapshot: ProfileSnapshot) {
     return this.db.transaction(async (tx) => {
       await tx.insert(bronzeVerification).values({ userId }).onConflictDoNothing();
       const [state] = await tx
@@ -186,11 +278,12 @@ export class BronzeRepository {
         .from(bronzeAttempt)
         .where(eq(bronzeAttempt.userId, userId));
       const id = randomUUID();
+      const reservationJobId = `reservation:${id}`;
       await tx.insert(bronzeAttempt).values({
         id,
         userId,
         number: (last?.number ?? 0) + 1,
-        providerJobId: jobId,
+        providerJobId: reservationJobId,
         avatarKey: snapshot.avatarKey,
         profileDob: snapshot.dob,
         profileGender: snapshot.gender,
@@ -201,7 +294,81 @@ export class BronzeRepository {
         .update(bronzeVerification)
         .set({ status: "pending", attemptsUsed: state.attemptsUsed + 1, currentAttemptId: id })
         .where(eq(bronzeVerification.userId, userId));
-      return id;
+      return { attemptId: id, reservationJobId };
+    });
+  }
+
+  /** Attach the paid provider session only to the reservation that still owns the row. */
+  async attachProviderSession(attemptId: string, providerSessionId: string) {
+    return this.db.transaction(async (tx) => {
+      const [candidate] = await tx
+        .select({ userId: bronzeAttempt.userId })
+        .from(bronzeAttempt)
+        .where(eq(bronzeAttempt.id, attemptId));
+      if (!candidate) return false;
+      const [state] = await tx
+        .select()
+        .from(bronzeVerification)
+        .where(eq(bronzeVerification.userId, candidate.userId))
+        .for("update");
+      const [attempt] = await tx
+        .select()
+        .from(bronzeAttempt)
+        .where(eq(bronzeAttempt.id, attemptId))
+        .for("update");
+      if (
+        !state ||
+        !attempt ||
+        state.currentAttemptId !== attemptId ||
+        state.status !== "pending" ||
+        !attempt.providerJobId.startsWith("reservation:")
+      )
+        return false;
+      const [updated] = await tx
+        .update(bronzeAttempt)
+        .set({ providerJobId: `didit:${providerSessionId}` })
+        .where(eq(bronzeAttempt.id, attemptId))
+        .returning({ id: bronzeAttempt.id });
+      return Boolean(updated);
+    });
+  }
+
+  /** Release a reservation when no provider session was successfully attached. */
+  async cancelReservation(attemptId: string) {
+    return this.db.transaction(async (tx) => {
+      const [candidate] = await tx
+        .select({ userId: bronzeAttempt.userId })
+        .from(bronzeAttempt)
+        .where(eq(bronzeAttempt.id, attemptId));
+      if (!candidate) return false;
+      const [state] = await tx
+        .select()
+        .from(bronzeVerification)
+        .where(eq(bronzeVerification.userId, candidate.userId))
+        .for("update");
+      const [attempt] = await tx
+        .select()
+        .from(bronzeAttempt)
+        .where(eq(bronzeAttempt.id, attemptId))
+        .for("update");
+      if (
+        !state ||
+        !attempt ||
+        state.currentAttemptId !== attemptId ||
+        !attempt.providerJobId.startsWith("reservation:")
+      )
+        return false;
+      await tx.delete(bronzeAttempt).where(eq(bronzeAttempt.id, attemptId));
+      const attemptsUsed = Math.max(0, state.attemptsUsed - 1);
+      await tx
+        .update(bronzeVerification)
+        .set({
+          status: attemptsUsed === 0 ? "not_started" : "failed",
+          attemptsUsed,
+          currentAttemptId: null,
+        })
+        .where(eq(bronzeVerification.userId, candidate.userId));
+      return true;
     });
   }
 
@@ -250,6 +417,16 @@ export class BronzeRepository {
   /** A session Didit never finished: the attempt fails, and counts toward the cap. */
   async expireAttempt(attemptId: string) {
     return this.db.transaction(async (tx) => {
+      const [candidate] = await tx
+        .select({ userId: bronzeAttempt.userId })
+        .from(bronzeAttempt)
+        .where(eq(bronzeAttempt.id, attemptId));
+      if (!candidate) return false;
+      const [state] = await tx
+        .select()
+        .from(bronzeVerification)
+        .where(eq(bronzeVerification.userId, candidate.userId))
+        .for("update");
       const [attempt] = await tx
         .select()
         .from(bronzeAttempt)
@@ -260,16 +437,11 @@ export class BronzeRepository {
         .update(bronzeAttempt)
         .set({ status: "failed", failureCodes: ["SESSION_EXPIRED"], completedAt: new Date() })
         .where(eq(bronzeAttempt.id, attemptId));
-      const [state] = await tx
-        .select()
-        .from(bronzeVerification)
-        .where(eq(bronzeVerification.userId, attempt.userId))
-        .for("update");
       if (state?.currentAttemptId === attemptId && state.status === "pending")
         await tx
           .update(bronzeVerification)
           .set({ status: afterFailure(state.attemptsUsed) })
-          .where(eq(bronzeVerification.userId, attempt.userId));
+          .where(eq(bronzeVerification.userId, candidate.userId));
       return true;
     });
   }
@@ -353,6 +525,17 @@ export class BronzeRepository {
     | { ok: false; reason: "closed" | "own" | "checks" | "changed" }
   > {
     return this.db.transaction(async (tx) => {
+      const [candidate] = await tx
+        .select({ userId: bronzeReview.userId })
+        .from(bronzeReview)
+        .where(eq(bronzeReview.id, input.id));
+      if (!candidate) return { ok: false, reason: "closed" };
+      if (candidate.userId === input.reviewerId) return { ok: false, reason: "own" };
+      const [state] = await tx
+        .select()
+        .from(bronzeVerification)
+        .where(eq(bronzeVerification.userId, candidate.userId))
+        .for("update");
       const [review] = await tx
         .select()
         .from(bronzeReview)
@@ -364,11 +547,6 @@ export class BronzeRepository {
         .select()
         .from(bronzeAttempt)
         .where(eq(bronzeAttempt.id, review.attemptId));
-      const [state] = await tx
-        .select()
-        .from(bronzeVerification)
-        .where(eq(bronzeVerification.userId, review.userId))
-        .for("update");
       // Only the attempt still waiting on this review; a revoked or withdrawn one is closed.
       if (
         !attempt ||
@@ -445,6 +623,12 @@ export class BronzeRepository {
   async revoke(userId: string) {
     return this.db.transaction(async (tx) => {
       const now = new Date();
+      const [state] = await tx
+        .select({ userId: bronzeVerification.userId })
+        .from(bronzeVerification)
+        .where(eq(bronzeVerification.userId, userId))
+        .for("update");
+      if (!state) return false;
       const [row] = await tx
         .update(bronzeVerification)
         .set({
@@ -478,17 +662,20 @@ export class BronzeRepository {
 
   /** An admin gives a rejected or revoked member a fresh set of attempts. */
   async reopen(userId: string) {
-    const [row] = await this.db
-      .update(bronzeVerification)
-      .set({ status: "not_started", attemptsUsed: 0, currentAttemptId: null })
-      .where(
-        and(
-          eq(bronzeVerification.userId, userId),
-          inArray(bronzeVerification.status, ["rejected", "revoked"]),
-        ),
-      )
-      .returning({ userId: bronzeVerification.userId });
-    return Boolean(row);
+    return this.db.transaction(async (tx) => {
+      const [state] = await tx
+        .select({ status: bronzeVerification.status })
+        .from(bronzeVerification)
+        .where(eq(bronzeVerification.userId, userId))
+        .for("update");
+      if (!state || !["rejected", "revoked"].includes(state.status)) return false;
+      const [row] = await tx
+        .update(bronzeVerification)
+        .set({ status: "not_started", attemptsUsed: 0, currentAttemptId: null })
+        .where(eq(bronzeVerification.userId, userId))
+        .returning({ userId: bronzeVerification.userId });
+      return Boolean(row);
+    });
   }
 
   async recordCallback(input: {
