@@ -33,15 +33,17 @@ export function selectChatInbox(
       ),
   );
   let pool = loaded;
-  if (found) {
+  if (found && foundIsNewer) {
+    // The API's answer is the latest word for this tab and search: what it left
+    // out (a chat whose member blocked you since, say) is gone.
+    pool = [...found].sort((a, b) => latest(b) - latest(a));
+  } else if (found) {
+    // The inbox loaded since: its copies are the truer ones, and the API's answer
+    // only adds older chats the loaded page doesn't hold.
     const loadedById = new Map(summaries.map((s) => [s.id, s]));
-    const foundById = new Map(found.map((s) => [s.id, s]));
-    const freshest = (id: string) =>
-      foundIsNewer
-        ? (foundById.get(id) ?? loadedById.get(id)!)
-        : (loadedById.get(id) ?? foundById.get(id)!);
-    const ids = new Set([...loaded.map((s) => s.id), ...found.map((s) => s.id)]);
-    pool = [...ids].map(freshest).sort((a, b) => latest(b) - latest(a));
+    const shown = new Set(loaded.map((s) => s.id));
+    const more = found.filter((s) => !shown.has(s.id)).map((s) => loadedById.get(s.id) ?? s);
+    pool = [...loaded, ...more].sort((a, b) => latest(b) - latest(a));
   }
   return {
     items: pool.filter(inTab[filter]),

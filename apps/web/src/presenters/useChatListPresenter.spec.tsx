@@ -147,7 +147,8 @@ describe("useChatListPresenter", () => {
     };
     const { result } = renderHook(() => useChatListPresenter());
     await act(async () => polls.get(LIST_POLL_MS)?.());
-    list.mockClear().mockResolvedValue([older]);
+    // The API finds Ada's chat too, and an older one the loaded page doesn't hold.
+    list.mockClear().mockResolvedValue([row, older]);
     vi.useFakeTimers();
     try {
       act(() => result.current.list.setQuery(" ada "));
@@ -159,8 +160,8 @@ describe("useChatListPresenter", () => {
       });
       expect(list).toHaveBeenCalledWith({ q: "ada", filter: "all" });
       expect(result.current.list.rows.map((r) => r.id)).toEqual(["c1", "c9"]);
-      // The next inbox refresh asks again: a chat that's gone since (a block, say) drops out.
-      list.mockImplementation(async (view?: { q?: string }) => (view?.q ? [] : [row]));
+      // The next inbox refresh asks again: Adaeze's chat is gone since (a block, say) and drops out.
+      list.mockImplementation(async () => [row]);
       await act(async () => polls.get(LIST_POLL_MS)?.());
       expect(list).toHaveBeenLastCalledWith(undefined);
       expect(result.current.list.rows.map((r) => r.id)).toEqual(["c1"]);
@@ -193,6 +194,33 @@ describe("useChatListPresenter", () => {
     await waitFor(() => expect(list).toHaveBeenCalledWith({ q: "", filter: "unread" }));
     // Ada's chat, the newest, has nothing unread; Tolu's older one is found by the API.
     await waitFor(() => expect(result.current.list.rows.map((r) => r.id)).toEqual(["c7"]));
+  });
+  it("drops a tab's older answer that lands after a newer one", async () => {
+    const olderUnread: ConversationSummaryPM = {
+      ...row,
+      id: "c7",
+      unreadCount: 2,
+      lastMessageAt: "2026-07-01T10:00:00.000Z",
+      peer: { ...row.peer!, userId: "u7", username: "tolu", displayName: "Tolu" },
+    };
+    const { result } = renderHook(() => useChatListPresenter());
+    await act(async () => polls.get(LIST_POLL_MS)?.());
+    const slow: Array<(items: ConversationSummaryPM[]) => void> = [];
+    list.mockImplementation((view?: { filter?: string }) =>
+      view?.filter === "unread"
+        ? new Promise<ConversationSummaryPM[]>((resolve) => slow.push(resolve))
+        : Promise.resolve([row]),
+    );
+    act(() => result.current.list.setFilter("unread"));
+    await waitFor(() => expect(slow).toHaveLength(1));
+    // A refresh asks again before the first answer is in.
+    await act(async () => polls.get(LIST_POLL_MS)?.());
+    expect(slow).toHaveLength(2);
+    await act(async () => slow[1]([olderUnread]));
+    expect(result.current.list.rows.map((r) => r.id)).toEqual(["c7"]);
+    // The first, older answer lands last: it's ignored.
+    await act(async () => slow[0]([]));
+    expect(result.current.list.rows.map((r) => r.id)).toEqual(["c7"]);
   });
   it("updates typing from live events without reloading conversations", async () => {
     live.up = true;

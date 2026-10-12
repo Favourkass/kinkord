@@ -53,16 +53,29 @@ export function useChatListPresenter() {
   useEffect(() => {
     wanted.current = { term, filter, view };
   }, [term, filter, view]);
+  // Requests are numbered: an answer that lands after a newer one of its kind is dropped.
+  const issued = useRef(0);
+  const accepted = useRef({ found: 0, counts: 0, inbox: 0 });
   const fetchView = useCallback((w: { term: string; filter: ChatInboxFilter; view: string }) => {
+    // Stamped with when it was asked for, to compare with the inbox's own answer.
+    const askedAt = Date.now();
+    const n = ++issued.current;
     // The loaded chats still answer while these are on their way, or unavailable.
     if (w.term || w.filter !== "all")
       chatService.list({ q: w.term, filter: w.filter }).then(
-        (items) =>
-          wanted.current.view === w.view && setFound({ view: w.view, items, at: Date.now() }),
+        (items) => {
+          if (wanted.current.view !== w.view || n < accepted.current.found) return;
+          accepted.current.found = n;
+          setFound({ view: w.view, items, at: askedAt });
+        },
         () => undefined,
       );
     chatService.counts(w.term).then(
-      (value) => wanted.current.term === w.term && setCounts({ term: w.term, value }),
+      (value) => {
+        if (wanted.current.term !== w.term || n < accepted.current.counts) return;
+        accepted.current.counts = n;
+        setCounts({ term: w.term, value });
+      },
       () => undefined,
     );
   }, []);
@@ -91,9 +104,14 @@ export function useChatListPresenter() {
     // The tab's and search's answers are refreshed with the inbox, so a chat
     // that's gone (a block, say) or has changed doesn't linger, and counts stay true.
     fetchView(wanted.current);
+    const askedAt = Date.now();
+    const n = ++issued.current;
     try {
-      setSummaries(await chatService.list());
-      setLoadedAt(Date.now());
+      const items = await chatService.list();
+      if (n < accepted.current.inbox) return;
+      accepted.current.inbox = n;
+      setSummaries(items);
+      setLoadedAt(askedAt);
       setError(null);
     } catch (e) {
       setError(messageOf(e));

@@ -63,14 +63,20 @@ describe("selectChatInbox", () => {
         (s) => s.id,
       ),
     ).toEqual(["a"]);
-    // When the API's answer is newer, its copy wins: Bola came online since the inbox loaded.
+    // When the API's answer is newer, it's the latest word: Bola came online since the inbox loaded.
     const online = { ...summaries[1], peer: { ...summaries[1].peer!, online: true } };
     expect(
-      selectChatInbox(summaries, "", "online", [online], null, true).items.map((s) => s.id),
+      selectChatInbox(summaries, "", "online", [summaries[0], online], null, true).items.map(
+        (s) => s.id,
+      ),
     ).toEqual(["a", "b"]);
     expect(
-      selectChatInbox(summaries, "", "online", [online], null, false).items.map((s) => s.id),
+      selectChatInbox(summaries, "", "online", [summaries[0], online], null, false).items.map(
+        (s) => s.id,
+      ),
     ).toEqual(["a"]);
+    // And what it left out is gone: Bola blocked the viewer, so searching Bola finds nothing.
+    expect(selectChatInbox(summaries, "bola", "all", [], null, true).items).toEqual([]);
     // An answer for another search, or none yet, changes nothing.
     expect(selectChatInbox(summaries, "ada", "all").items.map((s) => s.id)).toEqual(["a"]);
   });
