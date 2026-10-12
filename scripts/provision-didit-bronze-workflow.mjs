@@ -4,19 +4,20 @@
  * Nigerian IDs a NIMC lookup. Put the returned id in the verification
  * settings (DIDIT_WORKFLOW_ID locally, diditWorkflowId in kinkord/verification).
  *
- * Run with: node --env-file=apps/api/.env scripts/provision-didit-bronze-workflow.mjs dry-run|inspect|create sandbox|live
+ * Sandbox may load apps/api/.env. Live deliberately reads only the dedicated
+ * DIDIT_LIVE_API_KEY process variable; set it in the current shell and never
+ * write it to a repository or local env file.
  * The environment defaults to sandbox; live must be asked for explicitly.
  * The API key is read only from the environment and is never logged.
  */
+import { diditWorkflowApiKey } from "./didit-workflow-env.mjs";
 
 const baseUrl = "https://verification.didit.me/v3/workflows/";
 const mode = process.argv[2] ?? "dry-run";
 const environment = process.argv[3] ?? "sandbox";
 const label =
   environment === "live" ? "Kinkord Bronze - Nigeria Live" : "Kinkord Bronze - Nigeria Test";
-const apiKey = (
-  environment === "live" ? process.env.DIDIT_API_KEY : process.env.DIDIT_SANDBOX_API_KEY
-)?.trim();
+const apiKey = diditWorkflowApiKey(environment);
 
 if (!["dry-run", "inspect", "create"].includes(mode))
   throw new Error("Use dry-run, inspect or create.");
@@ -90,7 +91,9 @@ if (mode === "dry-run") {
 
 if (!apiKey)
   throw new Error(
-    environment === "live" ? "DIDIT_API_KEY is missing." : "DIDIT_SANDBOX_API_KEY is missing.",
+    environment === "live"
+      ? "DIDIT_LIVE_API_KEY is missing. Set it only in this shell; do not add it to .env."
+      : "DIDIT_SANDBOX_API_KEY is missing.",
   );
 
 function workflowRows(body) {

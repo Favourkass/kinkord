@@ -87,13 +87,23 @@ describe("VerificationConfig", () => {
 
   it("reads the secret, keeps the last good settings, and logs a failure once", async () => {
     vi.stubEnv("VERIFICATION_SECRET_ID", "kinkord/verification");
+    vi.stubEnv("VERIFICATION_BINDING_SECRET_ID", "kinkord/verification-binding");
     const warn = vi.spyOn(Logger.prototype, "warn").mockImplementation(() => undefined);
     const config = new VerificationConfig();
     expect(config.identityAvailable).toBe(false);
 
-    send.mockResolvedValueOnce({ SecretString: JSON.stringify(complete) });
+    send
+      .mockResolvedValueOnce({
+        SecretString: JSON.stringify({ ...complete, bindingSecret: "legacy-settings-copy" }),
+      })
+      .mockResolvedValueOnce({ SecretString: JSON.stringify({ bindingSecret: "b".repeat(64) }) });
     await config.refresh();
     expect(config.identityAvailable).toBe(true);
+    expect(config.current.bindingSecret).toBe("b".repeat(64));
+    expect(send.mock.calls.slice(0, 2).map(([command]) => command.input)).toEqual([
+      { SecretId: "kinkord/verification" },
+      { SecretId: "kinkord/verification-binding" },
+    ]);
 
     const missing = Object.assign(new Error("gone"), { name: "ResourceNotFoundException" });
     send.mockRejectedValue(missing);

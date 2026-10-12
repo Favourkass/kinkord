@@ -3,6 +3,8 @@ import { GetSecretValueCommand, SecretsManagerClient } from "@aws-sdk/client-sec
 
 /** Production's settings live here, made by infra/lib/verification-stack.ts. */
 export const DEFAULT_VERIFICATION_SECRET_ID = "kinkord/verification";
+/** Kept separate and retained because rotation would invalidate every stored identity fingerprint. */
+export const DEFAULT_VERIFICATION_BINDING_SECRET_ID = "kinkord/verification-binding";
 /** How often production re-reads the secret, so a switch flipped in the console lands without a deploy. */
 const REFRESH_MS = 5 * 60_000;
 
@@ -81,14 +83,18 @@ export class VerificationConfig implements OnModuleInit, OnModuleDestroy {
   /** The last read's failure, so a missing secret is logged once rather than every refresh. */
   private problem: string | null = null;
   readonly production: boolean;
-  private readonly secretId: string | null;
+  private readonly settingsSecretId: string | null;
+  private readonly bindingSecretId: string | null;
 
   constructor() {
     this.production = process.env.NODE_ENV === "production";
-    this.secretId =
+    this.settingsSecretId =
       process.env.VERIFICATION_SECRET_ID?.trim() ||
       (this.production ? DEFAULT_VERIFICATION_SECRET_ID : null);
-    this.settings = this.secretId ? VERIFICATION_OFF : settingsFromEnv();
+    this.bindingSecretId =
+      process.env.VERIFICATION_BINDING_SECRET_ID?.trim() ||
+      (this.production ? DEFAULT_VERIFICATION_BINDING_SECRET_ID : null);
+    this.settings = this.settingsSecretId ? VERIFICATION_OFF : settingsFromEnv();
   }
 
   /** A fixed configuration, for tests. */
@@ -100,13 +106,14 @@ export class VerificationConfig implements OnModuleInit, OnModuleDestroy {
       timer: null,
       problem: null,
       production,
-      secretId: null,
+      settingsSecretId: null,
+      bindingSecretId: null,
     });
     return config;
   }
 
   onModuleInit() {
-    if (!this.secretId) return;
+    if (!this.settingsSecretId || !this.bindingSecretId) return;
     void this.refresh();
     this.timer = setInterval(() => void this.refresh(), REFRESH_MS);
     this.timer.unref?.();
@@ -118,14 +125,19 @@ export class VerificationConfig implements OnModuleInit, OnModuleDestroy {
 
   /** Re-reads the secret; public so tests can await one read. */
   async refresh() {
-    if (!this.secretId) return;
+    if (!this.settingsSecretId || !this.bindingSecretId) return;
     try {
-      const out = await new SecretsManagerClient({}).send(
-        new GetSecretValueCommand({ SecretId: this.secretId }),
-      );
-      this.settings = parseVerificationSettings(
-        JSON.parse(out.SecretString ?? "{}") as Record<string, unknown>,
-      );
+      const client = new SecretsManagerClient({});
+      const [settingsOut, bindingOut] = await Promise.all([
+        client.send(new GetSecretValueCommand({ SecretId: this.settingsSecretId })),
+        client.send(new GetSecretValueCommand({ SecretId: this.bindingSecretId })),
+      ]);
+      const raw = JSON.parse(settingsOut.SecretString ?? "{}") as Record<string, unknown>;
+      const binding = JSON.parse(bindingOut.SecretString ?? "{}") as Record<string, unknown>;
+      this.settings = {
+        ...parseVerificationSettings(raw),
+        bindingSecret: text(binding.bindingSecret),
+      };
       this.problem = null;
     } catch (e) {
       // Keep the last good settings; a first failure leaves verification off.
