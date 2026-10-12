@@ -172,9 +172,7 @@ describe("useMemberProfilePresenter", () => {
       "following",
     ]);
     expect(apiGet).toHaveBeenCalledWith("/profiles/nene/friends?tab=followers&page=1&limit=5");
-    expect(apiGet).not.toHaveBeenCalledWith(
-      "/profiles/nene/friends?tab=suggested&page=1&limit=3",
-    );
+    expect(apiGet).not.toHaveBeenCalledWith("/profiles/nene/friends?tab=suggested&page=1&limit=3");
   });
 
   it("loads the profile, defaults to the About tab and formats presence", async () => {
