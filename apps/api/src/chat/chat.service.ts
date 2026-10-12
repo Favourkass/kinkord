@@ -631,7 +631,7 @@ export class ChatService {
 
   /**
    * The inbox search, across every chat rather than the latest page: the other
-   * member's name or username, or any message still in the chat.
+   * member's name as the inbox shows it or username, or any message still in the chat.
    */
   private matching(userId: string, pattern: string) {
     return or(
@@ -645,10 +645,16 @@ export class ChatService {
             and(
               eq(searchParticipant.conversationId, conversation.id),
               ne(searchParticipant.userId, userId),
+              // Only what the inbox shows of them: the account name stays private
+              // once they've a display name or username, so it mustn't be searchable.
               or(
                 ilike(searchProfile.displayName, pattern),
                 ilike(searchUser.username, pattern),
-                ilike(searchUser.name, pattern),
+                and(
+                  isNull(searchProfile.displayName),
+                  isNull(searchUser.username),
+                  ilike(searchUser.name, pattern),
+                ),
               ),
             ),
           ),

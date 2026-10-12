@@ -978,6 +978,10 @@ describe("ChatService inbox search", () => {
     expect(sql).toContain('"search_participant"."user_id" <> $');
     expect(sql).toContain('"search_profile"."display_name" ilike $');
     expect(sql).toContain('"search_user"."username" ilike $');
+    // The account name only when it's what the inbox shows: no display name, no username.
+    expect(sql).toContain(
+      '("search_profile"."display_name" is null and "search_user"."username" is null and "search_user"."name" ilike $',
+    );
     expect(sql).toContain('"search_message"."deleted_at" is null');
     expect(sql).toContain('"search_message"."body" ilike $');
     expect(params).toEqual(["u1", "%ada\\_%", "%ada\\_%", "%ada\\_%", "%ada\\_%"]);

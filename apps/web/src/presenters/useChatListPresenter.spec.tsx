@@ -222,6 +222,27 @@ describe("useChatListPresenter", () => {
     await act(async () => slow[0]([]));
     expect(result.current.list.rows.map((r) => r.id)).toEqual(["c7"]);
   });
+  it("lets the inbox's answer win over a tab answer asked for just before it, in the same moment", async () => {
+    const unread = { ...row, unreadCount: 3 };
+    list.mockImplementation(async (view?: { filter?: string }) =>
+      view?.filter === "unread" ? [unread] : [unread],
+    );
+    const { result } = renderHook(() => useChatListPresenter());
+    await act(async () => polls.get(LIST_POLL_MS)?.());
+    act(() => result.current.list.setFilter("unread"));
+    await waitFor(() => expect(result.current.list.rows.map((r) => r.id)).toEqual(["c1"]));
+    vi.useFakeTimers();
+    try {
+      // The chat is read between the tab's query and the inbox's: both asked in one millisecond.
+      list.mockImplementation(async (view?: { filter?: string }) =>
+        view?.filter === "unread" ? [unread] : [{ ...row, unreadCount: 0 }],
+      );
+      await act(async () => polls.get(LIST_POLL_MS)?.());
+      expect(result.current.list.rows).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it("updates typing from live events without reloading conversations", async () => {
     live.up = true;
     const { result } = renderHook(() => useChatListPresenter());

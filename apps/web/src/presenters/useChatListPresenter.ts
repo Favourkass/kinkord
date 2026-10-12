@@ -43,10 +43,11 @@ export function useChatListPresenter() {
   const [found, setFound] = useState<{
     view: string;
     items: ConversationSummaryPM[];
-    at: number;
+    /** Which request it answered: later requests read later data. */
+    n: number;
   } | null>(null);
-  // When the inbox last arrived, to tell which copy of a chat is newer.
-  const [loadedAt, setLoadedAt] = useState(0);
+  // Which request the loaded inbox answered, to tell which copy of a chat is newer.
+  const [loadedN, setLoadedN] = useState(0);
   const [counts, setCounts] = useState<{ term: string; value: InboxCountsPM } | null>(null);
   // What's on screen, for answers that land later: an answer for another view is dropped.
   const wanted = useRef({ term, filter, view });
@@ -57,8 +58,6 @@ export function useChatListPresenter() {
   const issued = useRef(0);
   const accepted = useRef({ found: 0, counts: 0, inbox: 0 });
   const fetchView = useCallback((w: { term: string; filter: ChatInboxFilter; view: string }) => {
-    // Stamped with when it was asked for, to compare with the inbox's own answer.
-    const askedAt = Date.now();
     const n = ++issued.current;
     // The loaded chats still answer while these are on their way, or unavailable.
     if (w.term || w.filter !== "all")
@@ -66,7 +65,7 @@ export function useChatListPresenter() {
         (items) => {
           if (wanted.current.view !== w.view || n < accepted.current.found) return;
           accepted.current.found = n;
-          setFound({ view: w.view, items, at: askedAt });
+          setFound({ view: w.view, items, n });
         },
         () => undefined,
       );
@@ -104,14 +103,13 @@ export function useChatListPresenter() {
     // The tab's and search's answers are refreshed with the inbox, so a chat
     // that's gone (a block, say) or has changed doesn't linger, and counts stay true.
     fetchView(wanted.current);
-    const askedAt = Date.now();
     const n = ++issued.current;
     try {
       const items = await chatService.list();
       if (n < accepted.current.inbox) return;
       accepted.current.inbox = n;
       setSummaries(items);
-      setLoadedAt(askedAt);
+      setLoadedN(n);
       setError(null);
     } catch (e) {
       setError(messageOf(e));
@@ -139,9 +137,9 @@ export function useChatListPresenter() {
         filter,
         found && found.view === view ? found.items : null,
         counts && counts.term === term ? counts.value : null,
-        found !== null && found.at >= loadedAt,
+        found !== null && found.n > loadedN,
       ),
-    [summaries, query, filter, found, counts, term, view, loadedAt],
+    [summaries, query, filter, found, counts, term, view, loadedN],
   );
   const rows = useMemo(
     () =>
