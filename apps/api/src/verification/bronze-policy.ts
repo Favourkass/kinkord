@@ -93,6 +93,58 @@ export function bronzeCallbackOutcome(input: {
   return ended(input.failureCodes.length ? input.failureCodes : ["DIDIT_REQUIRED_CHECK_MISSING"]);
 }
 
+/** Why a member's latest attempt didn't pass, in terms they can act on. */
+export type MemberFailure =
+  | "birth_date"
+  | "gender"
+  | "registry"
+  | "declined"
+  | "liveness"
+  | "face"
+  | "profile_changed"
+  | "expired"
+  | "other";
+
+/**
+ * Says why the latest attempt failed, as the member may be told. It never
+ * reveals a possible second account, and stays quiet about attempts the member
+ * or an admin ended (a withdrawal, a revocation).
+ */
+export function memberFailureReason(
+  attempt: { status: string; failureCodes: string[]; checks: Partial<BronzeChecks> } | null,
+): MemberFailure | null {
+  if (!attempt || attempt.status !== "failed") return null;
+  const codes = attempt.failureCodes;
+  const checks = { ...emptyBronzeChecks(), ...attempt.checks };
+  if (
+    ["CONSENT_WITHDRAWN", "VERIFICATION_REVOKED", "ACCOUNT_DELETED"].some((c) => codes.includes(c))
+  )
+    return null;
+  if (codes.includes("PROFILE_CHANGED_DURING_VERIFICATION")) return "profile_changed";
+  if (codes.includes("SESSION_EXPIRED")) return "expired";
+  if (codes.includes("DIDIT_DECLINED"))
+    return !checks.governmentId
+      ? "declined"
+      : !checks.liveness
+        ? "liveness"
+        : !checks.idFace
+          ? "face"
+          : "declined";
+  if (codes.includes("DIDIT_REQUIRED_CHECK_MISSING"))
+    return !checks.dateOfBirth
+      ? "birth_date"
+      : !checks.gender
+        ? "gender"
+        : !checks.governmentId
+          ? "registry"
+          : !checks.liveness
+            ? "liveness"
+            : !checks.idFace
+              ? "face"
+              : "other";
+  return "other";
+}
+
 /**
  * What an admin's decision on a review does. Approving confirms the two
  * checks a person can judge (the profile photo and the ID's country); what

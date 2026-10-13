@@ -5,6 +5,8 @@ import {
   bronzeConsent,
   bronzeReview,
   bronzeVerification,
+  moderationLog,
+  verificationAdminStepUp,
   verificationErasure,
   verificationIdentityHold,
 } from "../db/schema";
@@ -67,14 +69,14 @@ describe("BronzeRepository", () => {
 
   describe("revoke", () => {
     it("ends anything still in flight, so no later result or approval restores it", async () => {
-      const { repo, setOn } = queuedDb([
+      const { repo, setOn, valuesOn } = queuedDb([
         [{ userId: "u1" }],
         [{ userId: "u1" }],
         undefined,
         undefined,
         [],
       ]);
-      await expect(repo.revoke("u1")).resolves.toBe(true);
+      await expect(repo.revoke("u1", "admin-1", "Confirmed policy breach.")).resolves.toBe(true);
       expect(setOn(bronzeVerification)).toMatchObject({
         status: "revoked",
         currentAttemptId: null,
@@ -85,11 +87,17 @@ describe("BronzeRepository", () => {
         failureCodes: ["VERIFICATION_REVOKED"],
       });
       expect(setOn(bronzeReview)).toMatchObject({ status: "withdrawn" });
+      expect(valuesOn(moderationLog)).toMatchObject({
+        actorId: "admin-1",
+        action: "verification-revoke",
+        subjectUserId: "u1",
+        detail: "Confirmed policy breach.",
+      });
     });
 
     it("reports nothing to revoke for a member who never started", async () => {
       const { repo, setOn } = queuedDb([[]]);
-      await expect(repo.revoke("u1")).resolves.toBe(false);
+      await expect(repo.revoke("u1", "admin-1", "No verification exists.")).resolves.toBe(false);
       expect(setOn(bronzeAttempt)).toBeUndefined();
     });
   });
@@ -219,7 +227,7 @@ describe("BronzeRepository", () => {
         [{ binding: "fp-1" }, { binding: "fp-1" }, { binding: "fp-2" }],
         undefined,
       ]);
-      await expect(repo.revoke("u1")).resolves.toBe(true);
+      await expect(repo.revoke("u1", "admin-1", "Used someone else's ID.")).resolves.toBe(true);
       expect(valuesOn(verificationIdentityHold)).toEqual([
         { binding: "fp-1", userId: "u1" },
         { binding: "fp-2", userId: "u1" },
@@ -359,6 +367,17 @@ describe("BronzeRepository", () => {
     });
   });
 
+  it("stores step-up proof against one exact admin session", async () => {
+    const expiresAt = new Date("2026-10-12T16:10:00Z");
+    const { repo, valuesOn } = queuedDb([undefined]);
+    await repo.recordAdminStepUp("session-1", "admin-1", expiresAt);
+    expect(valuesOn(verificationAdminStepUp)).toMatchObject({
+      sessionId: "session-1",
+      userId: "admin-1",
+      expiresAt,
+    });
+  });
+
   describe("decideReview", () => {
     const decision = {
       id: "r1",
@@ -483,6 +502,41 @@ describe("BronzeRepository", () => {
         reasonCodes: ["PROFILE_PHOTO_FACE_MATCH_REQUIRED", "IDENTITY_ON_ANOTHER_ACCOUNT"],
       });
       expect(setOn(bronzeVerification)).toBeUndefined();
+    });
+
+    it("logs an approved review in the same transaction", async () => {
+      const { repo, valuesOn } = queuedDb([
+        [{ userId: "u1" }],
+        [{ currentAttemptId: "a1", status: "manual_review", attemptsUsed: 1 }],
+        [review],
+        [{ ...attempt, profileDob: "1998-04-02", profileGender: "female" }],
+        [{ avatarKey: "avatars/u1/a.jpg", dob: "1998-04-02", gender: "female" }],
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+      ]);
+      await expect(repo.decideReview(decision)).resolves.toMatchObject({
+        ok: true,
+        status: "verified",
+      });
+      expect(valuesOn(moderationLog)).toMatchObject({
+        actorId: "admin-1",
+        action: "verification-review-approve",
+        subjectUserId: "u1",
+        detail: decision.reason,
+      });
+    });
+  });
+
+  it("records why an admin reopens a verification", async () => {
+    const { repo, valuesOn } = queuedDb([[{ status: "rejected" }], [{ userId: "u1" }], undefined]);
+    await expect(repo.reopen("u1", "admin-1", "Support approved a retry.")).resolves.toBe(true);
+    expect(valuesOn(moderationLog)).toMatchObject({
+      actorId: "admin-1",
+      action: "verification-reopen",
+      subjectUserId: "u1",
+      detail: "Support approved a retry.",
     });
   });
 });

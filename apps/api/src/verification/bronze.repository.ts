@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
-import { and, desc, eq, inArray, isNotNull, isNull, max, ne, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNotNull, isNull, max, ne, sql } from "drizzle-orm";
 import { Db, DRIZZLE } from "../db/db.module";
+import { adminUserIds } from "../moderation/admins";
 import {
   bronzeAttempt,
   bronzeCallback,
@@ -9,9 +10,12 @@ import {
   bronzeProfileMatch,
   bronzeReview,
   bronzeVerification,
+  moderationLog,
   profile,
   profileMedia,
   user,
+  verificationAdminStepUp,
+  verificationAdminStepUpFailure,
   verificationErasure,
   verificationIdentityHold,
   type BronzeStatus,
@@ -99,6 +103,146 @@ export class BronzeRepository {
       )
       .limit(1);
     return Boolean(row);
+  }
+
+  /** Any standing consent, including an older notice version, may be withdrawn. */
+  async hasAnyConsent(userId: string) {
+    const [row] = await this.db
+      .select({ id: bronzeConsent.id })
+      .from(bronzeConsent)
+      .where(and(eq(bronzeConsent.userId, userId), isNull(bronzeConsent.withdrawnAt)))
+      .limit(1);
+    return Boolean(row);
+  }
+
+  async recordAdminStepUp(sessionId: string, userId: string, expiresAt: Date) {
+    const now = new Date();
+    await this.db
+      .insert(verificationAdminStepUp)
+      .values({ sessionId, userId, verifiedAt: now, expiresAt })
+      .onConflictDoUpdate({
+        target: verificationAdminStepUp.sessionId,
+        set: { userId, verifiedAt: now, expiresAt },
+      });
+  }
+
+  async hasActiveAdminStepUp(sessionId: string, userId: string, now = new Date()) {
+    const [row] = await this.db
+      .select({ sessionId: verificationAdminStepUp.sessionId })
+      .from(verificationAdminStepUp)
+      .where(
+        and(
+          eq(verificationAdminStepUp.sessionId, sessionId),
+          eq(verificationAdminStepUp.userId, userId),
+          gt(verificationAdminStepUp.expiresAt, now),
+        ),
+      )
+      .limit(1);
+    return Boolean(row);
+  }
+
+  /** Until when this admin may not try another two-factor code, if locked out. */
+  async stepUpLockedUntil(userId: string, now = new Date()): Promise<Date | null> {
+    const [row] = await this.db
+      .select({ lockedUntil: verificationAdminStepUpFailure.lockedUntil })
+      .from(verificationAdminStepUpFailure)
+      .where(eq(verificationAdminStepUpFailure.userId, userId));
+    return row?.lockedUntil && row.lockedUntil > now ? row.lockedUntil : null;
+  }
+
+  /**
+   * Counts a wrong code. `max` wrong codes within `windowMinutes` lock the
+   * admin out for that long. Returns when the lock ends, if it's now locked.
+   */
+  async recordStepUpFailure(userId: string, max: number, windowMinutes: number) {
+    const t = verificationAdminStepUpFailure;
+    const stale = sql`${t.windowStartedAt} < now() - make_interval(mins => ${windowMinutes})`;
+    const failures = sql`case when ${stale} then 1 else ${t.failures} + 1 end`;
+    const [row] = await this.db
+      .insert(t)
+      .values({ userId, failures: 1 })
+      .onConflictDoUpdate({
+        target: t.userId,
+        set: {
+          failures,
+          windowStartedAt: sql`case when ${stale} then now() else ${t.windowStartedAt} end`,
+          lockedUntil: sql`case when ${failures} >= ${max} then now() + make_interval(mins => ${windowMinutes}) else ${t.lockedUntil} end`,
+        },
+      })
+      .returning({ failures: t.failures, lockedUntil: t.lockedUntil });
+    return row?.lockedUntil && row.failures >= max ? row.lockedUntil : null;
+  }
+
+  async clearStepUpFailures(userId: string) {
+    await this.db
+      .delete(verificationAdminStepUpFailure)
+      .where(eq(verificationAdminStepUpFailure.userId, userId));
+  }
+
+  /** Everyone who moderates, to tell admins' verifications apart. */
+  adminIds(): Promise<string[]> {
+    return adminUserIds(this.db);
+  }
+
+  /** The member's most recent attempt, for saying why it didn't pass. */
+  async latestAttempt(userId: string) {
+    const [row] = await this.db
+      .select()
+      .from(bronzeAttempt)
+      .where(eq(bronzeAttempt.userId, userId))
+      .orderBy(desc(bronzeAttempt.number))
+      .limit(1);
+    return row ?? null;
+  }
+
+  /** Didit's status as last read; any successful read ends a run of failed ones. */
+  async noteProviderStatus(attemptId: string, providerStatus: string) {
+    await this.db
+      .update(bronzeAttempt)
+      .set({ providerStatus, resultFailures: 0 })
+      .where(eq(bronzeAttempt.id, attemptId));
+  }
+
+  /** One more failed read of Didit's result; returns the run so far and the last status seen. */
+  async noteResultFailure(attemptId: string) {
+    const [row] = await this.db
+      .update(bronzeAttempt)
+      .set({ resultFailures: sql`${bronzeAttempt.resultFailures} + 1` })
+      .where(eq(bronzeAttempt.id, attemptId))
+      .returning({
+        resultFailures: bronzeAttempt.resultFailures,
+        providerStatus: bronzeAttempt.providerStatus,
+      });
+    return row ?? { resultFailures: 0, providerStatus: null };
+  }
+
+  /** Another account holding this identity, for showing the reviewer who. */
+  async otherHolderOf(binding: string, userId: string) {
+    const [attempt] = await this.db
+      .select({ userId: bronzeAttempt.userId, username: user.username })
+      .from(bronzeAttempt)
+      .innerJoin(user, eq(user.id, bronzeAttempt.userId))
+      .where(
+        and(
+          eq(bronzeAttempt.identityBinding, binding),
+          ne(bronzeAttempt.userId, userId),
+          inArray(bronzeAttempt.status, ["verified", "manual_review"]),
+        ),
+      )
+      .limit(1);
+    if (attempt) return attempt;
+    const [hold] = await this.db
+      .select({ userId: verificationIdentityHold.userId, username: user.username })
+      .from(verificationIdentityHold)
+      .leftJoin(user, eq(user.id, verificationIdentityHold.userId))
+      .where(
+        and(
+          eq(verificationIdentityHold.binding, binding),
+          ne(verificationIdentityHold.userId, userId),
+        ),
+      )
+      .limit(1);
+    return hold ?? null;
   }
 
   /** At most one standing consent per notice version. */
@@ -471,6 +615,7 @@ export class BronzeRepository {
       .where(
         and(
           inArray(bronzeAttempt.status, ["started", "processing"]),
+          sql`${bronzeAttempt.providerJobId} like 'didit:%'`,
           sql`${bronzeAttempt.createdAt} < now() - interval '10 minutes'`,
           sql`(${bronzeAttempt.reconciledAt} is null or ${bronzeAttempt.reconciledAt} < now() - interval '4 minutes')`,
         ),
@@ -615,6 +760,15 @@ export class BronzeRepository {
       .where(eq(bronzeProfileMatch.attemptId, attemptId));
   }
 
+  /** Whose verification a review is about. */
+  async reviewSubject(reviewId: string): Promise<string | null> {
+    const [row] = await this.db
+      .select({ userId: bronzeReview.userId })
+      .from(bronzeReview)
+      .where(eq(bronzeReview.id, reviewId));
+    return row?.userId ?? null;
+  }
+
   /** The admins' queue, oldest first, with who each member is. */
   async openReviews() {
     return this.db
@@ -627,6 +781,7 @@ export class BronzeRepository {
         providerJobId: bronzeAttempt.providerJobId,
         avatarKey: bronzeAttempt.avatarKey,
         checks: bronzeAttempt.checks,
+        identityBinding: bronzeAttempt.identityBinding,
         username: user.username,
         displayName: profile.displayName,
       })
@@ -777,12 +932,18 @@ export class BronzeRepository {
             : { status: outcome.status },
         )
         .where(eq(bronzeVerification.userId, review.userId));
+      await tx.insert(moderationLog).values({
+        actorId: input.reviewerId,
+        action: `verification-review-${input.decision}`,
+        subjectUserId: review.userId,
+        detail: input.reason,
+      });
       return { ok: true, status: outcome.status, userId: review.userId, attemptId: attempt.id };
     });
   }
 
   /** An admin takes a verification away; only they can allow a new try. */
-  async revoke(userId: string) {
+  async revoke(userId: string, actorId: string, reason: string) {
     return this.db.transaction(async (tx) => {
       const now = new Date();
       const [state] = await tx
@@ -820,12 +981,18 @@ export class BronzeRepository {
         .where(and(eq(bronzeReview.userId, userId), eq(bronzeReview.status, "open")));
       // The same ID can't simply be verified on a fresh account instead.
       await this.holdIdentities(userId, tx);
+      await tx.insert(moderationLog).values({
+        actorId,
+        action: "verification-revoke",
+        subjectUserId: userId,
+        detail: reason,
+      });
       return true;
     });
   }
 
   /** An admin gives a rejected or revoked member a fresh set of attempts. */
-  async reopen(userId: string) {
+  async reopen(userId: string, actorId: string, reason: string) {
     return this.db.transaction(async (tx) => {
       const [state] = await tx
         .select({ status: bronzeVerification.status })
@@ -838,6 +1005,13 @@ export class BronzeRepository {
         .set({ status: "not_started", attemptsUsed: 0, currentAttemptId: null })
         .where(eq(bronzeVerification.userId, userId))
         .returning({ userId: bronzeVerification.userId });
+      if (row)
+        await tx.insert(moderationLog).values({
+          actorId,
+          action: "verification-reopen",
+          subjectUserId: userId,
+          detail: reason,
+        });
       return Boolean(row);
     });
   }

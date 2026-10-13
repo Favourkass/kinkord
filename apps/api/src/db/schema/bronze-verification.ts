@@ -11,7 +11,7 @@ import {
   uuid,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
-import { user } from "./auth";
+import { session, user } from "./auth";
 
 export type BronzeStatus =
   | "not_started"
@@ -96,6 +96,10 @@ export const bronzeAttempt = pgTable(
     identityBinding: text("identity_binding"),
     /** When the background check last asked Didit about this attempt. */
     reconciledAt: at("reconciled_at"),
+    /** Didit's status the last time we read it ("In Review", "In Progress", ...). */
+    providerStatus: text("provider_status"),
+    /** Reads of Didit's result that failed in a row; reset by any success. */
+    resultFailures: integer("result_failures").notNull().default(0),
     createdAt: at("created_at").defaultNow().notNull(),
     completedAt: at("completed_at"),
   },
@@ -204,6 +208,36 @@ export const verificationErasure = pgTable(
     index("verification_erasure_due_idx").on(t.completedAt, t.nextAttemptAt),
   ],
 );
+
+/** A recent TOTP proof for one exact admin session, never for the whole account. */
+export const verificationAdminStepUp = pgTable(
+  "verification_admin_step_up",
+  {
+    sessionId: text("session_id")
+      .primaryKey()
+      .references(() => session.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    verifiedAt: at("verified_at").defaultNow().notNull(),
+    expiresAt: at("expires_at").notNull(),
+  },
+  (t) => [index("verification_admin_step_up_user_idx").on(t.userId, t.expiresAt)],
+);
+
+/**
+ * Wrong two-factor codes an admin entered for verification work. Server-side
+ * TOTP checks skip Better Auth's rate limit, so this is what stops a stolen
+ * admin session from guessing codes until one works.
+ */
+export const verificationAdminStepUpFailure = pgTable("verification_admin_step_up_failure", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  failures: integer("failures").notNull().default(0),
+  windowStartedAt: at("window_started_at").defaultNow().notNull(),
+  lockedUntil: at("locked_until"),
+});
 
 /**
  * Identities an admin took the badge away from, or whose account was banned.
