@@ -77,14 +77,12 @@ describe("useSignupWizardPresenter", () => {
     patch.mockReset().mockResolvedValue({ avatarUrl: "a", coverUrl: "c" });
     post.mockReset().mockResolvedValue({});
     push.mockReset();
-    sendCode
-      .mockReset()
-      .mockResolvedValue({
-        otpId: "11111111-1111-4111-8111-111111111111",
-        sentTo: "tega@kinkord.com",
-        expiresAt: new Date(Date.now() + 600_000).toISOString(),
-        resendAfterMs: 60_000,
-      });
+    sendCode.mockReset().mockResolvedValue({
+      otpId: "11111111-1111-4111-8111-111111111111",
+      sentTo: "tega@kinkord.com",
+      expiresAt: new Date(Date.now() + 600_000).toISOString(),
+      resendAfterMs: 60_000,
+    });
     verifyCode.mockReset().mockResolvedValue({ verified: true, attemptsLeft: null });
   });
 
