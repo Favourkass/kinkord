@@ -10,6 +10,7 @@ import {
   type MentionSuggestionVM,
 } from "@/domain/mentions";
 import { membersApi } from "@/services/members.service";
+import { isOfficialOrganization } from "@/services/organization-placeholder.service";
 
 /** How long typing pauses before members are suggested. */
 export const MENTION_DELAY_MS = 150;
@@ -70,7 +71,7 @@ export function useMentionSuggestions(setText: (field: MentionField, text: strin
     () =>
       typing && found?.query === typing.query
         ? found.members
-            .map(toMentionSuggestionVM)
+            .map((m) => toMentionSuggestionVM(m, isOfficialOrganization(m.userId)))
             .filter((s): s is MentionSuggestionVM => s !== null)
         : [],
     [typing, found],

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import MaskIcon from "@/components/app/MaskIcon";
 import SilverCheck from "@/components/app/SilverCheck";
+import OrganizationBadge from "@/components/organization/OrganizationBadge";
 import type { FriendRowVM } from "@/domain/member";
 
 export interface PeopleRowVM extends FriendRowVM {
@@ -14,7 +15,14 @@ export interface PeopleTabProps {
   subTabs: Array<{ key: string; label: string; active: boolean }>;
   onSubTab: (key: string) => void;
   rows: PeopleRowVM[];
-  labels: { follow: string; following: string; friendsPill: string; more: string };
+  labels: {
+    follow: string;
+    following: string;
+    friendsPill: string;
+    more: string;
+    organization: string;
+    verifiedOrganization: string;
+  };
   onToggleFollow: (row: PeopleRowVM) => void;
   loading: boolean;
   loadingText: string;
@@ -57,7 +65,9 @@ export default function PeopleTab(p: PeopleTabProps) {
         {p.rows.map((r) => (
           <li key={r.userId} className="flex items-center justify-between gap-[8px] py-[12px]">
             <Link href={r.href} className="flex min-w-0 items-center gap-[12px]">
-              <span className="block size-[48px] shrink-0 overflow-hidden rounded-[24px] bg-pf-surface-2">
+              <span
+                className={`block size-[48px] shrink-0 overflow-hidden bg-pf-surface-2 ${r.organization ? "rounded-[10px]" : "rounded-[24px]"}`}
+              >
                 {r.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element -- presigned S3 URL
                   <img
@@ -77,6 +87,14 @@ export default function PeopleTab(p: PeopleTabProps) {
                 <span className="flex min-w-0 items-center gap-[3px] text-[13px] font-bold leading-[16px] text-pf-text">
                   <span className="truncate">{r.displayName}</span>
                   {r.silver ? <SilverCheck size={13} /> : null}
+                  {r.organization ? (
+                    <OrganizationBadge
+                      label={p.labels.organization}
+                      verified
+                      verifiedLabel={p.labels.verifiedOrganization}
+                      markSize={13}
+                    />
+                  ) : null}
                 </span>
                 {r.ageTag || r.location ? (
                   <span className="truncate text-[11px] leading-[13px] text-pf-muted">

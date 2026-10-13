@@ -23,6 +23,8 @@ export interface NotificationPM {
   id: string;
   type: NotificationKind;
   actor: {
+    /** Who it is; absent from an older API. */
+    userId?: string;
     name: string;
     username: string | null;
     avatarUrl: string | null;
@@ -49,6 +51,8 @@ export interface NotificationVM {
   actorName: string | null;
   /** The Silver check beside the actor's name. */
   actorSilver: boolean;
+  /** The official organization's marks: the Org pill and a square avatar. */
+  actorOrganization: boolean;
   avatarUrl: string | null;
   action: string;
   official: boolean;
@@ -135,7 +139,12 @@ const UNKNOWN_KIND = {
   action: () => "Something new for you.",
 } as const;
 
-export function toNotificationVM(item: NotificationPM, now = new Date()): NotificationVM {
+/** `organization` is whether the actor is the official organization; presenters decide it. */
+export function toNotificationVM(
+  item: NotificationPM,
+  now = new Date(),
+  organization = false,
+): NotificationVM {
   const date = new Date(item.createdAt);
   const minutes = Math.max(0, Math.floor((now.getTime() - date.getTime()) / 60_000));
   const time =
@@ -160,6 +169,7 @@ export function toNotificationVM(item: NotificationPM, now = new Date()): Notifi
     category: kind.category,
     actorName,
     actorSilver: !official && Boolean(item.actor?.silver),
+    actorOrganization: !official && organization,
     avatarUrl: official ? null : (item.actor?.avatarUrl ?? null),
     action,
     official,

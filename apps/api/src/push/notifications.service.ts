@@ -38,6 +38,8 @@ export interface InboxItem {
   id: string;
   type: NotificationType;
   actor: {
+    /** Who it is, for the app's own marks (the official organization's, say). */
+    userId: string;
     name: string;
     username: string | null;
     avatarUrl: string | null;
@@ -439,6 +441,7 @@ export class NotificationsService {
       type: row.type,
       actor: row.actorId
         ? {
+            userId: row.actorId,
             name: row.actorDisplayName ?? row.actorUsername ?? row.actorName ?? "Someone",
             username: row.actorUsername ?? null,
             avatarUrl: row.actorAvatarKey

@@ -31,4 +31,7 @@ export const NOTIFICATIONS_COPY = {
   retry: "Try again",
   refresh: "Refresh notifications",
   open: "Opening…",
+  /** Beside the official organization's name. */
+  organization: "Official",
+  verifiedOrganization: "Official Kinkord account",
 } as const;

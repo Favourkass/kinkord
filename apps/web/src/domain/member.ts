@@ -52,6 +52,8 @@ export interface MemberCardVM {
   followers: string;
   isFollowing: boolean;
   silver: boolean;
+  /** Temporary organization presentation for the configured official account. */
+  organization: boolean;
 }
 
 /**
@@ -70,10 +72,10 @@ export function locationOf(city: string | null, state: string | null): string | 
   return [city, displayState(state)].filter(Boolean).join(", ") || null;
 }
 
-export function toMemberCardVM(pm: MemberCardPM): MemberCardVM {
-  const ageTag = ageTagOf(pm.age, pm.gender);
-  const roles = pm.roles.length > 0 ? pm.roles.join(" | ") : null;
-  const location = locationOf(pm.city, pm.state);
+export function toMemberCardVM(pm: MemberCardPM, organization = false): MemberCardVM {
+  const ageTag = organization ? null : ageTagOf(pm.age, pm.gender);
+  const roles = organization ? null : pm.roles.length > 0 ? pm.roles.join(" | ") : null;
+  const location = organization ? null : locationOf(pm.city, pm.state);
   return {
     userId: pm.userId,
     username: pm.username,
@@ -87,6 +89,7 @@ export function toMemberCardVM(pm: MemberCardPM): MemberCardVM {
     followers: compactNumber(pm.followersCount),
     isFollowing: pm.isFollowing,
     silver: Boolean(pm.silver),
+    organization,
   };
 }
 
@@ -184,7 +187,8 @@ export interface PublicProfileVM {
   isOnline: boolean;
   /** Relative "an hour ago" for the "Last seen …" line; null when never seen. */
   lastSeenAgo: string | null;
-  stats: { friends: string; followers: string; following: string; mutualFriends: string };
+  /** `friends` is null for the organization, which has followers rather than friends. */
+  stats: { friends: string | null; followers: string; following: string; mutualFriends: string };
   /** "Abraka, Delta State, Nigeria" */
   locationLine: string | null;
   /** The same line split up, each piece linking to the directory filtered to it. */
@@ -235,6 +239,10 @@ export interface PublicProfileVM {
   /** The Silver check beside their name; `since` is "October 2026". */
   silver: { since: string | null } | null;
   restricted: boolean;
+  /** Account type is presentation-only until the full organization domain ships. */
+  accountType: "person" | "organization";
+  /** Official organization approval is distinct from personal identity verification. */
+  organizationVerified: boolean;
 }
 
 /** "https://x.com/naughty_neze/" -> "@naughty_neze"; falls back to the host. */
@@ -321,10 +329,16 @@ export function locationPartsOf(
   return parts;
 }
 
+/**
+ * `organization` is whether this is the official organization; presenters
+ * decide it. Its profile leaves out what only describes a person — presence,
+ * friends, where they live, age and roles — so the screens just show what's there.
+ */
 export function toPublicProfileVM(
   pm: PublicProfilePM,
   placeHref: PlaceHref = () => null,
   now = new Date(),
+  organization = false,
 ): PublicProfileVM {
   const ageTag = ageTagOf(pm.age, pm.gender) ?? "";
   const rolesTag = pm.roles.join(" | ");
@@ -338,17 +352,17 @@ export function toPublicProfileVM(
     handle: pm.username ? `@${pm.username}` : null,
     avatarUrl: pm.avatarUrl,
     coverUrl: pm.coverUrl,
-    isOnline: pm.isOnline,
-    lastSeenAgo: timeAgo(pm.lastSeenAt, now),
+    isOnline: !organization && pm.isOnline,
+    lastSeenAgo: organization ? null : timeAgo(pm.lastSeenAt, now),
     stats: {
-      friends: compactNumber(pm.counts.friends),
+      friends: organization ? null : compactNumber(pm.counts.friends),
       followers: compactNumber(pm.counts.followers),
       following: compactNumber(pm.counts.following),
       mutualFriends: compactNumber(pm.counts.mutualFriends),
     },
-    locationLine,
-    locationParts: locationPartsOf(pm, placeHref),
-    tagLine,
+    locationLine: organization ? null : locationLine,
+    locationParts: organization ? [] : locationPartsOf(pm, placeHref),
+    tagLine: organization ? null : tagLine,
     bio: pm.bio,
     basic: {
       age: pm.age === null ? null : String(pm.age),
@@ -391,6 +405,8 @@ export function toPublicProfileVM(
     },
     silver: pm.silver ? { since: monthYear(pm.silver.since) } : null,
     restricted: Boolean(pm.restricted),
+    accountType: organization ? "organization" : "person",
+    organizationVerified: organization,
   };
 }
 
@@ -451,4 +467,5 @@ export interface FriendRowVM {
   isFollowing: boolean;
   busy: boolean;
   silver: boolean;
+  organization: boolean;
 }

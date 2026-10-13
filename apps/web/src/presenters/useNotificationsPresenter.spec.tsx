@@ -50,7 +50,10 @@ const page = (over: Record<string, unknown> = {}) => ({
   q: undefined,
   ...over,
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllEnvs();
+});
 beforeEach(() => {
   counts.mockReset().mockResolvedValue({ all: 9, comment: 2, mention: 3 });
   list.mockReset().mockResolvedValue({ items: [item], nextCursor: null });
@@ -72,6 +75,20 @@ describe("useNotificationsPresenter", () => {
     expect(result.current.loading).toBe(true);
     rerender({ ready: true });
     await waitFor(() => expect(result.current.items).toHaveLength(1));
+  });
+  it("marks a notification from the official organization, by its configured id", async () => {
+    vi.stubEnv("NEXT_PUBLIC_KINKORD_OFFICIAL_USER_ID", "org");
+    list.mockResolvedValue({
+      items: [
+        { ...item, id: "n2", type: "follow", actor: { ...item.actor!, userId: "org" } },
+        item,
+      ],
+      nextCursor: null,
+    });
+    const { result } = renderHook(() => useNotificationsPresenter(true));
+    await waitFor(() => expect(result.current.items).toHaveLength(2));
+    const marked = Object.fromEntries(result.current.items.map((n) => [n.id, n.actorOrganization]));
+    expect(marked).toEqual({ n1: false, n2: true });
   });
   it("marks a clicked notification read before navigating", async () => {
     let resolve!: (value: NotificationPM) => void;

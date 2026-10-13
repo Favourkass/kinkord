@@ -112,7 +112,10 @@ describe("useChatThreadPresenter", () => {
     URL.createObjectURL = vi.fn(() => "blob:local-photo");
     URL.revokeObjectURL = vi.fn();
   });
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllEnvs();
+  });
 
   it("loads the thread and tells the viewer's bubbles apart", async () => {
     const { result } = await ready();
@@ -124,6 +127,13 @@ describe("useChatThreadPresenter", () => {
       ["m2", true],
     ]);
     expect(result.current.thread.hasMore).toBe(false);
+    expect(result.current.thread.peer?.organization).toBe(false);
+  });
+
+  it("marks the official organization in the header, by its configured id", async () => {
+    vi.stubEnv("NEXT_PUBLIC_KINKORD_OFFICIAL_USER_ID", "u2");
+    const { result } = await ready();
+    expect(result.current.thread.peer?.organization).toBe(true);
   });
 
   it("polls for what's newer than the last message and marks it read", async () => {

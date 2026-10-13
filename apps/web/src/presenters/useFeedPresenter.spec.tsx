@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommentPM, PostPM } from "@/domain/post";
 
 const replace = vi.fn();
@@ -54,6 +54,16 @@ vi.mock("@/services/posts.service", async (importOriginal) => ({
   },
   uploadPostPhoto: (...a: unknown[]) => uploadPostPhoto(...a),
 }));
+
+// The feed must never ask for a profile just to learn whether a post's author is followed.
+const profileRequest = vi.fn();
+vi.mock("@/services/members.service", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/services/members.service")>();
+  return {
+    ...original,
+    membersApi: { ...original.membersApi, profile: (...a: unknown[]) => profileRequest(...a) },
+  };
+});
 
 const giftBalance = vi.fn();
 const giftSend = vi.fn();
@@ -495,6 +505,19 @@ describe("people you may know", () => {
     expect(result.current.suggestions[0].isFollowing).toBe(false);
   });
 
+  it("labels a member's button Add friend, then Remove", async () => {
+    suggested.mockResolvedValue({ items: [person], total: 1 });
+    const { result } = await loaded();
+    await waitFor(() => expect(result.current.suggestions).toHaveLength(1));
+    expect(result.current.suggestions[0]).toMatchObject({
+      organization: false,
+      actionLabel: "Add friend",
+    });
+
+    await act(async () => result.current.toggleFollow("u3"));
+    expect(result.current.suggestions[0].actionLabel).toBe("Remove");
+  });
+
   it("hides the strip for the rest of the session", async () => {
     suggested.mockResolvedValue({ items: [person], total: 1 });
     const { result } = await loaded();
@@ -509,6 +532,94 @@ describe("people you may know", () => {
     const { result } = await loaded();
     expect(result.current.posts).toHaveLength(1);
     expect(result.current.error).toBeNull();
+  });
+});
+
+describe("following the official organization", () => {
+  const org = { userId: "org", username: "kinkord", displayName: "Kinkord", avatarUrl: null };
+  const orgPost = (isFollowing: boolean, over: Partial<PostPM> = {}) =>
+    pm({ id: "o1", postId: "o1", author: { ...org, isFollowing }, ...over });
+
+  beforeEach(() => vi.stubEnv("NEXT_PUBLIC_KINKORD_OFFICIAL_USER_ID", "org"));
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("takes whether the viewer follows it from the posts, asking for no profile", async () => {
+    feed.mockResolvedValue({ items: [orgPost(true), pm()], nextCursor: null });
+    const { result } = await loaded();
+    expect(result.current.posts[0]).toMatchObject({
+      authorOrganization: true,
+      canFollowAuthor: true,
+      authorIsFollowing: true,
+      authorFollowBusy: false,
+    });
+    // Anyone else's post offers no Follow.
+    expect(result.current.posts[1].canFollowAuthor).toBe(false);
+    expect(profileRequest).not.toHaveBeenCalled();
+  });
+
+  it("follows on every one of its posts at once, holding the buttons until the API answers", async () => {
+    let answer!: () => void;
+    follow.mockImplementation(() => new Promise<void>((resolve) => (answer = resolve)));
+    feed.mockResolvedValue({
+      items: [orgPost(false), orgPost(false, { id: "o2", postId: "o2" })],
+      nextCursor: null,
+    });
+    const { result } = await loaded();
+
+    act(() => void result.current.toggleFollow("org"));
+    expect(follow).toHaveBeenCalledWith("kinkord");
+    const state = () => result.current.posts.map((p) => [p.authorIsFollowing, p.authorFollowBusy]);
+    expect(state()).toEqual([
+      [true, true],
+      [true, true],
+    ]);
+
+    await act(async () => answer());
+    expect(state()).toEqual([
+      [true, false],
+      [true, false],
+    ]);
+  });
+
+  it("puts the button back when the API refuses", async () => {
+    feed.mockResolvedValue({ items: [orgPost(true)], nextCursor: null });
+    unfollow.mockRejectedValue(new ApiError(500, "boom"));
+    const { result } = await loaded();
+
+    await act(async () => result.current.toggleFollow("org"));
+    expect(unfollow).toHaveBeenCalledWith("kinkord");
+    expect(result.current.posts[0]).toMatchObject({
+      authorIsFollowing: true,
+      authorFollowBusy: false,
+    });
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("sends a signed-out member to log in, as every other follow does", async () => {
+    feed.mockResolvedValue({ items: [orgPost(false)], nextCursor: null });
+    follow.mockRejectedValue(new ApiError(401, "signed out"));
+    const { result } = await loaded();
+
+    await act(async () => result.current.toggleFollow("org"));
+    expect(replace).toHaveBeenCalledWith("/login");
+  });
+
+  it("keeps the Kinksters strip and the posts in agreement", async () => {
+    suggested.mockResolvedValue({ items: [{ ...org, isFollowing: false }], total: 1 });
+    feed.mockResolvedValue({ items: [orgPost(false)], nextCursor: null });
+    const { result } = await loaded();
+    await waitFor(() => expect(result.current.suggestions).toHaveLength(1));
+    expect(result.current.suggestions[0]).toMatchObject({
+      organization: true,
+      actionLabel: "Follow",
+    });
+
+    await act(async () => result.current.toggleFollow("org"));
+    expect(result.current.suggestions[0]).toMatchObject({
+      isFollowing: true,
+      actionLabel: "Following",
+    });
+    expect(result.current.posts[0].authorIsFollowing).toBe(true);
   });
 });
 

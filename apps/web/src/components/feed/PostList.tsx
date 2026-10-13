@@ -18,6 +18,7 @@ export interface PostListProps {
   onShare: (postId: string) => void;
   onGift: (postId: string, currency?: "coin" | "star" | "crown") => void;
   onOpenMedia: (media: PostMediaVM) => void;
+  onTogglePostAuthorFollow: (userId: string) => void;
   hasMore: boolean;
   loadingMore: boolean;
   onLoadMore: () => void;
@@ -63,6 +64,7 @@ export default function PostList(p: PostListProps) {
             onShare={() => p.onShare(post.postId)}
             onGift={(currency) => p.onGift(post.postId, currency)}
             onOpenMedia={p.onOpenMedia}
+            onToggleAuthorFollow={p.onTogglePostAuthorFollow}
           />
         ))}
 

@@ -193,6 +193,57 @@ describe("toPostVM", () => {
     const silver = post({ author: { ...author, silver: true } });
     expect(toPostVM(silver, false, href, NOW).authorSilver).toBe(true);
   });
+
+  it("marks the official organization's post when the presenter says it is one", () => {
+    const member = toPostVM(post({ author: { ...author, isFollowing: false } }), false, href, NOW);
+    expect(member).toMatchObject({
+      authorOrganization: false,
+      authorOrganizationVerified: false,
+      canFollowAuthor: false,
+    });
+    const organization = toPostVM(
+      post({ author: { ...author, isFollowing: true } }),
+      false,
+      href,
+      NOW,
+      true,
+    );
+    expect(organization).toMatchObject({
+      authorOrganization: true,
+      authorOrganizationVerified: true,
+      canFollowAuthor: true,
+      authorIsFollowing: true,
+      authorFollowBusy: false,
+    });
+  });
+
+  it("offers Follow on the organization's post, never on the viewer's own", () => {
+    const followable = (over: Partial<PostPM>) =>
+      toPostVM(post({ author: { ...author, isFollowing: false }, ...over }), false, href, NOW, true)
+        .canFollowAuthor;
+    // The organization reading its own post.
+    expect(followable({ mine: true })).toBe(false);
+    // The organization's repost of its own post is still its own.
+    expect(
+      followable({
+        id: "r1",
+        mine: true,
+        repostedBy: { userId: "u2", username: "tegamaxwell", displayName: "Sir T" },
+      }),
+    ).toBe(false);
+    // A member's repost of it is the organization's words, so Follow stays.
+    expect(
+      followable({
+        id: "r1",
+        mine: true,
+        repostedBy: { userId: "u1", username: "favour", displayName: "Favour" },
+      }),
+    ).toBe(true);
+  });
+
+  it("offers no Follow until the API says whether the viewer follows", () => {
+    expect(toPostVM(post(), false, href, NOW, true).canFollowAuthor).toBe(false);
+  });
 });
 
 describe("toCommentVM", () => {
@@ -214,6 +265,8 @@ describe("toCommentVM", () => {
     expect(
       toCommentVM({ ...pm, author: { ...author, silver: true } }, href, NOW).authorSilver,
     ).toBe(true);
+    expect(toCommentVM(pm, href, NOW).authorOrganization).toBe(false);
+    expect(toCommentVM(pm, href, NOW, true).authorOrganization).toBe(true);
   });
 });
 

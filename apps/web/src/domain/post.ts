@@ -16,6 +16,8 @@ export interface PostAuthorPM {
   /** Shows the Silver check beside their name; absent from an older API. */
   silver?: boolean;
   subscribed?: boolean;
+  /** Whether the viewer follows them; absent from an older API. */
+  isFollowing?: boolean;
 }
 
 export interface PostMediaPM {
@@ -132,10 +134,22 @@ export interface PostVM {
    * that is not the viewer's to delete.
    */
   isRepost: boolean;
+  authorUserId: string;
   authorName: string;
   /** The Silver check beside the author's name. */
   authorSilver: boolean;
   authorSubscribed: boolean;
+  /** The official organization's posts carry its marks. */
+  authorOrganization: boolean;
+  authorOrganizationVerified: boolean;
+  /**
+   * A Follow button beside the name: on the official organization's posts, never
+   * on the viewer's own, and only once the API has said whether they follow it.
+   */
+  canFollowAuthor: boolean;
+  authorIsFollowing: boolean;
+  /** A follow request is in flight, so the button is held. */
+  authorFollowBusy: boolean;
   handle: string | null;
   /** Link to the author's profile, or null for a member with no username yet. */
   authorHref: string | null;
@@ -175,9 +189,12 @@ export interface FeedSuggestionVM {
   userId: string;
   displayName: string;
   silver: boolean;
+  organization: boolean;
   handle: string | null;
   avatarUrl: string | null;
   isFollowing: boolean;
+  /** The card's button: "Add friend" / "Remove", or Follow / Following for the organization. */
+  actionLabel: string;
   /** A follow request is in flight, so the button is held. */
   busy: boolean;
   href: string | null;
@@ -187,6 +204,7 @@ export interface CommentVM {
   id: string;
   authorName: string;
   authorSilver: boolean;
+  authorOrganization: boolean;
   handle: string | null;
   authorHref: string | null;
   avatarUrl: string | null;
@@ -222,11 +240,22 @@ export function clampBody(body: string): string {
   return `${body.slice(0, clampLength(body))}…`;
 }
 
+/**
+ * The viewer wrote what the card shows: their own post, or their repost of it.
+ * `mine` alone is about the row, and a repost of someone else's post is the
+ * viewer's row with somebody else's words.
+ */
+function byViewer(pm: PostPM): boolean {
+  return pm.mine && (pm.repostedBy === null || pm.repostedBy.userId === pm.author.userId);
+}
+
+/** `organization` is whether the author is the official organization; presenters decide it. */
 export function toPostVM(
   pm: PostPM,
   expanded: boolean,
   hrefFor: HrefFor,
   now = new Date(),
+  organization = false,
 ): PostVM {
   const canExpand = needsClamp(pm.body);
   // How much of the body shows: all of it, or what fits before "more".
@@ -240,9 +269,15 @@ export function toPostVM(
     postId: pm.postId,
     repostedByName: pm.repostedBy?.displayName ?? null,
     isRepost: pm.id !== pm.postId,
+    authorUserId: pm.author.userId,
     authorName: pm.author.displayName,
     authorSilver: Boolean(pm.author.silver),
     authorSubscribed: Boolean(pm.author.subscribed),
+    authorOrganization: organization,
+    authorOrganizationVerified: organization,
+    canFollowAuthor: organization && !byViewer(pm) && typeof pm.author.isFollowing === "boolean",
+    authorIsFollowing: Boolean(pm.author.isFollowing),
+    authorFollowBusy: false,
     handle: handleOf(pm.author.username),
     authorHref: hrefFor(pm.author.username),
     avatarUrl: pm.author.avatarUrl,
@@ -271,11 +306,17 @@ export function toPostVM(
   };
 }
 
-export function toCommentVM(pm: CommentPM, hrefFor: HrefFor, now = new Date()): CommentVM {
+export function toCommentVM(
+  pm: CommentPM,
+  hrefFor: HrefFor,
+  now = new Date(),
+  organization = false,
+): CommentVM {
   return {
     id: pm.id,
     authorName: pm.author.displayName,
     authorSilver: Boolean(pm.author.silver),
+    authorOrganization: organization,
     handle: handleOf(pm.author.username),
     authorHref: hrefFor(pm.author.username),
     avatarUrl: pm.author.avatarUrl,

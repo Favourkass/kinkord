@@ -61,6 +61,20 @@ function makeRecordingDb(wheres: SQL[]) {
   return { select: vi.fn(() => chain()) };
 }
 
+/** Wraps a stubbed query so each `.leftJoin(table, on)` keeps its `on`, to read the SQL back. */
+function recordJoins(query: unknown, joins: SQL[]): unknown {
+  return new Proxy(query as object, {
+    get(target, prop) {
+      const value = Reflect.get(target, prop) as (...args: unknown[]) => unknown;
+      if (prop === "then") return value;
+      return (...args: unknown[]) => {
+        if (prop === "leftJoin") joins.push(args[1] as SQL);
+        return recordJoins(value(...args), joins);
+      };
+    },
+  });
+}
+
 /** A one-off chainable that resolves to `rows`, for a hand-built db stub. */
 function chainOnce(rows: unknown[]): unknown {
   const p: unknown = new Proxy(() => p, {
@@ -446,6 +460,36 @@ describe("PostsService.byId", () => {
     expect(vm?.mine).toBe(true);
   });
 
+  it("says whether the viewer follows the author, so a card needs no profile request", async () => {
+    const followed = makeDb([[{ ...row, viewerFollowsAuthor: true }], ...decorated()]);
+    expect((await service(followed).byId("p1", "u1"))?.author.isFollowing).toBe(true);
+    const stranger = makeDb([[{ ...row, viewerFollowsAuthor: false }], ...decorated()]);
+    expect((await service(stranger).byId("p1", "u1"))?.author.isFollowing).toBe(false);
+  });
+
+  it("takes a repost's follow from the original's author, not from whoever reposted it", async () => {
+    const repostRow = {
+      ...row,
+      id: "r1",
+      body: null,
+      authorId: "u1",
+      repostOfId: "p1",
+      viewerFollowsAuthor: false,
+    };
+    const joins: SQL[] = [];
+    const db = makeDb([[repostRow], [{ ...row, viewerFollowsAuthor: true }], ...decorated()]);
+    const recorded = { ...db, select: vi.fn(() => recordJoins(db.select(), joins)) };
+
+    const vm = await service(recorded as never).byId("r1", "viewer-1");
+
+    expect(vm?.author).toMatchObject({ userId: "u2", isFollowing: true });
+    // The originals query joins the viewer's own follow of each original's author.
+    const original = new PgDialect().sqlToQuery(joins.at(-1)!);
+    expect(original.sql).toContain('"viewer_follows_author"."follower_id" = $1');
+    expect(original.sql).toContain('"viewer_follows_author"."following_id" = "post"."author_id"');
+    expect(original.params).toEqual(["viewer-1"]);
+  });
+
   it("drops a repost whose original has been deleted rather than showing a hole", async () => {
     const repostRow = { ...row, id: "r1", body: null, authorId: "u1", repostOfId: "gone" };
     // originalsById finds nothing: the original is deleted or no longer public.
@@ -517,6 +561,15 @@ describe("the feed's visibility rules", () => {
   it("leaves the cursor out of the query on the first page", async () => {
     const { sql } = await feedSql();
     expect(sql).not.toContain('"post"."created_at" <');
+  });
+
+  it("reads whether the viewer follows each author off the rule's own join", async () => {
+    const db = makeRecordingDb([]);
+    await new PostsService(db as never, makeStorage() as never, push as never).feed("viewer-1");
+    const [fields] = db.select.mock.calls[0] as unknown as [{ viewerFollowsAuthor: SQL }];
+    expect(new PgDialect().sqlToQuery(fields.viewerFollowsAuthor).sql).toBe(
+      '"viewer_follows_author"."follower_id" is not null',
+    );
   });
 });
 

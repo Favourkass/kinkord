@@ -18,6 +18,7 @@ import {
   mergeNotifications,
   notificationsApi,
 } from "@/services/notifications.service";
+import { isOfficialOrganization } from "@/services/organization-placeholder.service";
 import { useRealtime } from "./useRealtime";
 
 /** Backstop refreshes: rare while live events arrive, more often while they can't. */
@@ -274,7 +275,9 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
       loadedFor === filterKey
         ? items
             .filter((item) => !unreadOnly || item.readAt === null)
-            .map((item) => toNotificationVM(item))
+            .map((item) =>
+              toNotificationVM(item, new Date(), isOfficialOrganization(item.actor?.userId)),
+            )
         : [],
     [items, loadedFor, unreadOnly, filterKey],
   );

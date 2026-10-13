@@ -19,6 +19,7 @@ import type { PostMediaVM } from "@/domain/post";
 import type { RealtimeEventPM } from "@/domain/realtime";
 import { ApiError } from "@/services/apiClient";
 import { chatService } from "@/services/chat.service";
+import { isOfficialOrganization } from "@/services/organization-placeholder.service";
 import { useHomePresenter } from "./useHomePresenter";
 import { useChatSafety } from "./useChatSafety";
 import { usePolling } from "./usePolling";
@@ -309,7 +310,11 @@ export function useChatThreadPresenter(conversationId: string) {
   }, [conversationId, hasMore, loadingMore, messages]);
 
   const peer = useMemo(() => {
-    const vm = toThreadPeerVM(summary?.peer ?? null, Routes.member);
+    const vm = toThreadPeerVM(
+      summary?.peer ?? null,
+      Routes.member,
+      isOfficialOrganization(summary?.peer?.userId),
+    );
     const isTyping = typing.has(conversationId) && !summary?.peer?.blockedByMe;
     return vm
       ? {

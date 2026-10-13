@@ -12,6 +12,7 @@ import {
 } from "@/domain/chat";
 import type { RealtimeEventPM } from "@/domain/realtime";
 import { chatService } from "@/services/chat.service";
+import { isOfficialOrganization } from "@/services/organization-placeholder.service";
 import { useHomePresenter } from "./useHomePresenter";
 import { usePolling } from "./usePolling";
 import { useTypingIndicators } from "./useTypingIndicators";
@@ -144,7 +145,13 @@ export function useChatListPresenter() {
   const rows = useMemo(
     () =>
       selected.items.map((s) => {
-        const row = toConversationRowVM(s, viewerId, Routes.messageThread);
+        const row = toConversationRowVM(
+          s,
+          viewerId,
+          Routes.messageThread,
+          new Date(),
+          isOfficialOrganization(s.peer?.userId),
+        );
         const isTyping = typing.has(s.id) && !s.peer?.blockedByMe;
         return {
           ...row,

@@ -319,6 +319,19 @@ describe("ProfilesService", () => {
     expect(setCalls[0]).toMatchObject({ bio: "hi" });
   });
 
+  it("keeps Kinkord out of a new display name, but lets the account that has it keep it", async () => {
+    const { service, setCalls, row, checks } = makeService();
+    await expect(
+      responseOf(service.updateOwn("u1", { displayName: "Kin_kord HQ" }, "Favour", now)),
+    ).resolves.toEqual({ displayName: ["That name is reserved."] });
+    expect(setCalls).toHaveLength(0);
+    expect(checks.hold).not.toHaveBeenCalled();
+
+    row.displayName = "Kinkord";
+    await service.updateOwn("u1", { displayName: "Kinkord Official" }, "Favour", now);
+    expect(setCalls[0]).toMatchObject({ displayName: "Kinkord Official" });
+  });
+
   it("tells members whether they're verified, and lets them hide the badge", async () => {
     const verifiedFor = (avatarKey: string) => ({
       status: "verified",
@@ -420,6 +433,19 @@ describe("ProfilesService", () => {
         username: ["You can change your username again on 1 Oct 2026."],
       });
       expect(transaction).not.toHaveBeenCalled();
+    });
+
+    it("keeps Kinkord out of a new handle, unless the account's handle already has it", async () => {
+      const refused = makeService({ selects: [[account]] });
+      await expect(
+        responseOf(refused.service.changeUsername("u1", "the.kinkord", now)),
+      ).resolves.toEqual({ username: ["That name is reserved."] });
+      expect(refused.transaction).not.toHaveBeenCalled();
+
+      const official = { username: "kinkord", displayUsername: "Kinkord", name: "Kinkord" };
+      const kept = makeService({ selects: [[official]] });
+      await kept.service.changeUsername("u1", "Kinkord_HQ", now);
+      expect(kept.setCalls[0]).toEqual({ username: "kinkord_hq", displayUsername: "Kinkord_HQ" });
     });
 
     it("turns a unique violation into a 409, wrapped or not", async () => {

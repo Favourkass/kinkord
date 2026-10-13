@@ -58,6 +58,18 @@ describe("notification presentation", () => {
     });
   });
 
+  it("marks the official organization, and never Kinkord's own notices", () => {
+    const actor = { userId: "org", name: "Kinkord", username: "kinkord", avatarUrl: null };
+    expect(toNotificationVM({ ...item, type: "follow", actor }).actorOrganization).toBe(false);
+    expect(
+      toNotificationVM({ ...item, type: "follow", actor }, new Date(), true).actorOrganization,
+    ).toBe(true);
+    expect(
+      toNotificationVM({ ...item, type: "report", actor: null }, new Date(), true)
+        .actorOrganization,
+    ).toBe(false);
+  });
+
   it("puts the Silver check beside a Silver member's name", () => {
     const actor = { name: "Ada", username: "ada", avatarUrl: null, silver: true };
     expect(toNotificationVM({ ...item, type: "follow", actor }).actorSilver).toBe(true);

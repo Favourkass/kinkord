@@ -20,7 +20,7 @@ export default function MemberProfilePage() {
   return (
     <ProfileScreen
       {...vm}
-      {...getProfilePosts(feed, shell.avatarUrl)}
+      {...getProfilePosts(feed, shell.avatarUrl, vm.authorFollow)}
       viewerAvatarUrl={shell.avatarUrl}
       notificationsUnread={shell.notificationsUnread}
       notificationsCount={shell.notificationsCount}

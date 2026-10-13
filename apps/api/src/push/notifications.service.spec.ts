@@ -162,6 +162,7 @@ describe("NotificationsService.list", () => {
       id: ID,
       type: "follow",
       actor: {
+        userId: "ada",
         name: "Ada",
         username: "ada_x",
         avatarUrl: "https://media.test/avatars/ada/a.jpg",
