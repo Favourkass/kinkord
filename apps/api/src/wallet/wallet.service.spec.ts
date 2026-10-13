@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, onTestFinished, vi } from "vitest";
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { SQL } from "drizzle-orm";
 import { WalletService, walletOperationDto } from "./wallet.service";
@@ -8,6 +8,18 @@ const rates = {
   coin: { buy: 1000, redeem: 800 },
   star: { buy: 10000, redeem: 8000 },
   crown: { buy: 100000, redeem: 80000 },
+};
+/** A saved wallet setup whose prices come to `rates` above, at ₦100 to the dollar. */
+const savedSettings = {
+  rates,
+  usdRates: {
+    coin: { buy: 10, redeem: 8 },
+    star: { buy: 100, redeem: 80 },
+    crown: { buy: 1000, redeem: 800 },
+  },
+  exchangeRateKobo: 10_000,
+  enabled: 1,
+  minimumKobo: 10_000_000,
 };
 const row = {
   id: "op",
@@ -86,6 +98,36 @@ function fixture(results: unknown[][], updates: unknown[][] = [], inserts: unkno
   return { db, storage, service, sets, values, orders };
 }
 describe("WalletService", () => {
+  it("uses independent USD pricing even when Silver prices and the old NGN cache differ", async () => {
+    const usdRates = {
+      coin: { buy: 10, redeem: 8 },
+      star: { buy: 100, redeem: 80 },
+      crown: { buy: 1000, redeem: 800 },
+    };
+    const payment = {
+      bankName: "Test Bank",
+      accountName: "Test",
+      accountNumber: "1234567890",
+      monthlyKobo: 560000,
+      monthlyUsdCents: 400,
+      yearlyKobo: 3360000,
+      yearlyUsdCents: 2400,
+    };
+    const config = { rates, usdRates, exchangeRateKobo: 140000, minimumKobo: 10000000, enabled: 1 };
+    const { service } = fixture([[config], [payment]]);
+    expect(await service.settings()).toMatchObject({
+      usdConversion: { kobo: 140000, usdCents: 100 },
+      rates: { coin: { buy: 14000, redeem: 11200 } },
+    });
+    const purchase = fixture([[], [config], [payment], []], [], [[row]]);
+    await purchase.service.create("user", "purchase", {
+      currency: "coin",
+      quantity: 100,
+      requestKey: "new",
+    });
+    expect(purchase.values[0]).toMatchObject({ quantity: 100, amountKobo: 1400000 });
+  });
+
   it("does not reveal a transaction that was not returned by the ownership-scoped query", async () => {
     const { service } = fixture([[]]);
     await expect(service.operation("other", "op")).rejects.toThrow(/not found/);
@@ -94,7 +136,7 @@ describe("WalletService", () => {
     const { service, db } = fixture(
       [
         [],
-        [{ rates, enabled: 1, minimumKobo: 80000 }],
+        [savedSettings],
         [
           {
             id: "bank",
@@ -110,7 +152,7 @@ describe("WalletService", () => {
     await expect(
       service.create("user", "withdrawal", {
         currency: "coin",
-        quantity: 100,
+        quantity: 12500,
         bankId: "bank",
         requestKey: "key",
       }),
@@ -126,29 +168,29 @@ describe("WalletService", () => {
       accountNumber: "1234567890",
     };
     const { service, sets, values } = fixture(
-      [[], [{ rates, enabled: 1, minimumKobo: 80000 }], [bank]],
+      [[], [savedSettings], [bank]],
       [[{ userId: "user" }]],
       [[{ ...row, kind: "withdrawal" }]],
     );
     await service.create("user", "withdrawal", {
       currency: "coin",
-      quantity: 100,
+      quantity: 12500,
       bankId: "bank",
       requestKey: "key",
     });
     expect(setSql(sets[0].earned)).toMatchObject({
       sql: '"wallet_balance"."earned"-$1',
-      params: [100],
+      params: [12500],
     });
     expect(values[0]).toMatchObject({ kind: "withdrawal", bankId: "bank" });
-    expect(values[1]).toMatchObject({ phase: "hold", availableDelta: -100, earnedDelta: -100 });
+    expect(values[1]).toMatchObject({ phase: "hold", availableDelta: -12500, earnedDelta: -12500 });
   });
   it("refuses a withdrawal sent as someone other than who is signed in", async () => {
     const { service, db } = fixture([]);
     await expect(
       service.create("user", "withdrawal", {
         currency: "coin",
-        quantity: 100,
+        quantity: 12500,
         bankId: "bank",
         requestKey: "key",
         senderId: "someone-else",
@@ -157,11 +199,11 @@ describe("WalletService", () => {
     expect(db.transaction).not.toHaveBeenCalled();
   });
   it("refuses a withdrawal whose rate changed after the member reviewed it", async () => {
-    const { service, db } = fixture([[], [{ rates, enabled: 1, minimumKobo: 80000 }]]);
+    const { service, db } = fixture([[], [savedSettings]]);
     await expect(
       service.create("user", "withdrawal", {
         currency: "coin",
-        quantity: 100,
+        quantity: 12500,
         bankId: "bank",
         requestKey: "key",
         // Reviewed at ₦4.00 a coin; it's ₦8.00 now.
@@ -315,23 +357,36 @@ describe("withdrawal membership eligibility", () => {
     expect(db.update).not.toHaveBeenCalled();
     expect(db.insert).not.toHaveBeenCalled();
   });
-  it("uses the existing Silver badge rule and denies missing, held or young accounts", async () => {
-    const eligible = {
-      heldAt: null,
-      heldFor: null,
+  it("needs the Silver badge, and an account 30 days old, unless it's a founder's", async () => {
+    // A fixed clock: the date in the message must not depend on when the suite runs.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-10T12:00:00Z"));
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const badge = { heldAt: null, heldFor: null, avatarKey: "avatar", coverKey: "cover" };
+    const account = {
       createdAt: new Date("2020-01-01"),
-      avatarKey: "avatar",
-      coverKey: "cover",
+      email: "m@example.test",
+      emailVerified: true,
     };
-    for (const [rows, expected] of [
-      [[], false],
-      [[eligible], true],
-      [[{ ...eligible, heldAt: new Date() }], false],
-      [[{ ...eligible, createdAt: new Date() }], false],
+    const today = { ...account, createdAt: new Date("2026-10-10T09:00:00Z") };
+    for (const [results, expected] of [
+      [[[]], false],
+      [[[{ ...badge, heldAt: new Date() }]], false],
+      [[[badge], [account]], true],
+      [[[badge], [today]], false],
+      [[[badge], [{ ...today, email: "maxihandsome@gmail.com" }]], true],
     ] as const) {
-      const { service } = fixture([[...rows]]);
+      const { service } = fixture(results.map((rows) => [...rows]));
       vi.mocked(service.redemptionEligibility).mockRestore();
       expect((await service.redemptionEligibility("user")).canRedeem).toBe(expected);
     }
+    const { service } = fixture([[badge], [today]]);
+    vi.mocked(service.redemptionEligibility).mockRestore();
+    await expect(service.redemptionEligibility("user")).resolves.toEqual({
+      canRedeem: false,
+      reason: "Withdrawals open on 9 Nov 2026, 30 days after you joined.",
+    });
   });
 });

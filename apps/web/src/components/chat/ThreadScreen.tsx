@@ -36,7 +36,10 @@ export interface ThreadScreenProps {
   retryLabel: string;
   onSend: (body: string) => void;
   onRetry: (clientId: string) => void;
-  composer: Pick<MessageComposerProps, "placeholder" | "sendLabel" | "maxLength" | "photo">;
+  composer: Pick<
+    MessageComposerProps,
+    "placeholder" | "sendLabel" | "maxLength" | "photo" | "onTyping"
+  >;
   /** Why photos aren't open yet, after the member tried to add one. */
   photoNotice: string | null;
   photoLabels: MessageBubblePhotoLabels;
@@ -96,7 +99,8 @@ export default function ThreadScreen(p: ThreadScreenProps) {
         />
         <PresenceDot
           online={Boolean(p.peer?.isOnline)}
-          label={p.onlineLabel}
+          status={p.peer?.presence}
+          label={p.peer?.presenceLabel ?? p.onlineLabel}
           className="absolute -bottom-[1px] -right-[1px]"
         />
       </span>
@@ -107,8 +111,12 @@ export default function ThreadScreen(p: ThreadScreenProps) {
           </span>
           {p.peer?.silver ? <SilverCheck size={15} /> : null}
         </span>
-        {p.peer?.isOnline && (
-          <span className="block text-[12px] text-app-online">{p.onlineLabel}</span>
+        {p.peer && (
+          <span
+            className={`block text-[12px] ${p.peer.typing || p.peer.presence === "online" ? "text-app-online" : p.peer.presence === "away" ? "text-kink-amber" : "text-app-muted"}`}
+          >
+            {p.peer.presenceLabel ?? p.onlineLabel}
+          </span>
         )}
       </span>
     </>

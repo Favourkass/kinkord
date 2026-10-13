@@ -14,6 +14,7 @@ import { z } from "zod";
 import { DRIZZLE, type Db } from "../db/db.module";
 import {
   moderationLog,
+  user,
   walletBalance,
   walletBank,
   walletLedger,
@@ -21,14 +22,18 @@ import {
   walletOperation,
   walletSettings,
 } from "../db/schema";
+import { isSuperAdmin } from "../moderation/admins";
 import { StorageService } from "../storage/storage.service";
 import { readSettings } from "../subscriptions/subscriptions.service";
 import { silverCheckStatus } from "../subscriptions/plans";
 import {
   nextWalletStatus,
+  MIN_PURCHASE_KOBO,
   PACKS,
+  purchasablePacks,
   sameSender,
   walletAmount,
+  walletNairaRates,
   walletDisabled,
   walletPaymentReference,
 } from "./rules";
@@ -57,6 +62,8 @@ export function walletOperationDto(row: Operation) {
   return { ...row, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
 }
 
+/** Days an account must have before it can cash out gifts. The founders don't wait. */
+export const WITHDRAWAL_MIN_ACCOUNT_DAYS = 30;
 @Injectable()
 export class WalletService {
   constructor(
@@ -65,24 +72,51 @@ export class WalletService {
   ) {}
   async redemptionEligibility(userId: string, db: Db = this.db) {
     const badge = await silverCheckStatus(db, userId);
-    return {
-      canRedeem: !!badge?.shown,
-      reason: badge?.shown
-        ? null
-        : "An active Silver subscription and Silver verification badge are required to redeem.",
-    };
+    if (!badge?.shown)
+      return {
+        canRedeem: false,
+        reason:
+          "An active Silver subscription and Silver verification badge are required to redeem.",
+      };
+    // The badge shows at once, but cashing out waits: a new account can't take gifts and leave.
+    const [account] = await db
+      .select({ createdAt: user.createdAt, email: user.email, emailVerified: user.emailVerified })
+      .from(user)
+      .where(eq(user.id, userId))
+      .limit(1);
+    if (!account) return { canRedeem: false, reason: "Account not found." };
+    const opensAt = new Date(
+      account.createdAt.getTime() + WITHDRAWAL_MIN_ACCOUNT_DAYS * 86_400_000,
+    );
+    if (opensAt > new Date() && !isSuperAdmin(account)) {
+      const date = opensAt.toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        timeZone: "UTC",
+      });
+      return {
+        canRedeem: false,
+        reason: `Withdrawals open on ${date}, ${WITHDRAWAL_MIN_ACCOUNT_DAYS} days after you joined.`,
+      };
+    }
+    return { canRedeem: true, reason: null };
   }
   async settings() {
     const [row] = await this.db.select().from(walletSettings).where(eq(walletSettings.id, 1));
     const payment = await readSettings(this.db);
+    const rates = row ? walletNairaRates(row.usdRates, row.exchangeRateKobo) : null;
     return {
       currency: "NGN" as const,
-      usdConversion: payment.bank ? payment.prices.monthly : null,
+      usdConversion: row?.exchangeRateKobo ? { kobo: row.exchangeRateKobo, usdCents: 100 } : null,
+      usdRates: row?.usdRates ?? null,
+      exchangeRateKobo: row?.exchangeRateKobo ?? null,
       enabled: !!row?.enabled && !!payment.bank,
-      rates: row?.rates ?? null,
+      rates,
       minimumKobo: row?.minimumKobo ?? null,
+      minimumPurchaseKobo: MIN_PURCHASE_KOBO,
       bank: payment.bank,
-      packs: PACKS,
+      packs: rates ? purchasablePacks(rates) : PACKS,
     };
   }
   async saveSettings(actorId: string, input: z.infer<typeof walletSettingsSchema>) {
@@ -93,7 +127,9 @@ export class WalletService {
         .insert(walletSettings)
         .values({
           id: 1,
-          rates: input.rates,
+          rates: walletNairaRates(input.usdRates, input.exchangeRateKobo),
+          usdRates: input.usdRates,
+          exchangeRateKobo: input.exchangeRateKobo,
           minimumKobo: input.minimumKobo,
           enabled: input.enabled ? 1 : 0,
           updatedBy: actorId,
@@ -101,7 +137,9 @@ export class WalletService {
         .onConflictDoUpdate({
           target: walletSettings.id,
           set: {
-            rates: input.rates,
+            rates: walletNairaRates(input.usdRates, input.exchangeRateKobo),
+            usdRates: input.usdRates,
+            exchangeRateKobo: input.exchangeRateKobo,
             minimumKobo: input.minimumKobo,
             enabled: input.enabled ? 1 : 0,
             updatedBy: actorId,
@@ -253,7 +291,7 @@ export class WalletService {
       const [config] = await tx.select().from(walletSettings).where(eq(walletSettings.id, 1));
       if (!config?.enabled) throw walletDisabled();
       const amountKobo = walletAmount(
-        config.rates,
+        walletNairaRates(config.usdRates, config.exchangeRateKobo),
         input.currency,
         input.quantity,
         kind,

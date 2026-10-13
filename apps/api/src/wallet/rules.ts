@@ -41,11 +41,32 @@ export const walletDisabled = () =>
     message: "Wallet transactions are not enabled yet.",
   });
 
+/** USD cents to integer kobo; the wallet FX rate is independent of subscriptions. */
+export function walletNairaRates(usdRates: WalletRates, exchangeRateKobo: number): WalletRates {
+  const pair = (kind: WalletCurrency) => ({
+    buy: (usdRates[kind].buy * exchangeRateKobo) / 100,
+    redeem: (usdRates[kind].redeem * exchangeRateKobo) / 100,
+  });
+  return { coin: pair("coin"), star: pair("star"), crown: pair("crown") };
+}
+
+/** The smallest purchase, in kobo: ₦1,000. */
+export const MIN_PURCHASE_KOBO = 100_000;
+
 export const PACKS = {
   coin: [100, 500, 1000, 2500],
   star: [10, 50, 100, 250],
   crown: [1, 3, 5, 10],
 };
+/** The bundles worth offering at these prices: the ones inside the purchase limits. */
+export function purchasablePacks(rates: WalletRates) {
+  const inRange = (currency: WalletCurrency) =>
+    PACKS[currency].filter((quantity) => {
+      const amount = quantity * rates[currency].buy;
+      return amount >= MIN_PURCHASE_KOBO && amount <= 1_000_000_000;
+    });
+  return { coin: inRange("coin"), star: inRange("star"), crown: inRange("crown") };
+}
 export function walletAmount(
   rates: WalletRates,
   currency: WalletCurrency,
@@ -55,11 +76,13 @@ export function walletAmount(
 ) {
   if (!Number.isSafeInteger(quantity) || quantity < 1)
     throw new BadRequestException("Enter a whole positive quantity.");
-  if (kind === "purchase" && !PACKS[currency].includes(quantity))
-    throw new BadRequestException("Choose an available bundle.");
   const amount = quantity * rates[currency][kind === "purchase" ? "buy" : "redeem"];
   if (!Number.isSafeInteger(amount) || amount > 1_000_000_000)
     throw new BadRequestException("Amount exceeds the wallet limit.");
+  if (kind === "purchase" && amount < MIN_PURCHASE_KOBO)
+    throw new BadRequestException(
+      `Minimum purchase is ₦${(MIN_PURCHASE_KOBO / 100).toLocaleString("en-NG")}.`,
+    );
   if (kind === "withdrawal" && amount < minimum)
     throw new BadRequestException("Withdrawal is below the configured minimum.");
   return amount;
