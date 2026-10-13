@@ -74,6 +74,18 @@ const reachCombinedStep = (result: { current: ReturnType<typeof useSignupWizardP
 
 describe("useSignupWizardPresenter", () => {
   beforeEach(() => {
+    get.mockReset().mockImplementation(async (path) =>
+      path === "/profile/options"
+        ? { kinks: ["Bondage"], lookingFor: ["Friendship"] }
+        : {
+            interests: [],
+            lookingFor: [],
+            limits: null,
+            avatarUrl: null,
+            coverUrl: null,
+            roles: [],
+          },
+    );
     patch.mockReset().mockResolvedValue({ avatarUrl: "a", coverUrl: "c" });
     post.mockReset().mockResolvedValue({});
     push.mockReset();
@@ -121,6 +133,21 @@ describe("useSignupWizardPresenter", () => {
       expect.objectContaining({ country, state, city }),
     );
     expect(result.current.stage).toBe("email");
+  });
+
+  it("submits the selected sexuality with the profile details", async () => {
+    const { result } = renderHook(() => useSignupWizardPresenter());
+    reachCombinedStep(result);
+    fillAccount(result);
+    fillAbout(result);
+    act(() =>
+      result.current.aboutStep.set({ ...result.current.aboutStep.draft, orientation: "Bisexual" }),
+    );
+    await act(() => result.current.submitCombinedStep());
+    expect(post).toHaveBeenCalledWith(
+      "/auth-ext/sign-up",
+      expect.objectContaining({ orientation: "Bisexual" }),
+    );
   });
 
   it("blocks step 1 until country + both confirmations are set", () => {
@@ -255,7 +282,7 @@ describe("useSignupWizardPresenter", () => {
       verifyCode.mockReset().mockResolvedValue({ verified: true, attemptsLeft: null });
     });
 
-    it("advances directly to profile only after email verification, without SMS", async () => {
+    it("advances to preferences only after email verification, without SMS", async () => {
       const { result } = renderHook(() => useSignupWizardPresenter());
       reachCombinedStep(result);
       fillAccount(result);
@@ -267,7 +294,7 @@ describe("useSignupWizardPresenter", () => {
       act(() => result.current.verifyStep.email.setCode("123456"));
       await act(() => result.current.verifyStep.email.verify());
       act(() => result.current.verifyStep.nextStep());
-      expect(result.current.stage).toBe("profile");
+      expect(result.current.stage).toBe("preferences");
       expect(result.current.step).toBe(4);
       expect(sendCode).not.toHaveBeenCalledWith("phone");
       expect(verifyCode).toHaveBeenCalledWith(
@@ -275,6 +302,43 @@ describe("useSignupWizardPresenter", () => {
         "11111111-1111-4111-8111-111111111111",
         "123456",
       );
+    });
+  });
+
+  describe("preferences step", () => {
+    it("edits and saves preferences before advancing to step 5", async () => {
+      const { result } = renderHook(() => useSignupWizardPresenter("preferences"));
+      await waitFor(() => expect(result.current.preferencesStep.canContinue).toBe(true));
+      act(() => result.current.preferencesStep.rows[0].onClick());
+      act(() =>
+        result.current.preferencesStep.editor?.onDraft({ kind: "multi", value: ["Bondage"] }),
+      );
+      act(() => result.current.preferencesStep.editor?.onSave());
+      expect(result.current.preferencesStep.rows[0].subtitle).toBe("Bondage");
+      await act(() => result.current.preferencesStep.submit());
+      expect(patch).toHaveBeenCalledWith("/profile", {
+        interests: ["Bondage"],
+        lookingFor: [],
+        limits: null,
+      });
+      expect(result.current.stage).toBe("profile");
+      expect(result.current.step).toBe(5);
+    });
+    it("keeps the step and draft when the server refuses the save", async () => {
+      patch.mockRejectedValueOnce(new Error("Save failed"));
+      const { result } = renderHook(() => useSignupWizardPresenter("preferences"));
+      await waitFor(() => expect(result.current.preferencesStep.canContinue).toBe(true));
+      await act(() => result.current.preferencesStep.submit());
+      expect(result.current.stage).toBe("preferences");
+      expect(result.current.preferencesStep.error).toBe("Save failed");
+    });
+    it("reports option loading errors and allows retry", async () => {
+      get.mockRejectedValueOnce(new Error("Load failed"));
+      const { result } = renderHook(() => useSignupWizardPresenter("preferences"));
+      await waitFor(() => expect(result.current.preferencesStep.error).toBe("Load failed"));
+      expect(result.current.preferencesStep.canContinue).toBe(false);
+      act(() => result.current.preferencesStep.retry());
+      await waitFor(() => expect(result.current.preferencesStep.canContinue).toBe(true));
     });
   });
 

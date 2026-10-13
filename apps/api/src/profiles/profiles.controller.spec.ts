@@ -31,6 +31,12 @@ describe("ProfilesController", () => {
     );
   });
 
+  it("makes preference options accessible before profile photos are uploaded", () => {
+    expect(
+      Reflect.getMetadata("kinkord:allowDuringSignUp", ProfilesController.prototype.options),
+    ).toBe(true);
+  });
+
   it("serves the option lists the pickers render", () => {
     const options = new ProfilesController(serviceMock()).options();
     expect(options.genders).toEqual(["Male", "Female"]);

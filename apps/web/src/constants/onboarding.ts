@@ -81,9 +81,9 @@ export const KINK_ROLES = [
 export const SIGNUP_STEP_LABELS = [
   "Country",
   "Account",
-  "Verification",
+  "Email verification",
+  "Preferences",
   "Profile",
-  "Welcome",
 ] as const;
 
 /** How the Send OTP message names each field that needs fixing. */
@@ -110,3 +110,20 @@ export function signupFixFieldsMessage(fields: SignupField[], regionName = "stat
     names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0];
   return `Check your ${list} above.`;
 }
+
+export const SEXUALITY_FIELD = {
+  label: "Sexuality (optional)",
+  placeholder: "Select your sexuality",
+  helper: "You can leave this blank or choose Prefer not to say.",
+  options: [
+    "Straight",
+    "Bisexual",
+    "Gay",
+    "Lesbian",
+    "Pansexual",
+    "Asexual",
+    "Queer",
+    "Questioning",
+    "Prefer not to say",
+  ],
+} as const;

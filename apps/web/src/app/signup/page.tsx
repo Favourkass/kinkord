@@ -4,7 +4,10 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AtSign, CheckCircle2, ChevronDown, Lock, Mail, MapPin, User, Users } from "lucide-react";
+import EditRowsCard from "@/components/profile/edit/EditRowsCard";
+import FieldEditorSheet from "@/components/profile/edit/FieldEditorSheet";
 import SignupShell from "@/components/auth/SignupShell";
+import SelectField from "@/components/auth/SelectField";
 import SearchSelectField from "@/components/auth/SearchSelectField";
 import CheckRow from "@/components/auth/CheckRow";
 import GoldCta from "@/components/auth/GoldCta";
@@ -44,7 +47,11 @@ function SignupWizard() {
   // The app sends a member who left sign-up half-done back to the step they owe.
   const resume = useSearchParams().get("resume");
   const p = useSignupWizardPresenter(
-    resume === "phone" || resume === "profile" ? "profile" : undefined,
+    resume === "phone"
+      ? "email"
+      : resume === "profile" || resume === "preferences"
+        ? resume
+        : undefined,
   );
   const [rolesOpen, setRolesOpen] = useState(false);
 
@@ -279,6 +286,14 @@ function SignupWizard() {
                 </p>
               )}
             </div>
+            <SelectField
+              label={p.aboutStep.sexuality.label}
+              options={p.aboutStep.sexuality.options}
+              placeholder={p.aboutStep.sexuality.placeholder}
+              helper={p.aboutStep.sexuality.helper}
+              value={p.aboutStep.draft.orientation ?? ""}
+              onChange={(orientation) => p.aboutStep.set({ ...p.aboutStep.draft, orientation })}
+            />
             {p.topError && <p className="text-[13px] text-red-400 lg:text-[15px]">{p.topError}</p>}
             <GoldCta
               label="Send OTP"
@@ -296,7 +311,7 @@ function SignupWizard() {
       {p.stage === "email" && (
         <SignupShell step={p.step} badge={`STEP ${p.step} OF 5`}>
           <section className="flex w-full max-w-[706px] flex-col items-center gap-5 text-center lg:gap-7">
-            <StageHeading plain="VERIFY YOUR" highlight="ACCOUNT" />
+            <StageHeading plain="VERIFY YOUR" highlight="EMAIL" />
             <div className="relative grid h-[92px] w-[84px] place-items-center rounded-t-[16px] rounded-b-[42px] border-[3px] border-kink-gold-bright bg-[#1a1400] lg:h-[130px] lg:w-[118px] lg:rounded-b-[56px]">
               <span className="grid h-[70px] w-[62px] place-items-center rounded-t-[10px] rounded-b-[32px] bg-[#2a2000] lg:h-[102px] lg:w-[90px] lg:rounded-b-[44px]">
                 <ShieldCheckIcon className="size-9 text-kink-gold-bright lg:size-12" />
@@ -366,6 +381,47 @@ function SignupWizard() {
               )}
             </section>
           </section>
+        </SignupShell>
+      )}
+
+      {p.stage === "preferences" && (
+        <SignupShell step={p.step} badge="STEP 4 OF 5">
+          <section className="flex w-full max-w-[706px] flex-col items-center gap-6">
+            <StageHeading plain="YOUR" highlight="PREFERENCES" />
+            <p className="text-center text-[13px] text-kink-help lg:text-[16px]">
+              Choose your kinks, what you’re looking for, and your limits. These are optional and
+              can be changed in Edit Profile.
+            </p>
+            {p.preferencesStep.loading ? (
+              <p className="text-kink-help">Loading preferences…</p>
+            ) : (
+              <EditRowsCard rows={p.preferencesStep.rows} />
+            )}
+            {p.preferencesStep.error && (
+              <div className="text-center">
+                <p role="alert" className="text-[13px] text-red-400">
+                  {p.preferencesStep.error}
+                </p>
+                {!p.preferencesStep.canContinue && (
+                  <button
+                    type="button"
+                    onClick={p.preferencesStep.retry}
+                    className="mt-2 text-kink-gold-bright underline"
+                  >
+                    Try again
+                  </button>
+                )}
+              </div>
+            )}
+            <GoldCta
+              label="Continue"
+              onClick={p.preferencesStep.submit}
+              loading={p.busy}
+              disabled={!p.preferencesStep.canContinue}
+              className="max-w-[564px]"
+            />
+          </section>
+          {p.preferencesStep.editor && <FieldEditorSheet {...p.preferencesStep.editor} />}
         </SignupShell>
       )}
 

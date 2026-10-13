@@ -17,6 +17,7 @@ export interface AboutDraft {
   dobMonth: number | null;
   dobYear: number | null;
   gender: "male" | "female" | null;
+  orientation?: string | null;
 }
 
 export const USERNAME_RE = /^[a-z0-9_]{3,30}$/;

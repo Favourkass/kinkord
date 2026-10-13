@@ -29,16 +29,31 @@ import {
   signupLocationErrorMessage,
 } from "@/services/signupLocation.service";
 import { Routes } from "@/constants/Routes";
+import type { EditorDraft, ProfileOptionsPM } from "@/domain/profile";
+import {
+  loadSignupPreferences,
+  saveSignupPreferences,
+  applySignupPreference,
+  signupPreferenceRows,
+  signupPreferenceDraft,
+  signupPreferenceEditor,
+  EMPTY_SIGNUP_PREFERENCES,
+  type SignupPreferences,
+  type SignupPreferenceKey,
+} from "@/services/signupPreferences.service";
+import { SEXUALITY_FIELD } from "@/constants/onboarding";
 import { PHOTO_CONFIRMATION_COPY } from "@/constants/photoConfirmation";
 import { useVerification } from "./useVerification";
 
-export type WizardStage = "country" | "account" | "about" | "email" | "profile" | "welcome";
+export type WizardStage =
+  "country" | "account" | "about" | "email" | "preferences" | "profile" | "welcome";
 const STAGE_STEP: Record<WizardStage, number> = {
   country: 1,
   account: 2,
   about: 2,
   email: 3,
-  profile: 4,
+  preferences: 4,
+  profile: 5,
   welcome: 5,
 };
 
@@ -77,6 +92,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
     dobMonth: null,
     dobYear: null,
     gender: null,
+    orientation: null,
   });
   const [aboutErrors, setAboutErrors] = useState<ReturnType<typeof validateAbout>>({});
   const selectCountry = useCallback((value: string) => {
@@ -89,7 +105,86 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
   // attempt, so the screen scrolls again even when it's the same field.
   const [firstInvalid, setFirstInvalid] = useState<{ field: SignupField } | null>(null);
 
-  // step 4
+  // Step 4: preferences are saved separately from the final photo step.
+  const [preferences, setPreferences] = useState<SignupPreferences>(EMPTY_SIGNUP_PREFERENCES);
+  const [preferenceOptions, setPreferenceOptions] = useState<ProfileOptionsPM | null>(null);
+  const [preferencesLoading, setPreferencesLoading] = useState(true);
+  const [preferencesError, setPreferencesError] = useState<string | null>(null);
+  const [preferenceRetry, setPreferenceRetry] = useState(0);
+  const [preferenceEdit, setPreferenceEdit] = useState<{
+    key: SignupPreferenceKey;
+    draft: EditorDraft;
+    error: string | null;
+  } | null>(null);
+  useEffect(() => {
+    if (stage !== "preferences") return;
+    let live = true;
+    void loadSignupPreferences()
+      .then(
+        (loaded) => {
+          if (!live) return;
+          setPreferences(loaded.preferences);
+          setPreferenceOptions(loaded.options);
+          setPreferencesError(null);
+        },
+        (error: unknown) => {
+          if (live)
+            setPreferencesError(
+              error instanceof Error ? error.message : "Could not load preferences. Try again.",
+            );
+        },
+      )
+      .finally(() => {
+        if (live) setPreferencesLoading(false);
+      });
+    return () => {
+      live = false;
+    };
+  }, [stage, preferenceRetry]);
+
+  const openPreference = useCallback(
+    (key: SignupPreferenceKey) => {
+      if (!preferenceOptions || preferencesLoading) return;
+      setPreferenceEdit({ key, draft: signupPreferenceDraft(key, preferences), error: null });
+    },
+    [preferenceOptions, preferencesLoading, preferences],
+  );
+  const applyPreference = useCallback(() => {
+    if (!preferenceEdit || !preferenceOptions) return;
+    try {
+      setPreferences(
+        applySignupPreference(
+          preferenceEdit.key,
+          preferenceEdit.draft,
+          preferences,
+          preferenceOptions,
+        ),
+      );
+      setPreferenceEdit(null);
+    } catch (error) {
+      setPreferenceEdit({
+        ...preferenceEdit,
+        error: error instanceof Error ? error.message : "Could not save your selection.",
+      });
+    }
+  }, [preferenceEdit, preferenceOptions, preferences]);
+  const completePreferences = useCallback(async () => {
+    if (!preferenceOptions || preferencesLoading || busy) return;
+    setBusy(true);
+    setPreferencesError(null);
+    try {
+      await saveSignupPreferences(preferences, preferenceOptions);
+      setStage("profile");
+    } catch (error) {
+      setPreferencesError(
+        error instanceof Error ? error.message : "Could not save preferences. Try again.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }, [preferenceOptions, preferencesLoading, preferences, busy]);
+
+  // step 5
   const [roles, setRoles] = useState<string[]>([]);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
@@ -137,6 +232,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
         city: about.city.trim() || null,
         dateOfBirth: dobToIso(about),
         gender: about.gender,
+        orientation: about.orientation ?? null,
       });
       setStage("email");
     } catch (e) {
@@ -157,7 +253,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
   }, [stage, emailSendCode]);
 
   const nextVerificationStep = useCallback(() => {
-    if (emailCode.verified) setStage("profile");
+    if (emailCode.verified) setStage("preferences");
   }, [emailCode.verified]);
 
   // Resume saved photos and roles without overwriting them.
@@ -271,6 +367,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
         set: setAbout,
         errors: aboutErrors,
         location: signupLocationFields(country, about.state),
+        sexuality: SEXUALITY_FIELD,
       },
       firstInvalid,
       submitCombinedStep,
@@ -278,6 +375,44 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
       verifyStep: {
         email: emailCode,
         nextStep: nextVerificationStep,
+      },
+      preferencesStep: {
+        rows: signupPreferenceRows(preferences, openPreference),
+        loading: preferencesLoading,
+        error: preferencesError,
+        canContinue: !preferencesLoading && preferenceOptions !== null && !busy,
+        retry: () => {
+          setPreferencesLoading(true);
+          setPreferencesError(null);
+          setPreferenceRetry((v) => v + 1);
+        },
+        submit: completePreferences,
+        editor:
+          preferenceEdit && preferenceOptions
+            ? {
+                ...signupPreferenceEditor(preferenceEdit.key, preferenceOptions),
+                lockMessage: null,
+                draft: preferenceEdit.draft,
+                onDraft: (draft: EditorDraft) =>
+                  setPreferenceEdit({ ...preferenceEdit, draft, error: null }),
+                error: preferenceEdit.error,
+                saving: false,
+                canSave: true,
+                labels: {
+                  save: "Save selection",
+                  cancel: "Cancel",
+                  saving: "Saving…",
+                  close: "Close",
+                  search: "Search options",
+                  selected:
+                    preferenceEdit.draft.kind === "multi"
+                      ? `${preferenceEdit.draft.value.length} selected`
+                      : null,
+                },
+                onSave: applyPreference,
+                onCancel: () => setPreferenceEdit(null),
+              }
+            : null,
       },
       profileStep: {
         roles,
@@ -320,6 +455,14 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
       firstInvalid,
       submitCombinedStep,
       backToCountry,
+      preferences,
+      preferenceOptions,
+      preferencesLoading,
+      preferencesError,
+      preferenceEdit,
+      openPreference,
+      applyPreference,
+      completePreferences,
       nextVerificationStep,
       emailCode,
       roles,

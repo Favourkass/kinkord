@@ -17,6 +17,7 @@ const fields = {
   city: "Sapele",
   dateOfBirth: "1999-08-04",
   gender: "male",
+  orientation: "Bisexual",
   phone: "+2348031234567",
 };
 

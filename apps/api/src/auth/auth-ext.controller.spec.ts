@@ -161,6 +161,29 @@ describe("AuthExtController", () => {
     );
   });
 
+  it.each(["Straight", "Bisexual", "Prefer not to say", null])(
+    "stores optional sexuality %s on signup",
+    async (orientation) => {
+      const { controller, signUpWithProfile } = makeController();
+      await controller.signUpCombined(req, makeRes(), { ...validSignUp, orientation });
+      expect(signUpWithProfile).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ orientation }),
+        expect.any(Headers),
+      );
+    },
+  );
+
+  it("does not require sexuality when omitted", async () => {
+    const { controller, signUpWithProfile } = makeController();
+    await controller.signUpCombined(req, makeRes(), validSignUp);
+    expect(signUpWithProfile).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ orientation: null }),
+      expect.any(Headers),
+    );
+  });
+
   it("rejects a sign-up whose date of birth is under 18", async () => {
     const { controller, signUpWithProfile } = makeController();
     const underage = new Date().toISOString().slice(0, 10);

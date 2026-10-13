@@ -48,6 +48,7 @@ const signUpSchema = z.object({
     .refine((s) => new Date(s) <= eighteenYearsAgo(), "You must be 18 or older to join")
     .nullish(),
   gender: z.string().trim().min(1).max(20).nullish(),
+  orientation: z.string().trim().min(1).max(40).nullish(),
   // Optional at signup; validate any supplied number using the Settings rule.
   phone: z
     .string()
@@ -106,6 +107,7 @@ export class AuthExtController {
         city: about.city ?? null,
         dateOfBirth: about.dateOfBirth ?? null,
         gender: about.gender ?? null,
+        orientation: about.orientation ?? null,
         phone: about.phone ?? null,
       },
       fromNodeHeaders(req.headers),
