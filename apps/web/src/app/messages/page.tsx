@@ -46,6 +46,8 @@ export default function MessagesPage() {
         emptyTitle={list.emptyTitle}
         emptyBody={list.emptyBody}
         onlineLabel={CHAT_COPY.online}
+        organizationLabel={CHAT_COPY.organization}
+        verifiedOrganizationLabel={CHAT_COPY.verifiedOrganization}
         query={list.query}
         onQuery={list.setQuery}
         searchMaxLength={INBOX_SEARCH_MAX}
