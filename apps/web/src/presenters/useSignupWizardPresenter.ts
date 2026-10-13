@@ -43,7 +43,7 @@ import {
   type SignupPreferences,
   type SignupPreferenceKey,
 } from "@/services/signupPreferences.service";
-import { KINK_ROLES, SEXUALITY_FIELD } from "@/constants/onboarding";
+import { DEFAULT_SIGNUP_COUNTRY, KINK_ROLES, SEXUALITY_FIELD } from "@/constants/onboarding";
 import { PHOTO_CONFIRMATION_COPY } from "@/constants/photoConfirmation";
 import { useVerification } from "./useVerification";
 
@@ -73,7 +73,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
   const [topError, setTopError] = useState<string | null>(null);
 
   // step 1
-  const [country, setCountry] = useState<string | null>(signupCountryOptions()[0].value);
+  const [country, setCountry] = useState<string | null>(DEFAULT_SIGNUP_COUNTRY);
   const [ageAttested, setAgeAttested] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [stepOneTouched, setStepOneTouched] = useState(false);

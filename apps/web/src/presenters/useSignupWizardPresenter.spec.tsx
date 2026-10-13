@@ -99,21 +99,21 @@ describe("useSignupWizardPresenter", () => {
     verifyCode.mockReset().mockResolvedValue({ verified: true, attemptsLeft: null });
   });
 
-  it("defaults to Kenya and clears locations when the country changes", () => {
+  it("defaults to Nigeria and clears locations when the country changes", () => {
     const { result } = renderHook(() => useSignupWizardPresenter());
-    expect(result.current.stepOne.country).toBe("KE");
-    expect(result.current.aboutStep.location.states).toHaveLength(47);
+    expect(result.current.stepOne.country).toBe("NG");
+    expect(result.current.aboutStep.location.states).toHaveLength(37);
     act(() =>
       result.current.aboutStep.set({
         ...result.current.aboutStep.draft,
-        state: "Nairobi",
-        city: "Westlands",
+        state: "Lagos",
+        city: "Ikeja",
       }),
     );
-    act(() => result.current.stepOne.setCountry("NG"));
+    act(() => result.current.stepOne.setCountry("KE"));
     expect(result.current.aboutStep.draft.state).toBe("");
     expect(result.current.aboutStep.draft.city).toBe("");
-    expect(result.current.aboutStep.location.states).toHaveLength(37);
+    expect(result.current.aboutStep.location.states).toHaveLength(47);
     act(() => result.current.stepOne.setCountry("NG"));
     expect(result.current.aboutStep.location.states).toHaveLength(37);
   });

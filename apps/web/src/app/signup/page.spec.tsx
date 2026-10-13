@@ -52,7 +52,7 @@ it("renders account signup without phone entry or phone instructions", () => {
   render(<SignupPage />);
   expect(screen.getByLabelText("Email address")).toBeTruthy();
   expect(screen.getByLabelText("Username")).toBeTruthy();
-  expect(screen.getByLabelText("County")).toBeTruthy();
+  expect(screen.getByLabelText("State")).toBeTruthy();
   const sexuality = screen.getByLabelText("Sexuality");
   expect(screen.getByRole("option", { name: "Straight" })).toBeTruthy();
   expect(screen.getByRole("option", { name: "Bisexual" })).toBeTruthy();
@@ -60,8 +60,8 @@ it("renders account signup without phone entry or phone instructions", () => {
   expect(screen.queryByRole("option", { name: "Prefer not to say" })).toBeNull();
   fireEvent.change(sexuality, { target: { value: "Bisexual" } });
   expect((sexuality as HTMLSelectElement).value).toBe("Bisexual");
-  expect(screen.getByText("Select your county")).toBeTruthy();
-  expect(screen.queryByText("Select your state")).toBeNull();
+  expect(screen.getByText("Select your state")).toBeTruthy();
+  expect(screen.queryByText("Select your county")).toBeNull();
   expect(screen.queryByText(/phone number/i)).toBeNull();
   expect(screen.queryByText(/one number can only/i)).toBeNull();
   expect(document.querySelector('input[type="tel"]')).toBeNull();
@@ -110,20 +110,20 @@ it("offers photo skipping and a searchable scrolling role list", async () => {
   expect(screen.queryByRole("button", { name: "Bottom" })).toBeNull();
 });
 
-it("searches towns inside a county and allows an unlisted place", () => {
+it("searches towns inside a state and allows an unlisted place", () => {
   render(<SignupPage />);
   expect((screen.getByLabelText("Region / City / Town") as HTMLButtonElement).disabled).toBe(true);
-  fireEvent.click(screen.getByLabelText("County"));
-  fireEvent.change(screen.getByRole("combobox", { name: "Search counties" }), {
-    target: { value: "Nairobi" },
+  fireEvent.click(screen.getByLabelText("State"));
+  fireEvent.change(screen.getByRole("combobox", { name: "Search states" }), {
+    target: { value: "Lagos" },
   });
-  fireEvent.click(screen.getByRole("option", { name: "Nairobi" }));
+  fireEvent.click(screen.getByRole("option", { name: "Lagos" }));
   fireEvent.click(screen.getByLabelText("Region / City / Town"));
   fireEvent.change(screen.getByRole("combobox", { name: "Search regions / cities / towns" }), {
-    target: { value: "Westlands" },
+    target: { value: "Ikeja" },
   });
-  fireEvent.click(screen.getByRole("option", { name: "Westlands" }));
-  expect(screen.getByLabelText("Region / City / Town").textContent).toContain("Westlands");
+  fireEvent.click(screen.getByRole("option", { name: "Ikeja" }));
+  expect(screen.getByLabelText("Region / City / Town").textContent).toContain("Ikeja");
   fireEvent.click(screen.getByLabelText("Region / City / Town"));
   fireEvent.change(screen.getByRole("combobox", { name: "Search regions / cities / towns" }), {
     target: { value: "Other region" },
