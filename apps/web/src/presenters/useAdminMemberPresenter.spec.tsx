@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
-import type { AdminMemberDetailPM } from "@/domain/moderation";
+import { Routes } from "@/constants/Routes";
+import { clockTime, type AdminMemberDetailPM } from "@/domain/moderation";
+import { ApiError } from "@/services/apiClient";
 import { useAdminMemberPresenter } from "./useAdminMemberPresenter";
 
 // One object for the whole file: a fresh router each render would re-run effects.
@@ -64,6 +66,14 @@ const detail: AdminMemberDetailPM = {
   rules: [],
 };
 
+const state = (status: string, over: Record<string, unknown> = {}) => ({
+  status,
+  attemptsUsed: 0,
+  own: false,
+  protected: false,
+  ...over,
+});
+
 async function ready() {
   const hook = renderHook(() => useAdminMemberPresenter("u9"));
   await waitFor(() => expect(hook.result.current.vm).not.toBeNull());
@@ -79,7 +89,7 @@ describe("useAdminMemberPresenter", () => {
     svc.block.mockResolvedValue({ blocked: "u9", postsRemoved: 1 });
     svc.deleteMember.mockResolvedValue({ deleted: "u9" });
     svc.deletePost.mockResolvedValue({ deleted: "p1" });
-    svc.memberVerification.mockResolvedValue({ status: "verified", attemptsUsed: 0 });
+    svc.memberVerification.mockResolvedValue(state("verified"));
     svc.stepUpVerification.mockResolvedValue({ verifiedUntil: "2026-10-12T12:10:00Z" });
     svc.revokeVerification.mockResolvedValue({ status: "revoked" });
   });
@@ -142,15 +152,19 @@ describe("useAdminMemberPresenter", () => {
       status: "Verified",
       revoke: true,
       reopen: false,
+      locked: null,
     });
 
     act(() => result.current.onRevokeVerification());
     expect(result.current.dialog?.destructive).toBe(true);
     expect(result.current.dialog?.canConfirm).toBe(false);
-    act(() => result.current.dialog?.input?.set("123456"));
+    // The code comes after the reason, and keeps every digit of a pasted "123 456".
+    expect(result.current.dialog?.input).toBeUndefined();
     act(() => result.current.dialog?.reason?.set("Confirmed document fraud."));
+    act(() => result.current.dialog?.code?.set("123 456"));
+    expect(result.current.dialog?.code?.value).toBe("123456");
     expect(result.current.dialog?.canConfirm).toBe(true);
-    svc.memberVerification.mockResolvedValue({ status: "revoked", attemptsUsed: 0 });
+    svc.memberVerification.mockResolvedValue(state("revoked"));
     await act(async () => result.current.dialog?.confirm());
 
     expect(svc.stepUpVerification).toHaveBeenCalledWith("123456");
@@ -159,17 +173,113 @@ describe("useAdminMemberPresenter", () => {
     await waitFor(() => expect(result.current.verification?.reopen).toBe(true));
   });
 
-  it("shows an expired badge as outdated rather than verified", async () => {
-    svc.memberVerification.mockResolvedValue({ status: "outdated", attemptsUsed: 1 });
-    const { result } = await ready();
+  it("shows an expired badge as outdated, and a used-up one as out of attempts", async () => {
+    svc.memberVerification.mockResolvedValue(state("outdated", { attemptsUsed: 1 }));
+    const { result, unmount } = await ready();
     await waitFor(() => expect(result.current.verification).not.toBeNull());
     expect(result.current.verification?.status).toBe("Verification lapsed after a profile change");
+    unmount();
+
+    svc.memberVerification.mockResolvedValue(state("rejected", { attemptsUsed: 3 }));
+    const next = await ready();
+    await waitFor(() => expect(next.result.current.verification).not.toBeNull());
+    expect(next.result.current.verification).toMatchObject({
+      status: "Out of attempts",
+      attempts: "3 of 3 attempts used",
+      reopen: true,
+    });
   });
 
-  it("still shows the member when their verification can't be read", async () => {
+  it("still shows the member when their verification can't be read, and says so", async () => {
     svc.memberVerification.mockRejectedValue(new Error("boom"));
     const { result } = await ready();
     expect(result.current.vm?.id).toBe("u9");
+    await waitFor(() =>
+      expect(result.current.verificationError).toBe(
+        "Couldn't load their identity verification. Refresh to try again.",
+      ),
+    );
     expect(result.current.verification).toBeNull();
+  });
+
+  it("offers no verification actions on your own page or a protected admin's", async () => {
+    svc.memberVerification.mockResolvedValue(state("rejected", { own: true }));
+    const { result, unmount } = await ready();
+    await waitFor(() => expect(result.current.verification).not.toBeNull());
+    expect(result.current.verification).toMatchObject({
+      revoke: false,
+      reopen: false,
+      locked: "You can't act on your own verification.",
+    });
+    unmount();
+
+    svc.memberVerification.mockResolvedValue(state("verified", { protected: true }));
+    const next = await ready();
+    await waitFor(() => expect(next.result.current.verification).not.toBeNull());
+    expect(next.result.current.verification).toMatchObject({
+      revoke: false,
+      reopen: false,
+      locked: "Only a founder can decide an admin's verification.",
+    });
+  });
+
+  it("reloads the page after a conflict, and won't resend an action no longer on offer", async () => {
+    svc.reopenVerification.mockRejectedValue(
+      new ApiError(409, { message: "Only a rejected or revoked verification can be reopened." }),
+    );
+    svc.memberVerification.mockResolvedValue(state("rejected", { attemptsUsed: 3 }));
+    const { result } = await ready();
+    await waitFor(() => expect(result.current.verification?.reopen).toBe(true));
+
+    act(() => result.current.onReopenVerification());
+    act(() => result.current.dialog?.reason?.set("Support approved a retry."));
+    act(() => result.current.dialog?.code?.set("123456"));
+    // Another admin already reopened it.
+    svc.memberVerification.mockResolvedValue(state("not_started"));
+    await act(async () => result.current.dialog?.confirm());
+
+    expect(result.current.dialog?.error).toBe(
+      "Only a rejected or revoked verification can be reopened.",
+    );
+    await waitFor(() => expect(svc.member).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(result.current.verification?.status).toBe("Not verified"));
+    expect(svc.memberVerification).toHaveBeenCalledTimes(2);
+    act(() => result.current.dialog?.code?.set("654321"));
+    expect(result.current.dialog?.canConfirm).toBe(false);
+  });
+
+  it("shows the API's message for a wrong or locked code, and links to Security when 2FA is off", async () => {
+    const { result } = await ready();
+    await waitFor(() => expect(result.current.verification).not.toBeNull());
+    const attempt = async (error: ApiError) => {
+      svc.stepUpVerification.mockRejectedValueOnce(error);
+      act(() => result.current.onRevokeVerification());
+      act(() => result.current.dialog?.reason?.set("Confirmed document fraud."));
+      act(() => result.current.dialog?.code?.set("123456"));
+      await act(async () => result.current.dialog?.confirm());
+    };
+
+    await attempt(new ApiError(403, { message: "That code isn't right.", code: "INVALID_CODE" }));
+    expect(result.current.dialog?.error).toBe("That code isn't right.");
+    expect(result.current.dialog?.code?.value).toBe("");
+    expect(result.current.dialog?.errorLink).toBeNull();
+
+    const retryAt = "2026-10-13T10:15:00Z";
+    await attempt(
+      new ApiError(429, { message: "Too many wrong codes.", code: "STEP_UP_LOCKED", retryAt }),
+    );
+    expect(result.current.dialog?.error).toBe(
+      `Too many wrong codes. You can try again at ${clockTime(retryAt)}.`,
+    );
+
+    await attempt(new ApiError(403, { message: "Turn on 2FA first.", code: "TWO_FACTOR_OFF" }));
+    expect(result.current.dialog?.error).toBe("Turn on 2FA first.");
+    expect(result.current.dialog?.errorLink).toEqual({
+      label: "Turn on two-factor in Security settings",
+      href: Routes.settingsSecurity,
+    });
+    expect(svc.revokeVerification).not.toHaveBeenCalled();
+    // Only a conflict re-reads the page.
+    expect(svc.member).toHaveBeenCalledOnce();
   });
 });

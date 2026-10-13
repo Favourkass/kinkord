@@ -27,6 +27,7 @@ export default function ModerationMemberPage() {
       <MemberDetailView
         vm={p.vm}
         verification={p.verification}
+        verificationError={p.verificationError}
         loading={p.loading}
         error={p.error}
         notice={p.notice}

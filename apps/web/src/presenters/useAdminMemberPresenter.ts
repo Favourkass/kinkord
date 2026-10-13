@@ -6,10 +6,16 @@ import { MODERATION_COPY } from "@/constants/moderation";
 import { Routes } from "@/constants/Routes";
 import {
   adminVerificationActions,
+  canChangeVerification,
+  stepUpMessage,
+  stepUpRefusal,
   toAdminMemberDetailVM,
+  toAdminMemberVerificationVM,
+  twoFactorCodeInput,
   type AdminMemberDetailPM,
   type AdminVerificationStatePM,
 } from "@/domain/moderation";
+import { ApiError } from "@/services/apiClient";
 import { moderationService } from "@/services/moderation.service";
 import { useAdminAccessPresenter } from "./useAdminAccessPresenter";
 
@@ -22,6 +28,12 @@ export type AdminDialogKind =
   | "revokeVerification"
   | "reopenVerification";
 
+export interface AdminDialogField {
+  label: string;
+  value: string;
+  set: (v: string) => void;
+}
+
 export interface AdminDialogVM {
   title: string;
   body: string;
@@ -29,16 +41,31 @@ export interface AdminDialogVM {
   cancelLabel: string;
   destructive: boolean;
   /** A short required line above the reason, e.g. an evidence reference. */
-  input?: { label: string; value: string; set: (v: string) => void } | null;
-  reason: { label: string; value: string; set: (v: string) => void } | null;
+  input?: AdminDialogField | null;
+  reason: AdminDialogField | null;
+  /** A current authenticator code, asked for after the reason. */
+  code?: AdminDialogField | null;
   checkbox: { label: string; checked: boolean; toggle: () => void } | null;
-  typeToConfirm: { label: string; value: string; set: (v: string) => void } | null;
+  typeToConfirm: AdminDialogField | null;
   canConfirm: boolean;
   busy: boolean;
   error: string | null;
+  /** Where to put right what the error says, e.g. Security settings when 2FA is off. */
+  errorLink?: { label: string; href: string } | null;
   confirm: () => void;
   cancel: () => void;
 }
+
+const STEP_UP_LABELS = {
+  expired: MODERATION_COPY.verification.stepUp.expired,
+  retryAt: MODERATION_COPY.verification.stepUp.retryAt,
+};
+const VERIFICATION_LABELS = {
+  statuses: MODERATION_COPY.member.verificationStatuses,
+  attemptsUsed: MODERATION_COPY.member.attemptsUsed,
+  own: MODERATION_COPY.verification.own,
+  protected: MODERATION_COPY.verification.protected,
+};
 
 function messageOf(e: unknown): string {
   return e instanceof Error ? e.message : "Something went wrong. Try again.";
@@ -50,6 +77,7 @@ export function useAdminMemberPresenter(id: string) {
   const copy = MODERATION_COPY;
   const [member, setMember] = useState<AdminMemberDetailPM | null>(null);
   const [verification, setVerification] = useState<AdminVerificationStatePM | null>(null);
+  const [verificationError, setVerificationError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -61,6 +89,7 @@ export function useAdminMemberPresenter(id: string) {
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
+  const [twoFactorOff, setTwoFactorOff] = useState(false);
 
   // Bumped after every action so the page re-reads what the server now holds.
   const [version, setVersion] = useState(0);
@@ -78,10 +107,18 @@ export function useAdminMemberPresenter(id: string) {
         if (live) setLoadError(messageOf(e));
       },
     );
-    // Secondary: the page still works if this one read fails.
+    // Read on its own: the rest of the page works without it, and says when it failed.
     moderationService.memberVerification(id).then(
-      (v) => live && setVerification(v),
-      () => live && setVerification(null),
+      (v) => {
+        if (!live) return;
+        setVerification(v);
+        setVerificationError(null);
+      },
+      () => {
+        if (!live) return;
+        setVerification(null);
+        setVerificationError(MODERATION_COPY.member.verificationError);
+      },
     );
     return () => {
       live = false;
@@ -100,6 +137,7 @@ export function useAdminMemberPresenter(id: string) {
     setChecked(kind === "deleteAccount");
     setTyped("");
     setDialogError(null);
+    setTwoFactorOff(false);
     setNotice(null);
   }, []);
 
@@ -111,6 +149,7 @@ export function useAdminMemberPresenter(id: string) {
     if (!dialog) return;
     setBusy(true);
     setDialogError(null);
+    setTwoFactorOff(false);
     const why = reason.trim() || null;
     try {
       if (dialog === "block") {
@@ -141,7 +180,13 @@ export function useAdminMemberPresenter(id: string) {
       setDialog(null);
       setVersion((v) => v + 1);
     } catch (e) {
-      setDialogError(messageOf(e));
+      const refusal = e instanceof ApiError ? stepUpRefusal(e.status, e.body) : null;
+      setDialogError(refusal ? stepUpMessage(refusal, messageOf(e), STEP_UP_LABELS) : messageOf(e));
+      setTwoFactorOff(refusal?.kind === "twoFactorOff");
+      // A refused code can't be used again; leave the box ready for the next one.
+      if (refusal) setTwoFactorCode("");
+      // Their verification moved on since this page read it: show it as it is now.
+      if (e instanceof ApiError && e.status === 409) setVersion((v) => v + 1);
     } finally {
       setBusy(false);
     }
@@ -155,13 +200,16 @@ export function useAdminMemberPresenter(id: string) {
       dialog === "block" || dialog === "deleteAccount" || verificationAction
         ? { label: copy.dialogs.reasonLabel, value: reason, set: setReason }
         : null;
-    const input = verificationAction
+    const code = verificationAction
       ? {
           label: copy.dialogs.twoFactorCodeLabel,
           value: twoFactorCode,
-          set: (value: string) => setTwoFactorCode(value.replace(/\D/g, "").slice(0, 6)),
+          set: (value: string) => setTwoFactorCode(twoFactorCodeInput(value)),
         }
       : null;
+    // Still on offer as the page reads it now (a refusal reloads it).
+    const actions = adminVerificationActions(verification);
+    const offered = dialog === "revokeVerification" ? actions.revoke : actions.reopen;
     const checkbox =
       dialog === "block" || dialog === "deleteAccount"
         ? {
@@ -187,16 +235,20 @@ export function useAdminMemberPresenter(id: string) {
       confirmLabel: text.confirm,
       cancelLabel: copy.dialogs.cancel,
       destructive: dialog !== "unblock" && dialog !== "reopenVerification",
-      input,
       reason: reasonField,
+      code,
       checkbox,
       typeToConfirm,
       canConfirm:
         phraseOk &&
         !busy &&
-        (!verificationAction || (/^\d{6}$/.test(twoFactorCode) && reason.trim().length >= 10)),
+        (!verificationAction ||
+          (offered && canChangeVerification({ code: twoFactorCode, reason }))),
       busy,
       error: dialogError,
+      errorLink: twoFactorOff
+        ? { label: copy.verification.stepUp.securityLink, href: Routes.settingsSecurity }
+        : null,
       confirm: () => void confirm(),
       cancel,
     };
@@ -206,11 +258,14 @@ export function useAdminMemberPresenter(id: string) {
     checked,
     confirm,
     copy.dialogs,
+    copy.verification.stepUp.securityLink,
     dialog,
     dialogError,
     reason,
     twoFactorCode,
+    twoFactorOff,
     typed,
+    verification,
     vm,
   ]);
 
@@ -221,13 +276,9 @@ export function useAdminMemberPresenter(id: string) {
     error: loadError,
     vm,
     verification: verification
-      ? {
-          label: copy.member.verification,
-          status: copy.member.verificationStatuses[verification.status] ?? verification.status,
-          attempts: copy.member.attemptsUsed(verification.attemptsUsed),
-          ...adminVerificationActions(verification),
-        }
+      ? toAdminMemberVerificationVM(verification, VERIFICATION_LABELS)
       : null,
+    verificationError,
     notice,
     dialog: dialogVM,
     labels: {
@@ -236,6 +287,7 @@ export function useAdminMemberPresenter(id: string) {
       noPosts: copy.member.noPosts,
       rules: copy.member.rules,
       protectedAccount: copy.member.protected,
+      verification: copy.member.verification,
       actions: copy.member.actions,
     },
     backHref: Routes.moderation,
