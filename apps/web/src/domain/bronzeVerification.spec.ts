@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   canStartVerification,
+  failureReason,
   hasAttemptOpen,
   isSafeLaunchUrl,
+  missingBeforeStart,
+  needsSupportToVerify,
   photoSettling,
+  showsVerificationEntry,
   type BronzeVerificationPM,
 } from "./bronzeVerification";
 
@@ -20,6 +24,8 @@ const pm = (over: Partial<BronzeVerificationPM> = {}): BronzeVerificationPM => (
   policyUrl: "https://kinkord.com/privacy/verification",
   missing: [],
   photoReadyAt: null,
+  resumable: false,
+  lastFailure: null,
   ...over,
 });
 
@@ -51,6 +57,54 @@ describe("hasAttemptOpen", () => {
     expect(hasAttemptOpen(pm({ missing: ["gender"] }))).toBe(true);
     expect(hasAttemptOpen(pm({ status: "pending" }))).toBe(false);
     expect(hasAttemptOpen(pm({ status: "failed", attemptsRemaining: 0 }))).toBe(false);
+  });
+});
+
+describe("missingBeforeStart", () => {
+  it("lists what's missing only while a check could follow", () => {
+    const missing = ["profilePhoto"] as const;
+    for (const status of ["not_started", "failed", "outdated"] as const)
+      expect(missingBeforeStart(pm({ status, missing: [...missing] }))).toEqual(missing);
+  });
+
+  it("never tells a verified, checking, decided or closed member to change their profile", () => {
+    for (const status of ["verified", "pending", "manual_review", "rejected", "revoked"] as const)
+      expect(missingBeforeStart(pm({ status, missing: ["profilePhoto"] }))).toEqual([]);
+    expect(missingBeforeStart(pm({ available: false, missing: ["gender"] }))).toEqual([]);
+    expect(
+      missingBeforeStart(pm({ status: "failed", attemptsRemaining: 0, missing: ["gender"] })),
+    ).toEqual([]);
+  });
+});
+
+describe("failureReason", () => {
+  it("gives the reason only while the member stands failed or rejected", () => {
+    expect(failureReason(pm({ status: "failed", lastFailure: "birth_date" }))).toBe("birth_date");
+    expect(failureReason(pm({ status: "rejected", lastFailure: "registry" }))).toBe("registry");
+    expect(failureReason(pm({ status: "verified", lastFailure: "face" }))).toBeNull();
+    expect(failureReason(pm({ status: "failed" }))).toBeNull();
+  });
+});
+
+describe("needsSupportToVerify", () => {
+  it("is true once rejected, revoked or out of attempts", () => {
+    expect(needsSupportToVerify(pm({ status: "rejected" }))).toBe(true);
+    expect(needsSupportToVerify(pm({ status: "revoked" }))).toBe(true);
+    // Verified on the last attempt: withdrawing leaves none to try again with.
+    expect(needsSupportToVerify(pm({ status: "verified", attemptsRemaining: 0 }))).toBe(true);
+    expect(needsSupportToVerify(pm({ status: "verified" }))).toBe(false);
+    expect(needsSupportToVerify(pm({ status: "failed", attemptsRemaining: 1 }))).toBe(false);
+  });
+});
+
+describe("showsVerificationEntry", () => {
+  it("lists Verification while it's open, or while the member has something there", () => {
+    expect(showsVerificationEntry(pm())).toBe(true);
+    const off = pm({ available: false });
+    expect(showsVerificationEntry(off)).toBe(false);
+    expect(showsVerificationEntry({ ...off, withdrawable: true })).toBe(true);
+    for (const status of ["pending", "verified", "rejected", "revoked"] as const)
+      expect(showsVerificationEntry({ ...off, status })).toBe(true);
   });
 });
 

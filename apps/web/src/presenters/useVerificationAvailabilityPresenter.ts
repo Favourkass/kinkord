@@ -1,20 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { showsVerificationEntry } from "@/domain/bronzeVerification";
 import { bronzeVerificationApi } from "@/services/bronzeVerification.service";
 
-/** Keeps verification out of Settings until the API explicitly enables it. */
+/**
+ * Whether Settings lists Verification: while it's open to the member, and
+ * also while they have a status there or consent to withdraw, even when it's off.
+ */
 export function useVerificationAvailabilityPresenter() {
-  const [available, setAvailable] = useState(false);
+  const [state, setState] = useState<"checking" | "shown" | "hidden">("checking");
 
   useEffect(() => {
     let live = true;
     bronzeVerificationApi.status().then(
       (status) => {
-        if (live) setAvailable(status.available);
+        if (live) setState(showsVerificationEntry(status) ? "shown" : "hidden");
       },
       () => {
-        if (live) setAvailable(false);
+        if (live) setState("hidden");
       },
     );
     return () => {
@@ -22,5 +26,5 @@ export function useVerificationAvailabilityPresenter() {
     };
   }, []);
 
-  return { available };
+  return { checking: state === "checking", showEntry: state === "shown" };
 }

@@ -11,15 +11,17 @@ describe("bronzeVerificationApi", () => {
     post.mockReset().mockResolvedValue({});
   });
 
-  it("loads status, records versioned consent, starts and withdraws", async () => {
+  it("loads status, records versioned consent, starts, resumes and withdraws", async () => {
     await bronzeVerificationApi.status();
     await bronzeVerificationApi.consent("identity-v3");
     await bronzeVerificationApi.start();
+    await bronzeVerificationApi.resume();
     await bronzeVerificationApi.withdraw();
     expect(get).toHaveBeenCalledWith("/verification/bronze/status");
     expect(post.mock.calls).toEqual([
       ["/verification/bronze/consent", { accepted: true, policyVersion: "identity-v3" }],
       ["/verification/bronze/attempts", {}],
+      ["/verification/bronze/attempts/resume", {}],
       ["/verification/bronze/consent/withdraw", {}],
     ]);
   });

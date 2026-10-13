@@ -105,7 +105,7 @@ export default function SettingsPage() {
           Security &amp; 2FA
           <ChevronRightIcon className="text-[#b8850f]" />
         </Link>
-        {verification.available ? (
+        {verification.showEntry ? (
           <Link
             href={Routes.settingsVerification}
             className="mt-[12px] flex h-[52px] items-center justify-between rounded-[16px] bg-app-members px-[18px] text-[18px] font-medium text-app-name"
