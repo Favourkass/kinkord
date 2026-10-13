@@ -187,9 +187,33 @@ export class BronzeRepository {
     });
   }
 
-  /** Queue provider erasure before deleting a member and their attempts. */
+  /**
+   * Queue provider erasure before deleting a member and their attempts. It
+   * takes the verification lock and ends anything in flight first, so a start
+   * that's still between reserving and attaching can't attach its paid session
+   * after the list is taken; that start queues its own session for erasure.
+   */
   async queueErasuresForUser(userId: string): Promise<string[]> {
     return this.db.transaction(async (tx) => {
+      await tx.insert(bronzeVerification).values({ userId }).onConflictDoNothing();
+      await tx
+        .select({ userId: bronzeVerification.userId })
+        .from(bronzeVerification)
+        .where(eq(bronzeVerification.userId, userId))
+        .for("update");
+      await tx
+        .update(bronzeAttempt)
+        .set({ status: "failed", failureCodes: ["ACCOUNT_DELETED"], completedAt: new Date() })
+        .where(
+          and(
+            eq(bronzeAttempt.userId, userId),
+            inArray(bronzeAttempt.status, ["started", "processing"]),
+          ),
+        );
+      await tx
+        .update(bronzeVerification)
+        .set({ currentAttemptId: null })
+        .where(eq(bronzeVerification.userId, userId));
       const sessions = await this.diditSessions(tx, userId);
       if (sessions.length)
         await tx

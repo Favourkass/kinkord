@@ -185,6 +185,26 @@ describe("BronzeRepository", () => {
     });
   });
 
+  it("closes the door on a start still attaching before listing sessions to erase", async () => {
+    const { repo, calls, setOn, valuesOn } = queuedDb([
+      undefined,
+      [{ userId: "u1" }],
+      undefined,
+      undefined,
+      [{ jobId: "didit:session-1" }],
+      undefined,
+    ]);
+    await expect(repo.queueErasuresForUser("u1")).resolves.toEqual(["session-1"]);
+    const locked = calls.findIndex((c) => c.op === "for");
+    const listed = calls.findIndex(
+      (c, i) => i > locked && c.op === "from" && c.args[0] === bronzeAttempt,
+    );
+    expect(locked).toBeGreaterThan(-1);
+    expect(listed).toBeGreaterThan(locked);
+    expect(setOn(bronzeVerification)).toEqual({ currentAttemptId: null });
+    expect(valuesOn(verificationErasure)).toEqual([{ providerSessionId: "session-1" }]);
+  });
+
   describe("identity holds", () => {
     it("keeps a revoked member's fingerprints apart from their account", async () => {
       const { repo, valuesOn } = queuedDb([

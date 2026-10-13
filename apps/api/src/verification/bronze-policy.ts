@@ -60,6 +60,9 @@ export function bronzeCallbackOutcome(input: {
     failureCodes,
   });
   if (input.status === "failed") return ended(input.failureCodes);
+  // Not finished at Didit: whatever has passed so far, wait for its decision.
+  if (input.status === "processing")
+    return { checks, status: "processing" as const, failureCodes: input.failureCodes };
   if (!input.profileUnchanged) return ended(["PROFILE_CHANGED_DURING_VERIFICATION"]);
   // Whatever else passed, a possible second account is for a person to decide.
   const held = [
@@ -90,12 +93,17 @@ export function bronzeCallbackOutcome(input: {
 /** Didit's Nigerian registry lookups: the national identity number, and the bank one. */
 const NIGERIA_REGISTRY_SERVICES = ["nga_national_id", "nga_bank_verification_number"];
 
-/** Whether someone born on `dob` (YYYY-MM-DD) is an adult on `now`. */
+/**
+ * Whether someone born on `dob` (YYYY-MM-DD) is 18 on `now`, by calendar age.
+ * (Subtracting 18 years from 29 February would roll over to 1 March and let a
+ * 17-year-old through.)
+ */
 export function adultOn(dob: string, now = new Date()) {
-  const cutoff = new Date(Date.UTC(now.getUTCFullYear() - 18, now.getUTCMonth(), now.getUTCDate()))
-    .toISOString()
-    .slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(dob) && dob <= cutoff;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dob)) return false;
+  const [year, month, day] = dob.split("-").map(Number);
+  const [nowMonth, nowDay] = [now.getUTCMonth() + 1, now.getUTCDate()];
+  const beforeBirthday = nowMonth < month || (nowMonth === month && nowDay < day);
+  return now.getUTCFullYear() - year - (beforeBirthday ? 1 : 0) >= 18;
 }
 
 /**

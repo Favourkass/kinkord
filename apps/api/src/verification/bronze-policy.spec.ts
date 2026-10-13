@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  adultOn,
   BRONZE_MAX_ATTEMPTS,
   bronzeCallbackOutcome,
   canAwardBronze,
@@ -197,6 +198,26 @@ describe("Bronze policy", () => {
         duplicate: true,
       }).status,
     ).toBe("failed");
+  });
+
+  it("counts age by the calendar, so leap day doesn't let a 17-year-old through", () => {
+    const leapDay = new Date("2028-02-29T12:00:00Z");
+    expect(adultOn("2010-02-28", leapDay)).toBe(true);
+    expect(adultOn("2010-03-01", leapDay)).toBe(false);
+    expect(adultOn("2008-02-29", new Date("2026-02-28T12:00:00Z"))).toBe(false);
+    expect(adultOn("2008-02-29", new Date("2026-03-01T12:00:00Z"))).toBe(true);
+    expect(adultOn("not a date", leapDay)).toBe(false);
+  });
+
+  it("keeps a check that Didit hasn't finished waiting, whatever has passed so far", () => {
+    const outcome = bronzeCallbackOutcome({
+      checks: { ...allButPhoto, profileFace: true },
+      status: "processing",
+      failureCodes: [],
+      attemptNumber: 1,
+      profileUnchanged: true,
+    });
+    expect(outcome.status).toBe("processing");
   });
 
   it("lets a member retry a failed attempt, and ends at the last one", () => {
