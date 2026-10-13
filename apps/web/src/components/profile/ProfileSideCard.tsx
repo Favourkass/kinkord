@@ -2,9 +2,11 @@ import Link from "next/link";
 import CoinBalance from "@/components/kinkcoins/CoinBalance";
 import type { CoinBalanceVM } from "@/domain/kinkcoins";
 import MaskIcon from "@/components/app/MaskIcon";
+import VerifiedMark from "@/components/brand/VerifiedMark";
 import type { PublicProfileVM } from "@/domain/member";
 import ExpandableAvatar from "./ExpandableAvatar";
 import SilverBadge, { type SilverBadgeLabels } from "./SilverBadge";
+import OrganizationBadge from "@/components/organization/OrganizationBadge";
 
 export interface ProfileSideCardLabels {
   follow: string;
@@ -13,8 +15,14 @@ export interface ProfileSideCardLabels {
   yourself: string;
   editProfile: string;
   tagsHeading: string;
+  /** Shown when the member's identity is verified and they show it. */
+  identityVerified: string;
+  /** Beside your own badge when you've hidden it from others. */
+  identityHidden: string;
   stats: { friends: string; followers: string; following: string };
   silver: SilverBadgeLabels;
+  organization: string;
+  verifiedOrganization: string;
 }
 
 export interface ProfileSideCardProps {
@@ -41,6 +49,7 @@ export default function ProfileSideCard({
   onToggleFollow,
   followBusy,
 }: ProfileSideCardProps) {
+  const organization = vm.accountType === "organization";
   return (
     <section className="flex flex-col gap-[24px] overflow-hidden rounded-[20px] border border-pf-border bg-pf-surface">
       <div className="relative h-[220px]">
@@ -57,7 +66,10 @@ export default function ProfileSideCard({
           )}
         </div>
         <div className="absolute left-[24px] top-[80px] size-[110px]">
-          <span aria-hidden className="absolute inset-0 rounded-full bg-pf-surface" />
+          <span
+            aria-hidden
+            className={`absolute inset-0 ${organization ? "rounded-[20px]" : "rounded-full"} bg-pf-surface`}
+          />
           {vm.avatarUrl ? (
             <ExpandableAvatar
               src={vm.avatarUrl}
@@ -66,9 +78,12 @@ export default function ProfileSideCard({
               closeLabel="Close"
               wrapperClassName="absolute left-[5px] top-[8px] size-[100px]"
               className="size-[100px]"
+              shape={organization ? "square" : "circle"}
             />
           ) : (
-            <span className="absolute left-[5px] top-[8px] grid size-[100px] place-items-center rounded-full bg-pf-surface-2 text-pf-muted">
+            <span
+              className={`absolute left-[5px] top-[8px] grid size-[100px] place-items-center ${organization ? "rounded-[18px]" : "rounded-full"} bg-pf-surface-2 text-pf-muted`}
+            >
               <MaskIcon name="people" width={40} />
             </span>
           )}
@@ -93,11 +108,30 @@ export default function ProfileSideCard({
               {vm.silver ? (
                 <SilverBadge since={vm.silver.since} labels={labels.silver} href={silverHref} />
               ) : null}
+              {organization ? (
+                <OrganizationBadge
+                  label={labels.organization}
+                  verified={vm.organizationVerified}
+                  verifiedLabel={labels.verifiedOrganization}
+                  markSize={16}
+                />
+              ) : null}
             </span>
             {vm.handle && (
               <span className="text-[15px] leading-[18px] text-pf-muted">{vm.handle}</span>
             )}
           </p>
+          {vm.verification.level === "identity" ? (
+            <span className="flex flex-wrap items-center gap-x-[8px] gap-y-[4px]">
+              <span className="flex items-center gap-[6px] rounded-full border border-kink-gold-bright/60 px-[12px] py-[4px] text-[12px] font-bold text-kink-gold-bright">
+                <VerifiedMark size={16} />
+                {labels.identityVerified}
+              </span>
+              {vm.verification.hiddenFromOthers ? (
+                <span className="text-[12px] text-pf-muted">{labels.identityHidden}</span>
+              ) : null}
+            </span>
+          ) : null}
           {presenceText && (
             <p className="text-[13px] leading-[16px] text-pf-muted">{presenceText}</p>
           )}
@@ -106,12 +140,16 @@ export default function ProfileSideCard({
           )}
         </div>
         <p className="flex flex-wrap items-center gap-[12px] text-[13px] leading-[16px]">
-          <span className="font-bold text-pf-text">
-            {vm.stats.friends} <span className="text-pf-muted">{labels.stats.friends}</span>
-          </span>
-          <span aria-hidden className="text-pf-muted">
-            ·
-          </span>
+          {vm.stats.friends !== null ? (
+            <>
+              <span className="font-bold text-pf-text">
+                {vm.stats.friends} <span className="text-pf-muted">{labels.stats.friends}</span>
+              </span>
+              <span aria-hidden className="text-pf-muted">
+                ·
+              </span>
+            </>
+          ) : null}
           <span className="font-bold text-pf-text">
             {vm.stats.followers} <span className="text-pf-muted">{labels.stats.followers}</span>
           </span>

@@ -5,6 +5,7 @@ export const MODERATION_COPY = {
     members: "Members",
     reports: "Reports",
     payments: "Payments",
+    verification: "Verification",
     blocklist: "Block list",
     admins: "Admins",
   },
@@ -122,6 +123,86 @@ export const MODERATION_COPY = {
     dismiss: "Dismiss",
     photo: "Photo",
   },
+  verification: {
+    intro:
+      "Identity checks Didit couldn't settle alone. Compare the photo members see with the original upload and the Didit session, then decide.",
+    loading: "Loading verifications…",
+    empty: "No verifications to review.",
+    refresh: "Refresh (photo links last 10 minutes)",
+    noName: "Unnamed member",
+    openMember: "Open member",
+    photo: "Profile photo (as members see it)",
+    original: "Original upload",
+    session: "Didit session",
+    why: "Why it needs a person",
+    checksHeading: "Checks",
+    passed: "Passed",
+    notPassed: "Not passed",
+    approve: "Approve",
+    reject: "Reject",
+    cannotApprove: "The ID checks didn't pass, so this can only be rejected.",
+    identityElsewhere:
+      "This ID is already on another account, so this can only be rejected. The member can withdraw verification on the other account first.",
+    own: "You can't act on your own verification.",
+    protected: "Only a founder can decide an admin's verification.",
+    duplicateOf: (handle: string | null) =>
+      handle ? `Same ID as ${handle}` : "Same ID as another account",
+    gone: "This review has closed.",
+    closePhoto: "Close photo",
+    confirmedUntil: (time: string) => `Confirmed until ${time}`,
+    checks: {
+      governmentId: "Government ID",
+      liveness: "Live selfie",
+      idFace: "Selfie matches ID",
+      profileFace: "Selfie matches profile photo",
+      dateOfBirth: "Birth date matches profile",
+      gender: "Gender matches profile",
+      country: "ID country matches profile",
+    },
+    reasons: {
+      PROFILE_PHOTO_FACE_MATCH_REQUIRED: "The profile photo match needs a person to check it",
+      PROFILE_PHOTO_MATCH_INCONCLUSIVE: "The selfie and profile photo didn't clearly match",
+      LOW_FACE_MATCH_SIMILARITY: "The selfie and profile photo didn't look alike enough",
+      PROFILE_PHOTO_MATCH_UNAVAILABLE: "The profile photo comparison wasn't available",
+      PROFILE_PHOTO_MATCH_INTERRUPTED: "The profile photo comparison was interrupted",
+      PROFILE_PHOTO_MATCH_CONSENT_REQUIRED: "No consent on record for the photo comparison",
+      PROFILE_PHOTO_CAPTURE_UNAVAILABLE: "Didit didn't return a selfie to compare",
+      PROFILE_CHANGED_DURING_VERIFICATION: "They changed their profile during the check",
+      ID_COUNTRY_UNCONFIRMED:
+        "Couldn't confirm the ID's country against their nationality or country",
+      IDENTITY_ON_ANOTHER_ACCOUNT: "This ID is already verified or in review on another account",
+      POSSIBLE_DUPLICATE_AT_DIDIT:
+        "Didit found a similar name and birth date on another account: check it's a different person",
+      FACE_ON_ANOTHER_ACCOUNT:
+        "Didit's face search matched this selfie to another account: check it's a different person",
+      IDENTITY_FINGERPRINT_UNAVAILABLE:
+        "Didit's result didn't include enough to check this ID against other accounts",
+    } as Record<string, string>,
+    decision: {
+      approveTitle: "Approve this verification?",
+      approveBody:
+        "They get the verified badge. Only approve if the selfie in Didit and the profile photo are clearly the same person, and the ID's country makes sense for them.",
+      rejectTitle: "Reject this verification?",
+      rejectBody: "The attempt counts as failed. They can try again if they have attempts left.",
+      evidenceLabel: "Evidence reference (e.g. the Didit session)",
+      reasonLabel: "Reason (at least 10 characters, kept in the audit log)",
+    },
+    notices: {
+      approved: "Approved. They're verified.",
+      rejected: "Rejected.",
+    },
+    stepUp: {
+      title: "Confirm this admin session",
+      body: "Enter the current six-digit code from your authenticator app. It confirms this session for 10 minutes, then we ask again.",
+      label: "Authenticator code",
+      action: "Confirm and open reviews",
+      confirming: "Confirming…",
+      expired: "Your two-factor confirmation ran out. Enter a new code.",
+      retryAt: (time: string) => `You can try again at ${time}.`,
+      noTwoFactor: "No authenticator app yet?",
+      securityLink: "Turn on two-factor in Security settings",
+    },
+  },
   /** Who has the admin tools; the founders add and remove them. */
   admins: {
     intro:
@@ -162,17 +243,34 @@ export const MODERATION_COPY = {
     noPosts: "No posts.",
     rules: "Sign-up rules for this member",
     protected: "Admin accounts can't be blocked or deleted here.",
+    verification: "Identity verification",
+    verificationStatuses: {
+      not_started: "Not verified",
+      pending: "Checking with Didit",
+      failed: "Last check didn't pass",
+      manual_review: "Waiting for review",
+      verified: "Verified",
+      outdated: "Verification lapsed after a profile change",
+      // They've used every attempt; an admin can give them a fresh set.
+      rejected: "Out of attempts",
+      revoked: "Revoked",
+    },
+    attemptsUsed: (n: number) => `${n} of 3 attempts used`,
+    verificationError: "Couldn't load their identity verification. Refresh to try again.",
     actions: {
       block: "Block",
       unblock: "Unblock",
       deletePosts: "Delete all posts",
       deleteAccount: "Delete account",
       deletePost: "Delete",
+      revokeVerification: "Revoke verification",
+      reopenVerification: "Allow verifying again",
     },
   },
   dialogs: {
     cancel: "Cancel",
     reasonLabel: "Reason (kept in the moderation log)",
+    twoFactorCodeLabel: "Current six-digit authenticator code",
     block: {
       title: "Block this member?",
       body: "They're signed out everywhere and can't sign in again. Their email and phone can't be used to sign up, and the IPs they used are flagged. Their profile and posts disappear from Kinkord.",
@@ -194,6 +292,16 @@ export const MODERATION_COPY = {
       body: "The post and its photos are removed. This can't be undone.",
       confirm: "Delete post",
     },
+    revokeVerification: {
+      title: "Revoke their verification?",
+      body: "Their verified badge goes, and any check in progress stops. They can't verify again until an admin allows it.",
+      confirm: "Revoke",
+    },
+    reopenVerification: {
+      title: "Let them verify again?",
+      body: "They get a fresh set of 3 attempts.",
+      confirm: "Allow",
+    },
     deleteAccount: {
       title: "Delete this account?",
       body: "The account, posts, comments, likes, follows and photos are permanently deleted. This can't be undone.",
@@ -210,6 +318,8 @@ export const MODERATION_COPY = {
     unblocked: "Unblocked.",
     postsDeleted: (n: number) => `${n} ${n === 1 ? "post" : "posts"} deleted.`,
     postDeleted: "Post deleted.",
+    verificationRevoked: "Verification revoked.",
+    verificationReopened: "They can verify again.",
   },
   blocklist: {
     intro:

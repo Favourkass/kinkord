@@ -140,9 +140,15 @@ describe("toConversationRowVM", () => {
       unread: 2,
       isOnline: true,
       silver: false,
+      organization: false,
     });
     const silver = summary({ peer: { ...summary().peer!, silver: true } });
     expect(toConversationRowVM(silver, "u1", (id) => `/messages/${id}`).silver).toBe(true);
+  });
+
+  it("marks the official organization when the presenter says it is one", () => {
+    const vm = toConversationRowVM(summary(), "u1", (id) => `/messages/${id}`, new Date(), true);
+    expect(vm.organization).toBe(true);
   });
 });
 
@@ -176,6 +182,11 @@ describe("thread view models", () => {
       silver: false,
     });
     expect(toThreadPeerVM({ ...summary().peer!, silver: true }, href)?.silver).toBe(true);
+  });
+
+  it("marks the official organization in the header when the presenter says it is one", () => {
+    expect(toThreadPeerVM(summary().peer, href)?.organization).toBe(false);
+    expect(toThreadPeerVM(summary().peer, href, true)?.organization).toBe(true);
   });
 
   it("links the header to their profile, by username or, without one, by id", () => {

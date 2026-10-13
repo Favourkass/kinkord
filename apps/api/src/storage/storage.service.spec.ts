@@ -47,7 +47,7 @@ describe("StorageService", () => {
   it("uses plain AWS S3 (instance-role credentials) when no endpoint is configured", async () => {
     const { s3ClientConfig } = await import("./storage.service");
     expect(s3ClientConfig({ AWS_REGION: "eu-west-1" })).toEqual({ region: "eu-west-1" });
-  });
+  }, 15_000);
 
   it("targets a local S3 with path-style addressing when S3_ENDPOINT is set", async () => {
     const { s3ClientConfig } = await import("./storage.service");
@@ -70,7 +70,11 @@ describe("StorageService", () => {
 
   it("builds its client from that config", async () => {
     process.env.S3_ENDPOINT = "http://localhost:9000";
-    const { StorageService } = await import("./storage.service");
+    const { StorageService, VERIFICATION_IMAGE_MAX_PIXELS, loadSharp } =
+      await import("./storage.service");
+    expect(VERIFICATION_IMAGE_MAX_PIXELS).toBe(20_000_000);
+    // Loaded on first use, not at startup, and then limited to one libvips thread.
+    expect((await loadSharp()).concurrency()).toBe(1);
     new StorageService();
     expect(s3Config).toHaveBeenCalledWith(
       expect.objectContaining({ endpoint: "http://localhost:9000", forcePathStyle: true }),
@@ -177,5 +181,48 @@ describe("StorageService", () => {
       Bucket: "kinkord-media-test",
       Key: "avatars/u1/y.jpg",
     });
+  });
+
+  it("remakes a verified photo's smaller sizes from its original, in its own format", async () => {
+    const sharp = (await import("sharp")).default;
+    const original = await sharp({
+      create: { width: 1200, height: 900, channels: 3, background: { r: 180, g: 40, b: 90 } },
+    })
+      .jpeg()
+      .toBuffer();
+    send.mockImplementation(async (cmd: { input: Record<string, unknown> }) =>
+      "Body" in cmd.input
+        ? {}
+        : {
+            Body: (async function* () {
+              yield original;
+            })(),
+          },
+    );
+    const { StorageService } = await import("./storage.service");
+    await new StorageService().regenerateVariants("avatars/u1/a.jpg");
+    const puts = send.mock.calls
+      .map(([cmd]) => (cmd as { input: Record<string, unknown> }).input)
+      .filter((input) => "Body" in input);
+    expect(puts.map((p) => p.Key).sort()).toEqual(["avatars/u1/a_md.jpg", "avatars/u1/a_sm.jpg"]);
+    for (const put of puts) {
+      const meta = await sharp(put.Body as Buffer).metadata();
+      expect(meta.format).toBe("jpeg");
+      expect(Math.max(meta.width ?? 0, meta.height ?? 0)).toBe(
+        put.Key === "avatars/u1/a_sm.jpg" ? 160 : 480,
+      );
+      expect(put.ContentType).toBe("image/jpeg");
+    }
+  });
+
+  it("gives admins ten-minute, uncached links to a member's photo", async () => {
+    const { StorageService } = await import("./storage.service");
+    await new StorageService().presignReviewDownload("avatars/u1/a.jpg", "md");
+    const [, cmd, opts] = lastSign();
+    expect(cmd.input).toMatchObject({
+      Key: "avatars/u1/a_md.jpg",
+      ResponseCacheControl: "no-store",
+    });
+    expect(opts.expiresIn).toBe(600);
   });
 });

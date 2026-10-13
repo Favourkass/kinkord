@@ -5,6 +5,7 @@ import Link from "next/link";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import MaskIcon from "@/components/app/MaskIcon";
 import SilverCheck from "@/components/app/SilverCheck";
+import OrganizationBadge from "@/components/organization/OrganizationBadge";
 import ConfirmDialog, { type ConfirmDialogProps } from "@/components/feed/ConfirmDialog";
 import MediaLightbox from "@/components/feed/MediaLightbox";
 import type { ThreadMessageVM, ThreadPeerVM } from "@/domain/chat";
@@ -30,6 +31,8 @@ export interface ThreadScreenProps {
    */
   newChat: { text: string; blocking: boolean } | null;
   onlineLabel: string;
+  organizationLabel: string;
+  verifiedOrganizationLabel: string;
   backHref: string;
   backLabel: string;
   emptyText: string;
@@ -96,6 +99,7 @@ export default function ThreadScreen(p: ThreadScreenProps) {
           alt=""
           size={38}
           ringClassName="bg-app-line"
+          shape={p.peer?.organization ? "square" : "circle"}
         />
         <PresenceDot
           online={Boolean(p.peer?.isOnline)}
@@ -110,6 +114,14 @@ export default function ThreadScreen(p: ThreadScreenProps) {
             {p.peer?.displayName ?? (p.loading ? "…" : "Member")}
           </span>
           {p.peer?.silver ? <SilverCheck size={15} /> : null}
+          {p.peer?.organization ? (
+            <OrganizationBadge
+              label={p.organizationLabel}
+              verified
+              verifiedLabel={p.verifiedOrganizationLabel}
+              markSize={14}
+            />
+          ) : null}
         </span>
         {p.peer && (
           <span

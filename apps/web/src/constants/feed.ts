@@ -62,6 +62,11 @@ export const FEED_COPY = {
   peopleDismiss: "Hide suggestions",
   peopleAdd: "Add friend",
   peopleAdded: "Remove",
+  /** The official organization is followed, on its posts and in the strip. */
+  follow: "Follow",
+  following: "Following",
+  organization: "Official",
+  verifiedOrganization: "Official Kinkord account",
   /** Desktop right rail, which the mobile frame has no room for. */
   asideHeading: "Kinkord",
   asideTagline: "The world's kink community",
@@ -97,4 +102,8 @@ export const POST_CARD_LABELS = {
   menu: FEED_COPY.postMenu,
   delete: FEED_COPY.deletePost,
   repostedBy: FEED_COPY.repostedBy,
+  organization: FEED_COPY.organization,
+  verifiedOrganization: FEED_COPY.verifiedOrganization,
+  follow: FEED_COPY.follow,
+  following: FEED_COPY.following,
 } as const;

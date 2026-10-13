@@ -6,11 +6,13 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { isAllowedPhone, PHONE_NOT_ALLOWED } from "./phone-rules";
+import { NAME_RESERVED, takesReservedName } from "./reserved-names";
 import { and, eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { Db, DRIZZLE } from "../db/db.module";
-import { profile, profileMedia, user } from "../db/schema";
+import { bronzeVerification, profile, profileMedia, user } from "../db/schema";
+import { stillVerified } from "../verification/bronze-policy";
 import {
   IMAGE_VARIANTS,
   StorageService,
@@ -99,6 +101,7 @@ export const updateProfileSchema = z.object({
   limits: z.string().trim().max(500).nullable().optional(),
   socialLinks: socialLinksSchema.optional(),
   profileVisibility: z.enum(PROFILE_VISIBILITIES).optional(),
+  showVerifiedBadge: z.boolean().optional(),
 });
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 
@@ -183,6 +186,9 @@ export class ProfilesService {
     await this.verifyUploads(input);
     const changes: Partial<typeof profile.$inferInsert> = { ...input };
     if (input.displayName !== undefined && input.displayName !== current.displayName) {
+      if (takesReservedName(input.displayName, current.displayName)) {
+        throw new BadRequestException({ displayName: [NAME_RESERVED] });
+      }
       const next = nextAllowedChange(current.displayNameChangedAt, now);
       if (next) throw new BadRequestException({ displayName: [lockMessage("display name", next)] });
       changes.displayNameChangedAt = now;
@@ -266,6 +272,9 @@ export class ProfilesService {
       account.username === username &&
       (account.displayUsername ?? account.username) === displayUsername;
     if (unchanged) return this.usernameVM(username, displayUsername, row.usernameChangedAt, now);
+    if (takesReservedName(displayUsername, account.username)) {
+      throw new BadRequestException({ username: [NAME_RESERVED] });
+    }
 
     const next = nextAllowedChange(row.usernameChangedAt, now);
     if (next) throw new BadRequestException({ username: [lockMessage("username", next)] });
@@ -385,6 +394,10 @@ export class ProfilesService {
   }
 
   private async toVM(row: typeof profile.$inferSelect, now = new Date()) {
+    const [verification] = await this.db
+      .select()
+      .from(bronzeVerification)
+      .where(eq(bronzeVerification.userId, row.userId));
     return {
       displayName: row.displayName,
       bio: row.bio,
@@ -411,6 +424,9 @@ export class ProfilesService {
       limits: row.limits ?? null,
       socialLinks: row.socialLinks ?? {},
       profileVisibility: row.profileVisibility ?? "public",
+      /** Verified for the photo, birth date and gender the profile has now. */
+      identityVerified: stillVerified(verification, row),
+      showVerifiedBadge: row.showVerifiedBadge,
       displayNameChangedAt: row.displayNameChangedAt?.toISOString() ?? null,
       /** null = a change is allowed now; otherwise the date the 30-day lock lifts. */
       canChangeDisplayNameAt:

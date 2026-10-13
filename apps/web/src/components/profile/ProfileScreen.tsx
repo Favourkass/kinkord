@@ -51,6 +51,8 @@ export interface ProfileScreenProps {
   };
   media: MediaTabProps;
   suggested: SuggestedFriendsProps;
+  /** The desktop "Suggested Friends" column; the organization's profile has none. */
+  showSuggestedRail: boolean;
   activeTab?: AppTab;
   viewerAvatarUrl: string | null;
   notificationsUnread?: boolean;
@@ -97,6 +99,7 @@ export default function ProfileScreen(p: ProfileScreenProps) {
           ready && p.vm ? <ProfileSideCard vm={p.vm} labels={p.sideLabels} {...actions} /> : null
         }
         aside={ready ? <SuggestedFriends {...p.suggested} /> : null}
+        showAside={p.showSuggestedRail}
         viewerAvatarUrl={p.viewerAvatarUrl}
         notificationsUnread={p.notificationsUnread}
         notificationsCount={p.notificationsCount}

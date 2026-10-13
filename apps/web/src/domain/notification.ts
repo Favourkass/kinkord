@@ -10,6 +10,9 @@ export type NotificationKind =
   | "payment"
   | "payment_verified"
   | "payment_rejected"
+  | "verification"
+  | "verification_update"
+  | "verification_underage"
   | "silver_check";
 
 /**
@@ -20,6 +23,8 @@ export interface NotificationPM {
   id: string;
   type: NotificationKind;
   actor: {
+    /** Who it is; absent from an older API. */
+    userId?: string;
     name: string;
     username: string | null;
     avatarUrl: string | null;
@@ -46,6 +51,8 @@ export interface NotificationVM {
   actorName: string | null;
   /** The Silver check beside the actor's name. */
   actorSilver: boolean;
+  /** The official organization's marks: the Org pill and a square avatar. */
+  actorOrganization: boolean;
   avatarUrl: string | null;
   action: string;
   official: boolean;
@@ -87,6 +94,23 @@ const KINDS: Record<
     icon: "shield",
     action: () => "A Silver member changed their name or photo. Review their badge.",
   },
+  verification: {
+    category: "Moderation",
+    icon: "shield",
+    action: () => "New verification to review.",
+  },
+  // The member's own check finished, or an admin decided, revoked or reopened it.
+  verification_update: {
+    category: "Identity verification",
+    icon: "bell",
+    action: () => "Your identity verification has an update.",
+  },
+  // To the admins; it opens that member's moderation page.
+  verification_underage: {
+    category: "Moderation",
+    icon: "shield",
+    action: () => "A member's ID shows they may be under 18.",
+  },
   test: {
     category: "Notifications enabled",
     icon: "bell",
@@ -103,6 +127,9 @@ const OFFICIAL: ReadonlySet<NotificationKind> = new Set([
   "payment_verified",
   "payment_rejected",
   "silver_check",
+  "verification",
+  "verification_update",
+  "verification_underage",
 ]);
 
 /** A kind this version of the app doesn't know yet still shows, as Kinkord's own. */
@@ -112,7 +139,12 @@ const UNKNOWN_KIND = {
   action: () => "Something new for you.",
 } as const;
 
-export function toNotificationVM(item: NotificationPM, now = new Date()): NotificationVM {
+/** `organization` is whether the actor is the official organization; presenters decide it. */
+export function toNotificationVM(
+  item: NotificationPM,
+  now = new Date(),
+  organization = false,
+): NotificationVM {
   const date = new Date(item.createdAt);
   const minutes = Math.max(0, Math.floor((now.getTime() - date.getTime()) / 60_000));
   const time =
@@ -137,6 +169,7 @@ export function toNotificationVM(item: NotificationPM, now = new Date()): Notifi
     category: kind.category,
     actorName,
     actorSilver: !official && Boolean(item.actor?.silver),
+    actorOrganization: !official && organization,
     avatarUrl: official ? null : (item.actor?.avatarUrl ?? null),
     action,
     official,

@@ -196,8 +196,23 @@ export function remainingPhotoSlots(current: number): number {
   return Math.max(0, POST_MEDIA_MAX - current);
 }
 
-export function toggleFollowOnSuggestion(pm: SuggestedPersonPM): SuggestedPersonPM {
-  return { ...pm, isFollowing: !pm.isFollowing };
+/**
+ * Whether the viewer follows a member, set on every place the feed shows them —
+ * each of their posts (a repost's author is the original's) and their
+ * suggestion card — so one follow can't leave two of them disagreeing.
+ */
+export function withAuthorFollow(items: PostPM[], userId: string, isFollowing: boolean): PostPM[] {
+  return items.map((p) =>
+    p.author.userId === userId ? { ...p, author: { ...p.author, isFollowing } } : p,
+  );
+}
+
+export function withSuggestionFollow(
+  items: SuggestedPersonPM[],
+  userId: string,
+  isFollowing: boolean,
+): SuggestedPersonPM[] {
+  return items.map((s) => (s.userId === userId ? { ...s, isFollowing } : s));
 }
 
 /**

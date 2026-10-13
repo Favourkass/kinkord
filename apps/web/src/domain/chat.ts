@@ -87,6 +87,8 @@ export interface ConversationRowVM {
   presence?: "online" | "away" | "offline";
   typing?: boolean;
   silver: boolean;
+  /** The official organization: marked, so nobody can pass for it in a chat. */
+  organization: boolean;
   avatarUrl: string | null;
   preview: string;
   time: string;
@@ -122,6 +124,7 @@ export interface ThreadPeerVM {
   presence?: "online" | "away" | "offline";
   typing?: boolean;
   silver: boolean;
+  organization: boolean;
   avatarUrl: string | null;
   isOnline: boolean;
   blockedByMe: boolean;
@@ -140,17 +143,20 @@ export function previewOf(summary: ConversationSummaryPM, viewerId: string | nul
   return viewerId !== null && last.senderId === viewerId ? `You: ${clipped}` : clipped;
 }
 
+/** `organization` is whether the other member is the official organization; presenters decide it. */
 export function toConversationRowVM(
   summary: ConversationSummaryPM,
   viewerId: string | null,
   href: (conversationId: string) => string,
   now = new Date(),
+  organization = false,
 ): ConversationRowVM {
   return {
     id: summary.id,
     href: href(summary.id),
     displayName: summary.peer?.displayName ?? "Member",
     silver: Boolean(summary.peer?.silver),
+    organization,
     presence: summary.peer?.presence ?? (summary.peer?.online ? "online" : "offline"),
     typing: Boolean(summary.peer?.typing),
     avatarUrl: summary.peer?.avatarUrl ?? null,
@@ -167,12 +173,14 @@ export function toConversationRowVM(
 export function toThreadPeerVM(
   peer: ChatPeerPM | null,
   profileHref: (usernameOrId: string) => string,
+  organization = false,
 ): ThreadPeerVM | null {
   if (!peer) return null;
   return {
     userId: peer.userId,
     displayName: peer.displayName,
     silver: Boolean(peer.silver),
+    organization,
     presence: peer.presence ?? (peer.online ? "online" : "offline"),
     typing: Boolean(peer.typing),
     avatarUrl: peer.avatarUrl,

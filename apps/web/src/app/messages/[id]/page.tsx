@@ -62,6 +62,8 @@ export default function ThreadPage({ params }: { params: Promise<{ id: string }>
         unavailableText={CHAT_COPY.unavailable}
         newChat={thread.newChat}
         onlineLabel={CHAT_COPY.online}
+        organizationLabel={CHAT_COPY.organization}
+        verifiedOrganizationLabel={CHAT_COPY.verifiedOrganization}
         backHref={backHref}
         backLabel={CHAT_COPY.back}
         emptyText={CHAT_COPY.threadEmpty}

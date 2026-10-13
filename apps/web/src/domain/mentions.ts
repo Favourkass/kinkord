@@ -103,10 +103,18 @@ export interface MentionSuggestionVM {
   name: string;
   avatarUrl: string | null;
   silver: boolean;
+  /** The official organization, which is marked as such wherever it can be named. */
+  organization: boolean;
 }
 
-/** A member to suggest while "@" is typed; only someone with a username can be mentioned. */
-export function toMentionSuggestionVM(pm: MemberCardPM): MentionSuggestionVM | null {
+/**
+ * A member to suggest while "@" is typed; only someone with a username can be
+ * mentioned. `organization` is whether they're the official organization.
+ */
+export function toMentionSuggestionVM(
+  pm: MemberCardPM,
+  organization = false,
+): MentionSuggestionVM | null {
   if (!pm.username) return null;
   return {
     userId: pm.userId,
@@ -114,5 +122,6 @@ export function toMentionSuggestionVM(pm: MemberCardPM): MentionSuggestionVM | n
     name: pm.displayName || pm.username,
     avatarUrl: pm.avatarUrl,
     silver: Boolean(pm.silver),
+    organization,
   };
 }

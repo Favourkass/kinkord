@@ -124,6 +124,8 @@ export interface PostAuthorVM {
   /** Shows the Silver check beside their name. */
   silver: boolean;
   subscribed: boolean;
+  /** Whether the viewer follows them, so a post can offer Follow without a profile request. */
+  isFollowing: boolean;
 }
 
 export interface PostVM {
@@ -591,6 +593,8 @@ export class PostsService {
         avatarKey: profile.avatarKey,
         silver: silverCheck(post.authorId),
         subscribed: sql<boolean>`exists (select 1 from ${memberSubscription} where ${memberSubscription.userId} = ${post.authorId} and ${memberSubscription.currentPeriodEnd} > now())`,
+        // The visibility rule's own join, so it costs nothing extra.
+        viewerFollowsAuthor: sql<boolean>`${viewerFollows.followerId} is not null`,
       })
       .from(post)
       .innerJoin(user, eq(user.id, post.authorId))
@@ -616,7 +620,8 @@ export class PostsService {
    * asserted again here: a repost must never become a way to see a friends-only
    * post, however the row got written.
    */
-  private async originalsById(ids: string[]) {
+  private async originalsById(ids: string[], viewerId: string) {
+    const viewerFollows = alias(follow, "viewer_follows_author");
     const rows = await this.db
       .select({
         id: post.id,
@@ -631,10 +636,16 @@ export class PostsService {
         avatarKey: profile.avatarKey,
         silver: silverCheck(post.authorId),
         subscribed: sql<boolean>`exists (select 1 from ${memberSubscription} where ${memberSubscription.userId} = ${post.authorId} and ${memberSubscription.currentPeriodEnd} > now())`,
+        // A repost's card shows the original's author, so it's their follow that counts.
+        viewerFollowsAuthor: sql<boolean>`${viewerFollows.followerId} is not null`,
       })
       .from(post)
       .innerJoin(user, eq(user.id, post.authorId))
       .leftJoin(profile, eq(profile.userId, post.authorId))
+      .leftJoin(
+        viewerFollows,
+        and(eq(viewerFollows.followerId, viewerId), eq(viewerFollows.followingId, post.authorId)),
+      )
       .where(and(inArray(post.id, ids), isNull(post.deletedAt), eq(post.visibility, "public")));
     return new Map(rows.map((r) => [r.id, r]));
   }
@@ -649,7 +660,9 @@ export class PostsService {
     // A repost carries no words or photos of its own; its content is the post
     // it points at, so that is what gets counted, reacted to and rendered.
     const originalIds = [...new Set(rows.map((r) => r.repostOfId).filter(isId))];
-    const originals = originalIds.length ? await this.originalsById(originalIds) : new Map();
+    const originals = originalIds.length
+      ? await this.originalsById(originalIds, viewerId)
+      : new Map();
     const pairs = rows
       .map((row) => ({
         row,
@@ -750,6 +763,7 @@ export class PostsService {
           avatarUrl: await avatar(content.avatarKey),
           silver: Boolean(content.silver),
           subscribed: Boolean(content.subscribed),
+          isFollowing: Boolean(content.viewerFollowsAuthor),
         },
         media: mediaByPost.get(content.id) ?? [],
         likes: likeCount.get(content.id) ?? 0,

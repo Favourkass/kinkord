@@ -50,6 +50,7 @@ export default function HomePage() {
       onGift={feed.openGift}
       giftDialog={feed.giftDialog}
       onOpenMedia={feed.openMedia}
+      onTogglePostAuthorFollow={feed.toggleFollow}
       hasMore={feed.hasMore}
       loadingMore={feed.loadingMore}
       onLoadMore={feed.loadMore}
@@ -92,6 +93,8 @@ export default function HomePage() {
           placeholder: FEED_COPY.composerPlaceholder,
           visibilityLabel: FEED_COPY.visibilityLabel,
           mentions: FEED_COPY.mentionSuggestions,
+          organization: FEED_COPY.organization,
+          verifiedOrganization: FEED_COPY.verifiedOrganization,
         },
       }}
       commentsPanel={{
@@ -121,18 +124,20 @@ export default function HomePage() {
           loading: FEED_COPY.loading,
           close: FEED_COPY.closeComments,
           mentions: FEED_COPY.mentionSuggestions,
+          organization: FEED_COPY.organization,
+          verifiedOrganization: FEED_COPY.verifiedOrganization,
         },
       }}
       people={{
         heading: FEED_COPY.peopleHeading,
         people: feed.suggestions,
-        addLabel: FEED_COPY.peopleAdd,
-        addedLabel: FEED_COPY.peopleAdded,
         seeAllLabel: FEED_COPY.peopleSeeAll,
         seeAllHref: Routes.members,
         dismissLabel: FEED_COPY.peopleDismiss,
         onDismiss: feed.hideSuggestions,
         onToggleFollow: feed.toggleFollow,
+        organizationLabel: FEED_COPY.organization,
+        verifiedOrganizationLabel: FEED_COPY.verifiedOrganization,
       }}
       lightbox={{
         media: feed.lightbox,

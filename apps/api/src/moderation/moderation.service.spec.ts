@@ -1,5 +1,6 @@
 import { ConflictException, ForbiddenException, NotFoundException } from "@nestjs/common";
 import { PgDialect } from "drizzle-orm/pg-core";
+import type { BronzeService } from "../verification/bronze.service";
 import { describe, expect, it, vi } from "vitest";
 import { memberBan, moderationLog, session, signupBlock, staff, user } from "../db/schema";
 import type { PostsService } from "../posts/posts.service";
@@ -48,12 +49,14 @@ function make(answers: unknown[]) {
   const posts = {
     removeAsModerator: vi.fn(async (id: string) => ({ deleted: id, authorId: "u9" })),
   };
+  const verification = { forgetMember: vi.fn(async () => undefined) };
   const service = new ModerationService(
     q.db,
     storage as unknown as StorageService,
     posts as unknown as PostsService,
+    verification as unknown as BronzeService,
   );
-  return { ...q, service, storage, posts };
+  return { ...q, service, storage, posts, verification };
 }
 
 const member = {
@@ -149,7 +152,7 @@ describe("ModerationService.unblock", () => {
 describe("ModerationService.deleteMember", () => {
   it("clears their files, blocks them from returning, then deletes the account", async () => {
     const target = { ...member, email: "x@y.com", emailVerified: false, phone: null };
-    const { service, storage, indexOf, after } = make([
+    const { service, storage, indexOf, after, verification } = make([
       [target],
       [],
       [], // no IPs
@@ -180,12 +183,22 @@ describe("ModerationService.deleteMember", () => {
         "posts/u9/a_sm.jpg",
       ].sort(),
     );
+    // What Didit holds is durably queued while the account still exists to find it by.
+    // A ban also holds their identity, so it can't verify a new account unseen.
+    expect(verification.forgetMember).toHaveBeenCalledWith("u9", { hold: true });
     // The rules are written while the account still exists to read them from.
     expect(indexOf("insert", signupBlock)).toBeLessThan(indexOf("delete", user));
     expect(after("insert", moderationLog, "values")).toMatchObject({
       action: "delete+block",
       detail: "@downtoearth x@y.com",
     });
+  });
+
+  it("keeps the account when durable provider-erasure queuing fails", async () => {
+    const { service, verification, indexOf } = make([[member], []]);
+    verification.forgetMember.mockRejectedValueOnce(new Error("database unavailable"));
+    await expect(service.deleteMember("admin1", "u9", {})).rejects.toThrow("database unavailable");
+    expect(indexOf("delete", user)).toBe(-1);
   });
 });
 

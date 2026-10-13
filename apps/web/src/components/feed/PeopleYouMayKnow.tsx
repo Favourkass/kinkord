@@ -1,37 +1,39 @@
 import Link from "next/link";
 import MaskIcon from "@/components/app/MaskIcon";
 import SilverCheck from "@/components/app/SilverCheck";
+import OrganizationBadge from "@/components/organization/OrganizationBadge";
 import type { FeedSuggestionVM } from "@/domain/post";
 
 export interface PeopleYouMayKnowProps {
   heading: string;
   people: FeedSuggestionVM[];
-  addLabel: string;
-  addedLabel: string;
   seeAllLabel: string;
   seeAllHref: string;
   dismissLabel: string;
   onDismiss: () => void;
   onToggleFollow: (userId: string) => void;
+  organizationLabel: string;
+  verifiedOrganizationLabel: string;
   /** "row" is the mobile strip; "column" is the desktop right rail. */
   layout?: "row" | "column";
 }
 
 /**
  * "People you may know" (Figma 831:169–837:222): a photo card per member with
- * Add friend / Remove underneath. It scrolls sideways in the phone feed and
- * stacks in the desktop rail, where there is a column to put it in.
+ * its button underneath (Add friend / Remove, or Follow for the organization).
+ * It scrolls sideways in the phone feed and stacks in the desktop rail, where
+ * there is a column to put it in.
  */
 export default function PeopleYouMayKnow({
   heading,
   people,
-  addLabel,
-  addedLabel,
   seeAllLabel,
   seeAllHref,
   dismissLabel,
   onDismiss,
   onToggleFollow,
+  organizationLabel,
+  verifiedOrganizationLabel,
   layout = "row",
 }: PeopleYouMayKnowProps) {
   if (people.length === 0) return null;
@@ -76,6 +78,14 @@ export default function PeopleYouMayKnow({
               <p className="flex min-w-0 items-center gap-[4px] text-[16px] font-bold text-feed-text">
                 <span className="truncate">{person.displayName}</span>
                 {person.silver ? <SilverCheck size={15} /> : null}
+                {person.organization ? (
+                  <OrganizationBadge
+                    label={organizationLabel}
+                    verified
+                    verifiedLabel={verifiedOrganizationLabel}
+                    markSize={14}
+                  />
+                ) : null}
               </p>
               <div className="flex items-center gap-[13px] pt-[8px]">
                 <button
@@ -90,7 +100,7 @@ export default function PeopleYouMayKnow({
                   }`}
                 >
                   {!person.isFollowing && <MaskIcon name="person-add" width={15} />}
-                  {person.isFollowing ? addedLabel : addLabel}
+                  {person.actionLabel}
                 </button>
               </div>
             </div>

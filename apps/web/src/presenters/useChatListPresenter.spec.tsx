@@ -64,7 +64,10 @@ describe("useChatListPresenter", () => {
     counts.mockReset().mockRejectedValue(new Error("offline"));
     me.mockReset().mockResolvedValue({ id: "u1" });
   });
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllEnvs();
+  });
 
   it("is loading until the first poll lands, then lists threads", async () => {
     const { result } = renderHook(() => useChatListPresenter());
@@ -73,6 +76,14 @@ describe("useChatListPresenter", () => {
     await waitFor(() => expect(result.current.list.rows[0].preview).toBe("You: see you"));
     expect(result.current.list.rows[0].href).toBe("/messages/c1");
     expect(result.current.list.loading).toBe(false);
+  });
+
+  it("marks a chat with the official organization, by its configured id", async () => {
+    vi.stubEnv("NEXT_PUBLIC_KINKORD_OFFICIAL_USER_ID", "u2");
+    const { result } = renderHook(() => useChatListPresenter());
+    await act(async () => polls.get(LIST_POLL_MS)?.());
+    await waitFor(() => expect(result.current.list.rows).toHaveLength(1));
+    expect(result.current.list.rows[0].organization).toBe(true);
   });
 
   it("says the inbox is empty rather than loading forever", async () => {

@@ -176,6 +176,20 @@
       "when": 1791705280160,
       "tag": "0024_wallet_usd_prices",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791885803027,
+      "tag": "0025_many_donald_blake",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1791888151301,
+      "tag": "0026_complete_sheva_callister",
+      "breakpoints": true
     }
   ]
 }

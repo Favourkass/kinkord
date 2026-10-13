@@ -7,6 +7,7 @@ import {
   toMediaTiles,
   toMemberCardVM,
   toPublicProfileVM,
+  withOwnBadgeVisibility,
   type MemberCardPM,
   type PlaceHref,
   type PublicProfilePM,
@@ -44,8 +45,19 @@ describe("toMemberCardVM", () => {
       followers: "1.2K",
       isFollowing: false,
       silver: false,
+      organization: false,
     });
     expect(toMemberCardVM({ ...card, silver: true }).silver).toBe(true);
+  });
+
+  it("marks the configured organization without changing the source profile", () => {
+    expect(toMemberCardVM(card, true)).toMatchObject({
+      userId: "u1",
+      organization: true,
+      ageTag: null,
+      roles: null,
+      location: null,
+    });
   });
 
   it("falls back to the display name when a member has no handle and drops unknown parts", () => {
@@ -155,6 +167,35 @@ describe("toPublicProfileVM", () => {
     expect(vm.basic.age).toBeNull();
     expect(vm.lastSeenAgo).toBeNull();
   });
+
+  it("leaves what only describes a person off the official organization's profile", () => {
+    const placeHref: PlaceHref = () => "/members/NG";
+    const person = toPublicProfileVM(profile, placeHref, now);
+    expect(person).toMatchObject({ accountType: "person", organizationVerified: false });
+
+    const vm = toPublicProfileVM(
+      { ...profile, isOnline: true, socialLinks: { x: "https://x.com/kinkord" } },
+      placeHref,
+      now,
+      true,
+    );
+    expect(vm).toMatchObject({
+      accountType: "organization",
+      organizationVerified: true,
+      isOnline: false,
+      lastSeenAgo: null,
+      locationLine: null,
+      locationParts: [],
+      tagLine: null,
+      stats: { friends: null, followers: "2.3K", following: "980" },
+    });
+    // What the organization says about itself stays, its links included.
+    expect(vm.displayName).toBe(profile.displayName);
+    expect(vm.bio).toBe(profile.bio);
+    expect(vm.socialLinks).toEqual([
+      { platform: "x", url: "https://x.com/kinkord", handle: "@kinkord" },
+    ]);
+  });
 });
 
 describe("About cards + media (profile rebuild, 2026-09-12)", () => {
@@ -228,6 +269,26 @@ describe("About cards + media (profile rebuild, 2026-09-12)", () => {
     expect(locked.restricted).toBe(true);
     expect(locked.socialLinks).toEqual([]);
     expect(locked.verification.level).toBe("none");
+  });
+
+  it("puts a verified identity above email and phone", () => {
+    const vm = toPublicProfileVM({
+      ...base,
+      verification: { email: true, phone: true, identity: true },
+    });
+    expect(vm.verification.level).toBe("identity");
+  });
+
+  it("marks your own verified badge when you've hidden it from others", () => {
+    const verified = { email: true, phone: true, identity: true as const };
+    const own = toPublicProfileVM({ ...base, isSelf: true, verification: verified });
+    expect(withOwnBadgeVisibility(own, false).verification.hiddenFromOthers).toBe(true);
+    // Shown to others, someone else's profile, or no badge to hide: unchanged.
+    expect(withOwnBadgeVisibility(own, true)).toBe(own);
+    const theirs = toPublicProfileVM({ ...base, verification: verified });
+    expect(withOwnBadgeVisibility(theirs, false)).toBe(theirs);
+    const unverified = toPublicProfileVM({ ...base, isSelf: true });
+    expect(withOwnBadgeVisibility(unverified, false)).toBe(unverified);
   });
 
   it("derives handles from links and features the current profile photo", () => {
