@@ -3,6 +3,8 @@ import { GetSecretValueCommand, SecretsManagerClient } from "@aws-sdk/client-sec
 
 /** Production's settings live here, made by infra/lib/verification-stack.ts. */
 export const DEFAULT_VERIFICATION_SECRET_ID = "kinkord/verification";
+/** Kept separate and retained because rotation would invalidate every stored identity fingerprint. */
+export const DEFAULT_VERIFICATION_BINDING_SECRET_ID = "kinkord/verification-binding";
 /** How often production re-reads the secret, so a switch flipped in the console lands without a deploy. */
 const REFRESH_MS = 5 * 60_000;
 
@@ -88,17 +90,24 @@ export class VerificationConfig implements OnModuleInit, OnModuleDestroy {
   private readonly log = new Logger(VerificationConfig.name);
   private settings: VerificationSettings;
   private timer: ReturnType<typeof setInterval> | null = null;
-  /** The last read's failure, so a missing secret is logged once rather than every refresh. */
-  private problem: string | null = null;
+  /** Each secret's last read failure, so one that's missing is logged once, not every refresh. */
+  private problems: Record<"settings" | "binding", string | null> = {
+    settings: null,
+    binding: null,
+  };
   readonly production: boolean;
-  private readonly secretId: string | null;
+  private readonly settingsSecretId: string | null;
+  private readonly bindingSecretId: string | null;
 
   constructor() {
     this.production = process.env.NODE_ENV === "production";
-    this.secretId =
+    this.settingsSecretId =
       process.env.VERIFICATION_SECRET_ID?.trim() ||
       (this.production ? DEFAULT_VERIFICATION_SECRET_ID : null);
-    this.settings = this.secretId ? VERIFICATION_OFF : settingsFromEnv();
+    this.bindingSecretId =
+      process.env.VERIFICATION_BINDING_SECRET_ID?.trim() ||
+      (this.production ? DEFAULT_VERIFICATION_BINDING_SECRET_ID : null);
+    this.settings = this.settingsSecretId ? VERIFICATION_OFF : settingsFromEnv();
   }
 
   /** A fixed configuration, for tests. */
@@ -108,15 +117,16 @@ export class VerificationConfig implements OnModuleInit, OnModuleDestroy {
       log: new Logger(VerificationConfig.name),
       settings,
       timer: null,
-      problem: null,
+      problems: { settings: null, binding: null },
       production,
-      secretId: null,
+      settingsSecretId: null,
+      bindingSecretId: null,
     });
     return config;
   }
 
   onModuleInit() {
-    if (!this.secretId) return;
+    if (!this.settingsSecretId || !this.bindingSecretId) return;
     void this.refresh();
     this.timer = setInterval(() => void this.refresh(), REFRESH_MS);
     this.timer.unref?.();
@@ -126,26 +136,55 @@ export class VerificationConfig implements OnModuleInit, OnModuleDestroy {
     if (this.timer) clearInterval(this.timer);
   }
 
-  /** Re-reads the secret; public so tests can await one read. */
+  /**
+   * Re-reads both secrets, each on its own. Readable settings always apply, so
+   * the off switch works even while the key can't be read; unreadable ones
+   * keep the last good settings (a first failure leaves verification off). An
+   * unreadable key is blanked, which keeps identity verification off until it
+   * can be read. Public so tests can await one read.
+   */
   async refresh() {
-    if (!this.secretId) return;
-    try {
-      const out = await new SecretsManagerClient({}).send(
-        new GetSecretValueCommand({ SecretId: this.secretId }),
+    const settingsId = this.settingsSecretId;
+    const bindingId = this.bindingSecretId;
+    if (!settingsId || !bindingId) return;
+    const [settings, binding] = await Promise.allSettled([
+      this.read(settingsId).then(parseVerificationSettings),
+      this.read(bindingId).then((raw) => text(raw.bindingSecret)),
+    ]);
+    this.settings = {
+      ...(settings.status === "fulfilled" ? settings.value : this.settings),
+      bindingSecret: binding.status === "fulfilled" ? binding.value : "",
+    };
+    this.report("settings", settingsId, settings, "verification stays as it was");
+    this.report("binding", bindingId, binding, "verification is off until it can be read");
+  }
+
+  private async read(secretId: string) {
+    const client = new SecretsManagerClient({});
+    const out = await client.send(new GetSecretValueCommand({ SecretId: secretId }));
+    return JSON.parse(out.SecretString ?? "{}") as Record<string, unknown>;
+  }
+
+  /** Logs a secret's failure once rather than every refresh, and when it's readable again. */
+  private report(
+    which: "settings" | "binding",
+    secretId: string,
+    result: PromiseSettledResult<unknown>,
+    consequence: string,
+  ) {
+    const problem =
+      result.status === "fulfilled"
+        ? null
+        : result.reason instanceof Error
+          ? result.reason.name
+          : "error";
+    if (problem && problem !== this.problems[which])
+      this.log.warn(
+        `verification settings unavailable (${problem} reading ${secretId}); ${consequence}`,
       );
-      this.settings = parseVerificationSettings(
-        JSON.parse(out.SecretString ?? "{}") as Record<string, unknown>,
-      );
-      this.problem = null;
-    } catch (e) {
-      // Keep the last good settings; a first failure leaves verification off.
-      const problem = e instanceof Error ? e.name : "error";
-      if (problem !== this.problem)
-        this.log.warn(
-          `verification settings unavailable (${problem}); verification stays as it was`,
-        );
-      this.problem = problem;
-    }
+    else if (!problem && this.problems[which])
+      this.log.log(`verification settings read from ${secretId} again`);
+    this.problems[which] = problem;
   }
 
   get current(): VerificationSettings {
