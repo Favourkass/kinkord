@@ -428,10 +428,17 @@ export class BronzeService implements OnModuleInit, OnModuleDestroy {
         failureCodes.push(match.reason ?? "PROFILE_PHOTO_MATCH_INCONCLUSIVE");
       if (!checks.country) failureCodes.push("ID_COUNTRY_UNCONFIRMED");
       status = canAwardBronze(checks) ? "verified" : "manual_review";
-      // Didit found the same name and birth date under another member of ours.
+      // Didit found a similar name and birth date, or the same face, on another
+      // of our members: an admin checks it's a different person. (The same
+      // identity on another account is found by its fingerprint when the
+      // result is recorded, and can only be rejected.)
       if (result.possibleDuplicate) {
         status = "manual_review";
-        failureCodes.push("IDENTITY_ON_ANOTHER_ACCOUNT");
+        failureCodes.push("POSSIBLE_DUPLICATE_AT_DIDIT");
+      }
+      if (result.faceElsewhere) {
+        status = "manual_review";
+        failureCodes.push("FACE_ON_ANOTHER_ACCOUNT");
       }
       // Whether this identity is on another account is decided under its lock
       // when the result is recorded.
@@ -599,7 +606,7 @@ export class BronzeService implements OnModuleInit, OnModuleDestroy {
       }
       if (result.reason === "duplicate")
         throw new ConflictException(
-          "Another account was verified with this ID since this review opened. Refresh to see it.",
+          "This ID is verified or being reviewed on another account, so this can only be rejected. The member can withdraw verification on the other account first.",
         );
       throw new ConflictException("This review is already closed.");
     }
