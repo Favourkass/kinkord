@@ -81,6 +81,13 @@ CREATE TABLE "verification_erasure" (
 	"created_at" timestamp (3) with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "verification_identity_hold" (
+	"binding" text NOT NULL,
+	"user_id" text NOT NULL,
+	"created_at" timestamp (3) with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "verification_identity_hold_binding_user_id_pk" PRIMARY KEY("binding","user_id")
+);
+--> statement-breakpoint
 ALTER TABLE "profile" ADD COLUMN "show_verified_badge" boolean DEFAULT true NOT NULL;--> statement-breakpoint
 ALTER TABLE "bronze_verification_attempt" ADD CONSTRAINT "bronze_verification_attempt_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "bronze_verification_callback" ADD CONSTRAINT "bronze_verification_callback_attempt_id_bronze_verification_attempt_id_fk" FOREIGN KEY ("attempt_id") REFERENCES "public"."bronze_verification_attempt"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -99,5 +106,6 @@ CREATE UNIQUE INDEX "bronze_consent_active_unique" ON "bronze_verification_conse
 CREATE INDEX "bronze_review_open_idx" ON "bronze_verification_review" USING btree ("status","created_at");--> statement-breakpoint
 CREATE INDEX "bronze_review_user_idx" ON "bronze_verification_review" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "bronze_review_reviewer_idx" ON "bronze_verification_review" USING btree ("reviewer_id");--> statement-breakpoint
+CREATE INDEX "bronze_verification_current_attempt_idx" ON "bronze_verification" USING btree ("current_attempt_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "verification_erasure_provider_session_unique" ON "verification_erasure" USING btree ("provider","provider_session_id");--> statement-breakpoint
 CREATE INDEX "verification_erasure_due_idx" ON "verification_erasure" USING btree ("completed_at","next_attempt_at");
