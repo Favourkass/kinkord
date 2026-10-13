@@ -444,6 +444,44 @@ describe("BronzeRepository", () => {
       expect(setOn(bronzeVerification)).toEqual({ status: "failed" });
     });
 
+    it("approves once the other account has let the identity go", async () => {
+      const { repo, setOn } = queuedDb([
+        [{ userId: "u1" }],
+        [waiting],
+        [{ ...review, reasonCodes: ["IDENTITY_ON_ANOTHER_ACCOUNT"] }],
+        [approvable],
+        [sameProfile],
+        undefined,
+        [],
+        [],
+        undefined,
+        undefined,
+        undefined,
+      ]);
+      await expect(repo.decideReview(decision)).resolves.toMatchObject({
+        ok: true,
+        status: "verified",
+      });
+      expect(setOn(bronzeVerification)).toMatchObject({ status: "verified" });
+    });
+
+    it("only rejects an identity still on another account, without repeating the reason", async () => {
+      const { repo, setOn } = queuedDb([
+        [{ userId: "u1" }],
+        [waiting],
+        [{ ...review, reasonCodes: ["IDENTITY_ON_ANOTHER_ACCOUNT"] }],
+        [approvable],
+        [sameProfile],
+        undefined,
+        [{ id: "other-attempt" }],
+      ]);
+      await expect(repo.decideReview(decision)).resolves.toEqual({
+        ok: false,
+        reason: "duplicate",
+      });
+      expect(setOn(bronzeReview)).toBeUndefined();
+    });
+
     it("won't approve a second account found since the review opened, and shows why", async () => {
       const { repo, setOn, calls } = queuedDb([
         [{ userId: "u1" }],
