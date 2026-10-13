@@ -24,11 +24,20 @@ describe("getVerificationPrivacyVM", () => {
     expect(vm.provider.href).toMatch(/^https:\/\/didit\.me\//);
   });
 
-  it("checks only IDs issued in Nigeria against the NIN registry", () => {
-    expect(sectionText("information")).toContain(
-      "If your ID was issued in Nigeria, its details are also checked against the national identity (NIN) registry",
+  it("checks only IDs issued in Nigeria against the government's records", () => {
+    const info = sectionText("information");
+    expect(info).toContain("If your ID was issued in Nigeria");
+    expect(info).toMatch(
+      /NIN\) register for a national ID, the passport register.+driver's licence register/,
     );
-    expect(sectionText("information")).toContain("IDs issued in other countries aren't checked");
+    expect(info).toContain("IDs issued in other countries aren't checked");
+    expect(info).not.toMatch(/BVN|bank/i);
+  });
+
+  it("discloses Didit's face search over Kinkord's own verified members", () => {
+    const info = sectionText("information");
+    expect(info).toContain("compares your selfie's face with the faces of other members");
+    expect(info).toContain("only covers Kinkord's own verified members");
   });
 
   it("says what outlives withdrawal and account deletion", () => {

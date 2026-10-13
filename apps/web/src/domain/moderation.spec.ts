@@ -274,6 +274,8 @@ describe("toAdminVerificationReviewVM", () => {
     own: "Your own",
     protected: "Founders only",
     duplicateOf: (handle: string | null) => `Same ID as ${handle ?? "another account"}`,
+    idChecksFailed: "ID checks failed: reject only",
+    identityElsewhere: "On another account: reject only",
   };
   const href = (id: string) => `/moderation/members/${id}`;
 
@@ -310,6 +312,29 @@ describe("toAdminVerificationReviewVM", () => {
     );
     expect(vm.name).toBe("Unnamed member");
     expect(vm.canApprove).toBe(false);
+    expect(vm.cannotApprove).toBe("ID checks failed: reject only");
+  });
+
+  it("only allows rejecting an identity that's already on another account", () => {
+    const vm = toAdminVerificationReviewVM(
+      { ...review, reasonCodes: ["IDENTITY_ON_ANOTHER_ACCOUNT"] },
+      href,
+      labels,
+      now,
+    );
+    expect(vm).toMatchObject({
+      canApprove: false,
+      cannotApprove: "On another account: reject only",
+    });
+    // Didit's similar-name or same-face matches are for the admin to judge.
+    expect(
+      toAdminVerificationReviewVM(
+        { ...review, reasonCodes: ["POSSIBLE_DUPLICATE_AT_DIDIT", "FACE_ON_ANOTHER_ACCOUNT"] },
+        href,
+        labels,
+        now,
+      ).canApprove,
+    ).toBe(true);
   });
 
   it("locks the decision on your own review, and on an admin's unless you're a founder", () => {

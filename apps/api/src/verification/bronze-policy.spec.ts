@@ -138,6 +138,22 @@ describe("Bronze policy", () => {
       ).toBe(true);
     });
 
+    it("checks Nigerian passports and licences against their own registers, never bank records", () => {
+      const record = (service: string) => ({
+        database_validations: [
+          { status: "Approved", validations: [{ service_id: service, outcome_code: "MATCH" }] },
+        ],
+      });
+      for (const service of ["nga_passport", "nga_drivers_license", "nga_national_id"])
+        expect(interpretDiditResult(decision("NGA", record(service)), nigerian).governmentId).toBe(
+          true,
+        );
+      expect(
+        interpretDiditResult(decision("NGA", record("nga_bank_verification_number")), nigerian)
+          .governmentId,
+      ).toBe(false);
+    });
+
     it("accepts a partial match only once Didit's reviewer has approved it", () => {
       expect(
         interpretDiditResult(decision("NGA", registry("PARTIAL_MATCH")), nigerian).governmentId,
@@ -151,6 +167,18 @@ describe("Bronze policy", () => {
           .governmentId,
       ).toBe(false);
     });
+  });
+
+  it("reports Didit's face search finding this face on another member", () => {
+    const withFace = (risk: string) => ({
+      status: "Approved",
+      liveness_checks: [{ status: "Approved", warnings: [{ risk, log_type: "information" }] }],
+    });
+    expect(interpretDiditResult(withFace("DUPLICATED_FACE"), nigerian).faceElsewhere).toBe(true);
+    expect(
+      interpretDiditResult(withFace("DUPLICATED_FACE_DOCUMENT_MISMATCH"), nigerian).faceElsewhere,
+    ).toBe(true);
+    expect(interpretDiditResult(withFace("LOW_FACE_QUALITY"), nigerian).faceElsewhere).toBe(false);
   });
 
   it("reports Didit's duplicate and under-age warnings, even on a declined ID", () => {
@@ -269,7 +297,7 @@ describe("Bronze policy", () => {
       checks: { ...idOnly, dateOfBirth: true, gender: true },
       attemptsUsed: 1,
       profileUnchanged: true,
-      unflaggedDuplicate: false,
+      sameIdentityElsewhere: false,
     };
 
     it("approves by confirming the photo and country, never what only the ID proves", () => {
@@ -285,14 +313,14 @@ describe("Bronze policy", () => {
       });
     });
 
-    it("ends a changed profile's attempt, and holds back an unseen second account", () => {
+    it("ends a changed profile's attempt, and only rejects an identity on another account", () => {
       expect(reviewOutcome({ ...review, profileUnchanged: false })).toEqual({
         ok: false,
         reason: "changed",
         status: "failed",
         failureCodes: ["PROFILE_CHANGED_DURING_VERIFICATION"],
       });
-      expect(reviewOutcome({ ...review, unflaggedDuplicate: true })).toEqual({
+      expect(reviewOutcome({ ...review, sameIdentityElsewhere: true })).toEqual({
         ok: false,
         reason: "duplicate",
       });

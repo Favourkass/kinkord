@@ -843,7 +843,7 @@ export class BronzeRepository {
       const approve = input.decision === "approve";
       const reasonCodes = (review.reasonCodes as string[]) ?? [];
       let profileUnchanged = true;
-      let unflaggedDuplicate = false;
+      let sameIdentityElsewhere = false;
       if (approve) {
         const [current] = await tx
           .select({
@@ -857,13 +857,11 @@ export class BronzeRepository {
           current?.avatarKey === attempt.avatarKey &&
           current.dob === attempt.profileDob &&
           current.gender === attempt.profileGender;
-        if (
-          profileUnchanged &&
-          attempt.identityBinding &&
-          !reasonCodes.includes("IDENTITY_ON_ANOTHER_ACCOUNT")
-        ) {
+        // Checked now, under the identity's lock: the other account may have
+        // withdrawn since the review opened, or appeared since.
+        if (profileUnchanged && attempt.identityBinding) {
           await lockIdentity(tx, attempt.identityBinding);
-          unflaggedDuplicate = await this.bindingUsedElsewhere(
+          sameIdentityElsewhere = await this.bindingUsedElsewhere(
             attempt.identityBinding,
             review.userId,
             tx,
@@ -875,11 +873,11 @@ export class BronzeRepository {
         checks: attempt.checks as Partial<BronzeChecks>,
         attemptsUsed: state.attemptsUsed,
         profileUnchanged,
-        unflaggedDuplicate,
+        sameIdentityElsewhere,
       });
       const now = new Date();
       if (!outcome.ok) {
-        if (outcome.reason === "duplicate")
+        if (outcome.reason === "duplicate" && !reasonCodes.includes("IDENTITY_ON_ANOTHER_ACCOUNT"))
           await tx
             .update(bronzeReview)
             .set({ reasonCodes: [...reasonCodes, "IDENTITY_ON_ANOTHER_ACCOUNT"] })

@@ -58,7 +58,7 @@ export const VERIFICATION_COPY = {
     gender:
       "The gender on your ID doesn't match your profile. If your profile is wrong, correct it in Edit profile.",
     registry:
-      "The national identity (NIN) registry couldn't confirm the details on your ID. Use a valid, current ID.",
+      "The Nigerian government's record for your ID couldn't confirm its details. Use a valid, current ID.",
     declined:
       "Your ID couldn't be accepted. Use a valid, unexpired government ID, with the whole card in view and no glare.",
     liveness:
@@ -87,7 +87,7 @@ export const VERIFICATION_COPY = {
     `Your photo was just uploaded. You can verify from ${time}, so the check uses the photo members see.`,
   checksHeading: "What we check",
   checks: [
-    "Your government ID. An ID issued in Nigeria is also checked against the national identity (NIN) registry.",
+    "Your government ID. An ID issued in Nigeria is also checked against the government's record for it (NIN, passport or driver's licence).",
     "A live selfie, matched to the photo on your ID.",
     "That selfie against your Kinkord profile photo.",
     "Your date of birth, gender and country against your profile.",

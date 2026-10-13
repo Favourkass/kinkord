@@ -455,10 +455,24 @@ describe("BronzeService decisions", () => {
     await service.reconcile(NOW);
     expect(repo.recordCallback.mock.calls[0][0]).toMatchObject({
       status: "manual_review",
-      failureCodes: ["IDENTITY_ON_ANOTHER_ACCOUNT"],
+      failureCodes: ["POSSIBLE_DUPLICATE_AT_DIDIT"],
     });
     expect(push.newVerificationReview).toHaveBeenCalled();
     expect(push.verificationUpdate).toHaveBeenCalledWith("u1");
+  });
+
+  it("sends a face Didit's search found on another member to an admin", async () => {
+    const { service, repo, didit } = setup();
+    didit.decision.mockResolvedValueOnce({
+      ...decision(),
+      liveness_checks: [{ status: "Approved", warnings: [{ risk: "DUPLICATED_FACE" }] }],
+    });
+    repo.claimForReconcile.mockResolvedValueOnce(due);
+    await service.reconcile(NOW);
+    expect(repo.recordCallback.mock.calls[0][0]).toMatchObject({
+      status: "manual_review",
+      failureCodes: ["FACE_ON_ANOTHER_ACCOUNT"],
+    });
   });
 
   it("alerts the admins when the ID says the member may be under 18", async () => {
@@ -781,7 +795,7 @@ describe("BronzeService for admins", () => {
     await service.reopen(admin, "u9", "Support approved a retry.");
     expect(push.verificationUpdate.mock.calls).toEqual([["u1"], ["u9"], ["u9"]]);
     repo.decideReview.mockResolvedValueOnce({ ok: false, reason: "duplicate" });
-    await expect(service.decideReview(admin, input)).rejects.toThrow(/another account/i);
+    await expect(service.decideReview(admin, input)).rejects.toThrow(/can only be rejected/);
   });
 
   it("says on a member's page whether this admin may act on them", async () => {
