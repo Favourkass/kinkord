@@ -20,7 +20,6 @@ import PhotoConfirmation from "@/components/profile/PhotoConfirmation";
 import AgePill from "@/components/ui/AgePill";
 import { ShieldCheckIcon } from "@/components/auth/AuthIcons";
 import { useSignupWizardPresenter } from "@/presenters/useSignupWizardPresenter";
-import { KINK_ROLES } from "@/constants/onboarding";
 import { Routes } from "@/constants/Routes";
 import type { SignupField } from "@/domain/onboarding";
 
@@ -431,14 +430,13 @@ function SignupWizard() {
             <StageHeading plain="BUILD YOUR" highlight="PROFILE" />
             {p.profileStep.resumed && (
               <p className="text-center text-[13px] text-kink-cream lg:text-[16px]">
-                Add a profile photo and a cover picture to start using Kinkord.
+                Add your photos now, or skip and add them later in Edit Profile.
               </p>
             )}
             <PhotoConfirmation {...p.profileStep.confirmation} />
             <UploadTile
               shape="circle"
               label="Profile photo"
-              required
               maxMb={5}
               previewUrl={p.profileStep.avatarUrl}
               uploading={p.profileStep.uploading === "avatar"}
@@ -449,7 +447,6 @@ function SignupWizard() {
             <UploadTile
               shape="banner"
               label="Cover picture"
-              required
               maxMb={10}
               previewUrl={p.profileStep.coverUrl}
               uploading={p.profileStep.uploading === "cover"}
@@ -481,11 +478,31 @@ function SignupWizard() {
               </button>
               {rolesOpen && (
                 <div className="mt-3">
-                  <RoleChips
-                    options={KINK_ROLES}
-                    selected={p.profileStep.roles}
-                    onToggle={p.profileStep.toggleRole}
-                  />
+                  <label className="mb-3 block">
+                    <span className="sr-only">Search roles</span>
+                    <input
+                      type="search"
+                      placeholder="Search roles"
+                      value={p.profileStep.roleSearch}
+                      onChange={(e) => p.profileStep.setRoleSearch(e.target.value)}
+                      className="h-[44px] w-full rounded-lg border border-kink-edge bg-kink-field px-4 text-white outline-none focus:border-kink-gold-bright"
+                    />
+                  </label>
+                  <div
+                    className="max-h-[260px] overflow-y-auto overscroll-contain rounded-lg border border-kink-edge p-3"
+                    role="region"
+                    aria-label="Available roles"
+                    tabIndex={0}
+                  >
+                    <RoleChips
+                      options={p.profileStep.roleOptions}
+                      selected={p.profileStep.roles}
+                      onToggle={p.profileStep.toggleRole}
+                    />
+                    {p.profileStep.roleOptions.length === 0 && (
+                      <p className="text-[13px] text-kink-help">No roles match your search.</p>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -498,6 +515,17 @@ function SignupWizard() {
               onClick={p.profileStep.submit}
               loading={p.busy}
             />
+            <button
+              type="button"
+              onClick={p.profileStep.skipPhotos}
+              disabled={p.busy || p.profileStep.uploading !== null}
+              className="text-[14px] font-semibold text-kink-gold-bright underline disabled:opacity-50"
+            >
+              Skip photos for now
+            </button>
+            <p className="text-center text-[12px] text-kink-help">
+              You can add your profile photo and cover picture later in Edit Profile.
+            </p>
             <p className="flex items-center gap-2 text-[11px] text-kink-help lg:text-[16px]">
               <Lock size={14} aria-hidden />
               Your information is private and secure.

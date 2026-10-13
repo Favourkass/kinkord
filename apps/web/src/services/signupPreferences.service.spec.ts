@@ -5,6 +5,7 @@ import {
   loadSignupPreferences,
   saveSignupPreferences,
   EMPTY_SIGNUP_PREFERENCES,
+  filterSignupRoles,
 } from "./signupPreferences.service";
 const mocks = vi.hoisted(() => ({ own: vi.fn(), options: vi.fn(), update: vi.fn() }));
 vi.mock("./profile.service", () => ({ profileApi: mocks }));
@@ -72,4 +73,11 @@ describe("signup preferences", () => {
       "Could not save",
     );
   });
+});
+
+it("filters roles case-insensitively and handles no matches", () => {
+  expect(
+    filterSignupRoles(["Acolyte", "Aftercare Buddy", "Aftercare Specialist"], " AFTERCARE "),
+  ).toEqual(["Aftercare Buddy", "Aftercare Specialist"]);
+  expect(filterSignupRoles(["Acolyte"], "zzzz")).toEqual([]);
 });

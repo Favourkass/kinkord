@@ -47,11 +47,13 @@ const presenceStub = () => {
 };
 
 interface ProfileRow {
+  signupPhotosSkipped: boolean;
   phoneVerified: boolean;
   avatarKey: string | null;
   coverKey: string | null;
 }
 const finished: ProfileRow = {
+  signupPhotosSkipped: false,
   phoneVerified: true,
   avatarKey: "avatars/u1/a.jpg",
   coverKey: "covers/u1/c.jpg",
@@ -157,6 +159,14 @@ describe("AuthGuard phone requirement", () => {
 });
 
 describe("AuthGuard profile photos", () => {
+  it("allows access after the member explicitly skips photos", async () => {
+    await expect(
+      guardFor(NEW, { avatarKey: null, coverKey: null, signupPhotosSkipped: true }).canActivate(
+        ctx({ headers: {} }),
+      ),
+    ).resolves.toBe(true);
+  });
+
   it("holds a member without a profile photo at the photo step", async () => {
     expect(await holdOf(guardFor(NEW, { avatarKey: null }))).toBe(PROFILE_PHOTOS_REQUIRED);
   });

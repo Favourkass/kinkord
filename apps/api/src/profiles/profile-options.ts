@@ -29,6 +29,16 @@ export const RELATIONSHIP_STATUSES = [
 ] as const;
 
 export const KINK_ROLES = [
+  "Acolyte",
+  "Adult Baby",
+  "Adult Baby Diaper Lover (ABDL)",
+  "Adventurer",
+  "Aesthetic Exhibitionist",
+  "Aesthetic Fetishist",
+  "Affection Slut",
+  "Affini",
+  "Aftercare Buddy",
+  "Aftercare Specialist",
   "Ageplayer",
   "Bottom",
   "Brat",

@@ -176,6 +176,13 @@
       "when": 1791705280160,
       "tag": "0024_wallet_usd_prices",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791881929227,
+      "tag": "0025_signup_optional_photos",
+      "breakpoints": true
     }
   ]
 }

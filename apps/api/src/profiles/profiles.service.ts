@@ -64,6 +64,7 @@ export const socialLinksSchema = z
  * are free text.
  */
 export const updateProfileSchema = z.object({
+  signupPhotosSkipped: z.boolean().optional(),
   displayName: z.string().trim().min(3).max(30).optional(),
   bio: z.string().trim().max(500).nullable().optional(),
   pronouns: z.string().trim().max(30).nullable().optional(),

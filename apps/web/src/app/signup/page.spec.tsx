@@ -27,6 +27,14 @@ vi.mock("@/services/verification.service", async (importOriginal) => ({
     verify: vi.fn(),
   },
 }));
+vi.mock("@/services/apiClient", () => ({
+  ApiError: class ApiError extends Error {},
+  api: {
+    get: async () => ({ avatarUrl: null, coverUrl: null, roles: [] }),
+    patch: (...args: unknown[]) => fixture.update(...args),
+    post: vi.fn(),
+  },
+}));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
@@ -65,9 +73,9 @@ it("shows the three preference rows at step 4 and saves a selection before photo
   expect(screen.getByRole("button", { name: /Looking For/ })).toBeTruthy();
   expect(screen.getByRole("button", { name: /Limits/ })).toBeTruthy();
   fireEvent.click(kinks);
-  fireEvent.click(screen.getByRole("button", { name: "Bondage", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Bondage" }));
   fireEvent.click(screen.getByRole("button", { name: "Save selection" }));
-  fireEvent.click(screen.getByRole("button", { name: "Continue", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   await waitFor(() =>
     expect(fixture.update).toHaveBeenCalledWith({
       interests: ["Bondage"],
@@ -84,4 +92,18 @@ it("uses email verification copy without phone or SMS prompts", async () => {
   expect(screen.getByRole("heading", { name: "VERIFY YOUR EMAIL" })).toBeTruthy();
   expect(await screen.findByText(/We emailed a 6-digit code/)).toBeTruthy();
   expect(screen.queryByText(/Text me a code|Wrong number|Skip for now/i)).toBeNull();
+});
+
+it("offers photo skipping and a searchable scrolling role list", async () => {
+  fixture.stage = "profile";
+  render(<SignupPage />);
+  expect(screen.getByRole("button", { name: "Skip photos for now" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Roles" }));
+  fireEvent.change(screen.getByLabelText("Search roles"), { target: { value: "aftercare" } });
+  expect(screen.getByRole("region", { name: "Available roles" }).className).toContain(
+    "overflow-y-auto",
+  );
+  expect(screen.getByRole("button", { name: "Aftercare Buddy" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Aftercare Specialist" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Bottom" })).toBeNull();
 });

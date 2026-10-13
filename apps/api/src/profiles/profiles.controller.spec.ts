@@ -37,11 +37,27 @@ describe("ProfilesController", () => {
     ).toBe(true);
   });
 
+  it("saves explicit photo skipping together with the new roles", async () => {
+    const service = serviceMock();
+    await new ProfilesController(service).update(req, {
+      signupPhotosSkipped: true,
+      roles: ["Acolyte", "Aftercare Specialist", "Adult Baby Diaper Lover (ABDL)"],
+    });
+    expect(service.updateOwn).toHaveBeenCalledWith(
+      "u1",
+      {
+        signupPhotosSkipped: true,
+        roles: ["Acolyte", "Aftercare Specialist", "Adult Baby Diaper Lover (ABDL)"],
+      },
+      "Favour",
+    );
+  });
+
   it("serves the option lists the pickers render", () => {
     const options = new ProfilesController(serviceMock()).options();
     expect(options.genders).toEqual(["Male", "Female"]);
     expect(options.relationshipStatuses).toHaveLength(17);
-    expect(options.roles).toHaveLength(20);
+    expect(options.roles).toHaveLength(30);
     expect(options.kinks).toHaveLength(50);
     expect(options.lookingFor).toHaveLength(10);
     expect(options.nameChangeCooldownDays).toBe(30);

@@ -25,7 +25,7 @@ export const profile = pgTable("profile", {
   city: text("city"),
   dateOfBirth: date("date_of_birth"),
   gender: text("gender"),
-  /** Kink roles picked at step 4; free-form labels. */
+  /** Kink roles picked during profile setup; validated against the role options. */
   roles: jsonb("roles").$type<string[]>().notNull().default([]),
   relationshipStatus: text("relationship_status"),
   lookingFor: jsonb("looking_for").$type<string[]>().notNull().default([]),
@@ -46,6 +46,8 @@ export const profile = pgTable("profile", {
   /** S3 object keys; served via presigned GET. */
   avatarKey: text("avatar_key"),
   coverKey: text("cover_key"),
+  /** Explicitly choosing to finish signup without photos. */
+  signupPhotosSkipped: boolean("signup_photos_skipped").notNull().default(false),
   /** Edit Profile (CEO brief, 2026-09-12). Nationality is ISO 3166-1 alpha-2, like `country`. */
   nationality: text("nationality"),
   occupation: text("occupation"),

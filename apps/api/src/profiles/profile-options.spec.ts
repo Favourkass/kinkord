@@ -19,7 +19,7 @@ describe("profile options (CEO brief, 2026-09-12)", () => {
     expect(RELATIONSHIP_STATUSES).toHaveLength(17);
     expect(RELATIONSHIP_STATUSES[0]).toBe("Single");
     expect(RELATIONSHIP_STATUSES.at(-1)).toBe("Head of Household (HoH)");
-    expect(KINK_ROLES).toHaveLength(20);
+    expect(KINK_ROLES).toHaveLength(30);
     expect(KINKS).toHaveLength(50);
     expect(KINKS[0]).toBe("Anal play");
     expect(KINKS.at(-1)).toBe("Wax play");

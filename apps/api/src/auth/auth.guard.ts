@@ -80,7 +80,7 @@ export class AuthGuard implements CanActivate {
    *
    * - Phone: while PHONE_STEP_REQUIRED is on, accounts newer than the rule
    *   need a verified phone.
-   * - Photos: every member needs a profile photo and a cover picture, the
+   * - Photos: unless explicitly skipped, members need a profile photo and a cover picture, the
    *   last step of sign-up. Deleting the current one from the Media tab asks
    *   for a new one the same way.
    */
@@ -98,6 +98,7 @@ export class AuthGuard implements CanActivate {
         phoneVerified: profile.phoneVerified,
         avatarKey: profile.avatarKey,
         coverKey: profile.coverKey,
+        signupPhotosSkipped: profile.signupPhotosSkipped,
       })
       .from(profile)
       .where(eq(profile.userId, user.id))
@@ -110,7 +111,7 @@ export class AuthGuard implements CanActivate {
     }
     // Without a profile row there is nowhere to save photos, so holding the
     // member would only lock them out.
-    if (row && (!row.avatarKey || !row.coverKey)) {
+    if (row && !row.signupPhotosSkipped && (!row.avatarKey || !row.coverKey)) {
       return {
         code: PROFILE_PHOTOS_REQUIRED,
         message: "Add a profile photo and a cover picture to continue.",

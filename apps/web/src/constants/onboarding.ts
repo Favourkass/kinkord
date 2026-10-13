@@ -54,8 +54,18 @@ export const NG_STATES = [
   "Zamfara",
 ] as const;
 
-/** Signup step 4 chips — the CEO's role list (2026-09-12); Edit Profile offers the same 20 via the API. */
+/** Signup role chips, including the ten additions; Edit Profile offers the same list via the API. */
 export const KINK_ROLES = [
+  "Acolyte",
+  "Adult Baby",
+  "Adult Baby Diaper Lover (ABDL)",
+  "Adventurer",
+  "Aesthetic Exhibitionist",
+  "Aesthetic Fetishist",
+  "Affection Slut",
+  "Affini",
+  "Aftercare Buddy",
+  "Aftercare Specialist",
   "Ageplayer",
   "Bottom",
   "Brat",

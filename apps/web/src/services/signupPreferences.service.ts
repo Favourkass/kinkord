@@ -132,3 +132,8 @@ export async function saveSignupPreferences(
     limits: preferences.limits.trim() || null,
   });
 }
+
+export function filterSignupRoles(options: readonly string[], query: string): string[] {
+  const search = query.trim().toLowerCase();
+  return options.filter((role) => role.toLowerCase().includes(search));
+}

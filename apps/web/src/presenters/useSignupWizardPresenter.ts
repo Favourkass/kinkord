@@ -29,6 +29,7 @@ import {
   signupLocationErrorMessage,
 } from "@/services/signupLocation.service";
 import { Routes } from "@/constants/Routes";
+import { filterSignupRoles } from "@/services/signupPreferences.service";
 import type { EditorDraft, ProfileOptionsPM } from "@/domain/profile";
 import {
   loadSignupPreferences,
@@ -41,7 +42,7 @@ import {
   type SignupPreferences,
   type SignupPreferenceKey,
 } from "@/services/signupPreferences.service";
-import { SEXUALITY_FIELD } from "@/constants/onboarding";
+import { KINK_ROLES, SEXUALITY_FIELD } from "@/constants/onboarding";
 import { PHOTO_CONFIRMATION_COPY } from "@/constants/photoConfirmation";
 import { useVerification } from "./useVerification";
 
@@ -186,6 +187,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
 
   // step 5
   const [roles, setRoles] = useState<string[]>([]);
+  const [rolesEdited, setRolesEdited] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState<"avatar" | "cover" | null>(null);
@@ -317,8 +319,27 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
   );
 
   const toggleRole = useCallback((role: string) => {
+    setRolesEdited(true);
     setRoles((r) => (r.includes(role) ? r.filter((x) => x !== role) : [...r, role]));
   }, []);
+
+  const [roleSearch, setRoleSearch] = useState("");
+  const skipPhotos = useCallback(async () => {
+    if (busy || uploading) return;
+    setBusy(true);
+    setProfileError(null);
+    try {
+      await api.patch("/profile", {
+        ...(initialStage === "profile" && !rolesEdited ? {} : { roles }),
+        signupPhotosSkipped: true,
+      });
+      setStage("welcome");
+    } catch (error) {
+      setProfileError(error instanceof Error ? error.message : "Could not save. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }, [roles, rolesEdited, initialStage, busy, uploading]);
 
   const completeProfile = useCallback(async () => {
     if (!avatarUrl || !coverUrl) {
@@ -416,6 +437,10 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
       },
       profileStep: {
         roles,
+        roleSearch,
+        setRoleSearch,
+        roleOptions: filterSignupRoles(KINK_ROLES, roleSearch),
+        skipPhotos,
         toggleRole,
         avatarUrl,
         coverUrl,
@@ -474,6 +499,8 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
       photoConfirmed,
       profileError,
       completeProfile,
+      roleSearch,
+      skipPhotos,
       resumedAtPhotos,
       finish,
     ],

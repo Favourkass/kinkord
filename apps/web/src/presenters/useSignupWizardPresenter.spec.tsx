@@ -150,6 +150,43 @@ describe("useSignupWizardPresenter", () => {
     );
   });
 
+  it("skips photos and their upload confirmation while saving selected roles", async () => {
+    const { result } = renderHook(() => useSignupWizardPresenter("profile"));
+    await waitFor(() => expect(get).toHaveBeenCalledWith("/profile"));
+    act(() => result.current.profileStep.toggleRole("Acolyte"));
+    await act(() => result.current.profileStep.skipPhotos());
+    expect(patch).toHaveBeenCalledWith("/profile", {
+      roles: ["Acolyte"],
+      signupPhotosSkipped: true,
+    });
+    expect(result.current.stage).toBe("welcome");
+  });
+
+  it("does not overwrite existing roles when skipping a resumed photo step without editing roles", async () => {
+    const { result } = renderHook(() => useSignupWizardPresenter("profile"));
+    await act(() => result.current.profileStep.skipPhotos());
+    expect(patch).toHaveBeenCalledWith("/profile", { signupPhotosSkipped: true });
+  });
+
+  it("does not complete signup when saving the photo skip fails", async () => {
+    patch.mockRejectedValueOnce(new Error("Skip failed"));
+    const { result } = renderHook(() => useSignupWizardPresenter("profile"));
+    await act(() => result.current.profileStep.skipPhotos());
+    expect(result.current.stage).toBe("profile");
+    expect(result.current.profileStep.error).toBe("Skip failed");
+  });
+
+  it("searches new roles without clearing selected roles", () => {
+    const { result } = renderHook(() => useSignupWizardPresenter());
+    act(() => result.current.profileStep.toggleRole("Acolyte"));
+    act(() => result.current.profileStep.setRoleSearch("aftercare"));
+    expect(result.current.profileStep.roleOptions).toEqual([
+      "Aftercare Buddy",
+      "Aftercare Specialist",
+    ]);
+    expect(result.current.profileStep.roles).toEqual(["Acolyte"]);
+  });
+
   it("blocks step 1 until country + both confirmations are set", () => {
     const { result } = renderHook(() => useSignupWizardPresenter());
     act(() => result.current.stepOne.submit());
