@@ -95,8 +95,10 @@ export function usePeoplePagePresenter(usernameParam: string, tabParam?: string 
     };
   }, [username, router]);
 
+  // Which lists there are depends on whose page it is (the organization has no
+  // friends), so the list waits for the profile rather than guessing a tab.
   useEffect(() => {
-    if (current) return;
+    if (!pm || current) return;
     let cancelled = false;
     void membersApi
       .friends(username, resolvedTab, 1, PAGE)
@@ -110,7 +112,13 @@ export function usePeoplePagePresenter(usernameParam: string, tabParam?: string 
     return () => {
       cancelled = true;
     };
-  }, [username, resolvedTab, key, current]);
+  }, [pm, username, resolvedTab, key, current]);
+
+  // A link to a list this page doesn't have (the organization's friends) lands
+  // on the one shown instead, and the address says so.
+  useEffect(() => {
+    if (pm && tab !== resolvedTab) router.replace(Routes.memberPeople(username, resolvedTab));
+  }, [pm, tab, resolvedTab, router, username]);
 
   const more = hasMore(current?.items.length ?? 0, current?.total ?? 0);
   const loadMore = useCallback(() => {
