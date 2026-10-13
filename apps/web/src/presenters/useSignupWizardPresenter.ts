@@ -16,10 +16,6 @@ import {
   validateAccount,
   validateAbout,
   invalidSignupFields,
-  toE164,
-  isAllowedPhone,
-  PHONE_NIGERIA_ONLY,
-  PHONE_STEP_REQUIRED,
   dobToIso,
   WIZARD_STEPS,
   type AccountDraft,
@@ -31,30 +27,23 @@ import { Routes } from "@/constants/Routes";
 import { PHOTO_CONFIRMATION_COPY } from "@/constants/photoConfirmation";
 import { useVerification } from "./useVerification";
 
-export type WizardStage =
-  "country" | "account" | "about" | "email" | "phone" | "profile" | "welcome";
+export type WizardStage = "country" | "account" | "about" | "email" | "profile" | "welcome";
 const STAGE_STEP: Record<WizardStage, number> = {
   country: 1,
   account: 2,
   about: 2,
   email: 3,
-  phone: 4,
-  profile: 5,
+  profile: 4,
   welcome: 5,
 };
 
 interface ProfileVM {
-  phoneVerified: boolean;
   avatarUrl: string | null;
   coverUrl: string | null;
   roles: string[];
 }
 
-/**
- * `initialStage` lets a member who left mid-way come back to the step they
- * still owe: the API sends anyone with an unverified phone back to "phone",
- * and anyone without a profile photo or cover back to "profile".
- */
+/** Resume incomplete profile setup without collecting a phone during signup. */
 export function useSignupWizardPresenter(initialStage: WizardStage = "country") {
   const router = useRouter();
   const [stage, setStage] = useState<WizardStage>(initialStage);
@@ -72,8 +61,6 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
     username: "",
     displayName: "",
     email: "",
-    phoneLocal: "",
-    phoneCountryCode: "+234",
     password: "",
     confirmPassword: "",
   });
@@ -98,7 +85,6 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
   const [uploading, setUploading] = useState<"avatar" | "cover" | null>(null);
   const [photoConfirmed, setPhotoConfirmed] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
-  const [phoneVerifiedOnFile, setPhoneVerifiedOnFile] = useState(false);
 
   const step = STAGE_STEP[stage];
 
@@ -140,7 +126,6 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
         city: about.city.trim() || null,
         dateOfBirth: dobToIso(about),
         gender: about.gender,
-        phone: toE164(account.phoneCountryCode, account.phoneLocal),
       });
       setStage("email");
     } catch (e) {
@@ -150,8 +135,6 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
     }
   }, [about, account, country]);
 
-  // Phone verification, shared with Settings → Security.
-  const phone = useVerification("phone", () => setStage("profile"));
   // Sent automatically when step 3 opens: they typed the address moments ago.
   const emailCode = useVerification("email");
 
@@ -162,69 +145,11 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
     emailSendCode();
   }, [stage, emailSendCode]);
 
-  const nextVerificationStep = useCallback(() => setStage("phone"), []);
-  // Texted codes aren't arriving reliably, so for now the code can wait
-  // (PHONE_STEP_REQUIRED); Settings → Security & 2FA verifies it later.
-  const skipPhone = useCallback(() => setStage("profile"), []);
+  const nextVerificationStep = useCallback(() => {
+    if (emailCode.verified) setStage("profile");
+  }, [emailCode.verified]);
 
-  // When the phone code can't be skipped, a mistyped number has to be fixable
-  // here or the member is stuck on this step for good.
-  const [knownPhone, setKnownPhone] = useState<string | null>(null);
-  const [changingPhone, setChangingPhone] = useState(false);
-  const [phoneDraft, setPhoneDraft] = useState({ countryCode: "+234", local: "" });
-  const [phoneChangeError, setPhoneChangeError] = useState<string | null>(null);
-  const [savingPhone, setSavingPhone] = useState(false);
-
-  // Someone resuming at this step has no draft in memory; show the number on file.
-  const hasDraftPhone = Boolean(account.phoneLocal.trim());
-  useEffect(() => {
-    if (stage !== "phone" || hasDraftPhone) return;
-    let live = true;
-    api.get<{ phone: string | null }>("/profile").then(
-      (p) => live && setKnownPhone(p.phone),
-      () => undefined,
-    );
-    return () => {
-      live = false;
-    };
-  }, [stage, hasDraftPhone]);
-
-  const phoneReset = phone.reset;
-  const savePhone = useCallback(async () => {
-    const e164 = toE164(phoneDraft.countryCode, phoneDraft.local);
-    if (!e164 || !isAllowedPhone(e164)) {
-      setPhoneChangeError(PHONE_NIGERIA_ONLY);
-      return;
-    }
-    setSavingPhone(true);
-    setPhoneChangeError(null);
-    try {
-      await api.patch("/profile", { phone: e164 });
-      setKnownPhone(e164);
-      setAccount((a) => ({
-        ...a,
-        phoneCountryCode: phoneDraft.countryCode,
-        phoneLocal: phoneDraft.local,
-      }));
-      phoneReset();
-      setChangingPhone(false);
-    } catch (e) {
-      setPhoneChangeError(
-        e instanceof Error ? e.message : "Could not save that number. Try again.",
-      );
-    } finally {
-      setSavingPhone(false);
-    }
-  }, [phoneDraft, phoneReset]);
-
-  const phoneNumber =
-    phone.sentTo ??
-    (hasDraftPhone ? toE164(account.phoneCountryCode, account.phoneLocal) : null) ??
-    knownPhone;
-
-  // Someone sent back to the photo step may already have one photo, their roles
-  // or a verified phone on file. Start from those, so finishing neither asks for
-  // a photo twice nor saves an empty role list over theirs.
+  // Resume saved photos and roles without overwriting them.
   const resumedAtPhotos = initialStage === "profile";
   useEffect(() => {
     if (!resumedAtPhotos) return;
@@ -235,7 +160,6 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
         setAvatarUrl((current) => current ?? p.avatarUrl);
         setCoverUrl((current) => current ?? p.coverUrl);
         setRoles((current) => (current.length > 0 ? current : p.roles));
-        setPhoneVerifiedOnFile(p.phoneVerified);
       },
       () => undefined,
     );
@@ -335,27 +259,8 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
       submitCombinedStep,
       backToCountry,
       verifyStep: {
-        ...phone,
-        number: phoneNumber,
         email: emailCode,
         nextStep: nextVerificationStep,
-        skip: PHONE_STEP_REQUIRED ? null : skipPhone,
-        changePhone: {
-          open: changingPhone,
-          countryCode: phoneDraft.countryCode,
-          local: phoneDraft.local,
-          error: phoneChangeError,
-          saving: savingPhone,
-          start: () => {
-            setPhoneDraft({ countryCode: account.phoneCountryCode, local: account.phoneLocal });
-            setPhoneChangeError(null);
-            setChangingPhone(true);
-          },
-          cancel: () => setChangingPhone(false),
-          setCountryCode: (countryCode: string) => setPhoneDraft((d) => ({ ...d, countryCode })),
-          setLocal: (local: string) => setPhoneDraft((d) => ({ ...d, local })),
-          save: () => void savePhone(),
-        },
       },
       profileStep: {
         roles,
@@ -378,7 +283,6 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
         submit: completeProfile,
         resumed: resumedAtPhotos,
       },
-      welcome: { phoneVerified: phone.verified || phoneVerifiedOnFile },
       finish,
     }),
     [
@@ -399,14 +303,6 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
       submitCombinedStep,
       backToCountry,
       nextVerificationStep,
-      skipPhone,
-      phone,
-      phoneNumber,
-      changingPhone,
-      phoneDraft,
-      phoneChangeError,
-      savingPhone,
-      savePhone,
       emailCode,
       roles,
       toggleRole,
@@ -418,7 +314,6 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
       profileError,
       completeProfile,
       resumedAtPhotos,
-      phoneVerifiedOnFile,
       finish,
     ],
   );

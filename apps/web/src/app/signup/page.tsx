@@ -3,19 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import {
-  AtSign,
-  CheckCircle2,
-  ChevronDown,
-  Clock,
-  Lock,
-  Mail,
-  MapPin,
-  Phone,
-  Smartphone,
-  User,
-  Users,
-} from "lucide-react";
+import { AtSign, CheckCircle2, ChevronDown, Lock, Mail, MapPin, User, Users } from "lucide-react";
 import SignupShell from "@/components/auth/SignupShell";
 import CountryRow from "@/components/auth/CountryRow";
 import CheckRow from "@/components/auth/CheckRow";
@@ -30,12 +18,7 @@ import PhotoConfirmation from "@/components/profile/PhotoConfirmation";
 import AgePill from "@/components/ui/AgePill";
 import { ShieldCheckIcon } from "@/components/auth/AuthIcons";
 import { useSignupWizardPresenter } from "@/presenters/useSignupWizardPresenter";
-import {
-  KINK_ROLES,
-  LAUNCH_COUNTRIES,
-  NG_STATES,
-  PHONE_COUNTRY_CODES,
-} from "@/constants/onboarding";
+import { KINK_ROLES, LAUNCH_COUNTRIES, NG_STATES } from "@/constants/onboarding";
 import { NG_LGAS } from "@/constants/nigeria";
 import { Routes } from "@/constants/Routes";
 import type { SignupField } from "@/domain/onboarding";
@@ -63,7 +46,7 @@ function SignupWizard() {
   // The app sends a member who left sign-up half-done back to the step they owe.
   const resume = useSearchParams().get("resume");
   const p = useSignupWizardPresenter(
-    resume === "phone" || resume === "profile" ? resume : undefined,
+    resume === "phone" || resume === "profile" ? "profile" : undefined,
   );
   const [rolesOpen, setRolesOpen] = useState(false);
 
@@ -195,40 +178,6 @@ function SignupWizard() {
                 helper="We'll never share your email with anyone."
               />
               <TextField
-                id={fieldId("phoneLocal")}
-                label="Phone number"
-                icon={Phone}
-                placeholder="803 123 4567"
-                autoComplete="tel-national"
-                leftAddon={
-                  <span className="flex h-full items-center gap-2">
-                    <span aria-hidden className="h-[26px] w-px bg-kink-edge" />
-                    <select
-                      aria-label="Country code"
-                      autoComplete="tel-country-code"
-                      value={p.accountStep.draft.phoneCountryCode}
-                      onChange={(e) =>
-                        p.accountStep.set({
-                          ...p.accountStep.draft,
-                          phoneCountryCode: e.target.value,
-                        })
-                      }
-                      className="appearance-none bg-transparent text-white outline-none [color-scheme:dark] [&>option]:bg-kink-field"
-                    >
-                      {PHONE_COUNTRY_CODES.map((c) => (
-                        <option key={c.code} value={c.dialCode}>{`${c.flag} ${c.dialCode}`}</option>
-                      ))}
-                    </select>
-                    <ChevronDown size={14} aria-hidden className="-ml-1 text-white" />
-                    <span aria-hidden className="h-[26px] w-px bg-kink-edge" />
-                  </span>
-                }
-                value={p.accountStep.draft.phoneLocal}
-                onChange={(v) => p.accountStep.set({ ...p.accountStep.draft, phoneLocal: v })}
-                error={p.accountStep.errors.phoneLocal}
-                helper="This will be used for verification. One number can only be linked to one account."
-              />
-              <TextField
                 id={fieldId("password")}
                 label="Password"
                 icon={Lock}
@@ -331,13 +280,12 @@ function SignupWizard() {
             />
             <div className="text-center text-[11px] text-kink-help lg:text-[16px]">
               <p>We&apos;ll send a 6-digit verification code to your email.</p>
-              <p>One number can only be linked to one Kinkord account.</p>
             </div>
           </section>
         </SignupShell>
       )}
 
-      {(p.stage === "email" || p.stage === "phone") && (
+      {p.stage === "email" && (
         <SignupShell step={p.step} badge={`STEP ${p.step} OF 5`}>
           <section className="flex w-full max-w-[706px] flex-col items-center gap-5 text-center lg:gap-7">
             <StageHeading plain="VERIFY YOUR" highlight="ACCOUNT" />
@@ -346,217 +294,75 @@ function SignupWizard() {
                 <ShieldCheckIcon className="size-9 text-kink-gold-bright lg:size-12" />
               </span>
             </div>
-            {p.stage === "email" ? (
-              <section className="w-full rounded-[16px] border border-kink-amber/60 bg-kink-surface p-5 text-left">
-                <div className="flex items-center justify-between">
-                  <p className="text-[15px] font-bold text-white">Email address</p>
-                  {p.verifyStep.email.verified && (
-                    <span className="rounded-full bg-kink-gold-bright px-[10px] py-[3px] text-[11px] font-bold text-black">
-                      VERIFIED
-                    </span>
-                  )}
-                </div>
-                {p.verifyStep.email.verified ? (
-                  <div className="mt-4 flex flex-col items-center gap-3">
-                    <p className="text-[12px] text-kink-cream lg:text-[15px]">
-                      Your email address is confirmed.
-                    </p>
-                    <GoldCta
-                      label="Next step"
-                      onClick={p.verifyStep.nextStep}
-                      className="max-w-[564px]"
-                    />
-                  </div>
-                ) : (
-                  <>
-                    <p className="mt-2 text-[12px] text-kink-cream lg:text-[15px]">
-                      {p.verifyStep.email.sentTo
-                        ? `We emailed a 6-digit code to ${p.verifyStep.email.sentTo}. It expires in 10 minutes.`
-                        : "Sending a 6-digit code to your email…"}
-                    </p>
-                    <div className="mt-4 flex flex-col items-center gap-3">
-                      <CodeInput
-                        value={p.verifyStep.email.code}
-                        onChange={p.verifyStep.email.setCode}
-                        disabled={!p.verifyStep.email.sent || p.verifyStep.email.verifying}
-                        label="Enter the code from your email"
-                      />
-                      {p.verifyStep.email.error && (
-                        <p className="text-[13px] text-red-400">{p.verifyStep.email.error}</p>
-                      )}
-                      <GoldCta
-                        label="Verify my email"
-                        arrow={false}
-                        onClick={p.verifyStep.email.verify}
-                        loading={p.verifyStep.email.verifying}
-                        className="max-w-[564px]"
-                      />
-                      <button
-                        type="button"
-                        onClick={p.verifyStep.email.sendCode}
-                        disabled={!p.verifyStep.email.canResend}
-                        className="text-[12px] text-kink-help underline disabled:opacity-60"
-                      >
-                        {p.verifyStep.email.resendIn > 0
-                          ? `Send a new code in ${String(
-                              Math.floor(p.verifyStep.email.resendIn / 60),
-                            ).padStart(
-                              2,
-                              "0",
-                            )}:${String(p.verifyStep.email.resendIn % 60).padStart(2, "0")}`
-                          : "Send a new code"}
-                      </button>
-                    </div>
-                  </>
-                )}
-              </section>
-            ) : (
-              <>
-                <div className="rounded-xl border border-kink-amber/60 bg-kink-surface px-5 py-3">
-                  <p className="text-[12px] text-kink-cream lg:text-[16px]">
-                    {p.verifyStep.sent
-                      ? "Enter the code we texted you. It expires in 10 minutes."
-                      : p.verifyStep.skip
-                        ? "We'll text a code to this number to confirm it's yours."
-                        : "We'll text a code to this number to confirm it's yours. You need it to use Kinkord."}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3 rounded-[12px] border-2 border-kink-gold-bright bg-[#111111] px-5 py-3 lg:px-8 lg:py-4">
-                  <Smartphone size={20} className="text-kink-gold-bright lg:size-7" aria-hidden />
-                  <span className="text-[15px] font-medium text-white lg:text-[24px]">
-                    {p.verifyStep.number ?? "your phone number"}
+            <section className="w-full rounded-[16px] border border-kink-amber/60 bg-kink-surface p-5 text-left">
+              <div className="flex items-center justify-between">
+                <p className="text-[15px] font-bold text-white">Email address</p>
+                {p.verifyStep.email.verified && (
+                  <span className="rounded-full bg-kink-gold-bright px-[10px] py-[3px] text-[11px] font-bold text-black">
+                    VERIFIED
                   </span>
-                </div>
-                {p.verifyStep.changePhone.open ? (
-                  <div className="flex w-full flex-col gap-3">
-                    <TextField
-                      label="New phone number"
-                      icon={Phone}
-                      placeholder="803 123 4567"
-                      autoComplete="tel-national"
-                      leftAddon={
-                        <span className="flex h-full items-center gap-2">
-                          <span aria-hidden className="h-[26px] w-px bg-kink-edge" />
-                          <select
-                            aria-label="Country code"
-                            autoComplete="tel-country-code"
-                            value={p.verifyStep.changePhone.countryCode}
-                            onChange={(e) =>
-                              p.verifyStep.changePhone.setCountryCode(e.target.value)
-                            }
-                            className="appearance-none bg-transparent text-white outline-none [color-scheme:dark] [&>option]:bg-kink-field"
-                          >
-                            {PHONE_COUNTRY_CODES.map((c) => (
-                              <option
-                                key={c.code}
-                                value={c.dialCode}
-                              >{`${c.flag} ${c.dialCode}`}</option>
-                            ))}
-                          </select>
-                          <ChevronDown size={14} aria-hidden className="-ml-1 text-white" />
-                          <span aria-hidden className="h-[26px] w-px bg-kink-edge" />
-                        </span>
-                      }
-                      value={p.verifyStep.changePhone.local}
-                      onChange={p.verifyStep.changePhone.setLocal}
-                      error={p.verifyStep.changePhone.error ?? undefined}
-                    />
-                    <div className="flex items-center gap-4">
-                      <GoldCta
-                        label="Save number"
-                        arrow={false}
-                        onClick={p.verifyStep.changePhone.save}
-                        loading={p.verifyStep.changePhone.saving}
-                        className="max-w-[240px]"
-                      />
-                      <button
-                        type="button"
-                        onClick={p.verifyStep.changePhone.cancel}
-                        className="text-[13px] text-kink-help underline lg:text-[16px]"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={p.verifyStep.changePhone.start}
-                    className="text-[13px] text-kink-help underline lg:text-[16px]"
-                  >
-                    Wrong number? Change it
-                  </button>
                 )}
-                <CodeInput
-                  value={p.verifyStep.code}
-                  onChange={p.verifyStep.setCode}
-                  disabled={!p.verifyStep.sent || p.verifyStep.verifying}
-                  label="Enter the 6-digit code"
-                />
-                {p.verifyStep.error && (
-                  <p className="text-[13px] text-red-400 lg:text-[15px]">{p.verifyStep.error}</p>
-                )}
-                {p.verifyStep.sent ? (
-                  <>
-                    <GoldCta
-                      label="Verify my number"
-                      arrow={false}
-                      onClick={p.verifyStep.verify}
-                      loading={p.verifyStep.verifying}
-                      className="max-w-[564px]"
-                    />
-                    <div className="flex items-center gap-2 text-[13px] text-white/60 lg:text-[18px]">
-                      <Clock size={16} aria-hidden />
-                      {p.verifyStep.canResend ? (
-                        <button
-                          type="button"
-                          onClick={p.verifyStep.sendCode}
-                          className="font-semibold text-kink-gold-bright underline"
-                        >
-                          Send a new code
-                        </button>
-                      ) : (
-                        <span>
-                          Resend code in{" "}
-                          <span className="font-semibold text-kink-gold-bright/60">
-                            {String(Math.floor(p.verifyStep.resendIn / 60)).padStart(2, "0")}:
-                            {String(p.verifyStep.resendIn % 60).padStart(2, "0")}
-                          </span>
-                        </span>
-                      )}
-                    </div>
-                  </>
-                ) : (
+              </div>
+              {p.verifyStep.email.verified ? (
+                <div className="mt-4 flex flex-col items-center gap-3">
+                  <p className="text-[12px] text-kink-cream lg:text-[15px]">
+                    Your email address is confirmed.
+                  </p>
                   <GoldCta
-                    label="Text me a code"
-                    arrow={false}
-                    onClick={p.verifyStep.sendCode}
-                    loading={p.verifyStep.sending}
+                    label="Next step"
+                    onClick={p.verifyStep.nextStep}
                     className="max-w-[564px]"
                   />
-                )}
-                {p.verifyStep.skip && (
-                  <div className="flex flex-col items-center gap-1">
+                </div>
+              ) : (
+                <>
+                  <p className="mt-2 text-[12px] text-kink-cream lg:text-[15px]">
+                    {p.verifyStep.email.sentTo
+                      ? `We emailed a 6-digit code to ${p.verifyStep.email.sentTo}. It expires in 10 minutes.`
+                      : "Sending a 6-digit code to your email…"}
+                  </p>
+                  <div className="mt-4 flex flex-col items-center gap-3">
+                    <CodeInput
+                      value={p.verifyStep.email.code}
+                      onChange={p.verifyStep.email.setCode}
+                      disabled={!p.verifyStep.email.sent || p.verifyStep.email.verifying}
+                      label="Enter the code from your email"
+                    />
+                    {p.verifyStep.email.error && (
+                      <p className="text-[13px] text-red-400">{p.verifyStep.email.error}</p>
+                    )}
+                    <GoldCta
+                      label="Verify my email"
+                      arrow={false}
+                      onClick={p.verifyStep.email.verify}
+                      loading={p.verifyStep.email.verifying}
+                      className="max-w-[564px]"
+                    />
                     <button
                       type="button"
-                      onClick={p.verifyStep.skip}
-                      className="text-[13px] text-kink-help underline lg:text-[16px]"
+                      onClick={p.verifyStep.email.sendCode}
+                      disabled={!p.verifyStep.email.canResend}
+                      className="text-[12px] text-kink-help underline disabled:opacity-60"
                     >
-                      Not getting the text? Skip for now
+                      {p.verifyStep.email.resendIn > 0
+                        ? `Send a new code in ${String(
+                            Math.floor(p.verifyStep.email.resendIn / 60),
+                          ).padStart(
+                            2,
+                            "0",
+                          )}:${String(p.verifyStep.email.resendIn % 60).padStart(2, "0")}`
+                        : "Send a new code"}
                     </button>
-                    <p className="text-[12px] text-white/60 lg:text-[15px]">
-                      You can verify your number later in Settings → Security &amp; 2FA.
-                    </p>
                   </div>
-                )}
-              </>
-            )}
+                </>
+              )}
+            </section>
           </section>
         </SignupShell>
       )}
 
       {p.stage === "profile" && (
-        <SignupShell step={p.step} badge="STEP 5 OF 5">
+        <SignupShell step={p.step} badge={`STEP ${p.step} OF 5`}>
           <section className="flex w-full max-w-[706px] flex-col items-center gap-6 lg:max-w-[1130px] lg:gap-8">
             <StageHeading plain="BUILD YOUR" highlight="PROFILE" />
             {p.profileStep.resumed && (
@@ -661,17 +467,8 @@ function SignupWizard() {
                     </span>
                   </div>
                   <p className="mt-1.5 flex items-center gap-2 text-[13px] text-[#bfbfbf] lg:text-[17px]">
-                    {p.welcome.phoneVerified ? (
-                      <>
-                        <CheckCircle2 size={16} className="shrink-0 text-[#59b240]" aria-hidden />
-                        Phone number verified
-                      </>
-                    ) : (
-                      <>
-                        <Clock size={16} className="shrink-0 text-kink-gold-bright" aria-hidden />
-                        Phone not verified yet. Verify it any time in Settings → Security &amp; 2FA.
-                      </>
-                    )}
+                    <CheckCircle2 size={16} className="shrink-0 text-[#59b240]" aria-hidden />
+                    Email address verified
                   </p>
                 </div>
               </div>

@@ -1,20 +1,10 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { PHONE_NIGERIA_ONLY } from "@/domain/onboarding";
 import { useSignupWizardPresenter } from "./useSignupWizardPresenter";
 
 const push = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push, replace: vi.fn() }) }));
-
-// The phone code is skippable for now; one test turns the requirement back on.
-const phoneStep = vi.hoisted(() => ({ required: false }));
-vi.mock("@/domain/onboarding", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/domain/onboarding")>()),
-  get PHONE_STEP_REQUIRED() {
-    return phoneStep.required;
-  },
-}));
 
 const patch = vi.fn();
 const post = vi.fn();
@@ -56,8 +46,6 @@ const fillAccount = (result: { current: ReturnType<typeof useSignupWizardPresent
       username: "@TegaMaxwell",
       displayName: "Sir T",
       email: "tega@kinkord.com",
-      phoneLocal: "0803 123 4567",
-      phoneCountryCode: "+234",
       password: "supersecret123",
       confirmPassword: "supersecret123",
     }),
@@ -89,6 +77,15 @@ describe("useSignupWizardPresenter", () => {
     patch.mockReset().mockResolvedValue({ avatarUrl: "a", coverUrl: "c" });
     post.mockReset().mockResolvedValue({});
     push.mockReset();
+    sendCode
+      .mockReset()
+      .mockResolvedValue({
+        otpId: "11111111-1111-4111-8111-111111111111",
+        sentTo: "tega@kinkord.com",
+        expiresAt: new Date(Date.now() + 600_000).toISOString(),
+        resendAfterMs: 60_000,
+      });
+    verifyCode.mockReset().mockResolvedValue({ verified: true, attemptsLeft: null });
   });
 
   it("blocks step 1 until country + both confirmations are set", () => {
@@ -138,28 +135,6 @@ describe("useSignupWizardPresenter", () => {
     expect(result.current.firstInvalid).not.toBe(first);
   });
 
-  it("sends the number Chrome autofills with its country code as E.164", async () => {
-    const { result } = renderHook(() => useSignupWizardPresenter());
-    reachCombinedStep(result);
-    fillAccount(result);
-    fillAbout(result);
-    act(() =>
-      result.current.accountStep.set({
-        ...result.current.accountStep.draft,
-        phoneLocal: "+234 803 123 4567",
-      }),
-    );
-
-    await act(() => result.current.submitCombinedStep());
-
-    expect(post).toHaveBeenCalledWith(
-      "/auth-ext/sign-up",
-      expect.objectContaining({ phone: "+2348031234567" }),
-    );
-    expect(result.current.topError).toBeNull();
-    expect(result.current.stage).toBe("email");
-  });
-
   it("posts account + about and advances to email verification", async () => {
     const { result } = renderHook(() => useSignupWizardPresenter());
     reachCombinedStep(result);
@@ -178,15 +153,15 @@ describe("useSignupWizardPresenter", () => {
         state: "Delta",
         dateOfBirth: "1999-08-04",
         gender: "male",
-        phone: "+2348031234567",
       }),
     );
     expect(result.current.stage).toBe("email");
     await waitFor(() => expect(sendCode).toHaveBeenCalledWith("email"));
     expect(sendCode.mock.calls.filter(([channel]) => channel === "email")).toHaveLength(1);
 
+    expect(post.mock.calls[0][1]).not.toHaveProperty("phone");
     act(() => result.current.verifyStep.nextStep());
-    expect(result.current.stage).toBe("phone");
+    expect(result.current.stage).toBe("email");
   });
 
   it("surfaces a server error on the combined step without advancing", async () => {
@@ -234,158 +209,43 @@ describe("useSignupWizardPresenter", () => {
     expect(result.current.totalSteps).toBe(5);
   });
 
-  describe("phone verification", () => {
+  describe("email verification", () => {
     beforeEach(() => {
       sendCode.mockReset().mockResolvedValue({
         otpId: "11111111-1111-4111-8111-111111111111",
-        sentTo: "+234******4567",
+        sentTo: "tega@kinkord.com",
         expiresAt: new Date(Date.now() + 600_000).toISOString(),
         resendAfterMs: 60_000,
       });
       verifyCode.mockReset().mockResolvedValue({ verified: true, attemptsLeft: null });
     });
 
-    it("keeps phone verification behind successful email verification", async () => {
+    it("advances directly to profile only after email verification, without SMS", async () => {
       const { result } = renderHook(() => useSignupWizardPresenter());
       reachCombinedStep(result);
       fillAccount(result);
       fillAbout(result);
-
       await act(() => result.current.submitCombinedStep());
       await waitFor(() => expect(sendCode).toHaveBeenCalledWith("email"));
-      expect(result.current.stage).toBe("email");
-
-      act(() => result.current.verifyStep.email.setCode("123456"));
-      await act(async () => result.current.verifyStep.email.verify());
-
-      expect(result.current.verifyStep.email.verified).toBe(true);
-      expect(result.current.stage).toBe("email");
-
       act(() => result.current.verifyStep.nextStep());
-      expect(result.current.stage).toBe("phone");
-    });
-
-    it("asks the API to text a code and shows the masked number", async () => {
-      const { result } = renderHook(() => useSignupWizardPresenter());
-      expect(result.current.verifyStep.sent).toBe(false);
-
-      await act(async () => result.current.verifyStep.sendCode());
-
-      expect(sendCode).toHaveBeenCalled();
-      expect(result.current.verifyStep.sent).toBe(true);
-      expect(result.current.verifyStep.sentTo).toBe("+234******4567");
-      // Cooldown starts immediately so the resend link cannot be hammered.
-      expect(result.current.verifyStep.canResend).toBe(false);
-      expect(result.current.verifyStep.resendIn).toBe(60);
-    });
-
-    it("moves on to the profile step once the code checks out", async () => {
-      const { result } = renderHook(() => useSignupWizardPresenter());
-      await act(async () => result.current.verifyStep.sendCode());
-      act(() => result.current.verifyStep.setCode("123456"));
-      await act(async () => result.current.verifyStep.verify());
-
+      expect(result.current.stage).toBe("email");
+      act(() => result.current.verifyStep.email.setCode("123456"));
+      await act(() => result.current.verifyStep.email.verify());
+      act(() => result.current.verifyStep.nextStep());
+      expect(result.current.stage).toBe("profile");
+      expect(result.current.step).toBe(4);
+      expect(sendCode).not.toHaveBeenCalledWith("phone");
       expect(verifyCode).toHaveBeenCalledWith(
-        "phone",
+        "email",
         "11111111-1111-4111-8111-111111111111",
         "123456",
       );
-      expect(result.current.verifyStep.verified).toBe(true);
-      expect(result.current.stage).toBe("profile");
-      expect(result.current.welcome.phoneVerified).toBe(true);
-    });
-
-    it("clears the boxes and says how many tries are left on a wrong code", async () => {
-      verifyCode.mockResolvedValueOnce({ verified: false, attemptsLeft: 2 });
-      const { result } = renderHook(() => useSignupWizardPresenter());
-      await act(async () => result.current.verifyStep.sendCode());
-      act(() => result.current.verifyStep.setCode("000000"));
-      await act(async () => result.current.verifyStep.verify());
-
-      expect(result.current.verifyStep.error).toMatch(/2 tries left/);
-      expect(result.current.verifyStep.code).toBe("");
-      // A wrong code must not advance the wizard.
-      expect(result.current.stage).not.toBe("profile");
-    });
-
-    it("will not call the API with a half-typed code", async () => {
-      const { result } = renderHook(() => useSignupWizardPresenter());
-      await act(async () => result.current.verifyStep.sendCode());
-      act(() => result.current.verifyStep.setCode("12"));
-      await act(async () => result.current.verifyStep.verify());
-
-      expect(verifyCode).not.toHaveBeenCalled();
-      expect(result.current.verifyStep.error).toMatch(/6-digit/);
-    });
-
-    it("surfaces a refusal instead of pretending the code was sent", async () => {
-      sendCode.mockRejectedValueOnce(new Error("429"));
-      const { result } = renderHook(() => useSignupWizardPresenter());
-      act(() => result.current.verifyStep.sendCode());
-
-      await waitFor(() => expect(result.current.verifyStep.error).toBeTruthy());
-      expect(result.current.verifyStep.sent).toBe(false);
-    });
-
-    it("lets a member skip the code for now and carry on to the profile step", () => {
-      const { result } = renderHook(() => useSignupWizardPresenter("phone"));
-      act(() => result.current.verifyStep.skip?.());
-
-      expect(result.current.stage).toBe("profile");
-      expect(result.current.verifyStep.verified).toBe(false);
-      expect(result.current.welcome.phoneVerified).toBe(false);
-      // Carrying on from the phone step isn't coming back to the photos.
-      expect(result.current.profileStep.resumed).toBe(false);
-      expect(verifyCode).not.toHaveBeenCalled();
-    });
-
-    it("offers no way past the phone code once it is required again", () => {
-      phoneStep.required = true;
-      try {
-        const { result } = renderHook(() => useSignupWizardPresenter("phone"));
-        expect(result.current.verifyStep.skip).toBeNull();
-      } finally {
-        phoneStep.required = false;
-      }
-    });
-  });
-
-  describe("coming back to the phone step", () => {
-    it("resumes there and shows the number on file", async () => {
-      const { result } = renderHook(() => useSignupWizardPresenter("phone"));
-      expect(result.current.stage).toBe("phone");
-      await waitFor(() => expect(result.current.verifyStep.number).toBe("+2348031234567"));
-    });
-
-    it("saves a corrected number and starts the code over", async () => {
-      const { result } = renderHook(() => useSignupWizardPresenter("phone"));
-      act(() => result.current.verifyStep.changePhone.start());
-      act(() => result.current.verifyStep.changePhone.setLocal("0805 555 0142"));
-      act(() => result.current.verifyStep.changePhone.save());
-
-      await waitFor(() => expect(result.current.verifyStep.changePhone.open).toBe(false));
-      expect(patch).toHaveBeenCalledWith("/profile", { phone: "+2348055550142" });
-      expect(result.current.verifyStep.number).toBe("+2348055550142");
-      expect(result.current.verifyStep.sent).toBe(false);
-    });
-
-    it("refuses a number that isn't one, without calling the server", async () => {
-      const { result } = renderHook(() => useSignupWizardPresenter("phone"));
-      act(() => result.current.verifyStep.changePhone.start());
-      act(() => result.current.verifyStep.changePhone.setLocal("12"));
-      act(() => result.current.verifyStep.changePhone.save());
-
-      await waitFor(() =>
-        expect(result.current.verifyStep.changePhone.error).toBe(PHONE_NIGERIA_ONLY),
-      );
-      expect(patch).not.toHaveBeenCalled();
     });
   });
 
   describe("coming back to the photo step", () => {
-    it("starts from the photo, roles and verified phone already on file", async () => {
+    it("starts from the photo and roles already on file", async () => {
       get.mockResolvedValueOnce({
-        phone: "+2348031234567",
         phoneVerified: true,
         avatarUrl: "https://media.kinkord.com/avatars/u1/a.jpg",
         coverUrl: null,
@@ -403,7 +263,6 @@ describe("useSignupWizardPresenter", () => {
       expect(get).toHaveBeenCalledWith("/profile");
       expect(result.current.profileStep.coverUrl).toBeNull();
       expect(result.current.profileStep.roles).toEqual(["Switch"]);
-      expect(result.current.welcome.phoneVerified).toBe(true);
     });
 
     it("still needs both photos before it finishes", async () => {

@@ -6,8 +6,6 @@ export interface AccountDraft {
   username: string;
   displayName: string;
   email: string;
-  phoneLocal: string;
-  phoneCountryCode: string;
   password: string;
   confirmPassword: string;
 }
@@ -32,10 +30,6 @@ export function validateAccount(d: AccountDraft): Partial<Record<keyof AccountDr
     errors.displayName = "Display name must be 3–30 characters.";
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email.trim()))
     errors.email = "Enter a valid email address.";
-  // Required: a number is what stops a removed member coming back with a fresh email.
-  if (!d.phoneLocal.trim()) errors.phoneLocal = "Enter your phone number.";
-  else if (!isAllowedPhone(toE164(d.phoneCountryCode, d.phoneLocal)))
-    errors.phoneLocal = PHONE_NIGERIA_ONLY;
   if (d.password.length < 10) errors.password = "Use at least 10 characters.";
   else if (!/[a-zA-Z]/.test(d.password) || !/\d/.test(d.password))
     errors.password = "Use letters and numbers.";
@@ -130,7 +124,6 @@ export const SIGNUP_FIELDS = [
   "username",
   "displayName",
   "email",
-  "phoneLocal",
   "password",
   "confirmPassword",
   "state",

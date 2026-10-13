@@ -46,6 +46,16 @@ export interface SecurityViewProps {
     description: string;
     verifiedNote: string;
     missingNote: string;
+    entry: {
+      label: string;
+      placeholder: string;
+      value: string;
+      onChange: (value: string) => void;
+      saveLabel: string;
+      onSave: () => void;
+      saving: boolean;
+      error: string | null;
+    };
     sentNote: string | null;
     sendLabel: string;
     onSend: () => void;
@@ -227,7 +237,34 @@ export default function SecurityView(p: SecurityViewProps) {
         {ph.verified ? (
           <p className="text-[13px] text-app-subtle">{ph.verifiedNote}</p>
         ) : !ph.hasNumber ? (
-          <p className="text-[13px] text-app-subtle">{ph.missingNote}</p>
+          <div className="flex flex-col gap-[12px]">
+            <p className="text-[13px] text-app-subtle">{ph.missingNote}</p>
+            <label>
+              <span className={label}>{ph.entry.label}</span>
+              <input
+                type="tel"
+                autoComplete="tel"
+                value={ph.entry.value}
+                placeholder={ph.entry.placeholder}
+                disabled={ph.entry.saving}
+                onChange={(e) => ph.entry.onChange(e.target.value)}
+                className={input}
+              />
+            </label>
+            <button
+              type="button"
+              className={gold}
+              onClick={ph.entry.onSave}
+              disabled={ph.entry.saving || !ph.entry.value.trim()}
+            >
+              {ph.entry.saveLabel}
+            </button>
+            {ph.entry.error && (
+              <p role="alert" className="text-[13px] font-semibold text-red-500">
+                {ph.entry.error}
+              </p>
+            )}
+          </div>
         ) : (
           <>
             <p className="text-[13px] text-app-subtle">{ph.sentNote ?? ph.description}</p>

@@ -32,6 +32,7 @@ export type ImageKind = "avatar" | "cover";
 
 /** PATCH /profile body — only the fields Edit Profile writes. */
 export interface ProfilePatch {
+  phone?: string | null;
   displayName?: string;
   bio?: string | null;
   gender?: string | null;

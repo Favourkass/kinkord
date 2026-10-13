@@ -89,7 +89,6 @@ export const SIGNUP_FIELD_NAMES: Record<SignupField, string> = {
   username: "username",
   displayName: "display name",
   email: "email address",
-  phoneLocal: "phone number",
   password: "password",
   confirmPassword: "password confirmation",
   state: "state",
