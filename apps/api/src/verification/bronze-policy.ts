@@ -151,8 +151,8 @@ export function memberFailureReason(
  * only the ID proves must already have passed. Rejecting fails the attempt,
  * so the member can try again if attempts remain. A review whose member has
  * since changed what was checked can't be approved, and ends like any other
- * changed profile. A second account found since the review opened must be
- * shown to the admin before anyone approves.
+ * changed profile. An identity that's on another account can only be
+ * rejected: the member withdraws verification there first.
  */
 export function reviewOutcome(input: {
   decision: "approve" | "reject";
@@ -160,8 +160,8 @@ export function reviewOutcome(input: {
   attemptsUsed: number;
   /** The photo, birth date and gender are still the ones the attempt checked. */
   profileUnchanged: boolean;
-  /** Another account holds this identity and the review doesn't say so yet. */
-  unflaggedDuplicate: boolean;
+  /** The same identity is verified on, being reviewed for, or held against another account. */
+  sameIdentityElsewhere: boolean;
 }):
   | {
       ok: true;
@@ -196,12 +196,25 @@ export function reviewOutcome(input: {
       status: afterFailure,
       failureCodes: ["PROFILE_CHANGED_DURING_VERIFICATION"],
     };
-  if (input.unflaggedDuplicate) return { ok: false, reason: "duplicate" };
+  // One person, one verified account: that's for rejecting, never approving.
+  if (input.sameIdentityElsewhere) return { ok: false, reason: "duplicate" };
   return { ok: true, checks, status: "verified", attemptStatus: "verified", failureCodes: [] };
 }
 
-/** Didit's Nigerian registry lookups: the national identity number, and the bank one. */
-const NIGERIA_REGISTRY_SERVICES = ["nga_national_id", "nga_bank_verification_number"];
+/**
+ * Didit's Nigerian government-record checks, one per kind of document: the
+ * national identity (NIN) register, the passport register and the driver's
+ * licence register.
+ */
+const NIGERIA_REGISTRY_SERVICES = ["nga_national_id", "nga_passport", "nga_drivers_license"];
+/** Didit's face search found this selfie's face on another of our members. */
+const FACE_ELSEWHERE_RISKS = [
+  "DUPLICATED_FACE",
+  "POSSIBLE_DUPLICATED_FACE",
+  "DUPLICATED_FACE_NAME_MISMATCH",
+  "DUPLICATED_FACE_DOCUMENT_MISMATCH",
+  "POSSIBLE_FACE_IN_BLOCKLIST",
+];
 
 /**
  * Whether someone born on `dob` (YYYY-MM-DD) is 18 on `now`, by calendar age.
@@ -236,21 +249,24 @@ export function interpretDiditResult(
   const approved = (key: string) => reports(key).some((report) => report.status === "Approved");
   const idReports = reports("id_verifications");
   const id = idReports.find((report) => report.status === "Approved");
-  // Risk codes Didit raised on any ID report, including declined ones.
-  const risks = new Set(
-    idReports.flatMap((report) =>
-      Array.isArray(report.warnings)
-        ? report.warnings.map((warning: unknown) =>
-            warning && typeof warning === "object"
-              ? String((warning as Record<string, unknown>).risk ?? "")
-              : "",
-          )
-        : [],
-    ),
-  );
-  // A registry check counts once Didit approved it: a full match on its own,
-  // a partial one only after Didit's reviewer approved it (the workflow sends
-  // partial matches to review).
+  // Risk codes Didit raised on a feature's reports, including declined ones.
+  const risksOf = (list: Record<string, unknown>[]) =>
+    new Set(
+      list.flatMap((report) =>
+        Array.isArray(report.warnings)
+          ? report.warnings.map((warning: unknown) =>
+              warning && typeof warning === "object"
+                ? String((warning as Record<string, unknown>).risk ?? "")
+                : "",
+            )
+          : [],
+      ),
+    );
+  const risks = risksOf(idReports);
+  const faceRisks = risksOf(reports("liveness_checks"));
+  // A government-record check counts once Didit approved it: a full match on
+  // its own, a partial one only after Didit's reviewer approved it (the
+  // workflow sends partial matches to review). Bank (BVN) records don't count.
   const registry = reports("database_validations").some(
     (report) =>
       report.status === "Approved" &&
@@ -270,9 +286,7 @@ export function interpretDiditResult(
       : null;
   const nigeriaLookup =
     lookup?.outcome === "match" &&
-    /NIMC|NIBSS|National Identity Management Commission|Nigerian Banking/i.test(
-      String(lookup.source ?? ""),
-    );
+    /NIMC|National Identity Management Commission/i.test(String(lookup.source ?? ""));
   const terminal = ["Approved", "Declined", "Expired", "Abandoned", "Kyc Expired"].includes(
     String(payload.status),
   );
@@ -280,8 +294,8 @@ export function interpretDiditResult(
     String(payload.status),
   );
   const field = (key: string) => (id && typeof id[key] === "string" ? (id[key] as string) : "");
-  // A Nigerian ID must also check out against NIMC or NIBSS, whatever the
-  // profile says; a foreign one never needs it. The profile decides only when
+  // A Nigerian ID must also check out against its government record, whatever
+  // the profile says; a foreign one never needs it. The profile decides only when
   // Didit couldn't read where the ID is from.
   const issuingState = field("issuing_state").trim().toUpperCase();
   const nigerianId = issuingState
@@ -297,6 +311,8 @@ export function interpretDiditResult(
     idFace: approved("face_matches"),
     /** Didit found the same name and birth date under another member of ours. */
     possibleDuplicate: risks.has("POSSIBLE_DUPLICATED_USER"),
+    /** Didit's face search matched this selfie to another of our members. */
+    faceElsewhere: FACE_ELSEWHERE_RISKS.some((risk) => faceRisks.has(risk)),
     /** The ID says the holder is under 18, whether or not Didit approved it. */
     underage:
       risks.has("MINIMUM_AGE_NOT_MET") ||
