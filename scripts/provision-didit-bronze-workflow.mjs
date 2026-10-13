@@ -1,71 +1,50 @@
 /**
  * Creates Kinkord's identity verification workflow ("Bronze") in a Didit
  * application: ID document, active liveness, face match to the ID, and for
- * Nigerian IDs a NIMC lookup. Put the returned id in the verification
- * settings (DIDIT_WORKFLOW_ID locally, diditWorkflowId in kinkord/verification).
+ * Nigerian IDs a NIMC lookup (the payload is in didit-bronze-workflow.mjs).
+ * Put the returned id in the verification settings (DIDIT_WORKFLOW_ID
+ * locally, diditWorkflowId in kinkord/verification).
  *
- * Sandbox may load apps/api/.env. Live deliberately reads only the dedicated
- * DIDIT_LIVE_API_KEY process variable; set it in the current shell and never
- * write it to a repository or local env file.
+ * Sandbox may load apps/api/.env. Live never reads a file: it refuses
+ * --env-file and asks for the key with the input hidden, so the key stays out
+ * of shell history and off disk (DIDIT_LIVE_API_KEY is used if already set).
  * The environment defaults to sandbox; live must be asked for explicitly.
- * The API key is read only from the environment and is never logged.
+ * The API key is never logged.
  */
-import { diditWorkflowApiKey } from "./didit-workflow-env.mjs";
+import { bronzeWorkflowPayload, workflowDifferences } from "./didit-bronze-workflow.mjs";
+import { diditWorkflowApiKey, readHidden, refuseEnvFileForLive } from "./didit-workflow-env.mjs";
 
 const baseUrl = "https://verification.didit.me/v3/workflows/";
 const mode = process.argv[2] ?? "dry-run";
 const environment = process.argv[3] ?? "sandbox";
-const label =
-  environment === "live" ? "Kinkord Bronze - Nigeria Live" : "Kinkord Bronze - Nigeria Test";
-const apiKey = diditWorkflowApiKey(environment);
 
 if (!["dry-run", "inspect", "create"].includes(mode))
   throw new Error("Use dry-run, inspect or create.");
 if (!["sandbox", "live"].includes(environment))
   throw new Error("Use sandbox or live as the environment.");
+refuseEnvFileForLive(environment);
 
-const payload = {
-  workflow_label: label,
-  status: "published",
-  is_default: false,
-  // Phone cameras only: a desktop webcam is easier to feed a fake video.
-  // Didit offers desktop visitors a QR code to carry on on their phone.
-  is_desktop_allowed: false,
-  session_expiration_time: 86400,
-  features: [
-    {
-      feature: "OCR",
-      config: {
-        is_age_restrictions_enabled: true,
-        minimum_age: 18,
-        minimum_age_action: "DECLINE",
-        duplicated_user_action: "REVIEW",
-      },
-    },
-    {
-      feature: "LIVENESS",
-      config: { face_liveness_method: "ACTIVE_3D" },
-    },
-    { feature: "FACE_MATCH" },
-    {
-      feature: "DATABASE_VALIDATION",
-      config: {
-        database_validation_countries: {
-          NGA: { services: ["nga_national_id"] },
-        },
-        database_validation_partial_match_action: "REVIEW",
-        database_validation_no_match_action: "DECLINE",
-        // Other countries do not have this Nigerian registry check. Kinkord's
-        // backend still requires a NIN/BVN match for a Nigerian Bronze award.
-        database_validation_not_applicable_action: "NO_ACTION",
-      },
-    },
-  ],
-};
+const payload = bronzeWorkflowPayload(environment);
+const label = payload.workflow_label;
+
+if (mode === "dry-run") {
+  console.log(JSON.stringify(payload, null, 2));
+  process.exit(0);
+}
+
+const apiKey =
+  diditWorkflowApiKey(environment) ||
+  (environment === "live" ? await readHidden("Didit live API key (input hidden): ") : "");
+if (!apiKey)
+  throw new Error(
+    environment === "live" ? "No live API key was entered." : "DIDIT_SANDBOX_API_KEY is missing.",
+  );
 
 async function request(url, options = {}) {
   const response = await fetch(url, {
     ...options,
+    // A redirect would carry the API key to wherever it points.
+    redirect: "error",
     headers: {
       "x-api-key": apiKey,
       accept: "application/json",
@@ -84,18 +63,6 @@ async function request(url, options = {}) {
   return body;
 }
 
-if (mode === "dry-run") {
-  console.log(JSON.stringify(payload, null, 2));
-  process.exit(0);
-}
-
-if (!apiKey)
-  throw new Error(
-    environment === "live"
-      ? "DIDIT_LIVE_API_KEY is missing. Set it only in this shell; do not add it to .env."
-      : "DIDIT_SANDBOX_API_KEY is missing.",
-  );
-
 function workflowRows(body) {
   if (Array.isArray(body)) return body;
   if (Array.isArray(body?.results)) return body.results;
@@ -103,7 +70,23 @@ function workflowRows(body) {
   throw new Error("Unexpected Didit workflow-list response.");
 }
 
-const current = workflowRows(await request(baseUrl));
+/** Every workflow in the application, following Didit's pages. */
+async function listWorkflows() {
+  const rows = [];
+  let url = new URL(baseUrl);
+  for (let page = 1; url; page++) {
+    if (page > 50) throw new Error("Didit's workflow list didn't end after 50 pages.");
+    const body = await request(url);
+    rows.push(...workflowRows(body));
+    url = body?.next ? new URL(body.next, baseUrl) : null;
+    // Each request carries the API key, so only Didit's own pages are followed.
+    if (url && url.origin !== new URL(baseUrl).origin)
+      throw new Error("Didit's next page is on another site; not sending the key there.");
+  }
+  return rows;
+}
+
+const current = await listWorkflows();
 const existing = current.filter((item) => item.workflow_label === label);
 
 if (mode === "inspect") {
@@ -136,25 +119,20 @@ if (mode === "inspect") {
   const id = created.uuid ?? created.workflow_id;
   if (typeof id !== "string" || !id) throw new Error("Didit did not return a workflow ID.");
   const detail = await request(`${baseUrl}${encodeURIComponent(id)}/`);
-  const graphNodes = Object.values(detail.workflow_graph?.nodes ?? {});
-  const featureNodes = graphNodes.filter((node) => node?.node_type === "feature");
-  const orderedFeatures = payload.features.map((item) => item.feature);
-  if (orderedFeatures.some((feature) => !featureNodes.some((node) => node.feature === feature))) {
+  const differences = workflowDifferences(payload, detail);
+  if (differences.length) {
+    const list = differences.map((line) => `\n- ${line}`).join("");
     throw new Error(
-      `Didit created workflow ${id}, but its returned graph is missing a required feature.`,
+      existing.length
+        ? `Workflow ${id} ("${label}") differs from this script, so it won't be reused:${list}\n` +
+            "Fix it in Didit's console, or rename it there so this script creates a new one."
+        : `Didit created workflow ${id}, but these settings didn't persist:${list}`,
     );
   }
-  const liveness = featureNodes.find((node) => node.feature === "LIVENESS");
-  const validation = featureNodes.find((node) => node.feature === "DATABASE_VALIDATION");
-  const nigeriaServices = validation?.config?.database_validation_countries?.NGA?.services ?? [];
-  if (
-    liveness?.config?.face_liveness_method !== "ACTIVE_3D" ||
-    !nigeriaServices.includes("nga_national_id")
-  ) {
-    throw new Error(
-      `Didit created workflow ${id}, but active liveness or Nigerian NIN validation did not persist.`,
-    );
-  }
+  const config = (feature) =>
+    Object.values(detail.workflow_graph.nodes).find(
+      (node) => node?.node_type === "feature" && node.feature === feature,
+    ).config;
   console.log(
     JSON.stringify(
       {
@@ -165,8 +143,8 @@ if (mode === "inspect") {
         status: detail.status,
         features: detail.features,
         isDesktopAllowed: detail.is_desktop_allowed,
-        livenessMethod: liveness.config.face_liveness_method,
-        nigeriaServices,
+        livenessMethod: config("LIVENESS").face_liveness_method,
+        nigeriaServices: config("DATABASE_VALIDATION").database_validation_countries.NGA.services,
       },
       null,
       2,
