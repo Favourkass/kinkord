@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
-import { and, desc, eq, inArray, isNull, max, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, max, ne, sql } from "drizzle-orm";
 import { Db, DRIZZLE } from "../db/db.module";
 import {
   bronzeAttempt,
@@ -13,6 +13,7 @@ import {
   profileMedia,
   user,
   verificationErasure,
+  verificationIdentityHold,
   type BronzeStatus,
 } from "../db/schema";
 import {
@@ -38,6 +39,10 @@ export interface ProfileSnapshot {
 /** Where a member lands when an attempt ends without a pass. */
 const afterFailure = (attemptsUsed: number): BronzeStatus =>
   attemptsUsed >= BRONZE_MAX_ATTEMPTS ? "rejected" : "failed";
+
+/** Serialises everything that decides whether one identity is on two accounts. */
+const lockIdentity = (tx: Pick<Db, "execute">, binding: string) =>
+  tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"identity:" + binding}))`);
 
 @Injectable()
 export class BronzeRepository {
@@ -114,13 +119,21 @@ export class BronzeRepository {
    * member's Didit sessions so the caller can also attempt immediate erasure.
    * Durable erasure work is queued in this same transaction, before any later
    * account deletion can cascade the member-owned rows away.
+   *
+   * It is not a way round the attempt limit: attempts already used stay used,
+   * and a member out of attempts (or revoked) stays that way until an admin
+   * reopens them. Otherwise withdrawing and consenting again would buy three
+   * more paid Didit sessions, as often as anyone liked.
    */
   async withdrawConsent(userId: string): Promise<string[]> {
     return this.db.transaction(async (tx) => {
       const now = new Date();
       await tx.insert(bronzeVerification).values({ userId }).onConflictDoNothing();
-      await tx
-        .select({ userId: bronzeVerification.userId })
+      const [state] = await tx
+        .select({
+          status: bronzeVerification.status,
+          attemptsUsed: bronzeVerification.attemptsUsed,
+        })
         .from(bronzeVerification)
         .where(eq(bronzeVerification.userId, userId))
         .for("update");
@@ -153,20 +166,23 @@ export class BronzeRepository {
         .update(bronzeReview)
         .set({ status: "withdrawn", decidedAt: now })
         .where(and(eq(bronzeReview.userId, userId), eq(bronzeReview.status, "open")));
+      const status: BronzeStatus =
+        state?.status === "revoked"
+          ? "revoked"
+          : state?.status === "rejected" || (state?.attemptsUsed ?? 0) >= BRONZE_MAX_ATTEMPTS
+            ? "rejected"
+            : "not_started";
       await tx
         .update(bronzeVerification)
         .set({
-          status: "not_started",
+          status,
           currentAttemptId: null,
-          attemptsUsed: 0,
           verifiedAt: null,
           verifiedAvatarKey: null,
           verifiedDob: null,
           verifiedGender: null,
         })
-        .where(
-          and(eq(bronzeVerification.userId, userId), ne(bronzeVerification.status, "revoked")),
-        );
+        .where(eq(bronzeVerification.userId, userId));
       return sessions;
     });
   }
@@ -184,6 +200,24 @@ export class BronzeRepository {
           });
       return sessions;
     });
+  }
+
+  /**
+   * Keeps the member's identity fingerprints apart from their account, so the
+   * same ID can't be verified elsewhere without an admin looking. For a
+   * revocation, and for an account deleted with a ban.
+   */
+  async holdIdentities(userId: string, db: Pick<Db, "select" | "insert"> = this.db) {
+    const rows = await db
+      .select({ binding: bronzeAttempt.identityBinding })
+      .from(bronzeAttempt)
+      .where(and(eq(bronzeAttempt.userId, userId), isNotNull(bronzeAttempt.identityBinding)));
+    const bindings = [...new Set(rows.map((r) => r.binding).filter((b): b is string => !!b))];
+    if (bindings.length)
+      await db
+        .insert(verificationIdentityHold)
+        .values(bindings.map((binding) => ({ binding, userId })))
+        .onConflictDoNothing();
   }
 
   /** Queue one newly-created provider session that could not be attached locally. */
@@ -273,6 +307,19 @@ export class BronzeRepository {
       ) {
         return null;
       }
+      // Withdrawing takes this same lock, so a consent seen here still stands.
+      const [consented] = await tx
+        .select({ id: bronzeConsent.id })
+        .from(bronzeConsent)
+        .where(
+          and(
+            eq(bronzeConsent.userId, userId),
+            eq(bronzeConsent.policyVersion, BRONZE_POLICY_VERSION),
+            isNull(bronzeConsent.withdrawnAt),
+          ),
+        )
+        .limit(1);
+      if (!consented) return null;
       const [last] = await tx
         .select({ number: max(bronzeAttempt.number) })
         .from(bronzeAttempt)
@@ -333,7 +380,11 @@ export class BronzeRepository {
     });
   }
 
-  /** Release a reservation when no provider session was successfully attached. */
+  /**
+   * Release a reservation when no provider session was successfully attached.
+   * The attempt is given back. A reservation the member has since moved past
+   * (a withdrawal, say) is simply removed.
+   */
   async cancelReservation(attemptId: string) {
     return this.db.transaction(async (tx) => {
       const [candidate] = await tx
@@ -351,14 +402,9 @@ export class BronzeRepository {
         .from(bronzeAttempt)
         .where(eq(bronzeAttempt.id, attemptId))
         .for("update");
-      if (
-        !state ||
-        !attempt ||
-        state.currentAttemptId !== attemptId ||
-        !attempt.providerJobId.startsWith("reservation:")
-      )
-        return false;
+      if (!attempt || !attempt.providerJobId.startsWith("reservation:")) return false;
       await tx.delete(bronzeAttempt).where(eq(bronzeAttempt.id, attemptId));
+      if (!state || state.currentAttemptId !== attemptId) return false;
       const attemptsUsed = Math.max(0, state.attemptsUsed - 1);
       await tx
         .update(bronzeVerification)
@@ -414,8 +460,35 @@ export class BronzeRepository {
       });
   }
 
-  /** A session Didit never finished: the attempt fails, and counts toward the cap. */
-  async expireAttempt(attemptId: string) {
+  /**
+   * Reservations that never got a Didit session: the start crashed or failed
+   * between reserving and attaching. Starts take seconds, so anything this old
+   * is abandoned and safe to release.
+   */
+  async staleReservations(limit: number) {
+    return this.db
+      .select({ id: bronzeAttempt.id })
+      .from(bronzeAttempt)
+      .where(
+        and(
+          sql`${bronzeAttempt.providerJobId} like 'reservation:%'`,
+          sql`${bronzeAttempt.createdAt} < now() - interval '15 minutes'`,
+        ),
+      )
+      .orderBy(bronzeAttempt.createdAt)
+      .limit(limit);
+  }
+
+  /**
+   * A session that ended without a result. When Didit never finished it
+   * (`SESSION_EXPIRED`) the attempt counts toward the cap. When it's our side
+   * that couldn't get the result (`RESULT_UNAVAILABLE`: an outage, or a
+   * re-created workflow) the member gets the attempt back.
+   */
+  async expireAttempt(
+    attemptId: string,
+    reason: "SESSION_EXPIRED" | "RESULT_UNAVAILABLE" = "SESSION_EXPIRED",
+  ) {
     return this.db.transaction(async (tx) => {
       const [candidate] = await tx
         .select({ userId: bronzeAttempt.userId })
@@ -435,20 +508,38 @@ export class BronzeRepository {
       if (!attempt || !["started", "processing"].includes(attempt.status)) return false;
       await tx
         .update(bronzeAttempt)
-        .set({ status: "failed", failureCodes: ["SESSION_EXPIRED"], completedAt: new Date() })
+        .set({ status: "failed", failureCodes: [reason], completedAt: new Date() })
         .where(eq(bronzeAttempt.id, attemptId));
-      if (state?.currentAttemptId === attemptId && state.status === "pending")
+      if (state?.currentAttemptId === attemptId && state.status === "pending") {
+        const attemptsUsed =
+          reason === "RESULT_UNAVAILABLE"
+            ? Math.max(0, state.attemptsUsed - 1)
+            : state.attemptsUsed;
         await tx
           .update(bronzeVerification)
-          .set({ status: afterFailure(state.attemptsUsed) })
+          .set(
+            reason === "RESULT_UNAVAILABLE"
+              ? { status: attemptsUsed === 0 ? "not_started" : "failed", attemptsUsed }
+              : { status: afterFailure(attemptsUsed) },
+          )
           .where(eq(bronzeVerification.userId, candidate.userId));
+      }
       return true;
     });
   }
 
-  /** Whether the same person's ID already verified, or is being reviewed for, another account. */
-  async bindingUsedElsewhere(binding: string, userId: string) {
-    const [row] = await this.db
+  /**
+   * Whether the same person's ID is verified on, being reviewed for, or held
+   * against another account. Callers that act on the answer take the
+   * identity's lock first and pass their transaction, so two accounts
+   * finishing at once can't both see "no".
+   */
+  async bindingUsedElsewhere(
+    binding: string,
+    userId: string,
+    db: Pick<Db, "select"> = this.db,
+  ): Promise<boolean> {
+    const [attempt] = await db
       .select({ id: bronzeAttempt.id })
       .from(bronzeAttempt)
       .where(
@@ -459,7 +550,18 @@ export class BronzeRepository {
         ),
       )
       .limit(1);
-    return Boolean(row);
+    if (attempt) return true;
+    const [hold] = await db
+      .select({ binding: verificationIdentityHold.binding })
+      .from(verificationIdentityHold)
+      .where(
+        and(
+          eq(verificationIdentityHold.binding, binding),
+          ne(verificationIdentityHold.userId, userId),
+        ),
+      )
+      .limit(1);
+    return Boolean(hold);
   }
 
   /** Unique attempt key claims the paid request across webhooks, polls and API instances. */
@@ -522,7 +624,7 @@ export class BronzeRepository {
     reason: string;
   }): Promise<
     | { ok: true; status: BronzeStatus; userId: string; attemptId: string }
-    | { ok: false; reason: "closed" | "own" | "checks" | "changed" }
+    | { ok: false; reason: "closed" | "own" | "checks" | "changed" | "duplicate" }
   > {
     return this.db.transaction(async (tx) => {
       const [candidate] = await tx
@@ -576,8 +678,44 @@ export class BronzeRepository {
           current?.avatarKey !== attempt.avatarKey ||
           current.dob !== attempt.profileDob ||
           current.gender !== attempt.profileGender
-        )
+        ) {
+          // What was checked is gone, so nothing here can be approved: the
+          // attempt ends as any changed profile's does, rather than waiting
+          // for someone to reject it.
+          const now = new Date();
+          await tx
+            .update(bronzeReview)
+            .set({ status: "withdrawn", reviewerId: input.reviewerId, decidedAt: now })
+            .where(eq(bronzeReview.id, input.id));
+          await tx
+            .update(bronzeAttempt)
+            .set({
+              status: "failed",
+              failureCodes: ["PROFILE_CHANGED_DURING_VERIFICATION"],
+              completedAt: now,
+            })
+            .where(eq(bronzeAttempt.id, attempt.id));
+          await tx
+            .update(bronzeVerification)
+            .set({ status: afterFailure(state.attemptsUsed) })
+            .where(eq(bronzeVerification.userId, review.userId));
           return { ok: false, reason: "changed" };
+        }
+        if (attempt.identityBinding) {
+          await lockIdentity(tx, attempt.identityBinding);
+          const reasonCodes = (review.reasonCodes as string[]) ?? [];
+          if (
+            !reasonCodes.includes("IDENTITY_ON_ANOTHER_ACCOUNT") &&
+            (await this.bindingUsedElsewhere(attempt.identityBinding, review.userId, tx))
+          ) {
+            // Found since the review opened: show the admin before anyone approves it.
+            await tx
+              .update(bronzeReview)
+              .set({ reasonCodes: [...reasonCodes, "IDENTITY_ON_ANOTHER_ACCOUNT"] })
+              .where(eq(bronzeReview.id, input.id));
+            return { ok: false, reason: "duplicate" };
+          }
+        }
       }
       const now = new Date();
       await tx
@@ -656,6 +794,8 @@ export class BronzeRepository {
         .update(bronzeReview)
         .set({ status: "withdrawn", decidedAt: now })
         .where(and(eq(bronzeReview.userId, userId), eq(bronzeReview.status, "open")));
+      // The same ID can't simply be verified on a fresh account instead.
+      await this.holdIdentities(userId, tx);
       return true;
     });
   }
@@ -720,9 +860,19 @@ export class BronzeRepository {
         .from(profile)
         .where(eq(profile.userId, input.userId))
         .for("update");
+      // Checked here, under the identity's lock, so two accounts of one person
+      // finishing at the same moment can't both pass.
+      const passing = input.status === "verified" || input.status === "manual_review";
+      let duplicate = false;
+      if (passing && input.identityBinding) {
+        await lockIdentity(tx, input.identityBinding);
+        duplicate = await this.bindingUsedElsewhere(input.identityBinding, input.userId, tx);
+      }
       const { checks, status, failureCodes } = bronzeCallbackOutcome({
         ...input,
         checks: merged,
+        duplicate,
+        bindingMissing: passing && !input.identityBinding,
         attemptNumber: current.attemptsUsed,
         profileUnchanged:
           currentProfile?.avatarKey === attempt.avatarKey &&

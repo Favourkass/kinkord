@@ -4,6 +4,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -42,26 +43,31 @@ const at = (name: string) => timestamp(name, { withTimezone: true, precision: 3 
  * A member's identity verification. Holds outcomes only: no ID number, document,
  * selfie or raw provider callback is stored anywhere in these tables.
  */
-export const bronzeVerification = pgTable("bronze_verification", {
-  userId: text("user_id")
-    .primaryKey()
-    .references(() => user.id, { onDelete: "cascade" }),
-  status: text("status").$type<BronzeStatus>().notNull().default("not_started"),
-  /** Failed attempts since the last success; the third ends automated tries. */
-  attemptsUsed: integer("attempts_used").notNull().default(0),
-  currentAttemptId: uuid("current_attempt_id").references((): AnyPgColumn => bronzeAttempt.id, {
-    onDelete: "set null",
-  }),
-  verifiedAt: at("verified_at"),
-  /** The profile as it was verified: change any of these and the badge comes off. */
-  verifiedAvatarKey: text("verified_avatar_key"),
-  verifiedDob: text("verified_dob"),
-  verifiedGender: text("verified_gender"),
-  updatedAt: at("updated_at")
-    .defaultNow()
-    .$onUpdate(() => new Date())
-    .notNull(),
-});
+export const bronzeVerification = pgTable(
+  "bronze_verification",
+  {
+    userId: text("user_id")
+      .primaryKey()
+      .references(() => user.id, { onDelete: "cascade" }),
+    status: text("status").$type<BronzeStatus>().notNull().default("not_started"),
+    /** Failed attempts since the last success; the third ends automated tries. */
+    attemptsUsed: integer("attempts_used").notNull().default(0),
+    currentAttemptId: uuid("current_attempt_id").references((): AnyPgColumn => bronzeAttempt.id, {
+      onDelete: "set null",
+    }),
+    verifiedAt: at("verified_at"),
+    /** The profile as it was verified: change any of these and the badge comes off. */
+    verifiedAvatarKey: text("verified_avatar_key"),
+    verifiedDob: text("verified_dob"),
+    verifiedGender: text("verified_gender"),
+    updatedAt: at("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  // Deleting an attempt clears it from here; without the index that scans every member.
+  (t) => [index("bronze_verification_current_attempt_idx").on(t.currentAttemptId)],
+);
 
 export const bronzeAttempt = pgTable(
   "bronze_verification_attempt",
@@ -197,4 +203,22 @@ export const verificationErasure = pgTable(
     uniqueIndex("verification_erasure_provider_session_unique").on(t.provider, t.providerSessionId),
     index("verification_erasure_due_idx").on(t.completedAt, t.nextAttemptAt),
   ],
+);
+
+/**
+ * Identities an admin took the badge away from, or whose account was banned.
+ * Only the one-way fingerprint, kept apart from the member's own rows and with
+ * no foreign key, so that the same ID can't be verified on another account
+ * without an admin looking, even after the member withdraws consent or the
+ * account is deleted.
+ */
+export const verificationIdentityHold = pgTable(
+  "verification_identity_hold",
+  {
+    binding: text("binding").notNull(),
+    /** The account it was held on; plain text so the hold outlives it. */
+    userId: text("user_id").notNull(),
+    createdAt: at("created_at").defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.binding, t.userId] })],
 );

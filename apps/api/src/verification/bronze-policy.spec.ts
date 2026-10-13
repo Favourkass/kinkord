@@ -56,6 +56,8 @@ describe("Bronze policy", () => {
     ).toBe(true);
   });
 
+  const nigerian = { country: "NG", nationality: null };
+
   it("reads Didit's decision, including Nigeria's registry check and its own review", () => {
     const decision = (status: string, lookup = true) => ({
       status,
@@ -73,7 +75,7 @@ describe("Bronze policy", () => {
       liveness_checks: [{ status: "Approved" }],
       face_matches: [{ status: "Approved" }],
     });
-    expect(interpretDiditResult(decision("Approved"), "NG")).toMatchObject({
+    expect(interpretDiditResult(decision("Approved"), nigerian)).toMatchObject({
       terminal: true,
       failed: false,
       governmentId: true,
@@ -81,15 +83,120 @@ describe("Bronze policy", () => {
       idFace: true,
       identity: { IssuingState: "NGA", IssuingStateName: "Nigeria", FullName: "Ada Okafor" },
     });
-    expect(interpretDiditResult(decision("Approved", false), "NG").governmentId).toBe(false);
-    expect(interpretDiditResult(decision("In Review"), "NG")).toMatchObject({
+    expect(interpretDiditResult(decision("Approved", false), nigerian).governmentId).toBe(false);
+    expect(interpretDiditResult(decision("In Review"), nigerian)).toMatchObject({
       terminal: false,
       inProviderReview: true,
     });
-    expect(interpretDiditResult(decision("Declined"), "NG")).toMatchObject({
+    expect(interpretDiditResult(decision("Declined"), nigerian)).toMatchObject({
       terminal: true,
       failed: true,
     });
+  });
+
+  describe("the Nigerian registry rule follows the ID, not the editable profile", () => {
+    const decision = (issuingState: string, extra: Record<string, unknown> = {}) => ({
+      status: "Approved",
+      id_verifications: [
+        {
+          status: "Approved",
+          date_of_birth: "1998-04-02",
+          gender: "F",
+          issuing_state: issuingState,
+          issuing_state_name: issuingState === "NGA" ? "Nigeria" : "United Kingdom",
+          full_name: "Ada Okafor",
+        },
+      ],
+      liveness_checks: [{ status: "Approved" }],
+      face_matches: [{ status: "Approved" }],
+      ...extra,
+    });
+    const registry = (outcome: string, status = "Approved") => ({
+      database_validations: [
+        { status, validations: [{ service_id: "nga_national_id", outcome_code: outcome }] },
+      ],
+    });
+
+    it("needs a registry match for a Nigerian ID even when the profile says elsewhere", () => {
+      const abroad = { country: "GB", nationality: "NG" };
+      expect(interpretDiditResult(decision("NGA"), abroad).governmentId).toBe(false);
+      expect(interpretDiditResult(decision("NGA", registry("MATCH")), abroad).governmentId).toBe(
+        true,
+      );
+    });
+
+    it("never asks a foreign ID for a Nigerian registry match", () => {
+      expect(interpretDiditResult(decision("GBR"), nigerian).governmentId).toBe(true);
+    });
+
+    it("falls back to the profile only when Didit couldn't read the ID's country", () => {
+      expect(interpretDiditResult(decision(""), nigerian).governmentId).toBe(false);
+      expect(
+        interpretDiditResult(decision(""), { country: "GH", nationality: null }).governmentId,
+      ).toBe(true);
+    });
+
+    it("accepts a partial match only once Didit's reviewer has approved it", () => {
+      expect(
+        interpretDiditResult(decision("NGA", registry("PARTIAL_MATCH")), nigerian).governmentId,
+      ).toBe(true);
+      expect(
+        interpretDiditResult(decision("NGA", registry("PARTIAL_MATCH", "In Review")), nigerian)
+          .governmentId,
+      ).toBe(false);
+      expect(
+        interpretDiditResult(decision("NGA", registry("NO_MATCH", "Declined")), nigerian)
+          .governmentId,
+      ).toBe(false);
+    });
+  });
+
+  it("reports Didit's duplicate and under-age warnings, even on a declined ID", () => {
+    const declined = (risk: string, dob = "1998-04-02") => ({
+      status: "Declined",
+      id_verifications: [
+        { status: "Declined", date_of_birth: dob, warnings: [{ risk, log_type: "error" }] },
+      ],
+    });
+    const now = new Date("2026-10-13");
+    expect(
+      interpretDiditResult(declined("POSSIBLE_DUPLICATED_USER"), nigerian, now).possibleDuplicate,
+    ).toBe(true);
+    expect(interpretDiditResult(declined("MINIMUM_AGE_NOT_MET"), nigerian, now).underage).toBe(
+      true,
+    );
+    expect(
+      interpretDiditResult(declined("DOCUMENT_EXPIRED", "2010-01-01"), nigerian, now),
+    ).toMatchObject({ underage: true, possibleDuplicate: false });
+    expect(interpretDiditResult(declined("DOCUMENT_EXPIRED"), nigerian, now).underage).toBe(false);
+  });
+
+  it("sends a possible second account, or an identity it can't fingerprint, to an admin", () => {
+    const input = {
+      checks: { ...allButPhoto, profileFace: true },
+      status: "verified" as const,
+      failureCodes: [],
+      attemptNumber: 1,
+      profileUnchanged: true,
+    };
+    expect(bronzeCallbackOutcome({ ...input, duplicate: true })).toMatchObject({
+      status: "manual_review",
+      failureCodes: ["IDENTITY_ON_ANOTHER_ACCOUNT"],
+    });
+    expect(bronzeCallbackOutcome({ ...input, bindingMissing: true })).toMatchObject({
+      status: "manual_review",
+      failureCodes: ["IDENTITY_FINGERPRINT_UNAVAILABLE"],
+    });
+    expect(bronzeCallbackOutcome(input).status).toBe("verified");
+    // A failed ID stays failed; there's nothing for an admin to approve.
+    expect(
+      bronzeCallbackOutcome({
+        ...input,
+        status: "failed",
+        failureCodes: ["DIDIT_DECLINED"],
+        duplicate: true,
+      }).status,
+    ).toBe("failed");
   });
 
   it("lets a member retry a failed attempt, and ends at the last one", () => {
