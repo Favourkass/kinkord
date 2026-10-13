@@ -141,6 +141,8 @@ export const MODERATION_COPY = {
     approve: "Approve",
     reject: "Reject",
     cannotApprove: "The ID checks didn't pass, so this can only be rejected.",
+    identityElsewhere:
+      "This ID is already on another account, so this can only be rejected. The member can withdraw verification on the other account first.",
     own: "You can't act on your own verification.",
     protected: "Only a founder can decide an admin's verification.",
     duplicateOf: (handle: string | null) =>
@@ -168,7 +170,11 @@ export const MODERATION_COPY = {
       PROFILE_CHANGED_DURING_VERIFICATION: "They changed their profile during the check",
       ID_COUNTRY_UNCONFIRMED:
         "Couldn't confirm the ID's country against their nationality or country",
-      IDENTITY_ON_ANOTHER_ACCOUNT: "This ID looks like it's already on another account",
+      IDENTITY_ON_ANOTHER_ACCOUNT: "This ID is already verified or in review on another account",
+      POSSIBLE_DUPLICATE_AT_DIDIT:
+        "Didit found a similar name and birth date on another account: check it's a different person",
+      FACE_ON_ANOTHER_ACCOUNT:
+        "Didit's face search matched this selfie to another account: check it's a different person",
       IDENTITY_FINGERPRINT_UNAVAILABLE:
         "Didit's result didn't include enough to check this ID against other accounts",
     } as Record<string, string>,

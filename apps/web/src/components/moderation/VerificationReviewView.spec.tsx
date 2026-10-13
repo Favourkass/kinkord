@@ -24,6 +24,7 @@ const row = (over: Partial<AdminVerificationReviewVM> = {}): AdminVerificationRe
   originalPhotoUrl: "https://media/a.jpg?X-Amz-Signature=s2",
   sessionId: "session-1",
   canApprove: true,
+  cannotApprove: null,
   locked: null,
   duplicate: null,
   ...over,
@@ -57,7 +58,6 @@ const props = (over: Partial<VerificationReviewViewProps> = {}): VerificationRev
     notPassed: "Not passed",
     approve: "Approve",
     reject: "Reject",
-    cannotApprove: "Reject only",
   },
   ...over,
 });

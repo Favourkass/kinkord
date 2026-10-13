@@ -30,6 +30,8 @@ const REVIEW_LABELS = {
   own: copy.own,
   protected: copy.protected,
   duplicateOf: copy.duplicateOf,
+  idChecksFailed: copy.cannotApprove,
+  identityElsewhere: copy.identityElsewhere,
 };
 
 function messageOf(e: unknown): string {
@@ -239,7 +241,6 @@ export function useAdminVerificationPresenter() {
       notPassed: copy.notPassed,
       approve: copy.approve,
       reject: copy.reject,
-      cannotApprove: copy.cannotApprove,
     },
   };
 }

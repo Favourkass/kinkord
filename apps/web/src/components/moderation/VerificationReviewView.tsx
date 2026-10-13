@@ -53,7 +53,6 @@ export interface VerificationReviewViewProps {
     notPassed: string;
     approve: string;
     reject: string;
-    cannotApprove: string;
   };
 }
 
@@ -298,9 +297,9 @@ export default function VerificationReviewView(p: VerificationReviewViewProps) {
 
               {r.locked ? (
                 <p className="pt-[8px] text-[13px] text-app-subtle">{r.locked}</p>
-              ) : r.canApprove ? null : (
-                <p className="pt-[8px] text-[13px] text-app-danger">{labels.cannotApprove}</p>
-              )}
+              ) : r.cannotApprove ? (
+                <p className="pt-[8px] text-[13px] text-app-danger">{r.cannotApprove}</p>
+              ) : null}
               <div className="flex flex-wrap items-center gap-[8px] pt-[14px]">
                 <Link
                   href={r.memberHref}

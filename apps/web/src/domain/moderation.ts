@@ -458,6 +458,10 @@ export interface AdminVerificationLabels extends AdminVerificationLockLabels {
   reasons: Record<string, string>;
   /** "Same ID as @ada"; `handle` is null when that account has no username. */
   duplicateOf: (handle: string | null) => string;
+  /** Why Approve is off: the ID checks failed. */
+  idChecksFailed: string;
+  /** Why Approve is off: the same identity is on another account (reject only). */
+  identityElsewhere: string;
 }
 
 export interface AdminVerificationReviewVM {
@@ -471,8 +475,10 @@ export interface AdminVerificationReviewVM {
   photoUrl: string;
   originalPhotoUrl: string;
   sessionId: string;
-  /** What only the ID proves has passed; the API refuses to approve otherwise. */
+  /** What only the ID proves has passed and the identity isn't on another account. */
   canApprove: boolean;
+  /** Why Approve is off, when it is. */
+  cannotApprove: string | null;
   /** Set when this admin may not decide it at all; shown instead of Approve and Reject. */
   locked: string | null;
   /** The account already verified with this ID, linking to its moderation page. */
@@ -497,6 +503,19 @@ const ID_CHECKS: AdminVerificationCheck[] = [
   "dateOfBirth",
   "gender",
 ];
+
+/**
+ * Why a review can't be approved, if it can't: what only the ID proves failed,
+ * or the same identity is on another account (one person, one verified
+ * account: reject only, as the API enforces).
+ */
+function blockedApproval(
+  pm: AdminVerificationReviewPM,
+  labels: AdminVerificationLabels,
+): string | null {
+  if (!ID_CHECKS.every((key) => pm.checks[key] === true)) return labels.idChecksFailed;
+  return pm.reasonCodes.includes("IDENTITY_ON_ANOTHER_ACCOUNT") ? labels.identityElsewhere : null;
+}
 
 /** Your own comes first: as a non-founder admin, your own verification is also an admin's. */
 function lockedReason(
@@ -530,7 +549,8 @@ export function toAdminVerificationReviewVM(
     photoUrl: pm.photoUrl,
     originalPhotoUrl: pm.originalPhotoUrl,
     sessionId: pm.providerSessionId,
-    canApprove: ID_CHECKS.every((key) => pm.checks[key] === true),
+    canApprove: !blockedApproval(pm, labels),
+    cannotApprove: blockedApproval(pm, labels),
     locked: lockedReason(pm, labels),
     duplicate: duplicate
       ? {
