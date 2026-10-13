@@ -12,6 +12,7 @@ import { useAdminAccessPresenter } from "@/presenters/useAdminAccessPresenter";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
 import { usePushPresenter } from "@/presenters/usePushPresenter";
 import { usePwaPresenter } from "@/presenters/usePwaPresenter";
+import { useVerificationAvailabilityPresenter } from "@/presenters/useVerificationAvailabilityPresenter";
 import { getTheme, setTheme, type Theme } from "@/util/theme";
 
 export default function SettingsPage() {
@@ -20,6 +21,7 @@ export default function SettingsPage() {
   const push = usePushPresenter();
   const admin = useAdminAccessPresenter();
   const nav = getAppShellNav();
+  const verification = useVerificationAvailabilityPresenter();
   const [theme, setThemeState] = useState<Theme>(() =>
     typeof document === "undefined" ? "light" : getTheme(),
   );
@@ -103,6 +105,15 @@ export default function SettingsPage() {
           Security &amp; 2FA
           <ChevronRightIcon className="text-[#b8850f]" />
         </Link>
+        {verification.showEntry ? (
+          <Link
+            href={Routes.settingsVerification}
+            className="mt-[12px] flex h-[52px] items-center justify-between rounded-[16px] bg-app-members px-[18px] text-[18px] font-medium text-app-name"
+          >
+            Verification
+            <ChevronRightIcon className="text-[#b8850f]" />
+          </Link>
+        ) : null}
         {admin.isAdmin ? (
           <Link
             href={Routes.moderation}

@@ -4,6 +4,8 @@ export const Routes = {
   about: "/about",
   team: "/about/team",
   contact: "/contact",
+  /** Privacy notice for identity verification, linked before members consent. */
+  verificationPrivacy: "/privacy/verification",
   invest: "/invest",
   lectures: "/lectures",
   lecture: (slug: string) => `/lectures/${slug}`,
@@ -36,6 +38,7 @@ export const Routes = {
   settings: "/settings",
   /** Password + 2FA moved here from /profile (CEO, 2026-09-12: "we still need to keep the change password and co"). */
   settingsSecurity: "/settings/security",
+  settingsVerification: "/settings/verification",
   // Edit Profile hub (Figma 1542:30) and its five sections.
   profileEdit: "/profile/edit",
   profileEditPhotos: "/profile/edit/photos",
