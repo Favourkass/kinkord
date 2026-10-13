@@ -17,6 +17,18 @@ describe("identityBinding", () => {
     expect(a).not.toContain("ada");
   });
 
+  it("ignores the order of the name's words and its accents", () => {
+    const passport = identityBinding(
+      { fullName: "OKAFOR ADA CHIOMA", dateOfBirth: "1990-02-03", gender: "F" },
+      secret,
+    );
+    const ninSlip = identityBinding(
+      { fullName: "Ada Chioma Ọkafor", dateOfBirth: "1990-02-03", gender: "Female" },
+      secret,
+    );
+    expect(passport).toBe(ninSlip);
+  });
+
   it("tells different people apart", () => {
     const ada = identityBinding(
       { fullName: "Ada Okafor", dateOfBirth: "1990-02-03", gender: "F" },

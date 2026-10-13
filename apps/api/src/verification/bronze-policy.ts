@@ -1,3 +1,5 @@
+import type { BronzeStatus } from "../db/schema";
+
 export const BRONZE_POLICY_VERSION = "bronze-2026-10-03-identity-v3";
 export const BRONZE_MAX_ATTEMPTS = 3;
 
@@ -44,48 +46,186 @@ export function bronzeCallbackOutcome(input: {
   failureCodes: string[];
   attemptNumber: number;
   profileUnchanged: boolean;
+  /** The same identity is verified, in review or held on another account (checked under its lock). */
+  duplicate?: boolean;
+  /** Didit gave too little to fingerprint the identity, so a duplicate can't be ruled out. */
+  bindingMissing?: boolean;
 }) {
   const checks = {
     ...input.checks,
     profileFace: input.checks.profileFace && input.profileUnchanged,
   };
-  if (input.status === "failed")
-    return {
-      checks,
-      status:
-        input.attemptNumber >= BRONZE_MAX_ATTEMPTS ? ("rejected" as const) : ("failed" as const),
-      failureCodes: input.failureCodes,
-    };
-  if (!input.profileUnchanged)
-    return {
-      checks,
-      status:
-        input.attemptNumber >= BRONZE_MAX_ATTEMPTS ? ("rejected" as const) : ("failed" as const),
-      failureCodes: ["PROFILE_CHANGED_DURING_VERIFICATION"],
-    };
-  if (input.status === "manual_review")
+  const ended = (failureCodes: string[]) => ({
+    checks,
+    status:
+      input.attemptNumber >= BRONZE_MAX_ATTEMPTS ? ("rejected" as const) : ("failed" as const),
+    failureCodes,
+  });
+  if (input.status === "failed") return ended(input.failureCodes);
+  // Not finished at Didit: whatever has passed so far, wait for its decision.
+  if (input.status === "processing")
+    return { checks, status: "processing" as const, failureCodes: input.failureCodes };
+  if (!input.profileUnchanged) return ended(["PROFILE_CHANGED_DURING_VERIFICATION"]);
+  // Whatever else passed, a possible second account is for a person to decide.
+  const held = [
+    ...(input.duplicate ? ["IDENTITY_ON_ANOTHER_ACCOUNT"] : []),
+    ...(input.bindingMissing ? ["IDENTITY_FINGERPRINT_UNAVAILABLE"] : []),
+  ];
+  if (input.status === "manual_review" || (held.length && idChecksPass(checks))) {
+    const failureCodes = [...new Set([...input.failureCodes, ...held])];
     return {
       checks,
       status: "manual_review" as const,
-      failureCodes: input.failureCodes.length
-        ? input.failureCodes
-        : ["PROFILE_PHOTO_FACE_MATCH_REQUIRED"],
+      failureCodes: failureCodes.length ? failureCodes : ["PROFILE_PHOTO_FACE_MATCH_REQUIRED"],
     };
+  }
   if (canAwardBronze(checks)) return { checks, status: "verified" as const, failureCodes: [] };
-  return idChecksPass(checks)
-    ? {
-        checks,
-        status: "manual_review" as const,
-        failureCodes: [
-          ...(!checks.profileFace ? ["PROFILE_PHOTO_FACE_MATCH_REQUIRED"] : []),
-          ...(!checks.country ? ["ID_COUNTRY_UNCONFIRMED"] : []),
-        ],
-      }
-    : { checks, status: "processing" as const, failureCodes: input.failureCodes };
+  if (idChecksPass(checks))
+    return {
+      checks,
+      status: "manual_review" as const,
+      failureCodes: [
+        ...(!checks.profileFace ? ["PROFILE_PHOTO_FACE_MATCH_REQUIRED"] : []),
+        ...(!checks.country ? ["ID_COUNTRY_UNCONFIRMED"] : []),
+      ],
+    };
+  // A finished result without what only the ID proves: nothing more is coming.
+  return ended(input.failureCodes.length ? input.failureCodes : ["DIDIT_REQUIRED_CHECK_MISSING"]);
 }
 
-/** A provider-level approval is insufficient without every required feature. */
-export function interpretDiditResult(payload: Record<string, unknown>, profileCountry: string) {
+/** Why a member's latest attempt didn't pass, in terms they can act on. */
+export type MemberFailure =
+  | "birth_date"
+  | "gender"
+  | "registry"
+  | "declined"
+  | "liveness"
+  | "face"
+  | "profile_changed"
+  | "expired"
+  | "other";
+
+/**
+ * Says why the latest attempt failed, as the member may be told. It never
+ * reveals a possible second account, and stays quiet about attempts the member
+ * or an admin ended (a withdrawal, a revocation).
+ */
+export function memberFailureReason(
+  attempt: { status: string; failureCodes: string[]; checks: Partial<BronzeChecks> } | null,
+): MemberFailure | null {
+  if (!attempt || attempt.status !== "failed") return null;
+  const codes = attempt.failureCodes;
+  const checks = { ...emptyBronzeChecks(), ...attempt.checks };
+  if (
+    ["CONSENT_WITHDRAWN", "VERIFICATION_REVOKED", "ACCOUNT_DELETED"].some((c) => codes.includes(c))
+  )
+    return null;
+  if (codes.includes("PROFILE_CHANGED_DURING_VERIFICATION")) return "profile_changed";
+  if (codes.includes("SESSION_EXPIRED")) return "expired";
+  if (codes.includes("DIDIT_DECLINED"))
+    return !checks.governmentId
+      ? "declined"
+      : !checks.liveness
+        ? "liveness"
+        : !checks.idFace
+          ? "face"
+          : "declined";
+  if (codes.includes("DIDIT_REQUIRED_CHECK_MISSING"))
+    return !checks.dateOfBirth
+      ? "birth_date"
+      : !checks.gender
+        ? "gender"
+        : !checks.governmentId
+          ? "registry"
+          : !checks.liveness
+            ? "liveness"
+            : !checks.idFace
+              ? "face"
+              : "other";
+  return "other";
+}
+
+/**
+ * What an admin's decision on a review does. Approving confirms the two
+ * checks a person can judge (the profile photo and the ID's country); what
+ * only the ID proves must already have passed. Rejecting fails the attempt,
+ * so the member can try again if attempts remain. A review whose member has
+ * since changed what was checked can't be approved, and ends like any other
+ * changed profile. A second account found since the review opened must be
+ * shown to the admin before anyone approves.
+ */
+export function reviewOutcome(input: {
+  decision: "approve" | "reject";
+  checks: Partial<BronzeChecks>;
+  attemptsUsed: number;
+  /** The photo, birth date and gender are still the ones the attempt checked. */
+  profileUnchanged: boolean;
+  /** Another account holds this identity and the review doesn't say so yet. */
+  unflaggedDuplicate: boolean;
+}):
+  | {
+      ok: true;
+      checks: BronzeChecks;
+      status: BronzeStatus;
+      attemptStatus: "verified" | "failed";
+      failureCodes: string[];
+    }
+  | { ok: false; reason: "checks" | "duplicate" }
+  | { ok: false; reason: "changed"; status: BronzeStatus; failureCodes: string[] } {
+  const afterFailure: BronzeStatus =
+    input.attemptsUsed >= BRONZE_MAX_ATTEMPTS ? "rejected" : "failed";
+  if (input.decision === "reject")
+    return {
+      ok: true,
+      checks: { ...emptyBronzeChecks(), ...input.checks },
+      status: afterFailure,
+      attemptStatus: "failed",
+      failureCodes: ["MANUAL_REVIEW_REJECTED"],
+    };
+  const checks: BronzeChecks = {
+    ...emptyBronzeChecks(),
+    ...input.checks,
+    profileFace: true,
+    country: true,
+  };
+  if (!idChecksPass(checks) || !canAwardBronze(checks)) return { ok: false, reason: "checks" };
+  if (!input.profileUnchanged)
+    return {
+      ok: false,
+      reason: "changed",
+      status: afterFailure,
+      failureCodes: ["PROFILE_CHANGED_DURING_VERIFICATION"],
+    };
+  if (input.unflaggedDuplicate) return { ok: false, reason: "duplicate" };
+  return { ok: true, checks, status: "verified", attemptStatus: "verified", failureCodes: [] };
+}
+
+/** Didit's Nigerian registry lookups: the national identity number, and the bank one. */
+const NIGERIA_REGISTRY_SERVICES = ["nga_national_id", "nga_bank_verification_number"];
+
+/**
+ * Whether someone born on `dob` (YYYY-MM-DD) is 18 on `now`, by calendar age.
+ * (Subtracting 18 years from 29 February would roll over to 1 March and let a
+ * 17-year-old through.)
+ */
+export function adultOn(dob: string, now = new Date()) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dob)) return false;
+  const [year, month, day] = dob.split("-").map(Number);
+  const [nowMonth, nowDay] = [now.getUTCMonth() + 1, now.getUTCDate()];
+  const beforeBirthday = nowMonth < month || (nowMonth === month && nowDay < day);
+  return now.getUTCFullYear() - year - (beforeBirthday ? 1 : 0) >= 18;
+}
+
+/**
+ * A provider-level approval is insufficient without every required feature.
+ * `member` is the profile the attempt checks against; it only stands in for
+ * the ID's own country when Didit couldn't read it.
+ */
+export function interpretDiditResult(
+  payload: Record<string, unknown>,
+  member: { country: string; nationality: string | null },
+  now = new Date(),
+) {
   const reports = (key: string): Record<string, unknown>[] =>
     Array.isArray(payload[key])
       ? (payload[key] as unknown[]).filter(
@@ -94,7 +234,23 @@ export function interpretDiditResult(payload: Record<string, unknown>, profileCo
         )
       : [];
   const approved = (key: string) => reports(key).some((report) => report.status === "Approved");
-  const id = reports("id_verifications").find((report) => report.status === "Approved");
+  const idReports = reports("id_verifications");
+  const id = idReports.find((report) => report.status === "Approved");
+  // Risk codes Didit raised on any ID report, including declined ones.
+  const risks = new Set(
+    idReports.flatMap((report) =>
+      Array.isArray(report.warnings)
+        ? report.warnings.map((warning: unknown) =>
+            warning && typeof warning === "object"
+              ? String((warning as Record<string, unknown>).risk ?? "")
+              : "",
+          )
+        : [],
+    ),
+  );
+  // A registry check counts once Didit approved it: a full match on its own,
+  // a partial one only after Didit's reviewer approved it (the workflow sends
+  // partial matches to review).
   const registry = reports("database_validations").some(
     (report) =>
       report.status === "Approved" &&
@@ -103,8 +259,8 @@ export function interpretDiditResult(payload: Record<string, unknown>, profileCo
         if (!value || typeof value !== "object" || Array.isArray(value)) return false;
         const check = value as Record<string, unknown>;
         return (
-          ["nga_national_id", "nga_bank_verification_number"].includes(String(check.service_id)) &&
-          check.outcome_code === "MATCH"
+          NIGERIA_REGISTRY_SERVICES.includes(String(check.service_id)) &&
+          ["MATCH", "PARTIAL_MATCH"].includes(String(check.outcome_code))
         );
       }),
   );
@@ -124,16 +280,31 @@ export function interpretDiditResult(payload: Record<string, unknown>, profileCo
     String(payload.status),
   );
   const field = (key: string) => (id && typeof id[key] === "string" ? (id[key] as string) : "");
+  // A Nigerian ID must also check out against NIMC or NIBSS, whatever the
+  // profile says; a foreign one never needs it. The profile decides only when
+  // Didit couldn't read where the ID is from.
+  const issuingState = field("issuing_state").trim().toUpperCase();
+  const nigerianId = issuingState
+    ? issuingState === "NGA"
+    : [member.country, member.nationality].some((code) => code?.toUpperCase() === "NG");
   return {
     terminal,
     failed,
     /** Still with Didit's own reviewers; never expire it from our side. */
     inProviderReview: String(payload.status) === "In Review",
-    // A Nigerian member's ID must also check out against NIMC or NIBSS.
-    governmentId:
-      Boolean(id) && (profileCountry.toUpperCase() !== "NG" || registry || nigeriaLookup),
+    governmentId: Boolean(id) && (!nigerianId || registry || nigeriaLookup),
     liveness: approved("liveness_checks"),
     idFace: approved("face_matches"),
+    /** Didit found the same name and birth date under another member of ours. */
+    possibleDuplicate: risks.has("POSSIBLE_DUPLICATED_USER"),
+    /** The ID says the holder is under 18, whether or not Didit approved it. */
+    underage:
+      risks.has("MINIMUM_AGE_NOT_MET") ||
+      idReports.some((report) => {
+        const dob =
+          typeof report.date_of_birth === "string" ? report.date_of_birth.slice(0, 10) : "";
+        return /^\d{4}-\d{2}-\d{2}$/.test(dob) && !adultOn(dob, now);
+      }),
     identity: {
       DOB: field("date_of_birth"),
       Gender: field("gender"),
@@ -190,9 +361,6 @@ export function matchIdentity(
   now = new Date(),
 ) {
   const dob = identity.DOB.slice(0, 10);
-  const cutoff = new Date(Date.UTC(now.getUTCFullYear() - 18, now.getUTCMonth(), now.getUTCDate()))
-    .toISOString()
-    .slice(0, 10);
   const normalizedGender = (value: string) =>
     value.trim().toLowerCase().startsWith("m")
       ? "m"
@@ -200,7 +368,7 @@ export function matchIdentity(
         ? "f"
         : "";
   return {
-    dateOfBirth: /^\d{4}-\d{2}-\d{2}$/.test(dob) && dob <= cutoff && dob === profile.dob,
+    dateOfBirth: adultOn(dob, now) && dob === profile.dob,
     gender:
       normalizedGender(identity.Gender) !== "" &&
       normalizedGender(identity.Gender) === normalizedGender(profile.gender),

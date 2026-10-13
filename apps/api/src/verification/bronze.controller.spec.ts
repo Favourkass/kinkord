@@ -9,7 +9,7 @@ import {
 import type { BronzeService } from "./bronze.service";
 
 const req = {
-  user: { id: "user-1", twoFactorEnabled: true },
+  user: { id: "user-1", twoFactorEnabled: true, email: "member@example.test", emailVerified: true },
   session: { id: "session-1" },
   headers: {},
 } as unknown as AuthedRequest;
@@ -21,6 +21,7 @@ function service() {
     consent: vi.fn(async () => ({ consented: true })),
     withdraw: vi.fn(async () => ({ consented: false })),
     start: vi.fn(async () => ({ provider: "didit" })),
+    resume: vi.fn(async () => ({ url: "https://verify.didit.me/s" })),
     diditCallback: vi.fn(() => ({ received: true })),
     reviews: vi.fn(async () => []),
     decideReview: vi.fn(async () => ({ status: "verified" })),
@@ -40,6 +41,8 @@ describe("verification routes", () => {
     await controller.consent(req, { accepted: true, policyVersion: "v3" });
     await controller.withdraw(req);
     await controller.start(req);
+    await controller.resume(req);
+    expect(bronze.resume).toHaveBeenCalledWith("user-1");
     expect(bronze.status).toHaveBeenCalledWith("user-1");
     expect(bronze.consent).toHaveBeenCalledWith("user-1", true, "v3");
     expect(bronze.withdraw).toHaveBeenCalledWith("user-1");
@@ -107,5 +110,15 @@ describe("verification routes", () => {
       expect.any(Headers),
     );
     expect(() => controller.stepUp(req, { code: "123" })).toThrow(BadRequestException);
+  });
+
+  it("tells the member page which admin is asking, and whether they're a founder", async () => {
+    const bronze = service();
+    const controller = new BronzeAdminController(as(bronze));
+    await controller.member(req, "member-9");
+    expect(bronze.adminStatus).toHaveBeenCalledWith(
+      { id: "user-1", twoFactorEnabled: true, sessionId: "session-1", founder: false },
+      "member-9",
+    );
   });
 });
