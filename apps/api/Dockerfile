@@ -1,7 +1,8 @@
-# Build stage runs on the BUILDER's native arch (fast on ARM Macs) — all
-# dependencies are pure JS, so the output is architecture-neutral and the
-# final stage can be stamped for any target platform.
-FROM --platform=$BUILDPLATFORM node:22-alpine AS build
+# Build stage runs on the TARGET platform: sharp (used to rebuild a photo's
+# smaller sizes) ships a native binary per platform, so dependencies must be
+# installed for the arch the image runs on. CI builds linux/amd64 natively;
+# a cross-build on an ARM Mac runs under emulation, slower but correct.
+FROM node:22-alpine AS build
 WORKDIR /repo
 RUN corepack enable
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json turbo.json .prettierrc.json ./

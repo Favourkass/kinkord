@@ -8,7 +8,7 @@
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test"
+    "test": "node --test scripts/didit-workflow-env.test.mjs scripts/didit-bronze-workflow.test.mjs && turbo run test"
   },
   "devDependencies": {
     "prettier": "^3.9.6",

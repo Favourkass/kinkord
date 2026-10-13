@@ -2,6 +2,7 @@ import Link from "next/link";
 import CoinBalance from "@/components/kinkcoins/CoinBalance";
 import type { CoinBalanceVM } from "@/domain/kinkcoins";
 import MaskIcon from "@/components/app/MaskIcon";
+import VerifiedMark from "@/components/brand/VerifiedMark";
 import type { PublicProfileVM } from "@/domain/member";
 import ExpandableAvatar from "./ExpandableAvatar";
 import SilverBadge, { type SilverBadgeLabels } from "./SilverBadge";
@@ -14,6 +15,10 @@ export interface ProfileSideCardLabels {
   yourself: string;
   editProfile: string;
   tagsHeading: string;
+  /** Shown when the member's identity is verified and they show it. */
+  identityVerified: string;
+  /** Beside your own badge when you've hidden it from others. */
+  identityHidden: string;
   stats: { friends: string; followers: string; following: string };
   silver: SilverBadgeLabels;
   organization: string;
@@ -116,6 +121,17 @@ export default function ProfileSideCard({
               <span className="text-[15px] leading-[18px] text-pf-muted">{vm.handle}</span>
             )}
           </p>
+          {vm.verification.level === "identity" ? (
+            <span className="flex flex-wrap items-center gap-x-[8px] gap-y-[4px]">
+              <span className="flex items-center gap-[6px] rounded-full border border-kink-gold-bright/60 px-[12px] py-[4px] text-[12px] font-bold text-kink-gold-bright">
+                <VerifiedMark size={16} />
+                {labels.identityVerified}
+              </span>
+              {vm.verification.hiddenFromOthers ? (
+                <span className="text-[12px] text-pf-muted">{labels.identityHidden}</span>
+              ) : null}
+            </span>
+          ) : null}
           {presenceText && (
             <p className="text-[13px] leading-[16px] text-pf-muted">{presenceText}</p>
           )}

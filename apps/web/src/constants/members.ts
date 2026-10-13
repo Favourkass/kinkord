@@ -98,7 +98,14 @@ export const MEMBERS_COPY = {
       noSocial: "No links added yet.",
       platforms: { facebook: "Facebook", x: "X (Twitter)" },
       verification: "Verification Status",
-      verified: { basic: "Basic Verified", none: "Not verified yet" },
+      verified: {
+        identity: "Identity verified",
+        basic: "Basic Verified",
+        none: "Not verified yet",
+      },
+      identityDetail: "ID and selfie checked by Kinkord",
+      /** Beside your own badge when you've hidden it from everyone else. */
+      identityHidden: "Hidden from others",
       verifiedDetail: (email: boolean, phone: boolean) =>
         email && phone
           ? "Email & Phone Verified"

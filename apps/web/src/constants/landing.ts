@@ -90,7 +90,7 @@ export const SOCIALS = [
   { name: "WhatsApp", href: null, icon: "message-circle" },
 ] as const;
 
-export const COMPANY_NAME = "Temaxiro Limited";
+export const COMPANY_NAME = "Kinkord Limited";
 export const COMPANY_ADDRESS = "30 Major Bowen Road, Sapele, Delta State, Nigeria";
 
 export const FOOTER_LINKS = [

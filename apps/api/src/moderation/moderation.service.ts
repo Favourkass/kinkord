@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { BronzeService } from "../verification/bronze.service";
 import { DRIZZLE, type Db } from "../db/db.module";
 import {
   memberBan,
@@ -126,6 +127,7 @@ export class ModerationService {
     @Inject(DRIZZLE) private readonly db: Db,
     private readonly storage: StorageService,
     private readonly posts: PostsService,
+    private readonly verification: BronzeService,
   ) {}
 
   private summarySelect() {
@@ -341,6 +343,10 @@ export class ModerationService {
     const target = await this.moderatable(actorId, id);
     const reason = opts.reason?.trim() || null;
     if (opts.block) await this.writeRules(id, target, await this.contactTrail(id), reason);
+    // Queue Didit's ID/selfie erasure before the attempt rows cascade away, and
+    // with a ban, hold the identity so it can't verify a new account unseen.
+    // If this durable write fails, keep the account so the deletion can be retried safely.
+    await this.verification.forgetMember(id, { hold: opts.block });
     const keys = await this.storedKeysOf(id);
     await Promise.all(
       keys.flatMap((k) => [

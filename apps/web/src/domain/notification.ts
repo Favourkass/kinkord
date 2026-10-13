@@ -10,6 +10,9 @@ export type NotificationKind =
   | "payment"
   | "payment_verified"
   | "payment_rejected"
+  | "verification"
+  | "verification_update"
+  | "verification_underage"
   | "silver_check";
 
 /**
@@ -91,6 +94,23 @@ const KINDS: Record<
     icon: "shield",
     action: () => "A Silver member changed their name or photo. Review their badge.",
   },
+  verification: {
+    category: "Moderation",
+    icon: "shield",
+    action: () => "New verification to review.",
+  },
+  // The member's own check finished, or an admin decided, revoked or reopened it.
+  verification_update: {
+    category: "Identity verification",
+    icon: "bell",
+    action: () => "Your identity verification has an update.",
+  },
+  // To the admins; it opens that member's moderation page.
+  verification_underage: {
+    category: "Moderation",
+    icon: "shield",
+    action: () => "A member's ID shows they may be under 18.",
+  },
   test: {
     category: "Notifications enabled",
     icon: "bell",
@@ -107,6 +127,9 @@ const OFFICIAL: ReadonlySet<NotificationKind> = new Set([
   "payment_verified",
   "payment_rejected",
   "silver_check",
+  "verification",
+  "verification_update",
+  "verification_underage",
 ]);
 
 /** A kind this version of the app doesn't know yet still shows, as Kinkord's own. */

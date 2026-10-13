@@ -42,7 +42,7 @@ export default function ModerationFrame({
                 key={t.href}
                 href={t.href}
                 aria-current={t.active ? "page" : undefined}
-                className={`whitespace-nowrap rounded-full px-[16px] py-[8px] text-[14px] font-bold ${
+                className={`shrink-0 whitespace-nowrap rounded-full px-[16px] py-[8px] text-[14px] font-bold ${
                   t.active
                     ? "bg-kink-amber text-black"
                     : "border border-app-input-border bg-app-input text-app-value"

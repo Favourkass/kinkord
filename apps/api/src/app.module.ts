@@ -19,6 +19,7 @@ import { PostsModule } from "./posts/posts.module";
 import { SafetyModule } from "./safety/safety.module";
 import { StorageModule } from "./storage/storage.module";
 import { SubscriptionsModule } from "./subscriptions/subscriptions.module";
+import { VerificationModule } from "./verification/verification.module";
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { SubscriptionsModule } from "./subscriptions/subscriptions.module";
     ProfilesModule,
     CommunityModule,
     MembersModule,
+    VerificationModule,
     OtpModule,
     PostsModule,
     SafetyModule,

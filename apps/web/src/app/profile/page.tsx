@@ -13,7 +13,7 @@ function OwnProfile() {
   const search = useSearchParams();
   const shell = useHomePresenter();
   const nav = getAppShellNav();
-  const vm = useOwnProfilePresenter(search.get("tab"));
+  const vm = useOwnProfilePresenter(search.get("tab"), shell.showVerifiedBadge);
   // Your handle is resolved from the API first, so nothing loads until it is
   // known — otherwise the first render would fetch the home feed instead.
   const feed = useFeedPresenter({ author: vm.username, ready: Boolean(vm.username) });

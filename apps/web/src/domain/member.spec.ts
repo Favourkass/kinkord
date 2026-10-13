@@ -7,6 +7,7 @@ import {
   toMediaTiles,
   toMemberCardVM,
   toPublicProfileVM,
+  withOwnBadgeVisibility,
   type MemberCardPM,
   type PlaceHref,
   type PublicProfilePM,
@@ -268,6 +269,26 @@ describe("About cards + media (profile rebuild, 2026-09-12)", () => {
     expect(locked.restricted).toBe(true);
     expect(locked.socialLinks).toEqual([]);
     expect(locked.verification.level).toBe("none");
+  });
+
+  it("puts a verified identity above email and phone", () => {
+    const vm = toPublicProfileVM({
+      ...base,
+      verification: { email: true, phone: true, identity: true },
+    });
+    expect(vm.verification.level).toBe("identity");
+  });
+
+  it("marks your own verified badge when you've hidden it from others", () => {
+    const verified = { email: true, phone: true, identity: true as const };
+    const own = toPublicProfileVM({ ...base, isSelf: true, verification: verified });
+    expect(withOwnBadgeVisibility(own, false).verification.hiddenFromOthers).toBe(true);
+    // Shown to others, someone else's profile, or no badge to hide: unchanged.
+    expect(withOwnBadgeVisibility(own, true)).toBe(own);
+    const theirs = toPublicProfileVM({ ...base, verification: verified });
+    expect(withOwnBadgeVisibility(theirs, false)).toBe(theirs);
+    const unverified = toPublicProfileVM({ ...base, isSelf: true });
+    expect(withOwnBadgeVisibility(unverified, false)).toBe(unverified);
   });
 
   it("derives handles from links and features the current profile photo", () => {
