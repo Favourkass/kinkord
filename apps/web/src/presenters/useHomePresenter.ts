@@ -31,6 +31,8 @@ export function useHomePresenter() {
     avatarUrl: null as string | null,
     membersCount: "—",
     silver: false,
+    /** Whether others see your verified badge; your own profile notes it when they don't. */
+    showVerifiedBadge: true,
   });
 
   useEffect(() => {
@@ -54,6 +56,7 @@ export function useHomePresenter() {
           avatarUrl: profile.avatarUrl,
           membersCount: String(stats.members),
           silver: me.plan === "silver",
+          showVerifiedBadge: profile.showVerifiedBadge !== false,
         });
         // Signed in: keep this device's notification subscription current.
         void pushService.sync().catch(() => undefined);

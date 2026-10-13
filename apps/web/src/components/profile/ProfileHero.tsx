@@ -2,6 +2,7 @@ import Link from "next/link";
 import CoinBalance from "@/components/kinkcoins/CoinBalance";
 import type { CoinBalanceVM } from "@/domain/kinkcoins";
 import MaskIcon from "@/components/app/MaskIcon";
+import VerifiedMark from "@/components/brand/VerifiedMark";
 import type { PublicProfileVM } from "@/domain/member";
 import ExpandableAvatar from "./ExpandableAvatar";
 import SilverBadge, { type SilverBadgeLabels } from "./SilverBadge";
@@ -15,6 +16,10 @@ export interface ProfileHeroLabels {
   /** Own profile (Figma 1167:552); inert until stories ship. */
   addToStory: string;
   comingSoon: string;
+  /** Shown when the member's identity is verified and they show it. */
+  identityVerified: string;
+  /** Beside your own badge when you've hidden it from others. */
+  identityHidden: string;
   stats: { friends: string; followers: string; following: string };
   silver: SilverBadgeLabels;
 }
@@ -102,6 +107,17 @@ export default function ProfileHero({
             <span className="text-[16px] leading-[19px] text-pf-muted">· {vm.handle}</span>
           )}
         </p>
+        {vm.verification.level === "identity" ? (
+          <span className="flex flex-wrap items-center justify-center gap-x-[8px] gap-y-[4px]">
+            <span className="flex items-center gap-[6px] rounded-full border border-kink-gold-bright/60 px-[12px] py-[4px] text-[12px] font-bold text-kink-gold-bright">
+              <VerifiedMark size={16} />
+              {labels.identityVerified}
+            </span>
+            {vm.verification.hiddenFromOthers ? (
+              <span className="text-[12px] text-pf-muted">{labels.identityHidden}</span>
+            ) : null}
+          </span>
+        ) : null}
         <p className="flex items-center gap-[12px] text-[13px] font-bold leading-[16px] text-pf-muted">
           <span>
             {vm.stats.friends} {labels.stats.friends}

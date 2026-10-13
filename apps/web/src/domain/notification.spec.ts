@@ -26,6 +26,9 @@ describe("notification presentation", () => {
     "like",
     "repost",
     "report",
+    "verification",
+    "verification_update",
+    "verification_underage",
     "test",
     "payment",
     "payment_verified",
@@ -78,6 +81,45 @@ describe("notification presentation", () => {
       category: "Silver badges",
       body: "A Silver member changed their name or photo. Review their badge.",
     });
+    expect(toNotificationVM({ ...item, type: "verification", actor: null })).toMatchObject({
+      official: true,
+      body: "New verification to review.",
+    });
+  });
+
+  it("tells a member their verification changed, and leads to its page", () => {
+    const vm = toNotificationVM({
+      ...item,
+      type: "verification_update",
+      actor: null,
+      url: "/settings/verification",
+    });
+    expect(vm).toMatchObject({
+      official: true,
+      actorName: null,
+      icon: "bell",
+      category: "Identity verification",
+      body: "Your identity verification has an update.",
+    });
+    // The API's link for it, Settings → Verification, is followed as is.
+    expect(notificationDestination("/settings/verification")).toBe("/settings/verification");
+  });
+
+  it("flags a possibly underage member to the admins, leading to their moderation page", () => {
+    const vm = toNotificationVM({
+      ...item,
+      type: "verification_underage",
+      actor: null,
+      url: "/moderation/members/u2",
+    });
+    expect(vm).toMatchObject({
+      official: true,
+      actorName: null,
+      icon: "shield",
+      category: "Moderation",
+      body: "A member's ID shows they may be under 18.",
+    });
+    expect(notificationDestination("/moderation/members/u2")).toBe("/moderation/members/u2");
   });
 
   it("still shows a kind this version doesn't know, rather than breaking the inbox", () => {

@@ -7,6 +7,9 @@ import type {
   AdminMemberPM,
   AdminReportPM,
   AdminReportStatus,
+  AdminVerificationReviewPM,
+  AdminVerificationStatePM,
+  AdminVerificationStatus,
   AdminTeamMemberPM,
   AdminTeamPM,
   BlockRulePM,
@@ -15,6 +18,7 @@ import type {
 import { api } from "./apiClient";
 
 const member = (id: string) => `/admin/members/${encodeURIComponent(id)}`;
+const verificationOf = (id: string) => `/admin/verification/members/${encodeURIComponent(id)}`;
 
 export const moderationService = {
   access: () => api.get<{ isAdmin: boolean }>("/admin/access"),
@@ -49,6 +53,30 @@ export const moderationService = {
       `/admin/reports/${encodeURIComponent(id)}/resolve`,
       { status },
     ),
+
+  /** Confirms this admin session with the current authenticator code. */
+  stepUpVerification: (code: string) =>
+    api.post<{ verifiedUntil: string }>("/admin/verification/step-up", { code }),
+
+  /** Identity checks waiting for an admin, oldest first. */
+  verificationReviews: () => api.get<AdminVerificationReviewPM[]>("/admin/verification/reviews"),
+
+  decideVerification: (
+    id: string,
+    body: { decision: "approve" | "reject"; evidenceReference: string; reason: string },
+  ) =>
+    api.post<{ status: AdminVerificationStatus }>(
+      `/admin/verification/reviews/${encodeURIComponent(id)}/decision`,
+      body,
+    ),
+
+  memberVerification: (id: string) => api.get<AdminVerificationStatePM>(verificationOf(id)),
+
+  revokeVerification: (id: string, reason: string) =>
+    api.post<{ status: AdminVerificationStatus }>(`${verificationOf(id)}/revoke`, { reason }),
+
+  reopenVerification: (id: string, reason: string) =>
+    api.post<{ status: AdminVerificationStatus }>(`${verificationOf(id)}/reopen`, { reason }),
 
   rules: () => api.get<BlockRulePM[]>("/admin/blocklist"),
 
