@@ -73,7 +73,8 @@ describe("useMembersRegionPresenter", () => {
     expect(result.current.title).toBe("Delta State");
     expect(result.current.subtitle).toBe("Discover like-minded members near you.");
     expect(result.current.selector.value).toBe("All regions");
-    expect(result.current.selector.options.slice(0, 2)).toEqual(["All regions", "Abraka"]);
+    expect(result.current.selector.options[0]).toBe("All regions");
+    expect(result.current.selector.options).toContain("Abraka");
     expect(result.current.selector.searchByRegionLabel).toBe("Search by Region");
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(apiGet).toHaveBeenCalledWith(

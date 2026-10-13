@@ -53,9 +53,11 @@ it("renders account signup without phone entry or phone instructions", () => {
   expect(screen.getByLabelText("Email address")).toBeTruthy();
   expect(screen.getByLabelText("Username")).toBeTruthy();
   expect(screen.getByLabelText("County")).toBeTruthy();
-  const sexuality = screen.getByLabelText("Sexuality (optional)");
+  const sexuality = screen.getByLabelText("Sexuality");
   expect(screen.getByRole("option", { name: "Straight" })).toBeTruthy();
   expect(screen.getByRole("option", { name: "Bisexual" })).toBeTruthy();
+  expect(screen.queryByRole("option", { name: "Gay" })).toBeNull();
+  expect(screen.queryByRole("option", { name: "Prefer not to say" })).toBeNull();
   fireEvent.change(sexuality, { target: { value: "Bisexual" } });
   expect((sexuality as HTMLSelectElement).value).toBe("Bisexual");
   expect(screen.getByText("Select your county")).toBeTruthy();
@@ -106,4 +108,50 @@ it("offers photo skipping and a searchable scrolling role list", async () => {
   expect(screen.getByRole("button", { name: "Aftercare Buddy" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "Aftercare Specialist" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Bottom" })).toBeNull();
+});
+
+it("searches towns inside a county and allows an unlisted place", () => {
+  render(<SignupPage />);
+  expect((screen.getByLabelText("Region / City / Town") as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(screen.getByLabelText("County"));
+  fireEvent.change(screen.getByRole("combobox", { name: "Search counties" }), {
+    target: { value: "Nairobi" },
+  });
+  fireEvent.click(screen.getByRole("option", { name: "Nairobi" }));
+  fireEvent.click(screen.getByLabelText("Region / City / Town"));
+  fireEvent.change(screen.getByRole("combobox", { name: "Search regions / cities / towns" }), {
+    target: { value: "Westlands" },
+  });
+  fireEvent.click(screen.getByRole("option", { name: "Westlands" }));
+  expect(screen.getByLabelText("Region / City / Town").textContent).toContain("Westlands");
+  fireEvent.click(screen.getByLabelText("Region / City / Town"));
+  fireEvent.change(screen.getByRole("combobox", { name: "Search regions / cities / towns" }), {
+    target: { value: "Other region" },
+  });
+  fireEvent.click(screen.getByRole("option", { name: "Other region / city / town" }));
+  const custom = screen.getByLabelText("Region / City / Town name") as HTMLInputElement;
+  fireEvent.change(custom, { target: { value: "My village" } });
+  expect(custom.value).toBe("My village");
+});
+
+it("offers former roles and the ten additions in the same searchable list", () => {
+  fixture.stage = "profile";
+  render(<SignupPage />);
+  fireEvent.click(screen.getByRole("button", { name: "Roles" }));
+  for (const role of [
+    "Bottom",
+    "Dominant",
+    "Submissive",
+    "Handler",
+    "Rigger",
+    "Rope Bunny",
+    "Acolyte",
+    "Adult Baby",
+    "Aftercare Buddy",
+  ]) {
+    expect(screen.getByRole("button", { name: role })).toBeTruthy();
+  }
+  fireEvent.change(screen.getByLabelText("Search roles"), { target: { value: "rigger" } });
+  expect(screen.getByRole("button", { name: "Rigger" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Acolyte" })).toBeNull();
 });

@@ -12,7 +12,7 @@ describe("getPageMetadata", () => {
       openGraph: {
         type: "website",
         siteName: "Kinkord",
-        locale: "en_NG",
+        locale: "en_US",
         url: "/about",
         title: "About Kinkord",
         description: "Where it started.",

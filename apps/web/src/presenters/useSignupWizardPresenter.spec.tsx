@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { OTHER_AREA } from "@/services/signupLocation.service";
 import { useSignupWizardPresenter } from "./useSignupWizardPresenter";
 
 const push = vi.fn();
@@ -109,17 +110,39 @@ describe("useSignupWizardPresenter", () => {
         city: "Westlands",
       }),
     );
-    act(() => result.current.stepOne.setCountry("US"));
+    act(() => result.current.stepOne.setCountry("NG"));
     expect(result.current.aboutStep.draft.state).toBe("");
     expect(result.current.aboutStep.draft.city).toBe("");
-    expect(result.current.aboutStep.location.states).toHaveLength(51);
+    expect(result.current.aboutStep.location.states).toHaveLength(37);
     act(() => result.current.stepOne.setCountry("NG"));
     expect(result.current.aboutStep.location.states).toHaveLength(37);
   });
 
   it.each([
+    ["NG", "Lagos", "Ikeja"],
+    ["KE", "Nairobi", "Westlands"],
+  ])("clears a dependent town when the parent changes for %s", (country, state, city) => {
+    const { result } = renderHook(() => useSignupWizardPresenter());
+    act(() => result.current.stepOne.setCountry(country));
+    act(() => result.current.aboutStep.selectState(state));
+    act(() => result.current.aboutStep.selectArea(city));
+    expect(result.current.aboutStep.draft.city).toBe(city);
+    act(() => result.current.aboutStep.selectArea(OTHER_AREA));
+    expect(result.current.aboutStep.location.customArea).toBe(true);
+    expect(result.current.aboutStep.draft.city).toBe("");
+    act(() =>
+      result.current.aboutStep.set({ ...result.current.aboutStep.draft, city: "New Town" }),
+    );
+    expect(result.current.aboutStep.draft.city).toBe("New Town");
+    expect(result.current.aboutStep.areaValue).toBe(OTHER_AREA);
+    act(() => result.current.aboutStep.selectState(state === "Lagos" ? "Delta" : "Kiambu"));
+    expect(result.current.aboutStep.draft.city).toBe("");
+    expect(result.current.aboutStep.location.customArea).toBe(false);
+  });
+
+  it.each([
     ["KE", "Nairobi", "Nairobi"],
-    ["US", "California", "Los Angeles"],
+    ["NG", "Lagos", "Ikeja"],
   ])("submits the chosen country and region for %s", async (country, state, city) => {
     const { result } = renderHook(() => useSignupWizardPresenter());
     reachCombinedStep(result);

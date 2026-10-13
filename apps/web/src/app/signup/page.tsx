@@ -78,6 +78,7 @@ function SignupWizard() {
             </div>
             <SearchSelectField
               label="Country"
+              boldLabel
               value={p.stepOne.country ?? ""}
               onChange={p.stepOne.setCountry}
               options={p.stepOne.options}
@@ -95,7 +96,11 @@ function SignupWizard() {
                 checked={p.stepOne.ageAttested}
                 onChange={p.stepOne.setAgeAttested}
                 error={p.stepOne.touched && !p.stepOne.ageAttested}
-                trailing={<span className="text-[18px] font-bold text-kink-cream">18+</span>}
+                trailing={
+                  <span role="img" aria-label="Adults only" className="text-[24px] leading-none">
+                    🔞
+                  </span>
+                }
               >
                 I confirm I am over 18.
               </CheckRow>
@@ -217,20 +222,19 @@ function SignupWizard() {
                 searchPlaceholder={p.aboutStep.location.stateSearchPlaceholder}
                 emptyLabel="No matching regions"
                 value={p.aboutStep.draft.state}
-                onChange={(v) => p.aboutStep.set({ ...p.aboutStep.draft, state: v, city: "" })}
+                onChange={p.aboutStep.selectState}
                 error={p.aboutStep.errors.state}
               />
               {p.aboutStep.location.areaMode === "select" ? (
                 <SearchSelectField
-                  label="LGA / Area"
+                  label={p.aboutStep.location.areaLabel}
                   options={p.aboutStep.location.areas}
-                  placeholder={
-                    p.aboutStep.draft.state ? "Select your area" : "Select your state first"
-                  }
-                  searchPlaceholder="Search areas"
+                  placeholder={p.aboutStep.location.areaPlaceholder}
+                  searchPlaceholder={p.aboutStep.location.areaSearchPlaceholder}
+                  disabled={p.aboutStep.location.areaDisabled}
                   emptyLabel="No matching areas"
-                  value={p.aboutStep.draft.city}
-                  onChange={(v) => p.aboutStep.set({ ...p.aboutStep.draft, city: v })}
+                  value={p.aboutStep.areaValue}
+                  onChange={p.aboutStep.selectArea}
                 />
               ) : (
                 <TextField
@@ -239,6 +243,15 @@ function SignupWizard() {
                   placeholder="Enter your city or town"
                   value={p.aboutStep.draft.city}
                   onChange={(v) => p.aboutStep.set({ ...p.aboutStep.draft, city: v })}
+                />
+              )}
+              {p.aboutStep.location.customArea && (
+                <TextField
+                  label="Region / City / Town name"
+                  icon={MapPin}
+                  placeholder="Enter your region, city or town"
+                  value={p.aboutStep.draft.city}
+                  onChange={(city) => p.aboutStep.set({ ...p.aboutStep.draft, city })}
                 />
               )}
             </div>

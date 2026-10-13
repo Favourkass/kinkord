@@ -42,17 +42,23 @@ export const KINK_ROLES = [
   "Ageplayer",
   "Bottom",
   "Brat",
+  "Brat Tamer",
   "Caregiver",
   "Cuckold",
+  "Curious",
   "Dominant",
   "Domme",
   "Exhibitionist",
+  "Handler",
+  "Little",
   "Masochist",
   "Master",
   "Mistress",
   "Owner",
   "Pet",
   "Primal",
+  "Rigger",
+  "Rope Bunny",
   "Sadist",
   "Slave",
   "Submissive",
@@ -62,9 +68,7 @@ export const KINK_ROLES = [
 ] as const;
 
 /**
- * Roles offered by the signup wizard before the 2026-09-12 list. Still accepted on
- * write so a member on a not-yet-refreshed app build can finish signing up; no longer
- * offered anywhere.
+ * Former signup roles, restored alongside the newer roles.
  */
 export const LEGACY_KINK_ROLES = [
   "Handler",
@@ -75,8 +79,8 @@ export const LEGACY_KINK_ROLES = [
   "Curious",
 ] as const;
 
-/** What PATCH /profile accepts for `roles`: the offered list plus the legacy names. */
-export const ACCEPTED_KINK_ROLES = [...KINK_ROLES, ...LEGACY_KINK_ROLES] as const;
+/** What PATCH /profile accepts for `roles`: the complete offered list. */
+export const ACCEPTED_KINK_ROLES = KINK_ROLES;
 
 export const KINKS = [
   "Anal play",

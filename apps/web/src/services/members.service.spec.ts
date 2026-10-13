@@ -131,9 +131,9 @@ describe("states + regions", () => {
     expect(statesForCountry("ng").length).toBe(37);
     expect(statesForCountry("gh")).toEqual([]);
     expect(statesForCountry("KE")).toHaveLength(47);
-    expect(statesForCountry("US")).toHaveLength(51);
-    expect(regionsForState("NG", "Delta")[0]).toBe("Abraka");
-    expect(regionsForState("NG", "Delta")).toContain("My region is not listed");
+    expect(statesForCountry("US")).toEqual([]);
+    expect(regionsForState("NG", "Delta")).toContain("Abraka");
+    expect(regionsForState("NG", "Delta")).toContain("Asaba");
     expect(regionsForState("NG", "Nowhere")).toEqual([]);
     expect(regionsForState("GH", "Delta")).toEqual([]);
     expect(isCountryAvailable("ng")).toBe(true);

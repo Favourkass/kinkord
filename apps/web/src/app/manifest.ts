@@ -1,11 +1,11 @@
 import type { MetadataRoute } from "next";
+import { SEO_COPY } from "@/constants/seo";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Kinkord — Where Kinksters Connect",
+    name: SEO_COPY.site.title,
     short_name: "Kinkord",
-    description:
-      "Where kinksters connect, explore their interests, build meaningful relationships, and find a community where they truly belong.",
+    description: SEO_COPY.site.description,
     start_url: "/",
     id: "/",
     display: "standalone",

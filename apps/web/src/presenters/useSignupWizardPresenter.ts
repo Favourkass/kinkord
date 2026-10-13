@@ -24,6 +24,7 @@ import {
 } from "@/domain/onboarding";
 import {
   signupLocationFields,
+  OTHER_AREA,
   signupCountryOptions,
   validateSignupAbout,
   signupLocationErrorMessage,
@@ -96,8 +97,19 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
     orientation: null,
   });
   const [aboutErrors, setAboutErrors] = useState<ReturnType<typeof validateAbout>>({});
+  const [customArea, setCustomArea] = useState(false);
+  const selectState = useCallback((state: string) => {
+    setCustomArea(false);
+    setAbout((current) => ({ ...current, state, city: "" }));
+  }, []);
+  const selectArea = useCallback((area: string) => {
+    const custom = area === OTHER_AREA;
+    setCustomArea(custom);
+    setAbout((current) => ({ ...current, city: custom ? "" : area }));
+  }, []);
   const selectCountry = useCallback((value: string) => {
     setCountry(value);
+    setCustomArea(false);
     setAbout((current) => ({ ...current, state: "", city: "" }));
     setAboutErrors({});
   }, []);
@@ -387,7 +399,10 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
         draft: about,
         set: setAbout,
         errors: aboutErrors,
-        location: signupLocationFields(country, about.state),
+        location: signupLocationFields(country, about.state, customArea),
+        selectState,
+        selectArea,
+        areaValue: customArea ? OTHER_AREA : about.city,
         sexuality: SEXUALITY_FIELD,
       },
       firstInvalid,
@@ -469,6 +484,9 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
       topError,
       country,
       selectCountry,
+      customArea,
+      selectState,
+      selectArea,
       ageAttested,
       termsAccepted,
       stepOneTouched,

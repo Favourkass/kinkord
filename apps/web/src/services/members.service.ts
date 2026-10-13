@@ -4,8 +4,7 @@
  */
 import { ALL_COUNTRY_CODES } from "@/constants/countries";
 import { AVAILABLE_COUNTRIES } from "@/constants/members";
-import { KE_COUNTIES, US_STATES } from "@/constants/countryRegions";
-import { NG_LGAS } from "@/constants/nigeria";
+import locationOptions from "@/constants/location-options.json";
 import type { MediaPagePM, MemberCardPM, PublicProfilePM } from "@/domain/member";
 import { countryName } from "@/util/format";
 import { api } from "./apiClient";
@@ -160,23 +159,16 @@ export function searchCountries(query: string, counts: CountryCountPM[] | null):
 }
 
 /** Configured states for a launched country, in the product team's order. */
+const locationCatalog = locationOptions as Record<string, Record<string, readonly string[]>>;
+
 export function statesForCountry(code: string): string[] {
-  switch (code.toUpperCase()) {
-    case "NG":
-      return Object.keys(NG_LGAS).sort((a, b) => a.localeCompare(b));
-    case "KE":
-      return [...KE_COUNTIES];
-    case "US":
-      return [...US_STATES];
-    default:
-      return [];
-  }
+  return Object.keys(locationCatalog[code.toUpperCase()] ?? {}).sort((a, b) => a.localeCompare(b));
 }
 
-/** Configured regions (LGAs / areas) for a state; empty when the state is unknown. */
+/** Regions, cities and towns within a Nigerian state or Kenyan county. */
 export function regionsForState(code: string, state: string): string[] {
-  if (code.toUpperCase() !== "NG") return [];
-  return [...(NG_LGAS[state] ?? [])];
+  const areas = locationCatalog[code.toUpperCase()]?.[state];
+  return Array.isArray(areas) ? [...areas] : [];
 }
 
 /** Optimistic follow flip for a directory card. */

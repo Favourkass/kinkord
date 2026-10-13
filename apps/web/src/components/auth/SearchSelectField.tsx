@@ -8,11 +8,13 @@ interface Props {
   label: string;
   value: string;
   onChange: (value: string) => void;
-  options: readonly { value: string; label: string }[];
+  options: readonly { value: string; label: string; icon?: string }[];
   placeholder: string;
   searchPlaceholder: string;
   emptyLabel: string;
   error?: string;
+  disabled?: boolean;
+  boldLabel?: boolean;
 }
 
 /** Searchable display options with keyboard selection and focus dismissal. */
@@ -44,6 +46,7 @@ export default function SearchSelectField(p: Props) {
       <button
         id={id}
         type="button"
+        disabled={p.disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={`${id}-options`}
@@ -55,7 +58,16 @@ export default function SearchSelectField(p: Props) {
         }}
         className={`flex h-[44px] w-full items-center justify-between rounded-lg border bg-kink-field px-4 text-left text-[15px] text-white focus:border-kink-gold-bright lg:h-[65px] lg:text-[20px] ${p.error ? "border-red-500/70" : "border-kink-edge"}`}
       >
-        <span>{selected?.label ?? p.placeholder}</span>
+        <span className="flex items-center gap-3">
+          {selected?.icon && (
+            <span aria-hidden className="text-[24px] leading-none">
+              {selected.icon}
+            </span>
+          )}
+          <span className={p.boldLabel ? "font-bold" : undefined}>
+            {selected?.label ?? p.placeholder}
+          </span>
+        </span>
         <ChevronDown size={18} aria-hidden />
       </button>
       {open && (
@@ -114,7 +126,14 @@ export default function SearchSelectField(p: Props) {
                 onClick={() => choose(option.value)}
                 className={`block w-full rounded-lg px-3 py-3 text-left text-[15px] hover:bg-kink-gold-bright/10 ${option.value === p.value || index === active ? "bg-kink-gold-bright/10 text-kink-gold-bright" : "text-white"}`}
               >
-                {option.label}
+                <span className="flex items-center gap-3">
+                  {option.icon && (
+                    <span aria-hidden className="text-[24px] leading-none">
+                      {option.icon}
+                    </span>
+                  )}
+                  <span className={p.boldLabel ? "font-bold" : undefined}>{option.label}</span>
+                </span>
               </button>
             ))}
             {!hits.length && <p className="p-3 text-[13px] text-kink-help">{p.emptyLabel}</p>}

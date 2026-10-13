@@ -57,7 +57,7 @@ describe("ProfilesController", () => {
     const options = new ProfilesController(serviceMock()).options();
     expect(options.genders).toEqual(["Male", "Female"]);
     expect(options.relationshipStatuses).toHaveLength(17);
-    expect(options.roles).toHaveLength(30);
+    expect(options.roles).toHaveLength(36);
     expect(options.kinks).toHaveLength(50);
     expect(options.lookingFor).toHaveLength(10);
     expect(options.nameChangeCooldownDays).toBe(30);

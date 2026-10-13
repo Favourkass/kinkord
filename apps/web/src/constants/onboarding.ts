@@ -3,7 +3,6 @@ import type { SignupField } from "@/domain/onboarding";
 export const LAUNCH_COUNTRIES = [
   { code: "KE", name: "Kenya", flag: "🇰🇪", dialCode: "+254" },
   { code: "NG", name: "Nigeria", flag: "🇳🇬", dialCode: "+234" },
-  { code: "US", name: "United States", flag: "🇺🇸", dialCode: "+1" },
 ] as const;
 
 /**
@@ -69,17 +68,23 @@ export const KINK_ROLES = [
   "Ageplayer",
   "Bottom",
   "Brat",
+  "Brat Tamer",
   "Caregiver",
   "Cuckold",
+  "Curious",
   "Dominant",
   "Domme",
   "Exhibitionist",
+  "Handler",
+  "Little",
   "Masochist",
   "Master",
   "Mistress",
   "Owner",
   "Pet",
   "Primal",
+  "Rigger",
+  "Rope Bunny",
   "Sadist",
   "Slave",
   "Submissive",
@@ -122,18 +127,8 @@ export function signupFixFieldsMessage(fields: SignupField[], regionName = "stat
 }
 
 export const SEXUALITY_FIELD = {
-  label: "Sexuality (optional)",
+  label: "Sexuality",
   placeholder: "Select your sexuality",
-  helper: "You can leave this blank or choose Prefer not to say.",
-  options: [
-    "Straight",
-    "Bisexual",
-    "Gay",
-    "Lesbian",
-    "Pansexual",
-    "Asexual",
-    "Queer",
-    "Questioning",
-    "Prefer not to say",
-  ],
+  helper: "You can leave this blank.",
+  options: ["Straight", "Bisexual"],
 } as const;
