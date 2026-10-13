@@ -65,8 +65,8 @@ export const FEED_COPY = {
   /** The official organization is followed, on its posts and in the strip. */
   follow: "Follow",
   following: "Following",
-  organization: "Org",
-  verifiedOrganization: "Verified organization",
+  organization: "Official",
+  verifiedOrganization: "Official Kinkord account",
   /** Desktop right rail, which the mobile frame has no room for. */
   asideHeading: "Kinkord",
   asideTagline: "The world's kink community",

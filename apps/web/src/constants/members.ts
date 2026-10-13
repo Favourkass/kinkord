@@ -73,8 +73,8 @@ export const MEMBERS_COPY = {
     online: "Online",
     lastSeen: (ago: string) => `Last seen ${ago}`,
     stats: { friends: "Friends", followers: "Followers", following: "Following" },
-    organization: "Org",
-    verifiedOrganization: "Verified organization",
+    organization: "Official",
+    verifiedOrganization: "Official Kinkord account",
     /** About tab cards (Figma 1256:800 + Profile Sections Design). */
     about: {
       aboutMe: "About Me",

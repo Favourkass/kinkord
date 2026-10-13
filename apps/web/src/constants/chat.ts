@@ -24,8 +24,8 @@ export const CHAT_COPY = {
   emptyBody: "Open someone's profile and tap Message to start a conversation.",
   online: "Online",
   /** Beside the official organization's name, so nobody can pass for it in a chat. */
-  organization: "Org",
-  verifiedOrganization: "Verified organization",
+  organization: "Official",
+  verifiedOrganization: "Official Kinkord account",
   presence: { online: "Online", away: "Away", offline: "Offline" },
   typing: "Is typing…",
   back: "Back",

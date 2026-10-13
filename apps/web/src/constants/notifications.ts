@@ -32,6 +32,6 @@ export const NOTIFICATIONS_COPY = {
   refresh: "Refresh notifications",
   open: "Opening…",
   /** Beside the official organization's name. */
-  organization: "Org",
-  verifiedOrganization: "Verified organization",
+  organization: "Official",
+  verifiedOrganization: "Official Kinkord account",
 } as const;
