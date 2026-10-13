@@ -86,6 +86,43 @@ describe("useSignupWizardPresenter", () => {
     verifyCode.mockReset().mockResolvedValue({ verified: true, attemptsLeft: null });
   });
 
+  it("defaults to Kenya and clears locations when the country changes", () => {
+    const { result } = renderHook(() => useSignupWizardPresenter());
+    expect(result.current.stepOne.country).toBe("KE");
+    expect(result.current.aboutStep.location.states).toHaveLength(47);
+    act(() =>
+      result.current.aboutStep.set({
+        ...result.current.aboutStep.draft,
+        state: "Nairobi",
+        city: "Westlands",
+      }),
+    );
+    act(() => result.current.stepOne.setCountry("US"));
+    expect(result.current.aboutStep.draft.state).toBe("");
+    expect(result.current.aboutStep.draft.city).toBe("");
+    expect(result.current.aboutStep.location.states).toHaveLength(51);
+    act(() => result.current.stepOne.setCountry("NG"));
+    expect(result.current.aboutStep.location.states).toHaveLength(37);
+  });
+
+  it.each([
+    ["KE", "Nairobi", "Nairobi"],
+    ["US", "California", "Los Angeles"],
+  ])("submits the chosen country and region for %s", async (country, state, city) => {
+    const { result } = renderHook(() => useSignupWizardPresenter());
+    reachCombinedStep(result);
+    act(() => result.current.stepOne.setCountry(country));
+    fillAccount(result);
+    fillAbout(result);
+    act(() => result.current.aboutStep.set({ ...result.current.aboutStep.draft, state, city }));
+    await act(() => result.current.submitCombinedStep());
+    expect(post).toHaveBeenCalledWith(
+      "/auth-ext/sign-up",
+      expect.objectContaining({ country, state, city }),
+    );
+    expect(result.current.stage).toBe("email");
+  });
+
   it("blocks step 1 until country + both confirmations are set", () => {
     const { result } = renderHook(() => useSignupWizardPresenter());
     act(() => result.current.stepOne.submit());

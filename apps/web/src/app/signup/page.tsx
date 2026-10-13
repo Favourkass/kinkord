@@ -5,11 +5,10 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AtSign, CheckCircle2, ChevronDown, Lock, Mail, MapPin, User, Users } from "lucide-react";
 import SignupShell from "@/components/auth/SignupShell";
-import CountryRow from "@/components/auth/CountryRow";
+import SearchSelectField from "@/components/auth/SearchSelectField";
 import CheckRow from "@/components/auth/CheckRow";
 import GoldCta from "@/components/auth/GoldCta";
 import TextField from "@/components/auth/TextField";
-import SelectField from "@/components/auth/SelectField";
 import DobPicker from "@/components/auth/DobPicker";
 import CodeInput from "@/components/auth/CodeInput";
 import UploadTile from "@/components/auth/UploadTile";
@@ -18,8 +17,7 @@ import PhotoConfirmation from "@/components/profile/PhotoConfirmation";
 import AgePill from "@/components/ui/AgePill";
 import { ShieldCheckIcon } from "@/components/auth/AuthIcons";
 import { useSignupWizardPresenter } from "@/presenters/useSignupWizardPresenter";
-import { KINK_ROLES, LAUNCH_COUNTRIES, NG_STATES } from "@/constants/onboarding";
-import { NG_LGAS } from "@/constants/nigeria";
+import { KINK_ROLES } from "@/constants/onboarding";
 import { Routes } from "@/constants/Routes";
 import type { SignupField } from "@/domain/onboarding";
 
@@ -72,17 +70,15 @@ function SignupWizard() {
               </p>
               <div className="mx-auto mt-2 h-[2px] w-[132px] bg-[#966400] opacity-50 lg:w-[264px]" />
             </div>
-            <div className="flex w-full flex-col gap-4">
-              {LAUNCH_COUNTRIES.map((c) => (
-                <CountryRow
-                  key={c.code}
-                  flag={c.flag}
-                  name={c.name}
-                  selected={p.stepOne.country === c.code}
-                  onSelect={() => p.stepOne.setCountry(c.code)}
-                />
-              ))}
-            </div>
+            <SearchSelectField
+              label="Country"
+              value={p.stepOne.country ?? ""}
+              onChange={p.stepOne.setCountry}
+              options={p.stepOne.options}
+              placeholder="Choose your country"
+              searchPlaceholder="Search countries"
+              emptyLabel="No countries found"
+            />
 
             <div className="w-full">
               <AgePill lead="18+ Only." rest="You must be 18 or older to join Kinkord." />
@@ -207,26 +203,38 @@ function SignupWizard() {
 
             <StageHeading plain="TELL US" highlight="ABOUT YOU" />
             <div className="grid w-full gap-4 sm:grid-cols-2 lg:gap-6">
-              <SelectField
+              <SearchSelectField
                 id={fieldId("state")}
-                label="State"
-                icon={MapPin}
-                options={NG_STATES}
-                placeholder="Select your state"
+                label={p.aboutStep.location.stateLabel}
+                options={p.aboutStep.location.states}
+                placeholder={p.aboutStep.location.statePlaceholder}
+                searchPlaceholder={p.aboutStep.location.stateSearchPlaceholder}
+                emptyLabel="No matching regions"
                 value={p.aboutStep.draft.state}
                 onChange={(v) => p.aboutStep.set({ ...p.aboutStep.draft, state: v, city: "" })}
                 error={p.aboutStep.errors.state}
               />
-              <SelectField
-                label="LGA / Area"
-                icon={MapPin}
-                options={NG_LGAS[p.aboutStep.draft.state] ?? []}
-                placeholder={
-                  p.aboutStep.draft.state ? "Select your area" : "Select your state first"
-                }
-                value={p.aboutStep.draft.city}
-                onChange={(v) => p.aboutStep.set({ ...p.aboutStep.draft, city: v })}
-              />
+              {p.aboutStep.location.areaMode === "select" ? (
+                <SearchSelectField
+                  label="LGA / Area"
+                  options={p.aboutStep.location.areas}
+                  placeholder={
+                    p.aboutStep.draft.state ? "Select your area" : "Select your state first"
+                  }
+                  searchPlaceholder="Search areas"
+                  emptyLabel="No matching areas"
+                  value={p.aboutStep.draft.city}
+                  onChange={(v) => p.aboutStep.set({ ...p.aboutStep.draft, city: v })}
+                />
+              ) : (
+                <TextField
+                  label="City / Town (optional)"
+                  icon={MapPin}
+                  placeholder="Enter your city or town"
+                  value={p.aboutStep.draft.city}
+                  onChange={(v) => p.aboutStep.set({ ...p.aboutStep.draft, city: v })}
+                />
+              )}
             </div>
             <p className="-mt-3 w-full text-left text-[11px] text-kink-help lg:text-[16px]">
               Your state and area help us show you local communities and events.

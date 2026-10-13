@@ -4,6 +4,7 @@
  */
 import { ALL_COUNTRY_CODES } from "@/constants/countries";
 import { AVAILABLE_COUNTRIES } from "@/constants/members";
+import { KE_COUNTIES, US_STATES } from "@/constants/countryRegions";
 import { NG_LGAS } from "@/constants/nigeria";
 import type { MediaPagePM, MemberCardPM, PublicProfilePM } from "@/domain/member";
 import { countryName } from "@/util/format";
@@ -160,7 +161,16 @@ export function searchCountries(query: string, counts: CountryCountPM[] | null):
 
 /** Configured states for a launched country, in the product team's order. */
 export function statesForCountry(code: string): string[] {
-  return code.toUpperCase() === "NG" ? Object.keys(NG_LGAS) : [];
+  switch (code.toUpperCase()) {
+    case "NG":
+      return Object.keys(NG_LGAS).sort((a, b) => a.localeCompare(b));
+    case "KE":
+      return [...KE_COUNTIES];
+    case "US":
+      return [...US_STATES];
+    default:
+      return [];
+  }
 }
 
 /** Configured regions (LGAs / areas) for a state; empty when the state is unknown. */

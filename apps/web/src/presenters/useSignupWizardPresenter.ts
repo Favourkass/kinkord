@@ -22,6 +22,7 @@ import {
   type AboutDraft,
   type SignupField,
 } from "@/domain/onboarding";
+import { signupLocationFields, signupCountryOptions } from "@/services/signupLocation.service";
 import { signupFixFieldsMessage } from "@/constants/onboarding";
 import { Routes } from "@/constants/Routes";
 import { PHOTO_CONFIRMATION_COPY } from "@/constants/photoConfirmation";
@@ -51,7 +52,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
   const [topError, setTopError] = useState<string | null>(null);
 
   // step 1
-  const [country, setCountry] = useState<string | null>(null);
+  const [country, setCountry] = useState<string | null>(signupCountryOptions()[0].value);
   const [ageAttested, setAgeAttested] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [stepOneTouched, setStepOneTouched] = useState(false);
@@ -74,6 +75,12 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
     gender: null,
   });
   const [aboutErrors, setAboutErrors] = useState<ReturnType<typeof validateAbout>>({});
+  const selectCountry = useCallback((value: string) => {
+    setCountry(value);
+    setAbout((current) => ({ ...current, state: "", city: "" }));
+    setAboutErrors({});
+  }, []);
+
   // The field a failed Send OTP should bring into view. A fresh object per
   // attempt, so the screen scrolls again even when it's the same field.
   const [firstInvalid, setFirstInvalid] = useState<{ field: SignupField } | null>(null);
@@ -245,7 +252,8 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
       topError,
       stepOne: {
         country,
-        setCountry,
+        setCountry: selectCountry,
+        options: signupCountryOptions(),
         ageAttested,
         setAgeAttested,
         termsAccepted,
@@ -254,7 +262,12 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
         submit: submitCountry,
       },
       accountStep: { draft: account, set: setAccount, errors: accountErrors },
-      aboutStep: { draft: about, set: setAbout, errors: aboutErrors },
+      aboutStep: {
+        draft: about,
+        set: setAbout,
+        errors: aboutErrors,
+        location: signupLocationFields(country, about.state),
+      },
       firstInvalid,
       submitCombinedStep,
       backToCountry,
@@ -291,6 +304,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
       busy,
       topError,
       country,
+      selectCountry,
       ageAttested,
       termsAccepted,
       stepOneTouched,

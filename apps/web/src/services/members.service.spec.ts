@@ -126,10 +126,12 @@ describe("searchCountries", () => {
 });
 
 describe("states + regions", () => {
-  it("knows Nigeria's configured states and regions, and nothing for other countries", () => {
+  it("knows configured states and regions for supported countries", () => {
     expect(statesForCountry("ng")).toContain("Delta");
     expect(statesForCountry("ng").length).toBe(37);
     expect(statesForCountry("gh")).toEqual([]);
+    expect(statesForCountry("KE")).toHaveLength(47);
+    expect(statesForCountry("US")).toHaveLength(51);
     expect(regionsForState("NG", "Delta")[0]).toBe("Abraka");
     expect(regionsForState("NG", "Delta")).toContain("My region is not listed");
     expect(regionsForState("NG", "Nowhere")).toEqual([]);
