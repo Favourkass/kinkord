@@ -20,9 +20,8 @@ import {
   BRONZE_MAX_ATTEMPTS,
   BRONZE_POLICY_VERSION,
   bronzeCallbackOutcome,
-  canAwardBronze,
   emptyBronzeChecks,
-  idChecksPass,
+  reviewOutcome,
   type BronzeChecks,
 } from "./bronze-policy";
 import type { ProfileMatchAudit } from "./profile-match-policy";
@@ -191,7 +190,8 @@ export class BronzeRepository {
    * Queue provider erasure before deleting a member and their attempts. It
    * takes the verification lock and ends anything in flight first, so a start
    * that's still between reserving and attaching can't attach its paid session
-   * after the list is taken; that start queues its own session for erasure.
+   * after the list is taken (that start queues its own session for erasure),
+   * and withdraws consent, so no new start can reserve before the account goes.
    */
   async queueErasuresForUser(userId: string): Promise<string[]> {
     return this.db.transaction(async (tx) => {
@@ -214,6 +214,11 @@ export class BronzeRepository {
         .update(bronzeVerification)
         .set({ currentAttemptId: null })
         .where(eq(bronzeVerification.userId, userId));
+      // With no standing consent, reserve() refuses any start that comes after.
+      await tx
+        .update(bronzeConsent)
+        .set({ withdrawnAt: new Date() })
+        .where(and(eq(bronzeConsent.userId, userId), isNull(bronzeConsent.withdrawnAt)));
       const sessions = await this.diditSessions(tx, userId);
       if (sessions.length)
         await tx
@@ -635,10 +640,9 @@ export class BronzeRepository {
   }
 
   /**
-   * An admin's decision. Approving confirms the two checks a person can judge
-   * (the profile photo and the ID's country); what only the ID proves must
-   * already have passed. Rejecting fails the attempt, so the member can try
-   * again if attempts remain.
+   * An admin's decision on a review (the rules are `reviewOutcome`'s). Takes
+   * the member's verification lock, then the identity's, and checks the review
+   * is still the one their verification waits on.
    */
   async decideReview(input: {
     id: string;
@@ -682,14 +686,10 @@ export class BronzeRepository {
       )
         return { ok: false, reason: "closed" };
       const approve = input.decision === "approve";
-      const checks: BronzeChecks = {
-        ...emptyBronzeChecks(),
-        ...(attempt.checks as Partial<BronzeChecks>),
-        ...(approve ? { profileFace: true, country: true } : {}),
-      };
+      const reasonCodes = (review.reasonCodes as string[]) ?? [];
+      let profileUnchanged = true;
+      let unflaggedDuplicate = false;
       if (approve) {
-        if (!idChecksPass(checks) || !canAwardBronze(checks))
-          return { ok: false, reason: "checks" };
         const [current] = await tx
           .select({
             avatarKey: profile.avatarKey,
@@ -698,50 +698,53 @@ export class BronzeRepository {
           })
           .from(profile)
           .where(eq(profile.userId, review.userId));
+        profileUnchanged =
+          current?.avatarKey === attempt.avatarKey &&
+          current.dob === attempt.profileDob &&
+          current.gender === attempt.profileGender;
         if (
-          current?.avatarKey !== attempt.avatarKey ||
-          current.dob !== attempt.profileDob ||
-          current.gender !== attempt.profileGender
+          profileUnchanged &&
+          attempt.identityBinding &&
+          !reasonCodes.includes("IDENTITY_ON_ANOTHER_ACCOUNT")
         ) {
-          // What was checked is gone, so nothing here can be approved: the
-          // attempt ends as any changed profile's does, rather than waiting
-          // for someone to reject it.
-          const now = new Date();
+          await lockIdentity(tx, attempt.identityBinding);
+          unflaggedDuplicate = await this.bindingUsedElsewhere(
+            attempt.identityBinding,
+            review.userId,
+            tx,
+          );
+        }
+      }
+      const outcome = reviewOutcome({
+        decision: input.decision,
+        checks: attempt.checks as Partial<BronzeChecks>,
+        attemptsUsed: state.attemptsUsed,
+        profileUnchanged,
+        unflaggedDuplicate,
+      });
+      const now = new Date();
+      if (!outcome.ok) {
+        if (outcome.reason === "duplicate")
+          await tx
+            .update(bronzeReview)
+            .set({ reasonCodes: [...reasonCodes, "IDENTITY_ON_ANOTHER_ACCOUNT"] })
+            .where(eq(bronzeReview.id, input.id));
+        if (outcome.reason === "changed") {
           await tx
             .update(bronzeReview)
             .set({ status: "withdrawn", reviewerId: input.reviewerId, decidedAt: now })
             .where(eq(bronzeReview.id, input.id));
           await tx
             .update(bronzeAttempt)
-            .set({
-              status: "failed",
-              failureCodes: ["PROFILE_CHANGED_DURING_VERIFICATION"],
-              completedAt: now,
-            })
+            .set({ status: "failed", failureCodes: outcome.failureCodes, completedAt: now })
             .where(eq(bronzeAttempt.id, attempt.id));
           await tx
             .update(bronzeVerification)
-            .set({ status: afterFailure(state.attemptsUsed) })
+            .set({ status: outcome.status })
             .where(eq(bronzeVerification.userId, review.userId));
-          return { ok: false, reason: "changed" };
         }
-        if (attempt.identityBinding) {
-          await lockIdentity(tx, attempt.identityBinding);
-          const reasonCodes = (review.reasonCodes as string[]) ?? [];
-          if (
-            !reasonCodes.includes("IDENTITY_ON_ANOTHER_ACCOUNT") &&
-            (await this.bindingUsedElsewhere(attempt.identityBinding, review.userId, tx))
-          ) {
-            // Found since the review opened: show the admin before anyone approves it.
-            await tx
-              .update(bronzeReview)
-              .set({ reasonCodes: [...reasonCodes, "IDENTITY_ON_ANOTHER_ACCOUNT"] })
-              .where(eq(bronzeReview.id, input.id));
-            return { ok: false, reason: "duplicate" };
-          }
-        }
+        return { ok: false, reason: outcome.reason };
       }
-      const now = new Date();
       await tx
         .update(bronzeReview)
         .set({
@@ -755,29 +758,28 @@ export class BronzeRepository {
       await tx
         .update(bronzeAttempt)
         .set({
-          checks: checks as unknown as Record<string, boolean>,
-          status: approve ? "verified" : "failed",
-          failureCodes: approve ? [] : ["MANUAL_REVIEW_REJECTED"],
+          checks: outcome.checks as unknown as Record<string, boolean>,
+          status: outcome.attemptStatus,
+          failureCodes: outcome.failureCodes,
           completedAt: now,
         })
         .where(eq(bronzeAttempt.id, attempt.id));
-      const status: BronzeStatus = approve ? "verified" : afterFailure(state.attemptsUsed);
       await tx
         .update(bronzeVerification)
         .set(
-          approve
+          outcome.status === "verified"
             ? {
-                status,
+                status: outcome.status,
                 attemptsUsed: 0,
                 verifiedAt: now,
                 verifiedAvatarKey: attempt.avatarKey,
                 verifiedDob: attempt.profileDob,
                 verifiedGender: attempt.profileGender,
               }
-            : { status },
+            : { status: outcome.status },
         )
         .where(eq(bronzeVerification.userId, review.userId));
-      return { ok: true, status, userId: review.userId, attemptId: attempt.id };
+      return { ok: true, status: outcome.status, userId: review.userId, attemptId: attempt.id };
     });
   }
 

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Db } from "../db/db.module";
 import {
   bronzeAttempt,
+  bronzeConsent,
   bronzeReview,
   bronzeVerification,
   verificationErasure,
@@ -191,6 +192,7 @@ describe("BronzeRepository", () => {
       [{ userId: "u1" }],
       undefined,
       undefined,
+      undefined,
       [{ jobId: "didit:session-1" }],
       undefined,
     ]);
@@ -202,6 +204,8 @@ describe("BronzeRepository", () => {
     expect(locked).toBeGreaterThan(-1);
     expect(listed).toBeGreaterThan(locked);
     expect(setOn(bronzeVerification)).toEqual({ currentAttemptId: null });
+    // No standing consent, so no new start can reserve before the account goes.
+    expect(setOn(bronzeConsent)).toEqual({ withdrawnAt: expect.any(Date) });
     expect(valuesOn(verificationErasure)).toEqual([{ providerSessionId: "session-1" }]);
   });
 
@@ -388,6 +392,7 @@ describe("BronzeRepository", () => {
         [{ currentAttemptId: "a1", status: "manual_review", attemptsUsed: 1 }],
         [review],
         [{ ...attempt, checks: { ...passedChecks, liveness: false } }],
+        [],
       ]);
       await expect(repo.decideReview(decision)).resolves.toEqual({ ok: false, reason: "checks" });
     });

@@ -9,6 +9,7 @@ import {
   idCountryMatches,
   interpretDiditResult,
   matchIdentity,
+  reviewOutcome,
   stillVerified,
 } from "./bronze-policy";
 
@@ -260,6 +261,65 @@ describe("Bronze policy", () => {
       checks: { profileFace: false },
       failureCodes: ["PROFILE_CHANGED_DURING_VERIFICATION"],
     });
+  });
+
+  describe("an admin's review decision", () => {
+    const review = {
+      decision: "approve" as const,
+      checks: { ...idOnly, dateOfBirth: true, gender: true },
+      attemptsUsed: 1,
+      profileUnchanged: true,
+      unflaggedDuplicate: false,
+    };
+
+    it("approves by confirming the photo and country, never what only the ID proves", () => {
+      expect(reviewOutcome(review)).toMatchObject({
+        ok: true,
+        status: "verified",
+        attemptStatus: "verified",
+        checks: { profileFace: true, country: true },
+      });
+      expect(reviewOutcome({ ...review, checks: { ...review.checks, liveness: false } })).toEqual({
+        ok: false,
+        reason: "checks",
+      });
+    });
+
+    it("ends a changed profile's attempt, and holds back an unseen second account", () => {
+      expect(reviewOutcome({ ...review, profileUnchanged: false })).toEqual({
+        ok: false,
+        reason: "changed",
+        status: "failed",
+        failureCodes: ["PROFILE_CHANGED_DURING_VERIFICATION"],
+      });
+      expect(reviewOutcome({ ...review, unflaggedDuplicate: true })).toEqual({
+        ok: false,
+        reason: "duplicate",
+      });
+    });
+
+    it("rejects into a retry, or the end on the last attempt", () => {
+      expect(reviewOutcome({ ...review, decision: "reject" })).toMatchObject({
+        ok: true,
+        status: "failed",
+        failureCodes: ["MANUAL_REVIEW_REJECTED"],
+      });
+      expect(
+        reviewOutcome({ ...review, decision: "reject", attemptsUsed: BRONZE_MAX_ATTEMPTS }),
+      ).toMatchObject({ status: "rejected" });
+    });
+  });
+
+  it("ends a finished result that lacks what only the ID proves, instead of waiting", () => {
+    expect(
+      bronzeCallbackOutcome({
+        checks: { ...allButPhoto, governmentId: false, profileFace: true },
+        status: "verified",
+        failureCodes: [],
+        attemptNumber: 1,
+        profileUnchanged: true,
+      }),
+    ).toMatchObject({ status: "failed", failureCodes: ["DIDIT_REQUIRED_CHECK_MISSING"] });
   });
 
   it("keeps the badge only while the verified photo, birth date and gender stay", () => {

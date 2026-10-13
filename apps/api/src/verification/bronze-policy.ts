@@ -1,3 +1,5 @@
+import type { BronzeStatus } from "../db/schema";
+
 export const BRONZE_POLICY_VERSION = "bronze-2026-10-03-identity-v3";
 export const BRONZE_MAX_ATTEMPTS = 3;
 
@@ -78,16 +80,72 @@ export function bronzeCallbackOutcome(input: {
     };
   }
   if (canAwardBronze(checks)) return { checks, status: "verified" as const, failureCodes: [] };
-  return idChecksPass(checks)
-    ? {
-        checks,
-        status: "manual_review" as const,
-        failureCodes: [
-          ...(!checks.profileFace ? ["PROFILE_PHOTO_FACE_MATCH_REQUIRED"] : []),
-          ...(!checks.country ? ["ID_COUNTRY_UNCONFIRMED"] : []),
-        ],
-      }
-    : { checks, status: "processing" as const, failureCodes: input.failureCodes };
+  if (idChecksPass(checks))
+    return {
+      checks,
+      status: "manual_review" as const,
+      failureCodes: [
+        ...(!checks.profileFace ? ["PROFILE_PHOTO_FACE_MATCH_REQUIRED"] : []),
+        ...(!checks.country ? ["ID_COUNTRY_UNCONFIRMED"] : []),
+      ],
+    };
+  // A finished result without what only the ID proves: nothing more is coming.
+  return ended(input.failureCodes.length ? input.failureCodes : ["DIDIT_REQUIRED_CHECK_MISSING"]);
+}
+
+/**
+ * What an admin's decision on a review does. Approving confirms the two
+ * checks a person can judge (the profile photo and the ID's country); what
+ * only the ID proves must already have passed. Rejecting fails the attempt,
+ * so the member can try again if attempts remain. A review whose member has
+ * since changed what was checked can't be approved, and ends like any other
+ * changed profile. A second account found since the review opened must be
+ * shown to the admin before anyone approves.
+ */
+export function reviewOutcome(input: {
+  decision: "approve" | "reject";
+  checks: Partial<BronzeChecks>;
+  attemptsUsed: number;
+  /** The photo, birth date and gender are still the ones the attempt checked. */
+  profileUnchanged: boolean;
+  /** Another account holds this identity and the review doesn't say so yet. */
+  unflaggedDuplicate: boolean;
+}):
+  | {
+      ok: true;
+      checks: BronzeChecks;
+      status: BronzeStatus;
+      attemptStatus: "verified" | "failed";
+      failureCodes: string[];
+    }
+  | { ok: false; reason: "checks" | "duplicate" }
+  | { ok: false; reason: "changed"; status: BronzeStatus; failureCodes: string[] } {
+  const afterFailure: BronzeStatus =
+    input.attemptsUsed >= BRONZE_MAX_ATTEMPTS ? "rejected" : "failed";
+  if (input.decision === "reject")
+    return {
+      ok: true,
+      checks: { ...emptyBronzeChecks(), ...input.checks },
+      status: afterFailure,
+      attemptStatus: "failed",
+      failureCodes: ["MANUAL_REVIEW_REJECTED"],
+    };
+  const checks: BronzeChecks = {
+    ...emptyBronzeChecks(),
+    ...input.checks,
+    profileFace: true,
+    country: true,
+  };
+  if (!idChecksPass(checks) || !canAwardBronze(checks)) return { ok: false, reason: "checks" };
+  if (!input.profileUnchanged)
+    return {
+      ok: false,
+      reason: "changed",
+      status: afterFailure,
+      failureCodes: ["PROFILE_CHANGED_DURING_VERIFICATION"],
+    };
+  if (input.unflaggedDuplicate) return { ok: false, reason: "duplicate" };
+  return { ok: true, checks, status: "verified", attemptStatus: "verified", failureCodes: [] };
 }
 
 /** Didit's Nigerian registry lookups: the national identity number, and the bank one. */
