@@ -6,7 +6,7 @@ describe("getInvestVM", () => {
 
   it("shares the same footer address line as the landing page", () => {
     expect(vm.footer.addressLine).toBe(
-      "Temaxiro Limited · 30 Major Bowen Road, Sapele, Delta State, Nigeria",
+      "Kinkord Limited · 30 Major Bowen Road, Sapele, Delta State, Nigeria",
     );
   });
 
