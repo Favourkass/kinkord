@@ -54,6 +54,8 @@ export const profile = pgTable("profile", {
   socialLinks: jsonb("social_links").$type<SocialLinks>().notNull().default({}),
   /** "public" (every member) or "friends" (mutual follows only). */
   profileVisibility: text("profile_visibility").notNull().default("public"),
+  /** Whether other members see the Verified badge; verifying doesn't have to be public. */
+  showVerifiedBadge: boolean("show_verified_badge").notNull().default(true),
   /** Display name and username may change once every 30 days; these stamp the last change. */
   displayNameChangedAt: timestamp("display_name_changed_at"),
   usernameChangedAt: timestamp("username_changed_at"),
