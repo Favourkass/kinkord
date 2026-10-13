@@ -281,9 +281,26 @@ export class PushService {
     this.toAdmins("verification", "New verification to review");
   }
 
+  /** A member's ID says they may be under 18: the admins look at the account. */
+  verificationUnderage(memberId: string): void {
+    this.toAdmins("verification_underage", "A member's ID shows they may be under 18", memberId);
+  }
+
+  /** The member's own verification moved on; the details are on their verification page. */
+  verificationUpdate(userId: string): void {
+    this.toMember(
+      userId,
+      "verification_update",
+      null,
+      "Your identity verification has an update",
+      `verification-${userId}`,
+    );
+  }
+
   private toAdmins(
-    type: "report" | "payment" | "silver_check" | "verification",
+    type: "report" | "payment" | "silver_check" | "verification" | "verification_underage",
     body: string,
+    subjectId: string | null = null,
   ): void {
     void adminUserIds(this.db)
       .then((ids) =>
@@ -291,8 +308,13 @@ export class PushService {
           ids.map((id) =>
             this.deliver(
               id,
-              { type },
-              { title: "Kinkord", body, url: notificationUrl(type, null, null), tag: type },
+              { type, subjectId: subjectId ?? undefined },
+              {
+                title: "Kinkord",
+                body,
+                url: notificationUrl(type, subjectId, null),
+                tag: subjectId ? `${type}-${subjectId}` : type,
+              },
             ),
           ),
         ),
@@ -302,18 +324,19 @@ export class PushService {
 
   private toMember(
     userId: string,
-    type: "payment_verified" | "payment_rejected",
-    paymentId: string,
+    type: "payment_verified" | "payment_rejected" | "verification_update",
+    subjectId: string | null,
     body: string,
+    tag = `payment-${subjectId}`,
   ): void {
     this.notify(async () => ({
       to: userId,
-      event: { type, subjectId: paymentId },
+      event: { type, subjectId: subjectId ?? undefined },
       message: {
         title: "Kinkord",
         body,
-        url: notificationUrl(type, paymentId, null),
-        tag: `payment-${paymentId}`,
+        url: notificationUrl(type, subjectId, null),
+        tag,
       },
     }));
   }

@@ -22,6 +22,11 @@ export interface VerificationSettings {
   profileMatch: { enabled: boolean; threshold: number };
   /** Keys the one-way identity fingerprint; changing it breaks every stored fingerprint. */
   bindingSecret: string;
+  /**
+   * Staff-only testing: while any user ids are listed, verification is offered
+   * to those members alone. Empty means everyone.
+   */
+  testers: string[];
 }
 
 const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
@@ -48,6 +53,10 @@ export function parseVerificationSettings(raw: Record<string, unknown>): Verific
       threshold: number(raw.profileMatchThreshold, 90, 90, 100),
     },
     bindingSecret: text(raw.bindingSecret),
+    testers: text(raw.testers)
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean),
   };
 }
 
@@ -64,6 +73,7 @@ export function settingsFromEnv(env: NodeJS.ProcessEnv = process.env): Verificat
     profileMatchEnabled: env.DIDIT_PROFILE_FACE_MATCH_ENABLED,
     profileMatchThreshold: env.DIDIT_PROFILE_FACE_MATCH_THRESHOLD,
     bindingSecret: env.VERIFICATION_BINDING_SECRET,
+    testers: env.VERIFICATION_TESTERS,
   });
 }
 
@@ -192,6 +202,12 @@ export class VerificationConfig implements OnModuleInit, OnModuleDestroy {
       // Sandbox checks never verify a real member.
       (!this.production || s.didit.mode === "live")
     );
+  }
+
+  /** Whether this member may verify now: available, and a listed tester while testing. */
+  availableTo(userId: string): boolean {
+    const { testers } = this.settings;
+    return this.identityAvailable && (testers.length === 0 || testers.includes(userId));
   }
 
   get profileMatchAvailable(): boolean {

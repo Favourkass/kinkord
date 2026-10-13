@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { getVerificationPrivacyVM } from "./getVerificationPrivacyVM";
 
+const sectionText = (id: string) =>
+  getVerificationPrivacyVM()
+    .sections.find((section) => section.id === id)
+    ?.paragraphs.join(" ") ?? "";
+
 describe("getVerificationPrivacyVM", () => {
   it("covers identity verification only, with the provider notice", () => {
     const vm = getVerificationPrivacyVM();
@@ -14,9 +19,25 @@ describe("getVerificationPrivacyVM", () => {
     expect(text).toContain("Authorized Kinkord reviewers");
     expect(text).toContain("retries it if Didit is temporarily unavailable");
     expect(text).toContain("Settings → Verification");
-    // Only Didit: no other provider or stage is described.
-    expect(text).not.toMatch(/Smile|Mono|bank-connection|residence|GPS/);
+    // Only Didit and the NIN registry: no other provider, bank check or stage is described.
+    expect(text).not.toMatch(/Smile|Mono|bank|BVN|NIMC|residence|GPS/);
     expect(vm.provider.href).toMatch(/^https:\/\/didit\.me\//);
+  });
+
+  it("checks only IDs issued in Nigeria against the NIN registry", () => {
+    expect(sectionText("information")).toContain(
+      "If your ID was issued in Nigeria, its details are also checked against the national identity (NIN) registry",
+    );
+    expect(sectionText("information")).toContain("IDs issued in other countries aren't checked");
+  });
+
+  it("says what outlives withdrawal and account deletion", () => {
+    const retention = sectionText("retention");
+    expect(retention).toContain("stay in Kinkord's moderation log for accountability");
+    expect(retention).toMatch(/revokes a verification or bans an account.+one-way fingerprint/);
+    expect(retention).toContain("never the name or ID number");
+    // Withdrawal doesn't promise to delete a fingerprint that is kept.
+    expect(sectionText("withdrawal")).toContain("unless an admin has revoked your verification");
   });
 
   it("gives every section a unique anchor", () => {

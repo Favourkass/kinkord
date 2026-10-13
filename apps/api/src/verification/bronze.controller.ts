@@ -13,6 +13,7 @@ import { z } from "zod";
 import { fromNodeHeaders } from "better-auth/node";
 import { AuthGuard, type AuthedRequest } from "../auth/auth.guard";
 import { AdminGuard } from "../moderation/admin.guard";
+import { isSuperAdmin } from "../moderation/admins";
 import { BronzeService } from "./bronze.service";
 
 const consentSchema = z.object({
@@ -42,6 +43,11 @@ export class BronzeController {
 
   @Post("attempts") start(@Req() req: AuthedRequest) {
     return this.bronze.start(req.user.id);
+  }
+
+  /** The same Didit session again, for a member who closed it before finishing. */
+  @Post("attempts/resume") resume(@Req() req: AuthedRequest) {
+    return this.bronze.resume(req.user.id);
   }
 }
 
@@ -73,6 +79,7 @@ const admin = (req: AuthedRequest) => ({
   id: req.user.id,
   twoFactorEnabled: req.user.twoFactorEnabled,
   sessionId: req.session.id,
+  founder: isSuperAdmin(req.user),
 });
 
 /** Verification reviews, for the same admins who moderate. */
@@ -102,9 +109,9 @@ export class BronzeAdminController {
     return this.bronze.decideReview(admin(req), { id, ...parsed.data });
   }
 
-  @Get("members/:userId") member(@Param("userId") id: string) {
+  @Get("members/:userId") member(@Req() req: AuthedRequest, @Param("userId") id: string) {
     if (!userId.safeParse(id).success) throw new BadRequestException("Invalid member.");
-    return this.bronze.adminStatus(id);
+    return this.bronze.adminStatus(admin(req), id);
   }
 
   @Post("members/:userId/revoke") revoke(

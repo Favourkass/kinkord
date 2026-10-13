@@ -414,8 +414,16 @@ export type AdminVerificationStatus =
   | "rejected"
   | "revoked";
 
+/** Whether this admin may act on a verification: never their own, and an admin's only as a founder. */
+interface AdminVerificationAccessPM {
+  /** The viewing admin's own verification. */
+  own: boolean;
+  /** An admin's verification, and the viewer isn't a founder. */
+  protected: boolean;
+}
+
 /** GET /admin/verification/reviews item. The photo links expire after 10 minutes. */
-export interface AdminVerificationReviewPM {
+export interface AdminVerificationReviewPM extends AdminVerificationAccessPM {
   id: string;
   userId: string;
   username: string | null;
@@ -428,18 +436,28 @@ export interface AdminVerificationReviewPM {
   /** The photo as members see it, and the original it was made from. */
   photoUrl: string;
   originalPhotoUrl: string;
+  /** Another account already holding this identity (with IDENTITY_ON_ANOTHER_ACCOUNT). */
+  duplicateOf: { userId: string; username: string | null } | null;
 }
 
 /** GET /admin/verification/members/:id */
-export interface AdminVerificationStatePM {
+export interface AdminVerificationStatePM extends AdminVerificationAccessPM {
   status: AdminVerificationStatus;
   attemptsUsed: number;
 }
 
-export interface AdminVerificationLabels {
+/** Why this admin can't act on a verification, shown in place of the buttons. */
+export interface AdminVerificationLockLabels {
+  own: string;
+  protected: string;
+}
+
+export interface AdminVerificationLabels extends AdminVerificationLockLabels {
   noName: string;
   checks: Record<AdminVerificationCheck, string>;
   reasons: Record<string, string>;
+  /** "Same ID as @ada"; `handle` is null when that account has no username. */
+  duplicateOf: (handle: string | null) => string;
 }
 
 export interface AdminVerificationReviewVM {
@@ -455,6 +473,10 @@ export interface AdminVerificationReviewVM {
   sessionId: string;
   /** What only the ID proves has passed; the API refuses to approve otherwise. */
   canApprove: boolean;
+  /** Set when this admin may not decide it at all; shown instead of Approve and Reject. */
+  locked: string | null;
+  /** The account already verified with this ID, linking to its moderation page. */
+  duplicate: { label: string; href: string } | null;
 }
 
 const CHECK_ORDER: AdminVerificationCheck[] = [
@@ -476,6 +498,15 @@ const ID_CHECKS: AdminVerificationCheck[] = [
   "gender",
 ];
 
+/** Your own comes first: as a non-founder admin, your own verification is also an admin's. */
+function lockedReason(
+  pm: AdminVerificationAccessPM,
+  labels: AdminVerificationLockLabels,
+): string | null {
+  if (pm.own) return labels.own;
+  return pm.protected ? labels.protected : null;
+}
+
 export function toAdminVerificationReviewVM(
   pm: AdminVerificationReviewPM,
   memberHref: (userId: string) => string,
@@ -483,6 +514,7 @@ export function toAdminVerificationReviewVM(
   now = new Date(),
 ): AdminVerificationReviewVM {
   const handle = pm.username ? `@${pm.username}` : null;
+  const duplicate = pm.duplicateOf;
   return {
     id: pm.id,
     name: pm.displayName?.trim() || handle || labels.noName,
@@ -499,17 +531,142 @@ export function toAdminVerificationReviewVM(
     originalPhotoUrl: pm.originalPhotoUrl,
     sessionId: pm.providerSessionId,
     canApprove: ID_CHECKS.every((key) => pm.checks[key] === true),
+    locked: lockedReason(pm, labels),
+    duplicate: duplicate
+      ? {
+          label: labels.duplicateOf(duplicate.username ? `@${duplicate.username}` : null),
+          href: memberHref(duplicate.userId),
+        }
+      : null,
   };
 }
 
-/** Which verification actions an admin has on a member's page. */
+/**
+ * Which verification actions an admin has on a member's page: revoke anything not
+ * already revoked, and reopen once they're out of attempts or revoked. Neither on
+ * your own, nor on an admin's unless you're a founder.
+ */
 export function adminVerificationActions(pm: AdminVerificationStatePM | null): {
   revoke: boolean;
   reopen: boolean;
 } {
-  if (!pm) return { revoke: false, reopen: false };
+  if (!pm || pm.own || pm.protected) return { revoke: false, reopen: false };
   return {
-    revoke: pm.status !== "not_started" && pm.status !== "revoked",
+    revoke: pm.status !== "revoked",
     reopen: pm.status === "rejected" || pm.status === "revoked",
   };
+}
+
+export interface AdminMemberVerificationLabels extends AdminVerificationLockLabels {
+  statuses: Record<AdminVerificationStatus, string>;
+  attemptsUsed: (n: number) => string;
+}
+
+/** A member's identity verification, on their moderation page. */
+export interface AdminMemberVerificationVM {
+  status: string;
+  attempts: string;
+  revoke: boolean;
+  reopen: boolean;
+  /** Why Revoke and Reopen are missing, shown in their place. */
+  locked: string | null;
+}
+
+export function toAdminMemberVerificationVM(
+  pm: AdminVerificationStatePM,
+  labels: AdminMemberVerificationLabels,
+): AdminMemberVerificationVM {
+  return {
+    status: labels.statuses[pm.status] ?? pm.status,
+    attempts: labels.attemptsUsed(pm.attemptsUsed),
+    ...adminVerificationActions(pm),
+    locked: lockedReason(pm, labels),
+  };
+}
+
+// What the API requires of a decision, revoke or reopen, checked first so the button says so.
+const MIN_EVIDENCE = 3;
+const MIN_REASON = 10;
+const CODE_DIGITS = 6;
+
+/** An authenticator code as typed or pasted: digits only, then six, so "123 456" stays whole. */
+export function twoFactorCodeInput(value: string): string {
+  return value.replace(/\D/g, "").slice(0, CODE_DIGITS);
+}
+
+export function isTwoFactorCode(code: string): boolean {
+  return code.length === CODE_DIGITS && /^\d+$/.test(code);
+}
+
+/** Approving or rejecting needs an evidence reference and a reason for the audit log. */
+export function canDecideVerification(input: { evidence: string; reason: string }): boolean {
+  return input.evidence.trim().length >= MIN_EVIDENCE && input.reason.trim().length >= MIN_REASON;
+}
+
+/** Revoking or reopening needs a reason for the log and a current authenticator code. */
+export function canChangeVerification(input: { code: string; reason: string }): boolean {
+  return isTwoFactorCode(input.code) && input.reason.trim().length >= MIN_REASON;
+}
+
+/** How long one admin 2FA confirmation lasts (POST /admin/verification/step-up). */
+export const ADMIN_STEP_UP_MS = 10 * 60_000;
+
+/**
+ * How long this confirmation has left, from the API's `verifiedUntil`. A device clock
+ * that disagrees with the server's can't make it lapse at once or run long: it's then
+ * the full ten minutes, and the API's own STEP_UP_REQUIRED covers any difference.
+ */
+export function stepUpRemainingMs(verifiedUntil: string, now = Date.now()): number {
+  const left = Date.parse(verifiedUntil) - now;
+  return left > 0 && left <= ADMIN_STEP_UP_MS ? left : ADMIN_STEP_UP_MS;
+}
+
+/** A refusal about the admin's 2FA confirmation, told apart by the `code` the API sends. */
+export type StepUpRefusal =
+  /** 403: missing or expired, so ask for a new code. */
+  | { kind: "required" }
+  /** 403: a wrong code. */
+  | { kind: "invalidCode" }
+  /** 429: too many wrong codes, until `retryAt`. */
+  | { kind: "locked"; retryAt: string | null }
+  /** 403: this admin hasn't turned on two-factor. */
+  | { kind: "twoFactorOff" };
+
+export function stepUpRefusal(status: number, body: unknown): StepUpRefusal | null {
+  const fields = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
+  if (status === 403 && fields.code === "STEP_UP_REQUIRED") return { kind: "required" };
+  if (status === 403 && fields.code === "INVALID_CODE") return { kind: "invalidCode" };
+  if (status === 403 && fields.code === "TWO_FACTOR_OFF") return { kind: "twoFactorOff" };
+  if (status === 429 && fields.code === "STEP_UP_LOCKED")
+    return { kind: "locked", retryAt: typeof fields.retryAt === "string" ? fields.retryAt : null };
+  return null;
+}
+
+export interface StepUpMessageLabels {
+  /** The confirmation ran out: enter a new code. */
+  expired: string;
+  /** "You can try again at 14:35." */
+  retryAt: (time: string) => string;
+}
+
+/** What to tell the admin: the API's own words, plus when a lock lifts. */
+export function stepUpMessage(
+  refusal: StepUpRefusal,
+  apiMessage: string,
+  labels: StepUpMessageLabels,
+): string {
+  if (refusal.kind === "required") return labels.expired;
+  if (refusal.kind === "locked") {
+    const time = clockTime(refusal.retryAt);
+    return time ? `${apiMessage} ${labels.retryAt(time)}` : apiMessage;
+  }
+  return apiMessage;
+}
+
+/** "14:35" on this device's clock; null when there's no time, or it isn't one. */
+export function clockTime(at: string | number | null): string | null {
+  if (at === null) return null;
+  const date = new Date(at);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 }

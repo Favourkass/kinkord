@@ -101,6 +101,8 @@ export const MEMBERS_COPY = {
         none: "Not verified yet",
       },
       identityDetail: "ID and selfie checked by Kinkord",
+      /** Beside your own badge when you've hidden it from everyone else. */
+      identityHidden: "Hidden from others",
       verifiedDetail: (email: boolean, phone: boolean) =>
         email && phone
           ? "Email & Phone Verified"

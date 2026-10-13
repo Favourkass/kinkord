@@ -184,7 +184,8 @@ describe("ModerationService.deleteMember", () => {
       ].sort(),
     );
     // What Didit holds is durably queued while the account still exists to find it by.
-    expect(verification.forgetMember).toHaveBeenCalledWith("u9");
+    // A ban also holds their identity, so it can't verify a new account unseen.
+    expect(verification.forgetMember).toHaveBeenCalledWith("u9", { hold: true });
     // The rules are written while the account still exists to read them from.
     expect(indexOf("insert", signupBlock)).toBeLessThan(indexOf("delete", user));
     expect(after("insert", moderationLog, "values")).toMatchObject({

@@ -1,5 +1,5 @@
 {
-  "id": "c1f24736-02ab-4920-8a24-83fbe99648cf",
+  "id": "be7d19f5-c76f-477c-b221-826ffe197a0c",
   "prevId": "bb8e28fe-5d6d-429a-baf0-1571632b5bff",
   "version": "7",
   "dialect": "postgresql",
@@ -1157,7 +1157,23 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "bronze_verification_current_attempt_idx": {
+          "name": "bronze_verification_current_attempt_idx",
+          "columns": [
+            {
+              "expression": "current_attempt_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "bronze_verification_user_id_user_id_fk": {
           "name": "bronze_verification_user_id_user_id_fk",
@@ -1302,6 +1318,46 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.verification_identity_hold": {
+      "name": "verification_identity_hold",
+      "schema": "",
+      "columns": {
+        "binding": {
+          "name": "binding",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp (3) with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "verification_identity_hold_binding_user_id_pk": {
+          "name": "verification_identity_hold_binding_user_id_pk",
+          "columns": [
+            "binding",
+            "user_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},

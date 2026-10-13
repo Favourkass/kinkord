@@ -195,4 +195,26 @@ describe("VerificationConfig", () => {
       ]);
     });
   });
+
+  it("offers verification only to listed testers while any are set", () => {
+    const on = {
+      enabled: true,
+      policyUrl: "https://kinkord.test/privacy/verification",
+      returnUrl: "https://kinkord.test/settings/verification",
+      diditApiKey: "k",
+      diditWebhookSecret: "w",
+      diditWorkflowId: "wf",
+      bindingSecret: "b".repeat(40),
+    };
+    const testing = VerificationConfig.fixed(
+      parseVerificationSettings({ ...on, testers: " staff-1, staff-2 ,," }),
+    );
+    expect(testing.current.testers).toEqual(["staff-1", "staff-2"]);
+    expect(testing.availableTo("staff-2")).toBe(true);
+    expect(testing.availableTo("member-1")).toBe(false);
+    const open = VerificationConfig.fixed(parseVerificationSettings(on));
+    expect(open.availableTo("member-1")).toBe(true);
+    const off = VerificationConfig.fixed(parseVerificationSettings({ ...on, enabled: false }));
+    expect(off.availableTo("staff-1")).toBe(false);
+  });
 });

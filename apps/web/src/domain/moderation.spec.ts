@@ -1,11 +1,22 @@
 import { describe, expect, it } from "vitest";
 import {
+  ADMIN_STEP_UP_MS,
   adminVerificationActions,
   adminUsername,
+  canChangeVerification,
+  canDecideVerification,
+  clockTime,
+  isTwoFactorCode,
+  stepUpMessage,
+  stepUpRefusal,
+  stepUpRemainingMs,
+  toAdminMemberVerificationVM,
   toAdminTeamRowVM,
   toAdminReportVM,
   toAdminVerificationReviewVM,
+  twoFactorCodeInput,
   type AdminVerificationReviewPM,
+  type AdminVerificationStatePM,
   type AdminReportPM,
   toAdminMemberDetailVM,
   toAdminMemberRowVM,
@@ -244,6 +255,9 @@ describe("toAdminVerificationReviewVM", () => {
     },
     photoUrl: "https://m/a_md.jpg",
     originalPhotoUrl: "https://m/a.jpg",
+    own: false,
+    protected: false,
+    duplicateOf: null,
   };
   const labels = {
     noName: "Unnamed member",
@@ -257,6 +271,9 @@ describe("toAdminVerificationReviewVM", () => {
       country: "Country",
     },
     reasons: { PROFILE_PHOTO_MATCH_INCONCLUSIVE: "Unclear photo match" },
+    own: "Your own",
+    protected: "Founders only",
+    duplicateOf: (handle: string | null) => `Same ID as ${handle ?? "another account"}`,
   };
   const href = (id: string) => `/moderation/members/${id}`;
 
@@ -270,6 +287,8 @@ describe("toAdminVerificationReviewVM", () => {
       reasons: ["Unclear photo match", "SOMETHING_NEW"],
       sessionId: "session-1",
       canApprove: true,
+      locked: null,
+      duplicate: null,
     });
     expect(vm.checks.filter((check) => !check.passed).map((check) => check.key)).toEqual([
       "profileFace",
@@ -292,27 +311,190 @@ describe("toAdminVerificationReviewVM", () => {
     expect(vm.name).toBe("Unnamed member");
     expect(vm.canApprove).toBe(false);
   });
+
+  it("locks the decision on your own review, and on an admin's unless you're a founder", () => {
+    expect(toAdminVerificationReviewVM({ ...review, own: true }, href, labels, now).locked).toBe(
+      "Your own",
+    );
+    expect(
+      toAdminVerificationReviewVM({ ...review, protected: true }, href, labels, now).locked,
+    ).toBe("Founders only");
+    // A non-founder admin's own review is both; "your own" is the reason that applies.
+    expect(
+      toAdminVerificationReviewVM({ ...review, own: true, protected: true }, href, labels, now)
+        .locked,
+    ).toBe("Your own");
+  });
+
+  it("names the account already verified with this ID and links to it", () => {
+    const vm = toAdminVerificationReviewVM(
+      { ...review, duplicateOf: { userId: "u7", username: "twin" } },
+      href,
+      labels,
+      now,
+    );
+    expect(vm.duplicate).toEqual({ label: "Same ID as @twin", href: "/moderation/members/u7" });
+    expect(
+      toAdminVerificationReviewVM(
+        { ...review, duplicateOf: { userId: "u8", username: null } },
+        href,
+        labels,
+        now,
+      ).duplicate,
+    ).toEqual({ label: "Same ID as another account", href: "/moderation/members/u8" });
+  });
 });
 
 describe("adminVerificationActions", () => {
-  it("offers revoking a live verification and reopening a closed one", () => {
-    expect(adminVerificationActions({ status: "verified", attemptsUsed: 0 })).toEqual({
-      revoke: true,
-      reopen: false,
-    });
-    expect(adminVerificationActions({ status: "revoked", attemptsUsed: 0 })).toEqual({
+  const state = (over: Partial<AdminVerificationStatePM>): AdminVerificationStatePM => ({
+    status: "verified",
+    attemptsUsed: 0,
+    own: false,
+    protected: false,
+    ...over,
+  });
+
+  it("revokes anything not already revoked, and reopens once out of attempts or revoked", () => {
+    expect(adminVerificationActions(state({}))).toEqual({ revoke: true, reopen: false });
+    expect(adminVerificationActions(state({ status: "revoked" }))).toEqual({
       revoke: false,
       reopen: true,
     });
-    expect(adminVerificationActions({ status: "rejected", attemptsUsed: 3 })).toEqual({
+    expect(adminVerificationActions(state({ status: "rejected", attemptsUsed: 3 }))).toEqual({
       revoke: true,
       reopen: true,
     });
-    expect(adminVerificationActions({ status: "not_started", attemptsUsed: 0 })).toEqual({
-      revoke: false,
+    expect(adminVerificationActions(state({ status: "not_started" }))).toEqual({
+      revoke: true,
       reopen: false,
     });
     expect(adminVerificationActions(null)).toEqual({ revoke: false, reopen: false });
+  });
+
+  it("offers nothing on your own verification, or an admin's to a non-founder", () => {
+    const none = { revoke: false, reopen: false };
+    expect(adminVerificationActions(state({ status: "rejected", own: true }))).toEqual(none);
+    expect(adminVerificationActions(state({ status: "rejected", protected: true }))).toEqual(none);
+  });
+});
+
+describe("toAdminMemberVerificationVM", () => {
+  const labels = {
+    statuses: {
+      not_started: "Not verified",
+      pending: "Checking",
+      failed: "Didn't pass",
+      manual_review: "Waiting for review",
+      verified: "Verified",
+      outdated: "Lapsed",
+      rejected: "Out of attempts",
+      revoked: "Revoked",
+    },
+    attemptsUsed: (n: number) => `${n} of 3 attempts used`,
+    own: "Your own",
+    protected: "Founders only",
+  };
+  const pm: AdminVerificationStatePM = {
+    status: "rejected",
+    attemptsUsed: 3,
+    own: false,
+    protected: false,
+  };
+
+  it("labels the status and attempts, with the actions on offer", () => {
+    expect(toAdminMemberVerificationVM(pm, labels)).toEqual({
+      status: "Out of attempts",
+      attempts: "3 of 3 attempts used",
+      revoke: true,
+      reopen: true,
+      locked: null,
+    });
+  });
+
+  it("says why the actions are missing on your own or a protected verification", () => {
+    expect(toAdminMemberVerificationVM({ ...pm, own: true }, labels)).toMatchObject({
+      revoke: false,
+      reopen: false,
+      locked: "Your own",
+    });
+    expect(toAdminMemberVerificationVM({ ...pm, protected: true }, labels)).toMatchObject({
+      revoke: false,
+      reopen: false,
+      locked: "Founders only",
+    });
+  });
+});
+
+describe("verification inputs", () => {
+  it("keeps the digits of a typed or pasted code before limiting it to six", () => {
+    expect(twoFactorCodeInput("123 456")).toBe("123456");
+    expect(twoFactorCodeInput("12ab3456")).toBe("123456");
+    expect(twoFactorCodeInput("Code: 987-654-3")).toBe("987654");
+    expect(isTwoFactorCode("123456")).toBe(true);
+    expect(isTwoFactorCode("12345")).toBe(false);
+    expect(isTwoFactorCode("12345a")).toBe(false);
+  });
+
+  it("needs evidence and a reason of at least ten characters for a decision", () => {
+    expect(canDecideVerification({ evidence: "didit:s1", reason: "Same person." })).toBe(true);
+    expect(canDecideVerification({ evidence: " ab ", reason: "Same person." })).toBe(false);
+    expect(canDecideVerification({ evidence: "didit:s1", reason: "  too short  " })).toBe(false);
+  });
+
+  it("needs a six-digit code and a reason to revoke or reopen", () => {
+    expect(canChangeVerification({ code: "123456", reason: "Confirmed fraud." })).toBe(true);
+    expect(canChangeVerification({ code: "12345", reason: "Confirmed fraud." })).toBe(false);
+    expect(canChangeVerification({ code: "123456", reason: "short" })).toBe(false);
+  });
+});
+
+describe("admin 2FA step-up", () => {
+  const labels = {
+    expired: "Enter a new code.",
+    retryAt: (time: string) => `Try again at ${time}.`,
+  };
+
+  it("tells the refusals apart by the code the API sends", () => {
+    expect(stepUpRefusal(403, { code: "STEP_UP_REQUIRED", message: "x" })).toEqual({
+      kind: "required",
+    });
+    expect(stepUpRefusal(403, { code: "INVALID_CODE" })).toEqual({ kind: "invalidCode" });
+    expect(stepUpRefusal(403, { code: "TWO_FACTOR_OFF" })).toEqual({ kind: "twoFactorOff" });
+    expect(stepUpRefusal(429, { code: "STEP_UP_LOCKED", retryAt: "2026-10-13T10:15:00Z" })).toEqual(
+      { kind: "locked", retryAt: "2026-10-13T10:15:00Z" },
+    );
+    expect(stepUpRefusal(429, { code: "STEP_UP_LOCKED" })).toEqual({
+      kind: "locked",
+      retryAt: null,
+    });
+    expect(stepUpRefusal(403, { message: "You can't decide your own verification." })).toBeNull();
+    expect(stepUpRefusal(409, { code: "STEP_UP_REQUIRED" })).toBeNull();
+    expect(stepUpRefusal(403, "Forbidden")).toBeNull();
+  });
+
+  it("uses the API's words, adds when a lock lifts, and asks for a new code once expired", () => {
+    const retryAt = "2026-10-13T10:15:00Z";
+    expect(stepUpMessage({ kind: "invalidCode" }, "Wrong code.", labels)).toBe("Wrong code.");
+    expect(stepUpMessage({ kind: "twoFactorOff" }, "Turn on 2FA.", labels)).toBe("Turn on 2FA.");
+    expect(stepUpMessage({ kind: "locked", retryAt }, "Too many wrong codes.", labels)).toBe(
+      `Too many wrong codes. Try again at ${clockTime(retryAt)}.`,
+    );
+    expect(clockTime(retryAt)).toMatch(/^\d{2}:\d{2}$/);
+    expect(stepUpMessage({ kind: "locked", retryAt: null }, "Locked.", labels)).toBe("Locked.");
+    expect(stepUpMessage({ kind: "required" }, "Confirm a code.", labels)).toBe(
+      "Enter a new code.",
+    );
+  });
+
+  it("times the confirmation from verifiedUntil, falling back to ten minutes on a skewed clock", () => {
+    const at = Date.parse("2026-10-13T10:00:00Z");
+    expect(stepUpRemainingMs("2026-10-13T10:09:00Z", at)).toBe(9 * 60_000);
+    // This device's clock runs ahead of the server's, or behind it, or the time is broken.
+    expect(stepUpRemainingMs("2026-10-13T09:59:00Z", at)).toBe(ADMIN_STEP_UP_MS);
+    expect(stepUpRemainingMs("2026-10-13T10:30:00Z", at)).toBe(ADMIN_STEP_UP_MS);
+    expect(stepUpRemainingMs("not a time", at)).toBe(ADMIN_STEP_UP_MS);
+    expect(clockTime("not a time")).toBeNull();
+    expect(clockTime(null)).toBeNull();
   });
 });
 

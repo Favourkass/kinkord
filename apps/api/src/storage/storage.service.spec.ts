@@ -70,10 +70,11 @@ describe("StorageService", () => {
 
   it("builds its client from that config", async () => {
     process.env.S3_ENDPOINT = "http://localhost:9000";
-    const { StorageService, VERIFICATION_IMAGE_MAX_PIXELS } = await import("./storage.service");
-    const sharp = (await import("sharp")).default;
+    const { StorageService, VERIFICATION_IMAGE_MAX_PIXELS, loadSharp } =
+      await import("./storage.service");
     expect(VERIFICATION_IMAGE_MAX_PIXELS).toBe(20_000_000);
-    expect(sharp.concurrency()).toBe(1);
+    // Loaded on first use, not at startup, and then limited to one libvips thread.
+    expect((await loadSharp()).concurrency()).toBe(1);
     new StorageService();
     expect(s3Config).toHaveBeenCalledWith(
       expect.objectContaining({ endpoint: "http://localhost:9000", forcePathStyle: true }),

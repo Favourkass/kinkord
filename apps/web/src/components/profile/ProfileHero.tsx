@@ -18,6 +18,8 @@ export interface ProfileHeroLabels {
   comingSoon: string;
   /** Shown when the member's identity is verified and they show it. */
   identityVerified: string;
+  /** Beside your own badge when you've hidden it from others. */
+  identityHidden: string;
   stats: { friends: string; followers: string; following: string };
   silver: SilverBadgeLabels;
 }
@@ -106,9 +108,14 @@ export default function ProfileHero({
           )}
         </p>
         {vm.verification.level === "identity" ? (
-          <span className="flex items-center gap-[6px] rounded-full border border-kink-gold-bright/60 px-[12px] py-[4px] text-[12px] font-bold text-kink-gold-bright">
-            <VerifiedMark size={16} />
-            {labels.identityVerified}
+          <span className="flex flex-wrap items-center justify-center gap-x-[8px] gap-y-[4px]">
+            <span className="flex items-center gap-[6px] rounded-full border border-kink-gold-bright/60 px-[12px] py-[4px] text-[12px] font-bold text-kink-gold-bright">
+              <VerifiedMark size={16} />
+              {labels.identityVerified}
+            </span>
+            {vm.verification.hiddenFromOthers ? (
+              <span className="text-[12px] text-pf-muted">{labels.identityHidden}</span>
+            ) : null}
           </span>
         ) : null}
         <p className="flex items-center gap-[12px] text-[13px] font-bold leading-[16px] text-pf-muted">

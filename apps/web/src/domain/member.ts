@@ -225,7 +225,13 @@ export interface PublicProfileVM {
   roles: string[];
   limits: string | null;
   socialLinks: SocialLinkVM[];
-  verification: { level: "identity" | "basic" | "none"; email: boolean; phone: boolean };
+  verification: {
+    level: "identity" | "basic" | "none";
+    email: boolean;
+    phone: boolean;
+    /** Your own profile only: you've hidden your verified badge from everyone else. */
+    hiddenFromOthers?: boolean;
+  };
   /** The Silver check beside their name; `since` is "October 2026". */
   silver: { since: string | null } | null;
   restricted: boolean;
@@ -386,6 +392,18 @@ export function toPublicProfileVM(
     silver: pm.silver ? { since: monthYear(pm.silver.since) } : null,
     restricted: Boolean(pm.restricted),
   };
+}
+
+/**
+ * You always see your own verified badge; when you've hidden it from everyone else
+ * (`showVerifiedBadge` off), your profile says so beside it.
+ */
+export function withOwnBadgeVisibility(
+  vm: PublicProfileVM,
+  showVerifiedBadge: boolean,
+): PublicProfileVM {
+  if (!vm.isSelf || showVerifiedBadge || vm.verification.level !== "identity") return vm;
+  return { ...vm, verification: { ...vm.verification, hiddenFromOthers: true } };
 }
 
 /* ---- Row view-models shared by the members screens and their presenters ---- */

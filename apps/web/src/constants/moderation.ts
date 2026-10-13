@@ -141,6 +141,13 @@ export const MODERATION_COPY = {
     approve: "Approve",
     reject: "Reject",
     cannotApprove: "The ID checks didn't pass, so this can only be rejected.",
+    own: "You can't act on your own verification.",
+    protected: "Only a founder can decide an admin's verification.",
+    duplicateOf: (handle: string | null) =>
+      handle ? `Same ID as ${handle}` : "Same ID as another account",
+    gone: "This review has closed.",
+    closePhoto: "Close photo",
+    confirmedUntil: (time: string) => `Confirmed until ${time}`,
     checks: {
       governmentId: "Government ID",
       liveness: "Live selfie",
@@ -159,8 +166,11 @@ export const MODERATION_COPY = {
       PROFILE_PHOTO_MATCH_CONSENT_REQUIRED: "No consent on record for the photo comparison",
       PROFILE_PHOTO_CAPTURE_UNAVAILABLE: "Didit didn't return a selfie to compare",
       PROFILE_CHANGED_DURING_VERIFICATION: "They changed their profile during the check",
-      ID_COUNTRY_UNCONFIRMED: "The ID's country doesn't match their nationality or country",
-      IDENTITY_ON_ANOTHER_ACCOUNT: "This ID is already verified on another account",
+      ID_COUNTRY_UNCONFIRMED:
+        "Couldn't confirm the ID's country against their nationality or country",
+      IDENTITY_ON_ANOTHER_ACCOUNT: "This ID looks like it's already on another account",
+      IDENTITY_FINGERPRINT_UNAVAILABLE:
+        "Didit's result didn't include enough to check this ID against other accounts",
     } as Record<string, string>,
     decision: {
       approveTitle: "Approve this verification?",
@@ -177,10 +187,14 @@ export const MODERATION_COPY = {
     },
     stepUp: {
       title: "Confirm this admin session",
-      body: "Enter the current six-digit code from your authenticator app. Confirmation lasts 10 minutes in this session.",
+      body: "Enter the current six-digit code from your authenticator app. It confirms this session for 10 minutes, then we ask again.",
       label: "Authenticator code",
       action: "Confirm and open reviews",
       confirming: "Confirming…",
+      expired: "Your two-factor confirmation ran out. Enter a new code.",
+      retryAt: (time: string) => `You can try again at ${time}.`,
+      noTwoFactor: "No authenticator app yet?",
+      securityLink: "Turn on two-factor in Security settings",
     },
   },
   /** Who has the admin tools; the founders add and remove them. */
@@ -231,10 +245,12 @@ export const MODERATION_COPY = {
       manual_review: "Waiting for review",
       verified: "Verified",
       outdated: "Verification lapsed after a profile change",
-      rejected: "Rejected",
+      // They've used every attempt; an admin can give them a fresh set.
+      rejected: "Out of attempts",
       revoked: "Revoked",
     },
     attemptsUsed: (n: number) => `${n} of 3 attempts used`,
+    verificationError: "Couldn't load their identity verification. Refresh to try again.",
     actions: {
       block: "Block",
       unblock: "Unblock",

@@ -26,6 +26,7 @@ export default function ModerationVerificationPage() {
         notice={p.notice}
         dialog={p.dialog}
         stepUp={p.stepUp}
+        confirmedUntil={p.confirmedUntil}
         onApprove={p.onApprove}
         onReject={p.onReject}
         onRefresh={p.onRefresh}
