@@ -14,6 +14,9 @@ it("renders account signup without phone entry or phone instructions", () => {
   render(<SignupPage />);
   expect(screen.getByLabelText("Email address")).toBeTruthy();
   expect(screen.getByLabelText("Username")).toBeTruthy();
+  expect(screen.getByLabelText("County")).toBeTruthy();
+  expect(screen.getByText("Select your county")).toBeTruthy();
+  expect(screen.queryByText("Select your state")).toBeNull();
   expect(screen.queryByText(/phone number/i)).toBeNull();
   expect(screen.queryByText(/one number can only/i)).toBeNull();
   expect(document.querySelector('input[type="tel"]')).toBeNull();

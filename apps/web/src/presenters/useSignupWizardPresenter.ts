@@ -22,8 +22,12 @@ import {
   type AboutDraft,
   type SignupField,
 } from "@/domain/onboarding";
-import { signupLocationFields, signupCountryOptions } from "@/services/signupLocation.service";
-import { signupFixFieldsMessage } from "@/constants/onboarding";
+import {
+  signupLocationFields,
+  signupCountryOptions,
+  validateSignupAbout,
+  signupLocationErrorMessage,
+} from "@/services/signupLocation.service";
 import { Routes } from "@/constants/Routes";
 import { PHOTO_CONFIRMATION_COPY } from "@/constants/photoConfirmation";
 import { useVerification } from "./useVerification";
@@ -111,12 +115,12 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
    */
   const submitCombinedStep = useCallback(async () => {
     const accErrors = validateAccount(account);
-    const abtErrors = validateAbout(about);
+    const abtErrors = validateSignupAbout(country, about);
     setAccountErrors(accErrors);
     setAboutErrors(abtErrors);
     const invalid = invalidSignupFields(accErrors, abtErrors);
     if (invalid.length > 0) {
-      setTopError(signupFixFieldsMessage(invalid));
+      setTopError(signupLocationErrorMessage(country, invalid));
       setFirstInvalid({ field: invalid[0] });
       return;
     }

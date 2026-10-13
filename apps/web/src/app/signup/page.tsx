@@ -237,7 +237,7 @@ function SignupWizard() {
               )}
             </div>
             <p className="-mt-3 w-full text-left text-[11px] text-kink-help lg:text-[16px]">
-              Your state and area help us show you local communities and events.
+              {p.aboutStep.location.helper}
             </p>
             <DobPicker
               id={fieldId("dob")}

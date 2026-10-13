@@ -103,9 +103,9 @@ export const SIGNUP_FIELD_NAMES: Record<SignupField, string> = {
  * field itself is usually scrolled out of view, so the tap has to say why
  * nothing happened.
  */
-export function signupFixFieldsMessage(fields: SignupField[]): string {
+export function signupFixFieldsMessage(fields: SignupField[], regionName = "state"): string {
   if (fields.length > 3) return "Fill in the fields marked in red above.";
-  const names = fields.map((f) => SIGNUP_FIELD_NAMES[f]);
+  const names = fields.map((f) => (f === "state" ? regionName : SIGNUP_FIELD_NAMES[f]));
   const list =
     names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0];
   return `Check your ${list} above.`;
