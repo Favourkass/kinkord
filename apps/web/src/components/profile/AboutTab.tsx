@@ -26,6 +26,8 @@ export interface AboutLabels {
   verification: string;
   verified: { identity: string; basic: string; none: string };
   identityDetail: string;
+  /** Beside your own badge when you've hidden it from others. */
+  identityHidden: string;
   verifiedDetail: (email: boolean, phone: boolean) => string;
   tagline: string;
   memberSince: (date: string) => string;
@@ -234,6 +236,7 @@ export default function AboutTab({ vm, labels }: AboutTabProps) {
               {vm.verification.level === "identity"
                 ? labels.identityDetail
                 : labels.verifiedDetail(vm.verification.email, vm.verification.phone)}
+              {vm.verification.hiddenFromOthers ? ` · ${labels.identityHidden}` : null}
             </span>
           </span>
         </div>
