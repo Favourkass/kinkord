@@ -2,6 +2,7 @@ import * as cdk from "aws-cdk-lib";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import { Construct } from "constructs";
+import { BACKUP_COPY_REGION } from "./backup-stack";
 
 /** Read by the API at runtime (apps/api/src/verification/verification-config.ts). */
 export const VERIFICATION_SECRET_NAME = "kinkord/verification";
@@ -29,6 +30,10 @@ export class VerificationStack extends cdk.Stack {
     const settingsSecret = new secretsmanager.Secret(this, "Settings", {
       secretName: VERIFICATION_SECRET_NAME,
       description: "Identity verification (Didit): the on switch, provider keys and settings",
+      // Frozen after the first deploy: CloudFormation regenerates the whole
+      // value whenever this changes, wiping the Didit keys and settings pasted
+      // in since. verification-stack.spec.ts pins it. (Adding `testers` changed
+      // it too, but before the stack was ever deployed, so nothing was wiped.)
       generateSecretString: {
         secretStringTemplate: JSON.stringify({
           enabled: false,
@@ -40,6 +45,8 @@ export class VerificationStack extends cdk.Stack {
           diditMode: "sandbox",
           profileMatchEnabled: false,
           profileMatchThreshold: 90,
+          // Comma-separated user IDs; while set, only they're offered verification.
+          testers: "",
         }),
         // Secrets Manager requires one generated field. It is deliberately
         // disposable; the durable identity-fingerprint key lives below.
@@ -54,12 +61,18 @@ export class VerificationStack extends cdk.Stack {
       secretName: VERIFICATION_BINDING_SECRET_NAME,
       description:
         "Stable HMAC key for identity fingerprints; never rotate without a fingerprint migration",
+      // Frozen after the first deploy: CloudFormation regenerates the whole
+      // value whenever this changes, replacing the key every stored
+      // fingerprint was made with. verification-stack.spec.ts pins it.
       generateSecretString: {
         secretStringTemplate: "{}",
         generateStringKey: "bindingSecret",
         passwordLength: 64,
         excludePunctuation: true,
       },
+      // Database backups are copied to Frankfurt, and the fingerprints in them
+      // are useless without this key.
+      replicaRegions: [{ region: BACKUP_COPY_REGION }],
       // Losing or replacing this key silently disables duplicate-ID matching
       // against every fingerprint that was written with the old value.
       removalPolicy: cdk.RemovalPolicy.RETAIN,
