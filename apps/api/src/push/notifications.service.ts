@@ -95,6 +95,8 @@ const REPEATS: Partial<
   follow: { key: (e) => `follow:${e.actorId}`, on: "skip" },
   message: { key: (e) => `message:${e.subjectId}`, on: "bump" },
   test: { key: () => "test", on: "bump" },
+  // One row for a member's verification: each update moves it back to the top.
+  verification_update: { key: () => "verification_update", on: "bump" },
 };
 
 /** Words a search can use to find a kind of notification, besides names. */
@@ -107,6 +109,8 @@ const SEARCH_WORDS: Record<NotificationType, readonly string[]> = {
   repost: ["repost", "reposted", "reposts"],
   report: ["report", "reports", "moderation"],
   verification: ["verification", "verify", "moderation"],
+  verification_update: ["verification", "verify", "identity"],
+  verification_underage: ["verification", "moderation", "age"],
   test: ["notifications", "enabled"],
   payment: ["payment", "payments", "verify"],
   payment_verified: ["payment", "silver", "premium", "subscription"],
@@ -137,6 +141,10 @@ export function notificationUrl(
       return "/subscription";
     case "verification":
       return "/moderation/verification";
+    case "verification_update":
+      return "/settings/verification";
+    case "verification_underage":
+      return subjectId ? `/moderation/members/${subjectId}` : "/moderation/members";
     case "test":
       return "/settings";
     default:

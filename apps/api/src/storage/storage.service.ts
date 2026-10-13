@@ -9,14 +9,29 @@ import {
   type S3ClientConfig,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import sharp from "sharp";
 import { verificationImage, VERIFICATION_IMAGE_MAX_BYTES } from "./verification-image";
 
 /** Download URLs are identical within this window, so browsers can cache them. */
 export const DOWNLOAD_URL_WINDOW_S = 3600;
 /** Bound libvips work and decoded image memory on the 1 GB API instance. */
 export const VERIFICATION_IMAGE_MAX_PIXELS = 20_000_000;
-sharp.concurrency(1);
+
+/**
+ * sharp is a native library, loaded on first use rather than at startup: if it
+ * ever failed to load in the container, only verification's photo step would
+ * fail, not the whole API.
+ */
+type Sharp = typeof import("sharp");
+let sharpModule: Promise<Sharp> | null = null;
+export function loadSharp(): Promise<Sharp> {
+  sharpModule ??= import("sharp").then((mod) => {
+    // CommonJS interop: the function is the default export, or the module itself.
+    const sharp = ((mod as { default?: Sharp }).default ?? mod) as Sharp;
+    sharp.concurrency(1);
+    return sharp;
+  });
+  return sharpModule;
+}
 
 /**
  * Stored sizes for every uploaded photo. The original is kept as-is; `sm` and
@@ -89,6 +104,7 @@ export class StorageService {
    */
   async regenerateVariants(key: string): Promise<void> {
     const original = await this.readVerificationImage(key);
+    const sharp = await loadSharp();
     for (const variant of IMAGE_VARIANTS) {
       const resized = sharp(original.bytes, {
         limitInputPixels: VERIFICATION_IMAGE_MAX_PIXELS,

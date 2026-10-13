@@ -1,4 +1,4 @@
-import type { BronzeRequirement, BronzeStatus } from "@/domain/bronzeVerification";
+import type { BronzeFailure, BronzeRequirement, BronzeStatus } from "@/domain/bronzeVerification";
 
 /** Copy for Settings → Verification. */
 export const VERIFICATION_COPY = {
@@ -6,12 +6,14 @@ export const VERIFICATION_COPY = {
   intro:
     "Verify your identity to get Kinkord's gold seal on your profile. Didit processes your ID and selfie; authorized Kinkord reviewers may access verification evidence when a manual review is needed.",
   loading: "Loading…",
+  retryLoad: "Try again",
   statusHeading: "Status",
   statuses: {
     not_started: { label: "Not verified", detail: "You haven't verified your identity yet." },
     pending: {
       label: "Checking",
-      detail: "Didit is checking your ID and selfie. This page updates by itself.",
+      detail:
+        "Didit is checking your ID and selfie. This page updates by itself, and we'll let you know when it's done.",
     },
     failed: {
       label: "Not passed",
@@ -19,11 +21,11 @@ export const VERIFICATION_COPY = {
     },
     manual_review: {
       label: "With our team",
-      detail: "A Kinkord admin is looking at your check. Your result will show here.",
+      detail: "A Kinkord admin is looking at your check. We'll let you know when there's a result.",
     },
     verified: {
       label: "Verified",
-      detail: "Your profile shows that your identity has been checked.",
+      detail: "Your identity has been checked.",
     },
     outdated: {
       label: "Verify again",
@@ -39,10 +41,39 @@ export const VERIFICATION_COPY = {
       detail: "Your verification was removed by an admin. Contact support to find out more.",
     },
   } satisfies Record<BronzeStatus, { label: string; detail: string }>,
+  /** Pending, but the member left Didit before finishing. */
+  unfinished: {
+    label: "Not finished",
+    detail: "You left Didit before finishing. Continue to pick up where you left off.",
+  },
+  /** A status newer than this page: shown plainly instead of breaking. */
+  unknownStatus: {
+    label: "Status unavailable",
+    detail: "This page is out of date. Refresh it to see your status.",
+  },
+  /** Why the last check didn't pass: what went wrong and what to fix. */
+  failures: {
+    birth_date:
+      "The birth date on your ID doesn't match your profile. If your profile is wrong, correct it in Edit profile.",
+    gender:
+      "The gender on your ID doesn't match your profile. If your profile is wrong, correct it in Edit profile.",
+    registry:
+      "The national identity (NIN) registry couldn't confirm the details on your ID. Use a valid, current ID.",
+    declined:
+      "Your ID couldn't be accepted. Use a valid, unexpired government ID, with the whole card in view and no glare.",
+    liveness:
+      "The live selfie didn't pass. Face the camera in good light, with nothing covering your face.",
+    face: "Your selfie didn't match the photo on your ID. Take the selfie in good light with your whole face in view, and use an ID with a clear photo of you.",
+    profile_changed:
+      "Your photo, birth date or gender changed while the check was running, so it couldn't finish.",
+    expired: "The check wasn't finished in time, so it expired.",
+    other:
+      "Your check couldn't be completed. Make sure your ID is valid and clear, and your profile photo is a recent photo of you.",
+  } satisfies Record<BronzeFailure, string>,
   attemptsLeft: (n: number) => (n === 1 ? "1 attempt left." : `${n} attempts left.`),
-  badgeHint: "You can hide the badge in Edit profile → Privacy.",
+  badgeHint: "You can show or hide your badge in Edit profile → Privacy.",
   badgeHintLink: "Privacy settings",
-  unavailable: "Verification isn't open yet. We'll let you know when it is.",
+  unavailable: "Verification isn't open yet.",
   needsHeading: "Before you start",
   needs: "Add these to your profile first:",
   missing: {
@@ -56,7 +87,7 @@ export const VERIFICATION_COPY = {
     `Your photo was just uploaded. You can verify from ${time}, so the check uses the photo members see.`,
   checksHeading: "What we check",
   checks: [
-    "Your government ID. Nigerian IDs are also checked against NIMC or bank (BVN) records.",
+    "Your government ID. An ID issued in Nigeria is also checked against the national identity (NIN) registry.",
     "A live selfie, matched to the photo on your ID.",
     "That selfie against your Kinkord profile photo.",
     "Your date of birth, gender and country against your profile.",
@@ -77,19 +108,34 @@ export const VERIFICATION_COPY = {
   start: "Verify with Didit",
   retry: "Try again",
   reverify: "Verify again",
+  resume: "Continue verification",
   starting: "Opening Didit…",
+  /** Said under the start button while it's held, so members know why. */
+  startHints: {
+    profile: "Add what's listed above to your profile first.",
+    photo: "You can start once your new photo is ready.",
+    consent: "Tick the box above to agree, then you can start.",
+  },
   refresh: "Refresh status",
   withdraw: {
     button: "Withdraw consent",
     title: "Withdraw your consent?",
-    body: "This stops any check in progress, removes your verified badge and queues a request for Didit to delete your verification session. Failed deletion requests are retried. You can verify again later.",
+    /** Members who are rejected, revoked or out of attempts verify again through support. */
+    body: (needsSupport: boolean) =>
+      `This stops any check in progress, removes your verified badge and asks Didit to delete any verification sessions it holds for you. Failed deletion requests are retried. ${
+        needsSupport
+          ? "To verify again after this, contact support."
+          : "You can verify again later."
+      }`,
     confirm: "Withdraw",
+    busy: "Withdrawing…",
     cancel: "Keep",
-    done: "Consent withdrawn. Your provider-deletion request has been recorded and will be retried if Didit is temporarily unavailable.",
+    done: "Consent withdrawn. Anything Didit held for you is being erased.",
   },
   errors: {
-    load: "Couldn't load your verification. Try again.",
+    load: "Couldn't load your verification.",
     start: "Couldn't start verification. Try again.",
+    resume: "Couldn't continue verification. Try again.",
     withdraw: "Couldn't withdraw your consent. Try again.",
     badLink: "Didit sent back a link we don't recognise, so we didn't open it. Try again.",
   },

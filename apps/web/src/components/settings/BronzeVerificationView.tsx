@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useId, useRef } from "react";
 import Link from "next/link";
 import VerifiedMark from "@/components/brand/VerifiedMark";
 
@@ -13,6 +16,8 @@ export interface BronzeVerificationViewProps {
     heading: string;
     label: string;
     detail: string;
+    /** Why the last check didn't pass, when that's where the member stands. */
+    failure: string | null;
     tone: "neutral" | "good" | "warn" | "bad";
   };
   attempts: string | null;
@@ -24,13 +29,22 @@ export interface BronzeVerificationViewProps {
   privacy: { label: string; href: string };
   consent: { text: string; checked: boolean; onChange: (checked: boolean) => void } | null;
   outdatedPage: string | null;
-  start: { label: string; visible: boolean; enabled: boolean; onClick: () => void } | null;
+  start: {
+    label: string;
+    visible: boolean;
+    enabled: boolean;
+    /** Why the button is held, shown under it. */
+    hint: string | null;
+    onClick: () => void;
+  } | null;
+  resume: { label: string; enabled: boolean; onClick: () => void } | null;
   refresh: { label: string; onClick: () => void } | null;
   withdraw: { label: string; onClick: () => void } | null;
   withdrawConfirm: {
     title: string;
     body: string;
     confirmLabel: string;
+    busyLabel: string;
     cancelLabel: string;
     busy: boolean;
     onConfirm: () => void;
@@ -48,9 +62,29 @@ const toneClass = {
   bad: "text-app-danger",
 } as const;
 const textLink = "font-bold text-kink-gold-bright underline underline-offset-4";
+const primaryButton =
+  "h-[48px] w-full rounded-[12px] bg-kink-amber text-[16px] font-bold text-black disabled:opacity-50";
 
 /** Settings → Verification. Renders the presenter's view model; decides nothing. */
 export default function BronzeVerificationView(p: BronzeVerificationViewProps) {
+  const hintId = useId();
+  const withdrawButton = useRef<HTMLButtonElement>(null);
+  const confirmOpen = p.withdrawConfirm !== null;
+  const confirmWasOpen = useRef(false);
+
+  // The withdraw button unmounts while the confirm box is open; when the box
+  // closes, focus goes back to it instead of falling to the page.
+  useEffect(() => {
+    if (confirmOpen) {
+      confirmWasOpen.current = true;
+      return;
+    }
+    if (confirmWasOpen.current) {
+      confirmWasOpen.current = false;
+      withdrawButton.current?.focus();
+    }
+  }, [confirmOpen]);
+
   return (
     <div className="flex flex-col gap-[16px] text-app-text">
       <header>
@@ -69,6 +103,9 @@ export default function BronzeVerificationView(p: BronzeVerificationViewProps) {
           {p.status.label}
         </p>
         <p className="mt-[4px] text-[14px] leading-[20px] text-app-subtle">{p.status.detail}</p>
+        {p.status.failure ? (
+          <p className="mt-[6px] text-[14px] leading-[20px] text-app-value">{p.status.failure}</p>
+        ) : null}
         {p.attempts ? <p className="mt-[6px] text-[13px] text-app-muted">{p.attempts}</p> : null}
         {p.badgeHint ? (
           <p className="mt-[8px] text-[13px] text-app-subtle">
@@ -77,6 +114,16 @@ export default function BronzeVerificationView(p: BronzeVerificationViewProps) {
               {p.badgeHint.linkLabel}
             </Link>
           </p>
+        ) : null}
+        {p.resume ? (
+          <button
+            type="button"
+            disabled={!p.resume.enabled}
+            onClick={p.resume.onClick}
+            className={`mt-[14px] ${primaryButton}`}
+          >
+            {p.resume.label}
+          </button>
         ) : null}
         {p.refresh ? (
           <button
@@ -155,10 +202,16 @@ export default function BronzeVerificationView(p: BronzeVerificationViewProps) {
             type="button"
             disabled={!p.start.enabled}
             onClick={p.start.onClick}
-            className="mt-[16px] h-[48px] w-full rounded-[12px] bg-kink-amber text-[16px] font-bold text-black disabled:opacity-50"
+            aria-describedby={p.start.hint ? hintId : undefined}
+            className={`mt-[16px] ${primaryButton}`}
           >
             {p.start.label}
           </button>
+          {p.start.hint ? (
+            <p id={hintId} className="mt-[8px] text-[13px] leading-[19px] text-app-subtle">
+              {p.start.hint}
+            </p>
+          ) : null}
         </section>
       ) : null}
 
@@ -190,12 +243,15 @@ export default function BronzeVerificationView(p: BronzeVerificationViewProps) {
               disabled={p.withdrawConfirm.busy}
               className="h-[44px] rounded-[12px] bg-app-danger px-[18px] text-[15px] font-bold text-white disabled:opacity-40"
             >
-              {p.withdrawConfirm.busy ? "…" : p.withdrawConfirm.confirmLabel}
+              {p.withdrawConfirm.busy
+                ? p.withdrawConfirm.busyLabel
+                : p.withdrawConfirm.confirmLabel}
             </button>
           </div>
         </section>
       ) : p.withdraw ? (
         <button
+          ref={withdrawButton}
           type="button"
           onClick={p.withdraw.onClick}
           className="self-start text-[14px] font-bold text-app-subtle underline underline-offset-4"

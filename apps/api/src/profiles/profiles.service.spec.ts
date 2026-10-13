@@ -346,9 +346,15 @@ describe("ProfilesService", () => {
       selects: [[row], [verifiedFor("avatars/u1/old.jpg")]],
     });
     expect((await replaced.getOwn("u1", "Favour")).identityVerified).toBe(false);
-    expect(updateProfileSchema.parse({ showVerifiedBadge: true })).toEqual({
-      showVerifiedBadge: true,
-    });
+
+    // Hiding the badge is saved like any profile edit, and the member stays verified.
+    const hiding = makeService({ selects: [[row], [verifiedFor("avatars/u1/a.jpg")]] });
+    Object.assign(hiding.row, row);
+    const input = updateProfileSchema.parse({ showVerifiedBadge: false });
+    const saved = await hiding.service.updateOwn("u1", input, "Favour");
+    expect(hiding.setCalls).toEqual([{ showVerifiedBadge: false }]);
+    expect(saved).toMatchObject({ identityVerified: true, showVerifiedBadge: false });
+    expect(hiding.checks.hold).not.toHaveBeenCalled();
   });
 
   it("exposes the new fields and lock dates in the own-profile VM", async () => {
