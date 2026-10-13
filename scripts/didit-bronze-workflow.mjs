@@ -1,7 +1,7 @@
 /**
  * Kinkord's identity verification workflow ("Bronze") as Didit's workflow API
- * takes it: ID document, active liveness, face match to the ID, and for
- * Nigerian IDs a NIMC lookup. Kept apart from provision-didit-bronze-workflow.mjs
+ * takes it: ID document, active liveness with face search, face match to the
+ * ID, and for Nigerian IDs a check against the document's government record. Kept apart from provision-didit-bronze-workflow.mjs
  * so it can be tested without calling Didit.
  */
 export function bronzeWorkflowPayload(environment) {
@@ -29,21 +29,32 @@ export function bronzeWorkflowPayload(environment) {
       },
       {
         feature: "LIVENESS",
-        config: { face_liveness_method: "ACTIVE_3D" },
+        config: {
+          face_liveness_method: "ACTIVE_3D",
+          // Face search compares the selfie with Kinkord's own verified members
+          // (disclosed in the privacy notice). Its matches are raised as
+          // warnings that Kinkord's API sends to Kinkord's admin review, so
+          // none of them wait in Didit's console.
+          face_search_enabled: true,
+          face_liveness_duplicated_face_name_mismatch_action: "NO_ACTION",
+          face_liveness_duplicated_face_document_mismatch_action: "NO_ACTION",
+        },
       },
       { feature: "FACE_MATCH" },
       {
         feature: "DATABASE_VALIDATION",
         config: {
           database_validation_countries: {
-            NGA: { services: ["nga_national_id"] },
+            // Each Nigerian document against its own register: NIN for national
+            // IDs, the passport register, the driver's licence register.
+            NGA: { services: ["nga_national_id", "nga_passport", "nga_drivers_license"] },
           },
-          // Kinkord accepts a partial NIN match once Didit's reviewer has
-          // approved it, so these wait in Didit's console for a person.
+          // Kinkord accepts a partial match once Didit's reviewer has approved
+          // it, so these wait in Didit's console for a person.
           database_validation_partial_match_action: "REVIEW",
           database_validation_no_match_action: "DECLINE",
-          // Other countries do not have this Nigerian registry check. Kinkord's
-          // backend still requires a NIN/BVN match for a Nigerian Bronze award.
+          // Other countries' IDs have no Nigerian record to check. Kinkord's
+          // backend still requires a record match for any Nigerian-issued ID.
           database_validation_not_applicable_action: "NO_ACTION",
         },
       },

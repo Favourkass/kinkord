@@ -26,12 +26,14 @@ It ships switched off. Nothing reaches Didit until the steps in
    and workflow. Every 5 minutes it also settles sessions whose webhook was
    missed, and expires them after 24 hours unless Didit is still reviewing.
 5. The ID must pass, liveness must pass, the selfie must match the ID, and the
-   ID's birth date and gender must match the profile (Nigerian IDs also need a
-   NIMC lookup; a partial match counts only once Didit's own reviewers approve
-   it). Then the selfie is compared with the profile photo. Clear on
-   everything: verified. Photo match or ID country unclear, or the identity
-   possibly on another account (Kinkord's fingerprint match or Didit's
-   possible-duplicate warning): a Kinkord admin decides.
+   ID's birth date and gender must match the profile. A Nigerian-issued ID must
+   also match its government record (NIN register, passport register or
+   driver's licence register; a partial match counts only once Didit's own
+   reviewers approve it; bank/BVN records don't count). Then the selfie is
+   compared with the profile photo. Clear on everything: verified. Photo match
+   or ID country unclear, or Didit finding a similar name and birth date
+   (possible-duplicate warning) or the same face (face search) on another
+   member: a Kinkord admin decides.
 
 A member has 3 attempts. After the third failure only an admin can reopen it.
 Changing the profile photo, birth date or gender hides the badge until they
@@ -52,10 +54,17 @@ reopen another admin's verification. Admins get a notification for each new
 case. A member's Moderation page shows their status, with **Revoke
 verification** and **Allow verifying again**.
 
-Possible duplicates are decided here, not in Didit's console: the same
-identity on another account by Kinkord's fingerprint, or Didit's
-possible-duplicate warning (the workflow lets Didit flag it without holding
-the session). The case shows which account already holds the identity.
+Possible duplicates are decided here, not in Didit's console (the workflow
+lets Didit flag them without holding the session):
+
+- **The same identity on another account** (Kinkord's fingerprint of the
+  ID's name, birth date and gender): **reject only**. One person, one verified
+  account. The case shows which account holds it; the member can withdraw
+  verification on that account first, and approval works once it's free.
+- **Didit's possible duplicate** (a similar name and birth date) and **face
+  search** (Didit compares each selfie with Kinkord's own verified members,
+  never other companies'): the admin checks in Didit's console whether it's a
+  different person, and decides.
 
 ## What's stored
 
@@ -166,9 +175,9 @@ Automation settles clear provider results, but Kinkord must assign trained
 staff to both queues:
 
 - **Kinkord Moderation → Verification** for profile-photo/country exceptions,
-  possible duplicates (Kinkord's fingerprint or Didit's warning) and other
-  cases the platform intentionally sends to a person.
-- **Didit's own review queue** for partial NIN matches, which the workflow
+  possible duplicates (Kinkord's fingerprint, Didit's warning or its face
+  search) and other cases the platform intentionally sends to a person.
+- **Didit's own review queue** for partial government-record matches, which the workflow
   sends there and Kinkord accepts only once Didit's reviewer approves them,
   and any other session Didit holds for review. Those members wait until
   someone works it; Kinkord's moderation page doesn't replace it.

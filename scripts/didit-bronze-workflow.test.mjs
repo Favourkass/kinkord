@@ -12,9 +12,22 @@ test("the Bronze workflow keeps Kinkord's verification rules", () => {
     assert.equal(config("OCR").minimum_age, 18);
     assert.equal(config("OCR").minimum_age_action, "DECLINE");
     assert.equal(config("LIVENESS").face_liveness_method, "ACTIVE_3D");
+    assert.equal(config("LIVENESS").face_search_enabled, true);
+    assert.equal(
+      config("LIVENESS").face_liveness_duplicated_face_name_mismatch_action,
+      "NO_ACTION",
+    );
+    assert.equal(
+      config("LIVENESS").face_liveness_duplicated_face_document_mismatch_action,
+      "NO_ACTION",
+    );
     assert.ok(features.some((item) => item.feature === "FACE_MATCH"));
     const registry = config("DATABASE_VALIDATION");
-    assert.deepEqual(registry.database_validation_countries.NGA.services, ["nga_national_id"]);
+    assert.deepEqual(registry.database_validation_countries.NGA.services, [
+      "nga_national_id",
+      "nga_passport",
+      "nga_drivers_license",
+    ]);
     assert.equal(registry.database_validation_partial_match_action, "REVIEW");
     assert.equal(registry.database_validation_no_match_action, "DECLINE");
   }
@@ -46,6 +59,6 @@ test("an existing workflow is reused only while it matches", () => {
   assert.deepEqual(workflowDifferences(payload, asDidit(drifted)), [
     'OCR.duplicated_user_action is "REVIEW", not "NO_ACTION"',
     "LIVENESS is missing",
-    'DATABASE_VALIDATION.database_validation_countries.NGA.services is [], not ["nga_national_id"]',
+    'DATABASE_VALIDATION.database_validation_countries.NGA.services is [], not ["nga_national_id","nga_passport","nga_drivers_license"]',
   ]);
 });
