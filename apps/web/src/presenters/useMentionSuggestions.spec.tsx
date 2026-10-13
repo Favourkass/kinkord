@@ -38,7 +38,10 @@ beforeEach(() => {
     limit: 6,
   });
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllEnvs();
+});
 
 describe("useMentionSuggestions", () => {
   it("suggests members with a username for the @ being typed, in that box only", async () => {
@@ -51,6 +54,19 @@ describe("useMentionSuggestions", () => {
       "ada3",
     ]);
     expect(result.current.picker("post", 1000).open).toBe(false);
+  });
+
+  it("marks the official organization among the members suggested", async () => {
+    vi.stubEnv("NEXT_PUBLIC_KINKORD_OFFICIAL_USER_ID", "u3");
+    const { result } = renderHook(() => useMentionSuggestions(setText));
+    act(() => result.current.track("post", "@ad", 3));
+    await waitFor(() => expect(result.current.picker("post", 1000).open).toBe(true));
+    expect(
+      result.current.picker("post", 1000).items.map((s) => [s.username, s.organization]),
+    ).toEqual([
+      ["ada1", false],
+      ["ada3", true],
+    ]);
   });
 
   it("asks nothing for a bare @, and closes once the caret leaves the handle", async () => {

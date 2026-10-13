@@ -29,7 +29,7 @@ export function getPostList(feed: Feed, viewerAvatarUrl: string | null) {
     onGift: feed.openGift,
     giftDialog: feed.giftDialog,
     onOpenMedia: feed.openMedia,
-    onTogglePostAuthorFollow: feed.togglePostAuthorFollow,
+    onTogglePostAuthorFollow: feed.toggleFollow,
     hasMore: feed.hasMore,
     loadingMore: feed.loadingMore,
     onLoadMore: feed.loadMore,
@@ -60,6 +60,8 @@ export function getPostList(feed: Feed, viewerAvatarUrl: string | null) {
         loading: FEED_COPY.loading,
         close: FEED_COPY.closeComments,
         mentions: FEED_COPY.mentionSuggestions,
+        organization: FEED_COPY.organization,
+        verifiedOrganization: FEED_COPY.verifiedOrganization,
       },
     },
     lightbox: {

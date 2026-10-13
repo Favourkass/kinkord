@@ -26,7 +26,6 @@ import type { GiftInDoubt } from "@/domain/wallet";
 import { GIFT_COPY, postGiftsService } from "@/services/post-gifts.service";
 import { pendingTransfersService } from "@/services/pendingTransfers.service";
 import { ApiError } from "@/services/apiClient";
-import { membersApi } from "@/services/members.service";
 import { isOfficialOrganization } from "@/services/organization-placeholder.service";
 import { useMentionSuggestions, type MentionField } from "./useMentionSuggestions";
 import {
@@ -40,12 +39,13 @@ import {
   postPermalink,
   postsApi,
   remainingPhotoSlots,
-  toggleFollowOnSuggestion,
   toggleLikeOnPost,
   toggleRepostOnPost,
   toggleSaveOnPost,
   uploadPostPhoto,
+  withAuthorFollow,
   withCommentDelta,
+  withSuggestionFollow,
   type SuggestedPersonPM,
 } from "@/services/posts.service";
 
@@ -54,14 +54,6 @@ const memberHref = (username: string | null) => (username ? Routes.member(userna
 
 interface DraftPhoto extends DraftPhotoVM {
   key: string | null;
-}
-
-interface OrganizationFollowState {
-  userId: string;
-  username: string;
-  isFollowing: boolean;
-  ready: boolean;
-  busy: boolean;
 }
 
 export interface FeedOptions {
@@ -108,9 +100,6 @@ export function useFeedPresenter({
   const router = useRouter();
 
   const [posts, setPosts] = useState<PostPM[]>([]);
-  const [organizationFollow, setOrganizationFollow] = useState<OrganizationFollowState | null>(
-    null,
-  );
   const [cursor, setCursor] = useState<string | null>(null);
   const surface = `${postId ?? ""}|${author ?? ""}|${saved}|${search ?? ""}`;
   /**
@@ -617,133 +606,90 @@ export function useFeedPresenter({
     }
   }, [confirmDelete, deleting, commentsFor, closeComments, onUnauthorized]);
 
-  // ---- suggestions ------------------------------------------------------
-
-  const officialAuthor = posts.find((post) => isOfficialOrganization(post.author.userId))?.author;
-  const officialAuthorId = officialAuthor?.userId ?? null;
-  const officialUsername = officialAuthor?.username ?? null;
-
-  // Posts do not carry follow state. Resolve it once for the configured official
-  // account, then share one optimistic state across every one of its posts.
-  useEffect(() => {
-    if (!officialAuthorId || !officialUsername) return;
-    let cancelled = false;
-    void membersApi
-      .profile(officialUsername)
-      .then((profile) => {
-        if (cancelled || profile.userId !== officialAuthorId) return;
-        setOrganizationFollow({
-          userId: officialAuthorId,
-          username: officialUsername,
-          isFollowing: profile.isFollowing,
-          ready: true,
-          busy: false,
-        });
-      })
-      .catch(() => {
-        if (!cancelled)
-          setOrganizationFollow((current) =>
-            current?.userId === officialAuthorId ? { ...current, ready: false } : current,
-          );
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [officialAuthorId, officialUsername]);
-
-  const togglePostAuthorFollow = useCallback(
-    (userId: string) => {
-      const current = organizationFollow;
-      if (!current || current.userId !== userId || !current.ready || current.busy) return;
-      const nextFollowing = !current.isFollowing;
-      setOrganizationFollow({ ...current, isFollowing: nextFollowing, busy: true });
-      void (
-        current.isFollowing
-          ? membersApi.unfollow(current.username)
-          : membersApi.follow(current.username)
-      )
-        .catch(() =>
-          setOrganizationFollow((latest) =>
-            latest?.userId === userId ? { ...latest, isFollowing: current.isFollowing } : latest,
-          ),
-        )
-        .finally(() =>
-          setOrganizationFollow((latest) =>
-            latest?.userId === userId ? { ...latest, busy: false } : latest,
-          ),
-        );
-    },
-    [organizationFollow],
-  );
+  // ---- following --------------------------------------------------------
 
   const hideSuggestions = useCallback(() => setSuggestionsHidden(true), []);
 
+  /**
+   * Optimistic follow, from a suggestion card or the Follow button on the
+   * official organization's posts. The posts carry whether the viewer follows
+   * their author, so nothing is asked for first; the flip reaches the card and
+   * every one of the member's posts at once, and is undone if the API refuses.
+   */
   const toggleFollow = useCallback(
     async (userId: string) => {
       const person = suggestions.find((s) => s.userId === userId);
-      if (!person?.username || followBusy.includes(userId)) return;
-      const handle = person.username;
+      const author = posts.find((p) => p.author.userId === userId)?.author;
+      const handle = person?.username ?? author?.username;
+      if (!handle || followBusy.includes(userId)) return;
+      const was = person?.isFollowing ?? Boolean(author?.isFollowing);
+      const show = (following: boolean) => {
+        setSuggestions((prev) => withSuggestionFollow(prev, userId, following));
+        setPosts((prev) => withAuthorFollow(prev, userId, following));
+      };
       setFollowBusy((prev) => [...prev, userId]);
-      setSuggestions((prev) =>
-        prev.map((s) => (s.userId === userId ? toggleFollowOnSuggestion(s) : s)),
-      );
+      show(!was);
       try {
-        if (person.isFollowing) await postsApi.unfollow(handle);
+        if (was) await postsApi.unfollow(handle);
         else await postsApi.follow(handle);
       } catch (e) {
-        if (!onUnauthorized(e)) {
-          setSuggestions((prev) =>
-            prev.map((s) => (s.userId === userId ? toggleFollowOnSuggestion(s) : s)),
-          );
-        }
+        if (!onUnauthorized(e)) show(was);
       } finally {
         setFollowBusy((prev) => prev.filter((id) => id !== userId));
       }
     },
-    [suggestions, followBusy, onUnauthorized],
+    [suggestions, posts, followBusy, onUnauthorized],
   );
 
   // ---- view models ------------------------------------------------------
 
   const postVMs: PostVM[] = useMemo(
     () =>
-      posts.map((p) => {
-        const organization = isOfficialOrganization(p.author.userId);
-        const follow =
-          organizationFollow?.userId === p.author.userId &&
-          organizationFollow.username === p.author.username
-            ? organizationFollow
-            : null;
-        return {
-          ...toPostVM(p, expanded.includes(p.id), memberHref),
-          authorOrganization: organization,
-          authorOrganizationVerified: organization,
-          authorIsFollowing: follow?.isFollowing ?? false,
-          authorFollowReady: follow?.ready ?? false,
-          authorFollowBusy: follow?.busy ?? false,
-        };
-      }),
-    [posts, expanded, organizationFollow],
+      posts.map((p) => ({
+        ...toPostVM(
+          p,
+          expanded.includes(p.id),
+          memberHref,
+          new Date(),
+          isOfficialOrganization(p.author.userId),
+        ),
+        authorFollowBusy: followBusy.includes(p.author.userId),
+      })),
+    [posts, expanded, followBusy],
   );
 
   const commentVMs: CommentVM[] = useMemo(
-    () => comments.map((c) => toCommentVM(c, memberHref)),
+    () =>
+      comments.map((c) =>
+        toCommentVM(c, memberHref, new Date(), isOfficialOrganization(c.author.userId)),
+      ),
     [comments],
   );
 
   const suggestionVMs: FeedSuggestionVM[] = useMemo(
     () =>
-      suggestions.map((s) => ({
-        userId: s.userId,
-        displayName: s.displayName,
-        silver: Boolean(s.silver),
-        organization: isOfficialOrganization(s.userId),
-        handle: handleOf(s.username),
-        avatarUrl: s.avatarUrl,
-        isFollowing: s.isFollowing,
-        busy: followBusy.includes(s.userId),
-        href: memberHref(s.username),
-      })),
+      suggestions.map((s) => {
+        const organization = isOfficialOrganization(s.userId);
+        return {
+          userId: s.userId,
+          displayName: s.displayName,
+          silver: Boolean(s.silver),
+          organization,
+          handle: handleOf(s.username),
+          avatarUrl: s.avatarUrl,
+          isFollowing: s.isFollowing,
+          // The organization is followed, never befriended.
+          actionLabel: organization
+            ? s.isFollowing
+              ? FEED_COPY.following
+              : FEED_COPY.follow
+            : s.isFollowing
+              ? FEED_COPY.peopleAdded
+              : FEED_COPY.peopleAdd,
+          busy: followBusy.includes(s.userId),
+          href: memberHref(s.username),
+        };
+      }),
     [suggestions, followBusy],
   );
 
@@ -1102,7 +1048,6 @@ export function useFeedPresenter({
     suggestionsHidden,
     hideSuggestions,
     toggleFollow,
-    togglePostAuthorFollow,
   };
 }
 

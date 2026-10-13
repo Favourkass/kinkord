@@ -109,11 +109,11 @@ export default function PostCard({
             {post.visibilityNote && <span>· {post.visibilityNote}</span>}
           </p>
         </div>
-        {post.authorOrganization && !post.mine ? (
+        {post.canFollowAuthor ? (
           <button
             type="button"
             onClick={() => onToggleAuthorFollow(post.authorUserId)}
-            disabled={!post.authorFollowReady || post.authorFollowBusy}
+            disabled={post.authorFollowBusy}
             aria-pressed={post.authorIsFollowing}
             className="shrink-0 rounded-full bg-kink-gold-bright px-[14px] py-[6px] text-[11px] font-bold text-black disabled:opacity-60"
           >

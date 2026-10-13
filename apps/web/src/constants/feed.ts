@@ -62,6 +62,9 @@ export const FEED_COPY = {
   peopleDismiss: "Hide suggestions",
   peopleAdd: "Add friend",
   peopleAdded: "Remove",
+  /** The official organization is followed, on its posts and in the strip. */
+  follow: "Follow",
+  following: "Following",
   organization: "Org",
   verifiedOrganization: "Verified organization",
   /** Desktop right rail, which the mobile frame has no room for. */
@@ -101,6 +104,6 @@ export const POST_CARD_LABELS = {
   repostedBy: FEED_COPY.repostedBy,
   organization: FEED_COPY.organization,
   verifiedOrganization: FEED_COPY.verifiedOrganization,
-  follow: "Follow",
-  following: "Following",
+  follow: FEED_COPY.follow,
+  following: FEED_COPY.following,
 } as const;

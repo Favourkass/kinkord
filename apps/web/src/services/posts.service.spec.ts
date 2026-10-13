@@ -28,10 +28,11 @@ const {
   canSubmitPost,
   postsApi,
   remainingPhotoSlots,
-  toggleFollowOnSuggestion,
   toggleLikeOnPost,
   uploadPostPhoto,
+  withAuthorFollow,
   withCommentDelta,
+  withSuggestionFollow,
 } = await import("./posts.service");
 
 const pm = (over: Partial<PostPM> = {}): PostPM => ({
@@ -130,8 +131,8 @@ describe("comment counts", () => {
   });
 });
 
-describe("toggleFollowOnSuggestion", () => {
-  it("flips the button without waiting for the round trip", () => {
+describe("following, wherever the member shows", () => {
+  it("sets the suggestion card without waiting for the round trip", () => {
     const person = {
       userId: "u2",
       username: "tega",
@@ -139,7 +140,24 @@ describe("toggleFollowOnSuggestion", () => {
       avatarUrl: null,
       isFollowing: false,
     };
-    expect(toggleFollowOnSuggestion(person).isFollowing).toBe(true);
+    const other = { ...person, userId: "u3", username: "kay" };
+    const next = withSuggestionFollow([person, other], "u2", true);
+    expect(next.map((s) => s.isFollowing)).toEqual([true, false]);
+    expect(withSuggestionFollow(next, "u2", false)[0].isFollowing).toBe(false);
+  });
+
+  it("sets every post by that author, a repost of theirs included, and no one else's", () => {
+    const repost = pm({
+      id: "r1",
+      repostedBy: { userId: "u1", username: "me", displayName: "Me" },
+    });
+    const someoneElse = pm({
+      id: "p2",
+      postId: "p2",
+      author: { userId: "u3", username: "kay", displayName: "Kay", avatarUrl: null },
+    });
+    const next = withAuthorFollow([pm(), repost, someoneElse], "u2", true);
+    expect(next.map((p) => p.author.isFollowing)).toEqual([true, true, undefined]);
   });
 });
 

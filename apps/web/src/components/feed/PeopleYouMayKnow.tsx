@@ -7,8 +7,6 @@ import type { FeedSuggestionVM } from "@/domain/post";
 export interface PeopleYouMayKnowProps {
   heading: string;
   people: FeedSuggestionVM[];
-  addLabel: string;
-  addedLabel: string;
   seeAllLabel: string;
   seeAllHref: string;
   dismissLabel: string;
@@ -22,14 +20,13 @@ export interface PeopleYouMayKnowProps {
 
 /**
  * "People you may know" (Figma 831:169–837:222): a photo card per member with
- * Add friend / Remove underneath. It scrolls sideways in the phone feed and
- * stacks in the desktop rail, where there is a column to put it in.
+ * its button underneath (Add friend / Remove, or Follow for the organization).
+ * It scrolls sideways in the phone feed and stacks in the desktop rail, where
+ * there is a column to put it in.
  */
 export default function PeopleYouMayKnow({
   heading,
   people,
-  addLabel,
-  addedLabel,
   seeAllLabel,
   seeAllHref,
   dismissLabel,
@@ -103,7 +100,7 @@ export default function PeopleYouMayKnow({
                   }`}
                 >
                   {!person.isFollowing && <MaskIcon name="person-add" width={15} />}
-                  {person.isFollowing ? addedLabel : addLabel}
+                  {person.actionLabel}
                 </button>
               </div>
             </div>

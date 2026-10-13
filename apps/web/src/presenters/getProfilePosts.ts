@@ -5,20 +5,51 @@ import type { useFeedPresenter } from "./useFeedPresenter";
 
 type Feed = ReturnType<typeof useFeedPresenter>;
 
+/** The profile header's Follow, as `useMemberProfilePresenter` hands it out. */
+export interface AuthorFollow {
+  userId: string;
+  isFollowing: boolean;
+  busy: boolean;
+  onToggle: () => void;
+}
+
 /**
  * Turns a feed pointed at one member into the Posts tab's props plus its three
  * overlays. Both /profile and /u/[username] render the same tab, so the wiring
  * lives here rather than being copied into each page.
  *
+ * On a member's page their own posts' Follow button (the organization's) is
+ * the header's Follow, given as `authorFollow`: one state, so following in
+ * either place shows in both.
+ *
  * Deliberately returns a plain shape: presenters may not import from
  * `components/`, and the page's call site type-checks it against
  * `ProfileScreenProps` anyway.
  */
-export function getProfilePosts(feed: Feed, viewerAvatarUrl: string | null) {
+export function getProfilePosts(
+  feed: Feed,
+  viewerAvatarUrl: string | null,
+  authorFollow: AuthorFollow | null = null,
+) {
   const copy = MEMBERS_COPY.profile.posts;
+  const posts = authorFollow
+    ? feed.posts.map((post) =>
+        post.authorUserId === authorFollow.userId
+          ? {
+              ...post,
+              authorIsFollowing: authorFollow.isFollowing,
+              authorFollowBusy: authorFollow.busy,
+            }
+          : post,
+      )
+    : feed.posts;
+  const toggleAuthorFollow = (userId: string) => {
+    if (authorFollow && userId === authorFollow.userId) authorFollow.onToggle();
+    else void feed.toggleFollow(userId);
+  };
   return {
     posts: {
-      posts: feed.posts,
+      posts,
       labels: POST_CARD_LABELS,
       loading: feed.loading,
       loadingText: copy.loading,
@@ -35,7 +66,7 @@ export function getProfilePosts(feed: Feed, viewerAvatarUrl: string | null) {
       onShare: feed.share,
       onGift: feed.openGift,
       onOpenMedia: feed.openMedia,
-      onTogglePostAuthorFollow: feed.togglePostAuthorFollow,
+      onTogglePostAuthorFollow: toggleAuthorFollow,
       hasMore: feed.hasMore,
       loadingMore: feed.loadingMore,
       onLoadMore: feed.loadMore,
@@ -70,6 +101,8 @@ export function getProfilePosts(feed: Feed, viewerAvatarUrl: string | null) {
           loading: FEED_COPY.loading,
           close: FEED_COPY.closeComments,
           mentions: FEED_COPY.mentionSuggestions,
+          organization: FEED_COPY.organization,
+          verifiedOrganization: FEED_COPY.verifiedOrganization,
         },
       },
       confirm: {
