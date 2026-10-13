@@ -9,6 +9,7 @@ import { resetPasswordEmail, verificationEmail } from "../email/templates";
 import { SIGNUP_REFUSED, SignupGuardService } from "../moderation/signup-guard.service";
 import { clientIpFrom } from "../moderation/signup-rules";
 import { ACCOUNT_SUSPENDED, isBanned } from "../moderation/admins";
+import { NAME_RESERVED, takesReservedName } from "../profiles/reserved-names";
 
 export const AUTH = Symbol("AUTH");
 export type Auth = ReturnType<typeof buildAuth>;
@@ -23,6 +24,23 @@ export function rejectUsernameChanges<T extends object>(data: T): { data: T } {
     throw new APIError("BAD_REQUEST", { message: "Change your username from Edit Profile." });
   }
   return { data };
+}
+
+/**
+ * "Kinkord" is reserved (profiles/reserved-names.ts). Every sign-up route creates its
+ * user through the create hook, so a new account's name and username are checked
+ * there, with nothing current. The update-user route can still rename the account
+ * (`name`), so a new name is checked against the one it has now.
+ */
+export function rejectReservedNames(
+  data: { name?: unknown; username?: unknown; displayUsername?: unknown },
+  currentName: string | null = null,
+): void {
+  const name = typeof data.name === "string" && takesReservedName(data.name, currentName);
+  const handle = [data.username, data.displayUsername].some(
+    (value) => typeof value === "string" && takesReservedName(value),
+  );
+  if (name || handle) throw new APIError("BAD_REQUEST", { message: NAME_RESERVED });
 }
 
 export function buildAuth(db: Db, email: EmailService, signupGuard: SignupGuardService) {
@@ -67,6 +85,7 @@ export function buildAuth(db: Db, email: EmailService, signupGuard: SignupGuardS
                 message: "You must confirm you are 18 or older to create an account.",
               });
             }
+            rejectReservedNames(u);
             // Removed members stay removed. Every sign-up route creates the user
             // here, so this is the one place email, name and IP are all checked.
             const verdict = await signupGuard.review(
@@ -91,7 +110,11 @@ export function buildAuth(db: Db, email: EmailService, signupGuard: SignupGuardS
           },
         },
         update: {
-          before: async (u) => rejectUsernameChanges(u),
+          before: async (u, ctx) => {
+            const update = rejectUsernameChanges(u);
+            rejectReservedNames(u, ctx?.context.session?.user.name ?? null);
+            return update;
+          },
         },
       },
       session: {
