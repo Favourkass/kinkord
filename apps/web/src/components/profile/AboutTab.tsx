@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import MaskIcon from "@/components/app/MaskIcon";
-import type { PublicProfileVM, SocialPlatform } from "@/domain/member";
+import type { PublicProfileVM, SocialLinkVM, SocialPlatform } from "@/domain/member";
 
 export interface AboutLabels {
   aboutMe: string;
@@ -77,6 +77,44 @@ function Card({ icon, title, children }: { icon: string; title: string; children
   );
 }
 
+/** Each link as a tappable row: the platform, the handle, out to the site. */
+function SocialLinks({
+  links,
+  platforms,
+}: {
+  links: SocialLinkVM[];
+  platforms: Record<SocialPlatform, string>;
+}) {
+  return (
+    <div className="flex flex-col gap-[8px]">
+      {links.map((link) => (
+        <a
+          key={link.platform}
+          href={link.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-[12px] rounded-[12px] border border-pf-border bg-pf-surface-2 p-[12px]"
+        >
+          <span
+            className={`grid size-[36px] shrink-0 place-items-center rounded-full text-white ${
+              link.platform === "facebook" ? "bg-[#1877f2]" : "border border-[#333333] bg-black"
+            }`}
+          >
+            <MaskIcon src={ICONS[link.platform]} width={18} />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="text-[13px] font-semibold text-pf-text">
+              {platforms[link.platform]}
+            </span>
+            <span className="truncate text-[12px] text-pf-muted">{link.handle}</span>
+          </span>
+          <MaskIcon src={ICONS.chevron} width={16} className="text-pf-muted" />
+        </a>
+      ))}
+    </div>
+  );
+}
+
 function Tags({ items }: { items: string[] }) {
   return (
     <ul className="flex flex-wrap gap-[8px]">
@@ -130,6 +168,9 @@ export default function AboutTab({ vm, labels }: AboutTabProps) {
           <p className={`text-[14px] leading-[1.5] ${vm.bio ? "text-pf-body" : "text-pf-muted"}`}>
             {vm.bio ?? labels.notShared}
           </p>
+          {vm.socialLinks.length > 0 ? (
+            <SocialLinks links={vm.socialLinks} platforms={labels.platforms} />
+          ) : null}
         </Card>
       </div>
     );
@@ -197,34 +238,7 @@ export default function AboutTab({ vm, labels }: AboutTabProps) {
         {vm.socialLinks.length === 0 ? (
           <p className="text-[13px] text-pf-muted">{labels.noSocial}</p>
         ) : (
-          <div className="flex flex-col gap-[8px]">
-            {vm.socialLinks.map((link) => (
-              <a
-                key={link.platform}
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-[12px] rounded-[12px] border border-pf-border bg-pf-surface-2 p-[12px]"
-              >
-                <span
-                  className={`grid size-[36px] shrink-0 place-items-center rounded-full text-white ${
-                    link.platform === "facebook"
-                      ? "bg-[#1877f2]"
-                      : "border border-[#333333] bg-black"
-                  }`}
-                >
-                  <MaskIcon src={ICONS[link.platform]} width={18} />
-                </span>
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="text-[13px] font-semibold text-pf-text">
-                    {labels.platforms[link.platform]}
-                  </span>
-                  <span className="truncate text-[12px] text-pf-muted">{link.handle}</span>
-                </span>
-                <MaskIcon src={ICONS.chevron} width={16} className="text-pf-muted" />
-              </a>
-            ))}
-          </div>
+          <SocialLinks links={vm.socialLinks} platforms={labels.platforms} />
         )}
       </Card>
 

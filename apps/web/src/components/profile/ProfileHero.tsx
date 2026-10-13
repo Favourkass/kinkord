@@ -121,7 +121,7 @@ export default function ProfileHero({
           )}
         </p>
         <p className="flex items-center gap-[12px] text-[13px] font-bold leading-[16px] text-pf-muted">
-          {!organization ? (
+          {vm.stats.friends !== null ? (
             <>
               <span>
                 {vm.stats.friends} {labels.stats.friends}
@@ -137,8 +137,8 @@ export default function ProfileHero({
             {vm.stats.following} {labels.stats.following}
           </span>
         </p>
-        {!organization && coinBalance && <CoinBalance balance={coinBalance} />}
-        {!organization && vm.locationParts.length > 0 && (
+        {coinBalance && <CoinBalance balance={coinBalance} />}
+        {vm.locationParts.length > 0 && (
           <p className="flex items-center gap-[4px] text-[13px] font-bold leading-[16px] text-pf-muted">
             <MaskIcon name="map-pin" width={14} className="text-kink-gold-bright" />
             {/* One span, so the comma hugs the word before it rather than the gap. */}
@@ -161,7 +161,7 @@ export default function ProfileHero({
             </span>
           </p>
         )}
-        {!organization && vm.tagLine && (
+        {vm.tagLine && (
           <p className="text-[14px] font-semibold leading-[17px] text-pf-muted">{vm.tagLine}</p>
         )}
         {vm.isSelf && <p className="text-[12px] text-pf-muted">{labels.yourself}</p>}

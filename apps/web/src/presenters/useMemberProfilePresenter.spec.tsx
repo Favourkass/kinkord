@@ -173,6 +173,50 @@ describe("useMemberProfilePresenter", () => {
     ]);
     expect(apiGet).toHaveBeenCalledWith("/profiles/nene/friends?tab=followers&page=1&limit=5");
     expect(apiGet).not.toHaveBeenCalledWith("/profiles/nene/friends?tab=suggested&page=1&limit=3");
+    // What only describes a person is left out of the VM, so the screens show none of it.
+    expect(result.current.vm).toMatchObject({
+      stats: { friends: null, followers: "2.3K" },
+      locationParts: [],
+      tagLine: null,
+    });
+    expect(result.current.showSuggestedRail).toBe(false);
+  });
+
+  it("gives the screen its display decisions: the rail, and no coin balance for the organization", async () => {
+    apiGet.mockImplementation(routeGet({ ...profile, isSelf: true, coinBalance: 2450 }));
+    const member = renderHook(() => useMemberProfilePresenter("nene"));
+    await waitFor(() => expect(member.result.current.loading).toBe(false));
+    expect(member.result.current.showSuggestedRail).toBe(true);
+    expect(member.result.current.coinBalance?.amount).toBe("2,450");
+
+    vi.stubEnv("NEXT_PUBLIC_KINKORD_OFFICIAL_USER_ID", "u2");
+    const organization = renderHook(() => useMemberProfilePresenter("nene"));
+    await waitFor(() => expect(organization.result.current.loading).toBe(false));
+    expect(organization.result.current.showSuggestedRail).toBe(false);
+    expect(organization.result.current.coinBalance).toBeUndefined();
+  });
+
+  it("hands its Follow to the page's posts, so the header and the cards are one state", async () => {
+    const { result } = renderHook(() => useMemberProfilePresenter("nene"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.authorFollow).toMatchObject({
+      userId: "u2",
+      isFollowing: false,
+      busy: false,
+    });
+
+    act(() => result.current.authorFollow?.onToggle());
+    expect(result.current.authorFollow).toMatchObject({ isFollowing: true, busy: true });
+    expect(result.current.vm?.isFollowing).toBe(true);
+    await waitFor(() => expect(result.current.authorFollow?.busy).toBe(false));
+    expect(apiPost).toHaveBeenCalledWith("/follows/nene", {});
+  });
+
+  it("has no Follow to hand out on your own profile", async () => {
+    apiGet.mockImplementation(routeGet({ ...profile, isSelf: true }));
+    const { result } = renderHook(() => useMemberProfilePresenter("nene"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.authorFollow).toBeNull();
   });
 
   it("loads the profile, defaults to the About tab and formats presence", async () => {
@@ -293,8 +337,23 @@ describe("useMemberProfilePresenter", () => {
       displayName: "Leather Lace",
       handle: "@leatherlace",
     });
+    expect(result.current.suggested.rows[0].actionLabel).toBe("Add");
     act(() => result.current.suggested.onAdd(result.current.suggested.rows[0]));
     expect(result.current.suggested.rows[0].isFollowing).toBe(true);
+    expect(result.current.suggested.rows[0].actionLabel).toBe("Added");
+    await waitFor(() => expect(apiPost).toHaveBeenCalledWith("/follows/leatherlace", {}));
+  });
+
+  it("offers Follow, not Add, when the suggestion is the official organization", async () => {
+    vi.stubEnv("NEXT_PUBLIC_KINKORD_OFFICIAL_USER_ID", "u9");
+    const { result } = renderHook(() => useMemberProfilePresenter("nene"));
+    await waitFor(() => expect(result.current.suggested.rows).toHaveLength(1));
+    expect(result.current.suggested.rows[0]).toMatchObject({
+      organization: true,
+      actionLabel: "Follow",
+    });
+    act(() => result.current.suggested.onAdd(result.current.suggested.rows[0]));
+    expect(result.current.suggested.rows[0].actionLabel).toBe("Following");
     await waitFor(() => expect(apiPost).toHaveBeenCalledWith("/follows/leatherlace", {}));
   });
 

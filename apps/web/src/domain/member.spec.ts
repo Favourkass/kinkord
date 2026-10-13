@@ -166,6 +166,35 @@ describe("toPublicProfileVM", () => {
     expect(vm.basic.age).toBeNull();
     expect(vm.lastSeenAgo).toBeNull();
   });
+
+  it("leaves what only describes a person off the official organization's profile", () => {
+    const placeHref: PlaceHref = () => "/members/NG";
+    const person = toPublicProfileVM(profile, placeHref, now);
+    expect(person).toMatchObject({ accountType: "person", organizationVerified: false });
+
+    const vm = toPublicProfileVM(
+      { ...profile, isOnline: true, socialLinks: { x: "https://x.com/kinkord" } },
+      placeHref,
+      now,
+      true,
+    );
+    expect(vm).toMatchObject({
+      accountType: "organization",
+      organizationVerified: true,
+      isOnline: false,
+      lastSeenAgo: null,
+      locationLine: null,
+      locationParts: [],
+      tagLine: null,
+      stats: { friends: null, followers: "2.3K", following: "980" },
+    });
+    // What the organization says about itself stays, its links included.
+    expect(vm.displayName).toBe(profile.displayName);
+    expect(vm.bio).toBe(profile.bio);
+    expect(vm.socialLinks).toEqual([
+      { platform: "x", url: "https://x.com/kinkord", handle: "@kinkord" },
+    ]);
+  });
 });
 
 describe("About cards + media (profile rebuild, 2026-09-12)", () => {

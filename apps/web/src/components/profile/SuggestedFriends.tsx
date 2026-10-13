@@ -3,11 +3,14 @@ import SilverCheck from "@/components/app/SilverCheck";
 import OrganizationBadge from "@/components/organization/OrganizationBadge";
 import type { FriendRowVM } from "@/domain/member";
 
+export interface SuggestedFriendRowVM extends FriendRowVM {
+  /** "Add" / "Added", or Follow / Following for the organization. */
+  actionLabel: string;
+}
+
 export interface SuggestedFriendsProps {
   heading: string;
-  rows: FriendRowVM[];
-  addLabel: string;
-  addedLabel: string;
+  rows: SuggestedFriendRowVM[];
   onAdd: (row: FriendRowVM) => void;
   empty: string;
   organizationLabel: string;
@@ -69,7 +72,7 @@ export default function SuggestedFriends(p: SuggestedFriendsProps) {
                 aria-pressed={r.isFollowing}
                 className="rounded-[6px] bg-[#1f2937] px-[10px] py-[4px] text-[11px] font-bold text-kink-gold-bright disabled:opacity-60"
               >
-                {r.isFollowing ? p.addedLabel : p.addLabel}
+                {r.actionLabel}
               </button>
             </li>
           ))}

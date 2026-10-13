@@ -124,7 +124,7 @@ export default function ProfileSideCard({
           )}
         </div>
         <p className="flex flex-wrap items-center gap-[12px] text-[13px] leading-[16px]">
-          {!organization ? (
+          {vm.stats.friends !== null ? (
             <>
               <span className="font-bold text-pf-text">
                 {vm.stats.friends} <span className="text-pf-muted">{labels.stats.friends}</span>
@@ -144,8 +144,8 @@ export default function ProfileSideCard({
             {vm.stats.following} <span className="text-pf-muted">{labels.stats.following}</span>
           </span>
         </p>
-        {!organization && coinBalance && <CoinBalance balance={coinBalance} />}
-        {!organization && vm.locationParts.length > 0 && (
+        {coinBalance && <CoinBalance balance={coinBalance} />}
+        {vm.locationParts.length > 0 && (
           <p className="flex items-center gap-[6px] text-[13px] font-semibold leading-[16px] text-pf-muted">
             <MaskIcon name="map-pin" width={14} className="text-kink-gold-bright" />
             {/* One span, so the comma hugs the word before it rather than the gap. */}
@@ -168,7 +168,7 @@ export default function ProfileSideCard({
             </span>
           </p>
         )}
-        {!organization && vm.tagLine && (
+        {vm.tagLine && (
           <div className="flex flex-col gap-[8px] border-t border-pf-border pt-[8px]">
             <p className="text-[12px] font-bold uppercase leading-[15px] tracking-[0.48px] text-pf-muted">
               {labels.tagsHeading}

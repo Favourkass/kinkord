@@ -186,7 +186,8 @@ export interface PublicProfileVM {
   isOnline: boolean;
   /** Relative "an hour ago" for the "Last seen …" line; null when never seen. */
   lastSeenAgo: string | null;
-  stats: { friends: string; followers: string; following: string; mutualFriends: string };
+  /** `friends` is null for the organization, which has followers rather than friends. */
+  stats: { friends: string | null; followers: string; following: string; mutualFriends: string };
   /** "Abraka, Delta State, Nigeria" */
   locationLine: string | null;
   /** The same line split up, each piece linking to the directory filtered to it. */
@@ -321,6 +322,11 @@ export function locationPartsOf(
   return parts;
 }
 
+/**
+ * `organization` is whether this is the official organization; presenters
+ * decide it. Its profile leaves out what only describes a person — presence,
+ * friends, where they live, age and roles — so the screens just show what's there.
+ */
 export function toPublicProfileVM(
   pm: PublicProfilePM,
   placeHref: PlaceHref = () => null,
@@ -339,17 +345,17 @@ export function toPublicProfileVM(
     handle: pm.username ? `@${pm.username}` : null,
     avatarUrl: pm.avatarUrl,
     coverUrl: pm.coverUrl,
-    isOnline: pm.isOnline,
-    lastSeenAgo: timeAgo(pm.lastSeenAt, now),
+    isOnline: !organization && pm.isOnline,
+    lastSeenAgo: organization ? null : timeAgo(pm.lastSeenAt, now),
     stats: {
-      friends: compactNumber(pm.counts.friends),
+      friends: organization ? null : compactNumber(pm.counts.friends),
       followers: compactNumber(pm.counts.followers),
       following: compactNumber(pm.counts.following),
       mutualFriends: compactNumber(pm.counts.mutualFriends),
     },
-    locationLine,
-    locationParts: locationPartsOf(pm, placeHref),
-    tagLine,
+    locationLine: organization ? null : locationLine,
+    locationParts: organization ? [] : locationPartsOf(pm, placeHref),
+    tagLine: organization ? null : tagLine,
     bio: pm.bio,
     basic: {
       age: pm.age === null ? null : String(pm.age),
