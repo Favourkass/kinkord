@@ -1,6 +1,9 @@
 import type { SignupField } from "@/domain/onboarding";
 
+export const DEFAULT_SIGNUP_COUNTRY = "NG";
+
 export const LAUNCH_COUNTRIES = [
+  { code: "KE", name: "Kenya", flag: "🇰🇪", dialCode: "+254" },
   { code: "NG", name: "Nigeria", flag: "🇳🇬", dialCode: "+234" },
 ] as const;
 
@@ -52,22 +55,38 @@ export const NG_STATES = [
   "Zamfara",
 ] as const;
 
-/** Signup step 4 chips — the CEO's role list (2026-09-12); Edit Profile offers the same 20 via the API. */
+/** Signup role chips, including the ten additions; Edit Profile offers the same list via the API. */
 export const KINK_ROLES = [
+  "Acolyte",
+  "Adult Baby",
+  "Adult Baby Diaper Lover (ABDL)",
+  "Adventurer",
+  "Aesthetic Exhibitionist",
+  "Aesthetic Fetishist",
+  "Affection Slut",
+  "Affini",
+  "Aftercare Buddy",
+  "Aftercare Specialist",
   "Ageplayer",
   "Bottom",
   "Brat",
+  "Brat Tamer",
   "Caregiver",
   "Cuckold",
+  "Curious",
   "Dominant",
   "Domme",
   "Exhibitionist",
+  "Handler",
+  "Little",
   "Masochist",
   "Master",
   "Mistress",
   "Owner",
   "Pet",
   "Primal",
+  "Rigger",
+  "Rope Bunny",
   "Sadist",
   "Slave",
   "Submissive",
@@ -79,9 +98,9 @@ export const KINK_ROLES = [
 export const SIGNUP_STEP_LABELS = [
   "Country",
   "Account",
-  "Verification",
+  "Email verification",
+  "Preferences",
   "Profile",
-  "Welcome",
 ] as const;
 
 /** How the Send OTP message names each field that needs fixing. */
@@ -89,7 +108,6 @@ export const SIGNUP_FIELD_NAMES: Record<SignupField, string> = {
   username: "username",
   displayName: "display name",
   email: "email address",
-  phoneLocal: "phone number",
   password: "password",
   confirmPassword: "password confirmation",
   state: "state",
@@ -102,10 +120,22 @@ export const SIGNUP_FIELD_NAMES: Record<SignupField, string> = {
  * field itself is usually scrolled out of view, so the tap has to say why
  * nothing happened.
  */
-export function signupFixFieldsMessage(fields: SignupField[]): string {
+export function signupFixFieldsMessage(fields: SignupField[], regionName = "state"): string {
   if (fields.length > 3) return "Fill in the fields marked in red above.";
-  const names = fields.map((f) => SIGNUP_FIELD_NAMES[f]);
+  const names = fields.map((f) => (f === "state" ? regionName : SIGNUP_FIELD_NAMES[f]));
   const list =
     names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0];
   return `Check your ${list} above.`;
 }
+
+/**
+ * Sexuality is private: only the member sees it. The options match the API's
+ * ORIENTATIONS (apps/api/src/profiles/profile-options.ts); the sign-up form
+ * shows them before the member can load GET /profile/options.
+ */
+export const SEXUALITY_FIELD = {
+  label: "Sexuality",
+  clearLabel: "Prefer not to say",
+  helper: "Only you can see this. You can change or clear it in Edit Profile.",
+  options: ["Straight", "Bisexual"],
+} as const;

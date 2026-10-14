@@ -13,19 +13,20 @@ import { fromNodeHeaders } from "better-auth/node";
 import { eq } from "drizzle-orm";
 import { DRIZZLE, type Db } from "../db/db.module";
 import { profile } from "../db/schema";
+import { isSuperAdmin } from "../moderation/admins";
 import { PresenceService } from "../presence/presence.service";
-import { PHONE_STEP_REQUIRED } from "../profiles/phone-rules";
 import { AUTH, Auth } from "./auth.instance";
 
 /**
- * Accounts created from this moment must verify a phone before they can use
- * Kinkord, while PHONE_STEP_REQUIRED is on. Older accounts are left alone;
- * asking every existing member to verify is a separate decision.
+ * Accounts created from this moment must verify their email before they can
+ * use Kinkord: with the phone optional, the verified address is what a ban
+ * holds on to. Older accounts are left alone; asking every existing member to
+ * verify is a separate decision.
  */
-export const PHONE_REQUIRED_SINCE = new Date("2026-09-28T00:00:00Z");
+export const EMAIL_VERIFICATION_REQUIRED_FROM = new Date("2026-10-14T00:00:00Z");
 
-/** The `code` the web app recognises to send a member to the phone step. */
-export const PHONE_VERIFICATION_REQUIRED = "PHONE_VERIFICATION_REQUIRED";
+/** The `code` the web app recognises to send a member to the email step. */
+export const EMAIL_VERIFICATION_REQUIRED = "EMAIL_VERIFICATION_REQUIRED";
 
 /** The `code` the web app recognises to send a member to the profile-photo step. */
 export const PROFILE_PHOTOS_REQUIRED = "PROFILE_PHOTOS_REQUIRED";
@@ -33,7 +34,7 @@ export const PROFILE_PHOTOS_REQUIRED = "PROFILE_PHOTOS_REQUIRED";
 const ALLOW_DURING_SIGN_UP = "kinkord:allowDuringSignUp";
 
 /**
- * Marks the routes a member needs to finish sign-up (verify a phone, add
+ * Marks the routes a member needs to finish sign-up (verify their email, add
  * profile photos), so the sign-up holds below let them through.
  */
 export const AllowDuringSignUp = () => SetMetadata(ALLOW_DURING_SIGN_UP, true);
@@ -46,6 +47,13 @@ export interface AuthedRequest extends Request {
 interface SignUpHold {
   code: string;
   message: string;
+}
+
+interface SignedInUser {
+  id: string;
+  email: string;
+  emailVerified: boolean;
+  createdAt: Date | string;
 }
 
 @Injectable()
@@ -73,44 +81,44 @@ export class AuthGuard implements CanActivate {
   }
 
   /**
-   * The sign-up steps can't be skipped in the app (bar the phone code, for
-   * now), but a member could still leave the sign-up page and open any other
-   * one; this is what actually holds them at the step they still owe. Only the
-   * routes needed to finish sign-up get through.
+   * The sign-up steps can't be skipped in the app, but a member could still
+   * leave the sign-up page and open any other one; this is what actually holds
+   * them at the step they still owe, in sign-up order. Only the routes needed
+   * to finish sign-up get through.
    *
-   * - Phone: while PHONE_STEP_REQUIRED is on, accounts newer than the rule
-   *   need a verified phone.
-   * - Photos: every member needs a profile photo and a cover picture, the
-   *   last step of sign-up. Deleting the current one from the Media tab asks
-   *   for a new one the same way.
+   * - Email: accounts created since EMAIL_VERIFICATION_REQUIRED_FROM need a
+   *   verified email. Founders are never held.
+   * - Photos: members need a profile photo and a cover picture, the last step
+   *   of sign-up. They may skip both only at first sign-up, before they have
+   *   ever had a profile photo. A skipped cover stays optional, but once they
+   *   have had a photo, deleting it from the Media tab asks for a new one, as
+   *   it does for everyone who never skipped.
    */
-  private async signUpHold(
-    ctx: ExecutionContext,
-    user: { id: string; createdAt: Date | string },
-  ): Promise<SignUpHold | null> {
+  private async signUpHold(ctx: ExecutionContext, user: SignedInUser): Promise<SignUpHold | null> {
     const allowed = this.reflector.getAllAndOverride<boolean>(ALLOW_DURING_SIGN_UP, [
       ctx.getHandler(),
       ctx.getClass(),
     ]);
     if (allowed) return null;
+    if (needsEmailVerification(user)) {
+      return {
+        code: EMAIL_VERIFICATION_REQUIRED,
+        message: "Verify your email address to continue.",
+      };
+    }
     const [row] = await this.db
       .select({
-        phoneVerified: profile.phoneVerified,
         avatarKey: profile.avatarKey,
         coverKey: profile.coverKey,
+        signupPhotosSkipped: profile.signupPhotosSkipped,
+        photoSkipAvailable: profile.photoSkipAvailable,
       })
       .from(profile)
       .where(eq(profile.userId, user.id))
       .limit(1);
-    if (PHONE_STEP_REQUIRED && createdSincePhoneRule(user.createdAt) && !row?.phoneVerified) {
-      return {
-        code: PHONE_VERIFICATION_REQUIRED,
-        message: "Verify your phone number to continue.",
-      };
-    }
     // Without a profile row there is nowhere to save photos, so holding the
     // member would only lock them out.
-    if (row && (!row.avatarKey || !row.coverKey)) {
+    if (row && photosMissing(row)) {
       return {
         code: PROFILE_PHOTOS_REQUIRED,
         message: "Add a profile photo and a cover picture to continue.",
@@ -120,7 +128,20 @@ export class AuthGuard implements CanActivate {
   }
 }
 
-function createdSincePhoneRule(createdAt: Date | string): boolean {
-  const created = new Date(createdAt);
-  return !Number.isNaN(created.getTime()) && created >= PHONE_REQUIRED_SINCE;
+/** Whether the member still owes a photo, given what they skipped and when. */
+function photosMissing(row: {
+  avatarKey: string | null;
+  coverKey: string | null;
+  signupPhotosSkipped: boolean;
+  photoSkipAvailable: boolean;
+}): boolean {
+  const avatarSkipped = row.signupPhotosSkipped && row.photoSkipAvailable;
+  return (!row.avatarKey && !avatarSkipped) || (!row.coverKey && !row.signupPhotosSkipped);
+}
+
+/** Whether this member still owes the email step before Kinkord opens up. */
+export function needsEmailVerification(user: Omit<SignedInUser, "id">): boolean {
+  if (user.emailVerified || isSuperAdmin(user)) return false;
+  const created = new Date(user.createdAt);
+  return !Number.isNaN(created.getTime()) && created >= EMAIL_VERIFICATION_REQUIRED_FROM;
 }

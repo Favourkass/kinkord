@@ -323,7 +323,8 @@ export class MembersService {
       city: p.city,
       age: ageFromDob(p.dateOfBirth),
       gender: p.gender,
-      orientation: hidden(p.orientation, null),
+      // Sexuality is private: only the member sees their own.
+      orientation: isSelf ? p.orientation : null,
       relationshipStatus: hidden(p.relationshipStatus, null),
       bodyType: hidden(p.bodyType, null),
       roles: p.roles ?? [],

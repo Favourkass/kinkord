@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MePM, OwnProfilePM, ProfileOptionsPM } from "@/domain/profile";
 
 const apiGet = vi.fn();
@@ -29,6 +29,7 @@ import {
   draftChanged,
   fieldErrorMessage,
   initialDraft,
+  loadCityOptions,
   locationLine,
   nationalityOptions,
   patchFor,
@@ -82,6 +83,7 @@ const me: MePM = {
 };
 const options: ProfileOptionsPM = {
   genders: ["Male", "Female"],
+  orientations: ["Straight", "Bisexual"],
   relationshipStatuses: ["Single", "Married"],
   roles: ["Dominant", "Switch"],
   kinks: ["Bondage", "Latex", "Wax play"],
@@ -102,6 +104,7 @@ describe("buildEditRows", () => {
       "displayName",
       "bio",
       "gender",
+      "orientation",
       "dateOfBirth",
       "nationality",
       "relationshipStatus",
@@ -133,6 +136,7 @@ describe("buildEditRows", () => {
       displayName: "Naughty Neze",
       bio: "Chill",
       gender: "Female",
+      orientation: null,
       dateOfBirth: "26 Mar 1998",
       nationality: "Nigeria",
       relationshipStatus: "Single",
@@ -181,13 +185,52 @@ describe("buildEditRows", () => {
     });
     const state = buildEditRow("state", ctx).editor;
     if (state.kind === "single") expect(state.options.map((o) => o.value)).toContain("Delta");
-    const city = buildEditRow("city", ctx).editor;
-    if (city.kind === "single") expect(city.options.map((o) => o.value)).toContain("Abraka");
-    const noState = buildEditRow("city", { ...ctx, profile: { ...profile, state: null } }).editor;
+    // The state's towns load separately; a town the list lacks can be typed in.
+    expect(buildEditRow("city", ctx).editor).toMatchObject({ options: [], custom: true });
+    expect(buildEditRow("city", { ...ctx, cityOptions: ["Abraka", "Warri"] }).editor).toEqual({
+      kind: "single",
+      value: "Abraka",
+      options: [
+        { value: "Abraka", label: "Abraka" },
+        { value: "Warri", label: "Warri" },
+      ],
+      searchable: true,
+      custom: true,
+    });
+    const noState = buildEditRow("city", {
+      ...ctx,
+      profile: { ...profile, state: null },
+      cityOptions: ["Abraka"],
+    }).editor;
     if (noState.kind === "single") expect(noState.options).toEqual([]);
     expect(buildEditRow("socialLinks", ctx).editor).toEqual({
       kind: "links",
       value: { facebook: "https://facebook.com/nene", x: "" },
+    });
+  });
+});
+
+describe("sexuality row", () => {
+  it("offers the API's list after a choice that clears it, and saves that as null", () => {
+    const row = buildEditRow("orientation", ctx);
+    expect(row.value).toBeNull();
+    expect(row.editor).toEqual({
+      kind: "single",
+      value: null,
+      searchable: false,
+      options: [
+        { value: "", label: "Prefer not to say" },
+        { value: "Straight", label: "Straight" },
+        { value: "Bisexual", label: "Bisexual" },
+      ],
+    });
+    const chosen = { ...ctx, profile: { ...profile, orientation: "Bisexual" } };
+    expect(buildEditRow("orientation", chosen).value).toBe("Bisexual");
+    expect(patchFor("orientation", { kind: "single", value: "Straight" }, profile)).toEqual({
+      orientation: "Straight",
+    });
+    expect(patchFor("orientation", { kind: "single", value: "" }, profile)).toEqual({
+      orientation: null,
     });
   });
 });
@@ -241,6 +284,11 @@ describe("drafts", () => {
     expect(patchFor("city", { kind: "single", value: "Warri" }, profile)).toEqual({
       city: "Warri",
       location: "Warri, Delta State, Nigeria",
+    });
+    // A typed town nobody listed saves the same way.
+    expect(patchFor("city", { kind: "single", value: " Ikota Villa " }, profile)).toEqual({
+      city: "Ikota Villa",
+      location: "Ikota Villa, Delta State, Nigeria",
     });
     expect(patchFor("country", { kind: "single", value: "NG" }, profile)).toEqual({
       country: "NG",
@@ -338,5 +386,18 @@ describe("profileApi + uploadProfileImage", () => {
     await expect(uploadProfileImage("avatar", new File([], "x.jpg"))).rejects.toThrow(/max 5MB/);
     expect(upload).not.toHaveBeenCalled();
     expect(apiPatch).not.toHaveBeenCalled();
+  });
+});
+
+describe("loadCityOptions", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("loads the towns of the member's state, and nothing without a state", async () => {
+    const fetch = vi.fn(async () => new Response(JSON.stringify(["Abraka", "Warri"])));
+    vi.stubGlobal("fetch", fetch);
+    await expect(loadCityOptions(profile)).resolves.toEqual(["Abraka", "Warri"]);
+    expect(fetch).toHaveBeenCalledWith("/locations/NG/delta.json");
+    await expect(loadCityOptions({ ...profile, state: null })).resolves.toEqual([]);
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });

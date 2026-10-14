@@ -20,7 +20,7 @@ export function getPageMetadata(
     openGraph: {
       type: "website",
       siteName: SITE_NAME,
-      locale: "en_NG",
+      locale: "en_US",
       url: path,
       title: copy.title,
       description: copy.description,

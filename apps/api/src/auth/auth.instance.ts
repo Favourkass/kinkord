@@ -144,9 +144,10 @@ export function buildAuth(db: Db, email: EmailService, signupGuard: SignupGuardS
       enabled: true,
       minPasswordLength: 10,
       // Signup opens a session immediately so the onboarding wizard can finish
-      // (steps 4-5 need auth). Email link verification runs alongside; the
-      // step-3 phone OTP is skippable until SMS is live (user decision
-      // 2026-08-22) and gates "Basic verified", not login.
+      // (steps 3-5 need auth). The step-3 email code is enforced by AuthGuard's
+      // sign-up hold instead (accounts since 2026-10-14): only the routes the
+      // wizard needs answer until it's done. The phone is optional and only
+      // gates "Basic verified".
       requireEmailVerification: false,
       sendResetPassword: async ({ user, url }) => {
         const t = resetPasswordEmail(url);

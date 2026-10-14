@@ -76,6 +76,7 @@ const me: MePM = {
 };
 const options: ProfileOptionsPM = {
   genders: ["Male", "Female"],
+  orientations: ["Straight", "Bisexual"],
   relationshipStatuses: ["Single", "Married"],
   roles: ["Dominant", "Switch"],
   kinks: ["Bondage", "Latex"],
@@ -110,6 +111,7 @@ describe("useEditSectionPresenter", () => {
       ["Display Name", "Naughty Neze"],
       ["Bio", "Chill"],
       ["Gender", "Female"],
+      ["Sexuality", "Not set"],
       ["Date of Birth", "26 Mar 1998"],
       ["Nationality", "Nigeria"],
       ["Relationship Status", "Single"],
@@ -132,6 +134,36 @@ describe("useEditSectionPresenter", () => {
     expect(apiPatch).toHaveBeenCalledWith("/profile", { bio: "New bio" });
     expect(result.current.notice).toBe("Saved.");
     expect(result.current.rows[2].subtitle).toBe("New bio");
+  });
+
+  it("lets the member set or clear their private sexuality", async () => {
+    apiPatch.mockResolvedValue({ ...profile, orientation: "Bisexual" });
+    const { result } = renderHook(() => useEditSectionPresenter("basic"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const row = () => result.current.rows.find((r) => r.key === "orientation")!;
+    act(() => row().onClick?.());
+    expect(result.current.editor?.title).toBe("Sexuality");
+    expect(result.current.editor?.help).toMatch(/^Only you can see this\./);
+    const editor = result.current.editor?.editor;
+    if (editor?.kind !== "single") throw new Error("sexuality should be a single picker");
+    expect(editor.options.map((o) => o.label)).toEqual([
+      "Prefer not to say",
+      "Straight",
+      "Bisexual",
+    ]);
+    act(() => result.current.editor?.onDraft({ kind: "single", value: "Bisexual" }));
+    act(() => result.current.editor?.onSave());
+    await waitFor(() => expect(result.current.editor).toBeNull());
+    expect(apiPatch).toHaveBeenCalledWith("/profile", { orientation: "Bisexual" });
+    expect(row().subtitle).toBe("Bisexual");
+
+    apiPatch.mockResolvedValue({ ...profile, orientation: null });
+    act(() => row().onClick?.());
+    act(() => result.current.editor?.onDraft({ kind: "single", value: "" }));
+    act(() => result.current.editor?.onSave());
+    await waitFor(() => expect(result.current.editor).toBeNull());
+    expect(apiPatch).toHaveBeenLastCalledWith("/profile", { orientation: null });
+    expect(row().subtitle).toBe("Not set");
   });
 
   it("locks the username for 30 days, then changes it through its own endpoint", async () => {
@@ -208,6 +240,37 @@ describe("useEditSectionPresenter", () => {
     const editor = result.current.editor?.editor;
     if (editor?.kind !== "single") throw new Error("expected a picker");
     expect(editor.options.map((o) => o.label)).toEqual(["Shown", "Hidden"]);
+  });
+
+  it("offers the state's towns in the City editor, and saves a typed one", async () => {
+    const fetch = vi.fn(async () => new Response(JSON.stringify(["Abraka", "Asaba", "Warri"])));
+    vi.stubGlobal("fetch", fetch);
+    apiPatch.mockResolvedValue({ ...profile, city: "Ikota Villa" });
+    const { result } = renderHook(() => useEditSectionPresenter("location"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(fetch).toHaveBeenCalledWith("/locations/NG/delta.json");
+    const city = result.current.rows.findIndex((r) => r.key === "city");
+    act(() => result.current.rows[city].onClick?.());
+    await waitFor(() => {
+      const editor = result.current.editor?.editor;
+      expect(editor?.kind === "single" && editor.options.map((o) => o.value)).toEqual([
+        "Abraka",
+        "Asaba",
+        "Warri",
+      ]);
+    });
+    const editor = result.current.editor?.editor;
+    if (editor?.kind !== "single") throw new Error("expected a picker");
+    expect(editor.custom?.typedLabel("Ikota Villa")).toBe("Use “Ikota Villa”");
+    expect(result.current.editor?.labels.more).toBe("Keep typing to narrow it down");
+    act(() => result.current.editor?.onDraft({ kind: "single", value: "Ikota Villa" }));
+    act(() => result.current.editor?.onSave());
+    await waitFor(() => expect(result.current.editor).toBeNull());
+    expect(apiPatch).toHaveBeenCalledWith("/profile", {
+      city: "Ikota Villa",
+      location: "Ikota Villa, Delta State, Nigeria",
+    });
+    vi.unstubAllGlobals();
   });
 
   it("sends an expired session back to login", async () => {

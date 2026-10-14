@@ -23,6 +23,7 @@ export interface SignUpProfileFields {
   city: string | null;
   dateOfBirth: string | null;
   gender: string | null;
+  orientation: string | null;
   phone: string | null;
 }
 

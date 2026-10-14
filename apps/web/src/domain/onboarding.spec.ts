@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   isAllowedPhone,
-  PHONE_NIGERIA_ONLY,
   dobToIso,
   invalidSignupFields,
   isAdult,
@@ -16,8 +15,6 @@ const account = (over: Partial<AccountDraft> = {}): AccountDraft => ({
   username: "tegamaxwell",
   displayName: "Sir T",
   email: "tega@kinkord.com",
-  phoneLocal: "0803 123 4567",
-  phoneCountryCode: "+234",
   password: "supersecret123",
   confirmPassword: "supersecret123",
   ...over,
@@ -49,37 +46,8 @@ describe("validateAccount", () => {
   });
 });
 
-describe("validateAccount: phone", () => {
-  it("requires a phone number", () => {
-    expect(validateAccount(account({ phoneLocal: "  " })).phoneLocal).toBe(
-      "Enter your phone number.",
-    );
-  });
-  it("still rejects a number that isn't one", () => {
-    expect(validateAccount(account({ phoneLocal: "12" })).phoneLocal).toBe(PHONE_NIGERIA_ONLY);
-  });
-
-  it("takes Nigerian mobiles however they're typed", () => {
-    for (const phoneLocal of [
-      "0803 123 4567",
-      "803 123 4567",
-      "+234 803 123 4567",
-      "07031234567",
-    ]) {
-      expect(validateAccount(account({ phoneLocal })).phoneLocal, phoneLocal).toBeUndefined();
-    }
-  });
-
-  it("refuses numbers from other countries, and Nigerian landlines, for now", () => {
-    for (const phoneLocal of ["+44 7700 900123", "+254 703 105232", "01 234 5678"]) {
-      expect(validateAccount(account({ phoneLocal })).phoneLocal, phoneLocal).toBe(
-        PHONE_NIGERIA_ONLY,
-      );
-    }
-  });
-  it("accepts the full international number Chrome autofill puts in the box", () => {
-    expect(validateAccount(account({ phoneLocal: "+2348031234567" })).phoneLocal).toBeUndefined();
-  });
+it("accepts valid signup details without a phone number", () => {
+  expect(validateAccount(account())).toEqual({});
 });
 
 describe("toE164", () => {
@@ -117,7 +85,7 @@ describe("invalidSignupFields", () => {
   it("lists failing fields in on-screen order across both steps", () => {
     expect(
       invalidSignupFields({ confirmPassword: "x", phoneLocal: "x" }, { gender: "x", dob: "x" }),
-    ).toEqual(["phoneLocal", "confirmPassword", "dob", "gender"]);
+    ).toEqual(["confirmPassword", "dob", "gender"]);
     expect(invalidSignupFields({}, {})).toEqual([]);
   });
 });

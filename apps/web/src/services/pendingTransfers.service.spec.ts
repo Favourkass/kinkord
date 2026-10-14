@@ -57,6 +57,11 @@ describe("what a failed money request says", () => {
         new ApiError(403, { code: "PROFILE_PHOTOS_REQUIRED", message: "Add your photos" }),
       ),
     ).toBe("unread");
+    expect(
+      pending.failure(
+        new ApiError(403, { code: "EMAIL_VERIFICATION_REQUIRED", message: "Verify your email" }),
+      ),
+    ).toBe("unread");
     // Sent as one member while another is signed in (a switch in another tab).
     expect(
       pending.failure(new ApiError(409, { code: "WRONG_ACCOUNT", message: "Someone else" })),

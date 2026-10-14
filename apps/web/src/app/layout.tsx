@@ -53,7 +53,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "Kinkord",
-    locale: "en_NG",
+    locale: "en_US",
     title: SEO_COPY.site.title,
     description: SEO_COPY.site.description,
   },

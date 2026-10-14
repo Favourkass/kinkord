@@ -1,5 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { EditorDraft } from "@/domain/profile";
+import {
+  SEARCH_RESULT_LIMIT,
+  matchesSearch,
+  normalizeSearch,
+  optionMatcher,
+} from "@/util/textSearch";
 
 export interface EditorOptionVM {
   value: string;
@@ -10,7 +16,13 @@ export interface EditorOptionVM {
 export type EditorVM =
   | { kind: "text"; maxLength: number; placeholder: string; prefix?: string }
   | { kind: "textarea"; maxLength: number; placeholder: string }
-  | { kind: "single"; options: EditorOptionVM[]; searchable: boolean }
+  | {
+      kind: "single";
+      options: EditorOptionVM[];
+      searchable: boolean;
+      /** Offers what was typed as a choice: Use “Ikota”. */
+      custom?: { typedLabel: (query: string) => string };
+    }
   | { kind: "multi"; options: EditorOptionVM[]; max: number; searchable: boolean }
   | { kind: "date"; max: string }
   | {
@@ -37,10 +49,14 @@ export interface FieldEditorSheetProps {
     search: string;
     /** "3/10 selected" for multi pickers. */
     selected: string | null;
+    /** Under a search showing only its first matches. */
+    more?: string;
   };
   onSave: () => void;
   onCancel: () => void;
 }
+
+const NO_OPTIONS: EditorOptionVM[] = [];
 
 const field =
   "w-full rounded-[12px] border border-pf-input-border bg-pf-input px-[14px] text-[15px] text-pf-text outline-none placeholder:text-pf-muted focus:border-kink-gold-bright disabled:opacity-60";
@@ -49,8 +65,14 @@ const field =
 export default function FieldEditorSheet(p: FieldEditorSheetProps) {
   const [query, setQuery] = useState("");
   const locked = p.lockMessage !== null;
-  const q = query.trim().toLowerCase();
-  const matches = (o: EditorOptionVM) => !q || o.label.toLowerCase().includes(q);
+  const q = normalizeSearch(query);
+  const matches = (o: EditorOptionVM) => matchesSearch(o.label, q);
+  // Single pickers can be long (a state's towns): the first matches only, while searchable.
+  const singleOptions = p.editor.kind === "single" ? p.editor.options : NO_OPTIONS;
+  const singleLimit =
+    p.editor.kind === "single" && p.editor.searchable ? SEARCH_RESULT_LIMIT : Infinity;
+  const matchSingle = useMemo(() => optionMatcher(singleOptions), [singleOptions]);
+  const found = useMemo(() => matchSingle(query, singleLimit), [matchSingle, query, singleLimit]);
 
   const search =
     (p.editor.kind === "single" || p.editor.kind === "multi") && p.editor.searchable ? (
@@ -111,9 +133,23 @@ export default function FieldEditorSheet(p: FieldEditorSheetProps) {
       />
     );
   } else if (editor.kind === "single" && draft.kind === "single") {
+    const typed = query.trim();
     body = (
       <div role="listbox" aria-label={p.title} className="flex flex-col">
-        {editor.options.filter(matches).map((o) => {
+        {editor.custom && typed ? (
+          <button
+            type="button"
+            role="option"
+            aria-selected={draft.value === typed}
+            onClick={() => p.onDraft({ kind: "single", value: typed })}
+            className={`sticky top-0 z-10 flex min-h-[46px] w-full items-center border-b border-pf-divider bg-pf-sheet py-[10px] text-left text-[14px] font-semibold ${
+              draft.value === typed ? "text-kink-gold-bright" : "text-pf-text"
+            }`}
+          >
+            {editor.custom.typedLabel(typed)}
+          </button>
+        ) : null}
+        {found.hits.map((o) => {
           const selected = o.value === draft.value;
           return (
             <button
@@ -141,6 +177,9 @@ export default function FieldEditorSheet(p: FieldEditorSheetProps) {
             </button>
           );
         })}
+        {found.more && p.labels.more ? (
+          <p className="py-[10px] text-[12px] text-pf-muted">{p.labels.more}</p>
+        ) : null}
       </div>
     );
   } else if (editor.kind === "multi" && draft.kind === "multi") {

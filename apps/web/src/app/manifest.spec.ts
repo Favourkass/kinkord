@@ -6,6 +6,10 @@ import manifest from "./manifest";
 describe("web app manifest", () => {
   const icons = manifest().icons ?? [];
 
+  it("names the installed app Kinkord, whatever the search title says", () => {
+    expect(manifest()).toMatchObject({ name: "Kinkord", short_name: "Kinkord" });
+  });
+
   it("gives the installed app a monochrome icon for its status-bar notifications", () => {
     const monochrome = icons.filter((icon) => icon.purpose === "monochrome");
     expect(monochrome.map((icon) => icon.sizes)).toEqual(["96x96", "192x192"]);
