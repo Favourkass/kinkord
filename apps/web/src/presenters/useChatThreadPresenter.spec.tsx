@@ -276,6 +276,43 @@ describe("useChatThreadPresenter", () => {
     });
   });
 
+  describe("chats across countries", () => {
+    const abroad = () =>
+      new ApiError(403, {
+        code: "CROSS_COUNTRY_PREMIUM",
+        message: "Messaging members in another country is part of Silver Premium.",
+      });
+
+    it("offers Silver in place of the composer when writing first is refused, not a retry", async () => {
+      svc.history.mockResolvedValue([]);
+      svc.send.mockRejectedValueOnce(abroad());
+      const { result } = await ready();
+      act(() => result.current.send("hi"));
+      await waitFor(() =>
+        expect(result.current.thread.newChat).toEqual({
+          text: CHAT_COPY.crossCountry,
+          blocking: true,
+          link: { label: "Get Silver Premium", href: "/subscription" },
+        }),
+      );
+      expect(result.current.thread.messages).toEqual([]);
+      expect(result.current.thread.sendError).toBeNull();
+    });
+
+    it("gives the composer back once the other member writes: replies are free", async () => {
+      // Only the viewer has written here so far.
+      svc.history.mockResolvedValue([msg("m1", "u1", 1)]);
+      svc.send.mockRejectedValueOnce(abroad());
+      const { result } = await ready();
+      act(() => result.current.send("hello again"));
+      await waitFor(() => expect(result.current.thread.newChat?.link?.href).toBe("/subscription"));
+
+      svc.history.mockResolvedValueOnce([msg("m2", "u2", 2)]);
+      await act(async () => polls.get(THREAD_POLL_MS)?.tick());
+      expect(result.current.thread.newChat).toBeNull();
+    });
+  });
+
   describe("live delivery", () => {
     it("fetches what's new the moment a live event names this thread", async () => {
       const { result } = await ready();

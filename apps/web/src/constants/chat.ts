@@ -40,6 +40,10 @@ export const CHAT_COPY = {
   newChatHint: "You can start one new chat a day. Sending a message here uses today's.",
   newChatLimit:
     "You've already started a new chat today. You can message someone new after midnight. Replies in your existing chats aren't limited.",
+  /** A free member writing first to someone in another country. */
+  crossCountry:
+    "Messaging members in another country is part of Silver Premium. You can always reply if they message you first.",
+  getSilver: "Get Silver Premium",
   photoAdd: "Add a photo",
   photoRemove: "Remove photo",
   photoUploading: "Uploading…",

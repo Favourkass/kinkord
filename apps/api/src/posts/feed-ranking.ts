@@ -39,7 +39,7 @@ export const WINDOWS = {
   /** ...and the posts of members the viewer follows, this far back. */
   followedDays: 30,
   followedLimit: 400,
-  /** Nearby: posts by members in the viewer's country. */
+  /** Nearby: posts by members in the viewer's state. */
   nearbyDays: 14,
   nearbyLimit: 800,
   /** How far back the viewer's own likes, saves, shares, comments and reposts are read. */
@@ -66,11 +66,10 @@ export const FOR_YOU = {
   alreadyReacted: 0.35,
 } as const;
 
-/** Nearby: closeness first, then freshness, with engagement as a nudge. */
+/** Nearby: the viewer's own city first, then freshness, with engagement as a nudge. */
 export const NEARBY = {
-  sameCity: 4,
-  sameState: 2,
-  sameCountry: 1,
+  sameCity: 2,
+  sameState: 1,
   halfLifeHours: 24,
   engagement: 0.15,
 } as const;
@@ -317,11 +316,9 @@ export function nearbyScore(
   engagement: Engagement | undefined,
   asOf: Date,
 ): number {
-  // Everyone in the pool shares the viewer's country (or state), so at least that.
-  const proximity = Math.max(
-    author ? byTier(placeTier(viewer, author), NEARBY) : 0,
-    NEARBY.sameCountry,
-  );
+  // Everyone in the pool shares the viewer's state; their own city counts double.
+  const proximity =
+    author && placeTier(viewer, author) === "city" ? NEARBY.sameCity : NEARBY.sameState;
   return (
     proximity *
     freshness(c.createdAt, asOf, NEARBY.halfLifeHours) *

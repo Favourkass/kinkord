@@ -347,14 +347,14 @@ describe("Nearby's pages", () => {
       if (isAuthors(q))
         return [
           person("ada", { city: "Ikeja", state: "Lagos", country: "NG" }),
-          person("cal", { state: "Ogun", country: "NG" }),
+          person("cal", { city: "Lekki", state: "Lagos", country: "NG" }),
         ];
       if (isRows(q)) return q.limit === 800 ? pool : older;
       return [];
     });
 
-  it("asks for a location, reading nothing else, when the viewer has no country or state", async () => {
-    const db = nearbyDb({ ...me, country: null, state: null });
+  it("asks for a location, reading nothing else, when the viewer has no state", async () => {
+    const db = nearbyDb({ ...me, state: null });
     expect(await page(db, null, 2, "nearby")).toEqual({
       ids: [],
       nextCursor: null,
@@ -363,7 +363,7 @@ describe("Nearby's pages", () => {
     expect(db.queries).toHaveLength(1);
   });
 
-  it("ranks the viewer's own city first, then reads on with older posts from the country", async () => {
+  it("ranks the viewer's own city first, then reads on with older posts from the state", async () => {
     const db = nearbyDb(
       me,
       [row(1, "cal", 1), row(2, "ada", 3)],
@@ -379,19 +379,20 @@ describe("Nearby's pages", () => {
     const [pool, older] = db.queries.filter(isRows);
     for (const q of [pool, older]) {
       const { sql, params } = render(q.where!);
-      // Original posts by members in the viewer's country; no gender filter.
+      // Original posts by members in the viewer's state, within their country; no gender filter.
       expect(sql).toContain('"post"."repost_of_id" is null');
       expect(sql).toContain(
-        'exists (select 1 from "profile" where "profile"."user_id" = "post"."author_id" and "profile"."country" = $',
+        'exists (select 1 from "profile" where "profile"."user_id" = "post"."author_id" and ("profile"."state" = $',
       );
-      expect(params).toContain("NG");
+      expect(sql).toContain('"profile"."country" = $');
+      expect(params).toEqual(expect.arrayContaining(["Lagos", "NG"]));
       expect(sql).not.toContain("gender");
     }
     expect(pool.limit).toBe(800);
     expect(render(pool.where!).params).toContain(iso(hoursAgo(14 * 24)));
   });
 
-  it("looks in the viewer's state when they have no country", async () => {
+  it("looks in the viewer's state alone when they have no country", async () => {
     const db = nearbyDb({ ...me, country: null }, []);
     await page(db, null, 2, "nearby");
     const [pool] = db.queries.filter(isRows);

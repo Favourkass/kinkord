@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, renderHook, waitFor } from "@testing-library/react";
+import { CHAT_COPY } from "@/constants/chat";
+import { ApiError } from "@/services/apiClient";
 import { useStartChatPresenter } from "./useStartChatPresenter";
 
 // One object for the file: a fresh router each render would re-run the effect.
@@ -32,6 +34,26 @@ describe("useStartChatPresenter", () => {
     await waitFor(() =>
       expect(result.current.error).toBe("You've started a lot of new conversations today."),
     );
+    expect(result.current.premium).toBeNull();
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it("offers Silver when the member is in another country", async () => {
+    start.mockRejectedValue(
+      new ApiError(403, {
+        code: "CROSS_COUNTRY_PREMIUM",
+        message: "Messaging members in another country is part of Silver Premium.",
+      }),
+    );
+    const { result } = renderHook(() => useStartChatPresenter("u2"));
+    await waitFor(() =>
+      expect(result.current.premium).toEqual({
+        text: CHAT_COPY.crossCountry,
+        linkLabel: "Get Silver Premium",
+        href: "/subscription",
+      }),
+    );
+    expect(result.current.error).toBeNull();
     expect(router.replace).not.toHaveBeenCalled();
   });
 });

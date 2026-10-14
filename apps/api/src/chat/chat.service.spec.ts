@@ -8,12 +8,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { type SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { PgDialect } from "drizzle-orm/pg-core";
-import { conversation, conversationParticipant, message } from "../db/schema";
+import { conversation, conversationParticipant, message, profile } from "../db/schema";
 import type { PushService } from "../push/push.service";
 import type { RealtimeService } from "../realtime/realtime.service";
 import type { StorageService } from "../storage/storage.service";
 import { SILVER_NEW_CHATS_PER_DAY } from "../subscriptions/plans";
 import { NEW_CHAT_LIMIT } from "./allowance";
+import { CROSS_COUNTRY_MESSAGE, CROSS_COUNTRY_PREMIUM } from "./cross-country";
 import {
   CHAT_PHOTO_MAX_MB,
   ChatService,
@@ -105,6 +106,15 @@ const row = (id: string, over: Record<string, unknown> = {}) => ({
   deletedAt: null,
   ...over,
 });
+/** Both members' saved countries, as the cross-country check reads them for u1 and u2. */
+const countries = (u1: string | null, u2: string | null) => [
+  { userId: "u1", country: u1 },
+  { userId: "u2", country: u2 },
+];
+/** Same country: nothing more is asked. */
+const nigerians = countries("NG", "NG");
+/** Silver running, as hasSilver reads it. */
+const onSilver = [{ end: new Date(Date.now() + 86_400_000) }];
 
 describe("ChatService.startDm", () => {
   it("won't open a thread with yourself", async () => {
@@ -131,6 +141,7 @@ describe("ChatService.startDm", () => {
     const { service, after } = make([
       [{ id: "u2" }], // target
       [], // no thread yet
+      nigerians, // the same country
       [{ n: 0 }], // under the daily cap
       [{ id: "c9" }], // created
       undefined, // members added
@@ -144,7 +155,12 @@ describe("ChatService.startDm", () => {
   });
 
   it("stops someone opening too many new threads in a day", async () => {
-    const { service } = make([[{ id: "u2" }], [], [{ n: MAX_NEW_CONVERSATIONS_PER_DAY }]]);
+    const { service } = make([
+      [{ id: "u2" }],
+      [],
+      nigerians,
+      [{ n: MAX_NEW_CONVERSATIONS_PER_DAY }],
+    ]);
     const err = await service.startDm(member("u1"), "u2").catch((e: unknown) => e);
     expect(err).toBeInstanceOf(HttpException);
     expect((err as HttpException).getStatus()).toBe(429);
@@ -195,6 +211,7 @@ describe("ChatService.sendMessage", () => {
       [{ userId: "u1" }], // a member of the thread
       [{ userId: "u2" }], // the other member is still here
       [{ n: 0 }], // not sending too fast
+      nigerians, // in the same country
       [{ id: "m0" }], // the thread already has messages: not a new chat
       [saved],
       undefined,
@@ -227,6 +244,7 @@ describe("ChatService.sendMessage", () => {
       [{ userId: "u1" }],
       [{ userId: "u2" }],
       [{ n: 0 }],
+      nigerians,
       [{ id: "m0" }],
       [saved],
       undefined,
@@ -244,6 +262,7 @@ describe("ChatService.sendMessage", () => {
       [{ userId: "u1" }],
       [{ userId: "u2" }],
       [{ n: 0 }],
+      nigerians,
       [{ id: "m0" }],
       [saved],
       undefined,
@@ -266,6 +285,7 @@ describe("ChatService.sendMessage", () => {
         [{ userId: "u1" }],
         [{ userId: "u2" }],
         [{ n: 0 }],
+        nigerians,
         [], // nobody has written in this thread yet
         [], // on Basic: no Silver
         undefined, // the member's new-chat lock
@@ -290,6 +310,7 @@ describe("ChatService.sendMessage", () => {
         [{ userId: "u1" }],
         [{ userId: "u2" }],
         [{ n: 0 }],
+        nigerians,
         [], // an empty thread: this would be a new chat
         [], // on Basic
         undefined, // lock
@@ -313,8 +334,9 @@ describe("ChatService.sendMessage", () => {
         [{ userId: "u1" }],
         [{ userId: "u2" }],
         [{ n: 0 }],
+        nigerians,
         [], // an empty thread
-        [{ end: new Date(Date.now() + 86_400_000) }], // on Silver
+        onSilver,
         undefined, // lock
         [{ n: SILVER_NEW_CHATS_PER_DAY - 1 }], // one left today
         [saved],
@@ -340,6 +362,187 @@ describe("ChatService.sendMessage", () => {
       });
       expect(calls.some((c) => c.op === "execute")).toBe(false);
       expect(left()).toBe(0);
+    });
+  });
+});
+
+describe("chats across countries need Silver to start", () => {
+  const abroad = countries("NG", "KE");
+  const refusal = { code: CROSS_COUNTRY_PREMIUM, message: CROSS_COUNTRY_MESSAGE };
+  const askedWhereTheyLive = (calls: Array<{ op: string; args: unknown[] }>) =>
+    calls.some((c) => c.op === "from" && c.args[0] === profile);
+
+  describe("opening a thread", () => {
+    it("refuses a free member a new thread with someone in another country", async () => {
+      const { service, calls, left } = make([
+        [{ id: "u2" }], // target
+        [], // no thread yet
+        abroad,
+        [], // on Basic
+      ]);
+      const err = await service.startDm(member("u1"), "u2").catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(ForbiddenException);
+      expect((err as HttpException).getResponse()).toEqual(refusal);
+      expect(calls.some((c) => c.op === "insert")).toBe(false);
+      expect(left()).toBe(0);
+    });
+
+    it("always opens a thread the pair already has", async () => {
+      const { service, calls, left } = make([[{ id: "u2" }], [{ id: "c1" }], undefined]);
+      await expect(service.startDm(member("u1"), "u2")).resolves.toBe("c1");
+      expect(askedWhereTheyLive(calls)).toBe(false);
+      expect(left()).toBe(0);
+    });
+
+    it("lets a Silver member open one, still under the cap on new threads", async () => {
+      const { service, left } = make([
+        [{ id: "u2" }],
+        [],
+        abroad,
+        onSilver,
+        [{ n: 0 }], // under the daily cap
+        [{ id: "c9" }],
+        undefined,
+      ]);
+      await expect(service.startDm(member("u1"), "u2")).resolves.toBe("c9");
+      expect(left()).toBe(0);
+    });
+
+    it("lets the super admins open one without asking where anyone lives", async () => {
+      const { service, calls, left } = make([[{ id: "u2" }], [], [{ id: "c9" }], undefined]);
+      await expect(service.startDm(admin, "u2")).resolves.toBe("c9");
+      expect(askedWhereTheyLive(calls)).toBe(false);
+      expect(left()).toBe(0);
+    });
+
+    it("reads a member with no country saved as Nigerian", async () => {
+      const home = make([
+        [{ id: "u2" }],
+        [],
+        countries(null, "NG"),
+        [{ n: 0 }],
+        [{ id: "c9" }],
+        undefined,
+      ]);
+      await expect(home.service.startDm(member("u1"), "u2")).resolves.toBe("c9");
+      const away = make([[{ id: "u2" }], [], countries(null, "KE"), []]);
+      await expect(away.service.startDm(member("u1"), "u2")).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+    });
+  });
+
+  describe("writing in a thread", () => {
+    /** The database's answers up to the check, for u1 writing to u2 in c1. */
+    const upToCheck = [[{ userId: "u1" }], [{ userId: "u2" }], [{ n: 0 }]];
+
+    it("refuses a free member's first message to someone in another country", async () => {
+      const { service, push, realtime } = make([
+        ...upToCheck,
+        abroad,
+        [], // u2 hasn't written here
+        [], // on Basic
+      ]);
+      const err = await service
+        .sendMessage(member("u1"), "c1", { body: "hi" })
+        .catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(ForbiddenException);
+      expect((err as HttpException).getStatus()).toBe(403);
+      expect((err as HttpException).getResponse()).toEqual(refusal);
+      expect(push.newMessage).not.toHaveBeenCalled();
+      expect(realtime.notify).not.toHaveBeenCalled();
+    });
+
+    it("doesn't use up the daily allowance on a message it refuses", async () => {
+      const { service, calls, left } = make([...upToCheck, abroad, [], []]);
+      await service.sendMessage(member("u1"), "c1", { body: "hi" }).catch(() => undefined);
+      // Refused before the new-chat lock and count: nothing was saved to count.
+      expect(calls.some((c) => c.op === "execute" || c.op === "insert")).toBe(false);
+      expect(left()).toBe(0);
+    });
+
+    it("lets a free member reply once the other member has written", async () => {
+      const saved = row("m2", { senderId: "u1", body: "hi" });
+      const { service, left } = make([
+        ...upToCheck,
+        abroad,
+        [{ id: "m1" }], // u2 wrote first
+        [{ id: "m1" }], // the thread has messages: not a new chat
+        [saved],
+        undefined,
+      ]);
+      await expect(service.sendMessage(member("u1"), "c1", { body: "hi" })).resolves.toMatchObject({
+        id: "m2",
+      });
+      expect(left()).toBe(0);
+    });
+
+    it("lets a Silver member write first, as one of today's new chats", async () => {
+      const saved = row("m1", { senderId: "u1", body: "hi" });
+      const { service, calls, left } = make([
+        ...upToCheck,
+        abroad,
+        [], // u2 hasn't written here
+        onSilver,
+        [], // an empty thread: a new chat
+        onSilver, // Silver's allowance
+        undefined, // lock
+        [{ n: 0 }], // no chats started today
+        [saved],
+        undefined,
+      ]);
+      await expect(service.sendMessage(member("u1"), "c1", { body: "hi" })).resolves.toMatchObject({
+        id: "m1",
+      });
+      expect(calls.some((c) => c.op === "execute")).toBe(true);
+      expect(left()).toBe(0);
+    });
+
+    it("lets the super admins write without asking where anyone lives", async () => {
+      const saved = row("m1", { senderId: "a1", body: "hi" });
+      const { service, calls, left } = make([
+        [{ userId: "a1" }],
+        [{ userId: "u2" }],
+        [{ n: 0 }],
+        [saved],
+        undefined,
+      ]);
+      await expect(service.sendMessage(admin, "c1", { body: "hi" })).resolves.toMatchObject({
+        id: "m1",
+      });
+      expect(askedWhereTheyLive(calls)).toBe(false);
+      expect(left()).toBe(0);
+    });
+
+    it("asks nothing more in a chat within one country, after one query for both", async () => {
+      const saved = row("m1", { senderId: "u1", body: "hi" });
+      const { service, calls, left } = make([
+        ...upToCheck,
+        nigerians,
+        [], // an empty thread: the free allowance applies as before
+        [], // on Basic
+        undefined, // lock
+        [{ n: 0 }],
+        [saved],
+        undefined,
+      ]);
+      await expect(service.sendMessage(member("u1"), "c1", { body: "hi" })).resolves.toMatchObject({
+        id: "m1",
+      });
+      expect(calls.filter((c) => c.op === "from" && c.args[0] === profile)).toHaveLength(1);
+      expect(left()).toBe(0);
+    });
+
+    it("reads a member with no country saved as Nigerian", async () => {
+      const saved = row("m2", { senderId: "u1", body: "hi" });
+      const home = make([...upToCheck, countries("NG", null), [{ id: "m1" }], [saved], undefined]);
+      await expect(home.service.sendMessage(member("u1"), "c1", { body: "hi" })).resolves.toEqual(
+        expect.objectContaining({ id: "m2" }),
+      );
+      const away = make([...upToCheck, countries("KE", null), [], []]);
+      await expect(
+        away.service.sendMessage(member("u1"), "c1", { body: "hi" }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
     });
   });
 });
@@ -627,6 +830,7 @@ describe("chat photos", () => {
       const { service, storage, after } = make([
         ...upToPhoto,
         [{ id: "m0" }], // the other member has written here
+        nigerians,
         [{ id: "m0" }], // the thread has messages: not a new chat
         [saved],
         undefined,
@@ -652,6 +856,7 @@ describe("chat photos", () => {
       const { service, after } = make([
         ...upToPhoto,
         [{ id: "m0" }],
+        nigerians,
         [{ id: "m0" }],
         [saved],
         undefined,
@@ -666,6 +871,7 @@ describe("chat photos", () => {
       const { service, storage } = make([
         ...upToPhoto,
         [{ id: "m0" }],
+        nigerians,
         [{ id: "m0" }],
         [saved],
         undefined,

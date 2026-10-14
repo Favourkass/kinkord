@@ -141,15 +141,16 @@ strip); roles always count, being on every card.
 
 ### Nearby
 
-Original posts (not reposts) by members in the viewer's country, or their
-state when they have no country, from the last 14 days, the newest 800, made
-at or before `asOf`, never the viewer's own. No gender filter. With neither a
-country nor a state: empty, with `hint: "no_location"`, and the app links to
-Edit Profile → Location.
+Original posts (not reposts) by members in the viewer's state (within their
+country, when they have one), from the last 14 days, the newest 800, made at
+or before `asOf`, never the viewer's own. No gender filter. Without a state:
+empty, with `hint: "no_location"`, and the app links to Edit Profile →
+Location. (The founder narrowed Nearby from the country to the state on
+2026-10-14.)
 
 **score = closeness × 0.5^(age in hours / 24) × (1 + 0.15 × ln(1 + engagement))**,
-closeness being the same city 4, the same state 2, the same country 1, and
-engagement counted as for For You. The same one-row-per-post and diversity
+closeness being 2 for the viewer's own city and 1 for the rest of the state,
+and engagement counted as for For You. The same one-row-per-post and diversity
 rules.
 
 ### Paging For You and Nearby
@@ -165,7 +166,7 @@ The cursor is opaque base64url JSON, versioned: `{ v: 1, tab, asOf, at:
 fills with older posts, newest first, and the cursor carries on as `{ at:
 "older", before, skip }`, so the feed never ends early: for For You, everything
 older than the week's pool, less the followed members' posts already ranked;
-for Nearby, the country's older posts. A cursor that isn't this tab's (garbage,
+for Nearby, the state's older posts. A cursor that isn't this tab's (garbage,
 another version, another tab) reads the first page.
 
 Known limits: an unlike, an unfollow, a deleted post or a new block between
@@ -178,6 +179,6 @@ can't be read as of `asOf`); the app drops a row it already shows.
   scrolled past, so a post seen and ignored isn't lowered yet.
 - Negative feedback: "show me less of this", hiding a post, muting a member.
 - Keeping a ranked window between pages instead of reading it again per page.
-- Nearby by distance rather than the same city, state or country.
+- Nearby by distance rather than the same city or state.
 - Widening the pools (600 recent, 400 followed, 800 nearby) once the
   community outgrows them, and tuning the weights against real use.

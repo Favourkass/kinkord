@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isCrossCountryPremium,
   isNewChatLimit,
   mergeMessages,
   newChatNotice,
@@ -241,5 +242,14 @@ describe("isNewChatLimit", () => {
     expect(isNewChatLimit({ message: "You're sending messages too fast." })).toBe(false);
     expect(isNewChatLimit(null)).toBe(false);
     expect(isNewChatLimit("NEW_CHAT_LIMIT")).toBe(false);
+  });
+});
+
+describe("isCrossCountryPremium", () => {
+  it("recognises the API's refusal and nothing else", () => {
+    expect(isCrossCountryPremium({ code: "CROSS_COUNTRY_PREMIUM", message: "x" })).toBe(true);
+    expect(isCrossCountryPremium({ code: "NEW_CHAT_LIMIT", message: "x" })).toBe(false);
+    expect(isCrossCountryPremium(null)).toBe(false);
+    expect(isCrossCountryPremium("CROSS_COUNTRY_PREMIUM")).toBe(false);
   });
 });

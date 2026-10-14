@@ -186,7 +186,7 @@ export interface FeedVM {
   nextCursor: string | null;
   /**
    * Why a tab may be empty, so the app can say what would fill it: the viewer
-   * follows nobody (Following), or has no country or state (Nearby).
+   * follows nobody (Following), or has no state (Nearby).
    */
   hint?: FeedHint;
 }

@@ -37,7 +37,23 @@ export default function StartChatPage({ params }: { params: Promise<{ userId: st
       labels={nav.labels}
     >
       <div className="px-[20px] py-[48px] text-center">
-        {start.error ? (
+        {start.premium ? (
+          <>
+            <p className="text-[14px] text-app-text">{start.premium.text}</p>
+            <Link
+              href={start.premium.href}
+              className="mt-[16px] inline-block rounded-full bg-kink-gold-bright px-[18px] py-[9px] text-[14px] font-bold text-kink-ink"
+            >
+              {start.premium.linkLabel}
+            </Link>
+            <Link
+              href={start.backHref}
+              className="mt-[12px] block text-[14px] text-app-muted underline"
+            >
+              {CHAT_COPY.heading}
+            </Link>
+          </>
+        ) : start.error ? (
           <>
             <p className="text-[14px] font-semibold text-app-danger">{start.error}</p>
             <Link
