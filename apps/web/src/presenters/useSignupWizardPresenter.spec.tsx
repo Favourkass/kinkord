@@ -365,6 +365,65 @@ describe("useSignupWizardPresenter", () => {
     });
   });
 
+  describe("coming back to the email step", () => {
+    const meSays = (emailVerified: boolean) => {
+      const fallback = get.getMockImplementation();
+      get.mockImplementation(async (path) =>
+        path === "/me" ? { emailVerified } : fallback!(path),
+      );
+    };
+
+    it("sends a code to a member the email hold sent back, and waits for it", async () => {
+      meSays(false);
+      const { result } = renderHook(() => useSignupWizardPresenter("email"));
+      await waitFor(() => expect(sendCode).toHaveBeenCalledWith("email"));
+      expect(get).toHaveBeenCalledWith("/me");
+      expect(result.current.stage).toBe("email");
+      expect(result.current.step).toBe(3);
+      act(() => result.current.verifyStep.email.setCode("123456"));
+      await act(() => result.current.verifyStep.email.verify());
+      act(() => result.current.verifyStep.nextStep());
+      expect(result.current.stage).toBe("preferences");
+    });
+
+    it("moves on without a code when the email was verified meanwhile", async () => {
+      meSays(true);
+      const { result } = renderHook(() => useSignupWizardPresenter("email"));
+      await waitFor(() => expect(result.current.stage).toBe("preferences"));
+      expect(sendCode).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("welcome", () => {
+    it("says the email is verified once it was verified here", async () => {
+      const { result } = renderHook(() => useSignupWizardPresenter());
+      reachCombinedStep(result);
+      fillAccount(result);
+      fillAbout(result);
+      await act(() => result.current.submitCombinedStep());
+      await waitFor(() => expect(sendCode).toHaveBeenCalledWith("email"));
+      act(() => result.current.verifyStep.email.setCode("123456"));
+      await act(() => result.current.verifyStep.email.verify());
+      expect(result.current.welcome.emailVerified).toBe(true);
+    });
+
+    it.each([true, false])(
+      "asks the account whether the email is verified (%s) when that step was done before",
+      async (emailVerified) => {
+        const fallback = get.getMockImplementation();
+        get.mockImplementation(async (path) =>
+          path === "/me" ? { emailVerified } : fallback!(path),
+        );
+        const { result } = renderHook(() => useSignupWizardPresenter("profile"));
+        expect(result.current.welcome.emailVerified).toBe(false);
+        await act(() => result.current.profileStep.skipPhotos());
+        expect(result.current.stage).toBe("welcome");
+        await waitFor(() => expect(get).toHaveBeenCalledWith("/me"));
+        await waitFor(() => expect(result.current.welcome.emailVerified).toBe(emailVerified));
+      },
+    );
+  });
+
   describe("preferences step", () => {
     it("edits and saves preferences before advancing to step 5", async () => {
       const { result } = renderHook(() => useSignupWizardPresenter("preferences"));

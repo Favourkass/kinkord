@@ -2,9 +2,16 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import SignupPage from "./page";
-const fixture = vi.hoisted(() => ({ stage: "account", update: vi.fn() }));
+const fixture = vi.hoisted(() => ({
+  stage: "account",
+  update: vi.fn(),
+  emailVerified: false,
+  resume: null as string | null,
+}));
 beforeEach(() => {
   fixture.stage = "account";
+  fixture.emailVerified = false;
+  fixture.resume = null;
   fixture.update.mockReset().mockResolvedValue({});
 });
 afterEach(cleanup);
@@ -30,21 +37,26 @@ vi.mock("@/services/verification.service", async (importOriginal) => ({
 vi.mock("@/services/apiClient", () => ({
   ApiError: class ApiError extends Error {},
   api: {
-    get: async () => ({ avatarUrl: null, coverUrl: null, roles: [] }),
+    get: async (path: string) =>
+      path === "/me"
+        ? { emailVerified: fixture.emailVerified }
+        : { avatarUrl: null, coverUrl: null, roles: [] },
     patch: (...args: unknown[]) => fixture.update(...args),
     post: vi.fn(),
   },
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(fixture.resume ? { resume: fixture.resume } : {}),
 }));
 vi.mock("@/presenters/useSignupWizardPresenter", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/presenters/useSignupWizardPresenter")>();
   return {
-    useSignupWizardPresenter: () =>
+    useSignupWizardPresenter: (
+      resumed?: import("@/presenters/useSignupWizardPresenter").WizardStage,
+    ) =>
       original.useSignupWizardPresenter(
-        fixture.stage as import("@/presenters/useSignupWizardPresenter").WizardStage,
+        resumed ?? (fixture.stage as import("@/presenters/useSignupWizardPresenter").WizardStage),
       ),
   };
 });
@@ -154,4 +166,31 @@ it("offers former roles and the ten additions in the same searchable list", () =
   fireEvent.change(screen.getByLabelText("Search roles"), { target: { value: "rigger" } });
   expect(screen.getByRole("button", { name: "Rigger" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Acolyte" })).toBeNull();
+});
+
+it.each([
+  [true, 1],
+  [false, 0],
+])("says the email is verified on the welcome card only when it is (%s)", async (verified, n) => {
+  fixture.stage = "welcome";
+  fixture.emailVerified = verified;
+  render(<SignupPage />);
+  expect(screen.getByText(/Welcome to Kinkord/)).toBeTruthy();
+  if (verified) expect(await screen.findByText("Email address verified")).toBeTruthy();
+  else await new Promise((r) => setTimeout(r, 0));
+  expect(screen.queryAllByText("Email address verified")).toHaveLength(n);
+});
+
+it("opens the email step for a member the email hold sent back", async () => {
+  fixture.resume = "email";
+  render(<SignupPage />);
+  expect(screen.getByRole("heading", { name: "VERIFY YOUR EMAIL" })).toBeTruthy();
+  expect(await screen.findByText(/We emailed a 6-digit code/)).toBeTruthy();
+});
+
+it("no longer knows a phone step to resume", () => {
+  fixture.resume = "phone";
+  render(<SignupPage />);
+  expect(screen.queryByRole("heading", { name: "VERIFY YOUR EMAIL" })).toBeNull();
+  expect(screen.getByLabelText("Email address")).toBeTruthy();
 });

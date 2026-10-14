@@ -7,7 +7,7 @@ const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
  * step each one sends them back to.
  */
 const SIGN_UP_STEP_FOR_CODE = new Map([
-  ["PHONE_VERIFICATION_REQUIRED", "phone"],
+  ["EMAIL_VERIFICATION_REQUIRED", "email"],
   ["PROFILE_PHOTOS_REQUIRED", "profile"],
 ]);
 

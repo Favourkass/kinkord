@@ -31,7 +31,7 @@ import {
 } from "@/services/signupLocation.service";
 import { Routes } from "@/constants/Routes";
 import { filterSignupRoles } from "@/services/signupPreferences.service";
-import type { EditorDraft, ProfileOptionsPM } from "@/domain/profile";
+import type { EditorDraft, MePM, ProfileOptionsPM } from "@/domain/profile";
 import {
   loadSignupPreferences,
   saveSignupPreferences,
@@ -258,13 +258,55 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
 
   // Sent automatically when step 3 opens: they typed the address moments ago.
   const emailCode = useVerification("email");
+  // Whether the account's email was already verified, for members who come back.
+  const [accountEmailVerified, setAccountEmailVerified] = useState(false);
 
-  // The address was typed moments ago, so the code goes out without asking.
+  // The address was typed moments ago, so the code goes out without asking. A
+  // member the email hold sent back here may have verified since (in another
+  // tab): they move straight on instead of being sent a code they can't use.
   const emailSendCode = emailCode.sendCode;
+  const resumedAtEmail = initialStage === "email";
   useEffect(() => {
     if (stage !== "email") return;
-    emailSendCode();
-  }, [stage, emailSendCode]);
+    if (!resumedAtEmail) {
+      emailSendCode();
+      return;
+    }
+    let live = true;
+    api.get<Pick<MePM, "emailVerified">>("/me").then(
+      (me) => {
+        if (!live) return;
+        if (!me.emailVerified) {
+          emailSendCode();
+          return;
+        }
+        setAccountEmailVerified(true);
+        setStage("preferences");
+      },
+      () => {
+        if (live) emailSendCode();
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [stage, emailSendCode, resumedAtEmail]);
+
+  // The welcome card only says the email is verified when it is: a member
+  // finishing their photos may never have done the email step.
+  useEffect(() => {
+    if (stage !== "welcome" || emailCode.verified) return;
+    let live = true;
+    api.get<Pick<MePM, "emailVerified">>("/me").then(
+      (me) => {
+        if (live) setAccountEmailVerified(me.emailVerified === true);
+      },
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [stage, emailCode.verified]);
 
   const nextVerificationStep = useCallback(() => {
     if (emailCode.verified) setStage("preferences");
@@ -475,6 +517,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
         submit: completeProfile,
         resumed: resumedAtPhotos,
       },
+      welcome: { emailVerified: emailCode.verified || accountEmailVerified },
       finish,
     }),
     [
@@ -508,6 +551,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
       completePreferences,
       nextVerificationStep,
       emailCode,
+      accountEmailVerified,
       roles,
       toggleRole,
       avatarUrl,

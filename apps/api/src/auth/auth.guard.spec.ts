@@ -1,24 +1,20 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ForbiddenException, UnauthorizedException } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
+import { EmailVerificationController } from "../otp/otp.controller";
 import { type PresenceService } from "../presence/presence.service";
+import { ProfilesController } from "../profiles/profiles.controller";
+import { PushController } from "../push/push.controller";
 import {
   AllowDuringSignUp,
   AuthGuard,
-  PHONE_VERIFICATION_REQUIRED,
+  EMAIL_VERIFICATION_REQUIRED,
+  EMAIL_VERIFICATION_REQUIRED_FROM,
   PROFILE_PHOTOS_REQUIRED,
+  needsEmailVerification,
 } from "./auth.guard";
 import { type Auth } from "./auth.instance";
-
-// The phone step is optional for now; most tests here turn it back on to check
-// the hold that returns with it.
-const phoneStep = vi.hoisted(() => ({ required: true }));
-vi.mock("../profiles/phone-rules", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../profiles/phone-rules")>()),
-  get PHONE_STEP_REQUIRED() {
-    return phoneStep.required;
-  },
-}));
+import { MeController } from "./me.controller";
 
 class Routes {
   finishSignUp() {}
@@ -31,12 +27,15 @@ AllowDuringSignUp()(
   Object.getOwnPropertyDescriptor(Routes.prototype, "finishSignUp")!,
 );
 
-const ctx = (req: object, handler: keyof Routes = "feed") =>
+const ctxFor = (req: object, handler: unknown, cls: unknown) =>
   ({
     switchToHttp: () => ({ getRequest: () => req }),
-    getHandler: () => Routes.prototype[handler],
-    getClass: () => Routes,
+    getHandler: () => handler,
+    getClass: () => cls,
   }) as never;
+
+const ctx = (req: object, handler: keyof Routes = "feed") =>
+  ctxFor(req, Routes.prototype[handler], Routes);
 
 const authWith = (session: unknown) =>
   ({ api: { getSession: vi.fn(async () => session) } }) as unknown as Auth;
@@ -48,13 +47,11 @@ const presenceStub = () => {
 
 interface ProfileRow {
   signupPhotosSkipped: boolean;
-  phoneVerified: boolean;
   avatarKey: string | null;
   coverKey: string | null;
 }
 const finished: ProfileRow = {
   signupPhotosSkipped: false,
-  phoneVerified: true,
   avatarKey: "avatars/u1/a.jpg",
   coverKey: "covers/u1/c.jpg",
 };
@@ -65,16 +62,28 @@ const dbWithProfile = (row: Partial<ProfileRow> | null) => {
   return { select: vi.fn(() => ({ from: () => ({ where: () => ({ limit }) }) })) };
 };
 
-const guardWithDb = (createdAt: string, db: ReturnType<typeof dbWithProfile>) =>
-  new AuthGuard(
-    authWith({ user: { id: "u1", createdAt }, session: { id: "s1" } }),
+interface Account {
+  createdAt: string;
+  emailVerified?: boolean;
+  email?: string;
+}
+
+const guardWithDb = (account: Account | string, db: ReturnType<typeof dbWithProfile>) => {
+  const {
+    createdAt,
+    emailVerified = true,
+    email = "member@kinkord.com",
+  } = typeof account === "string" ? { createdAt: account } : account;
+  return new AuthGuard(
+    authWith({ user: { id: "u1", email, emailVerified, createdAt }, session: { id: "s1" } }),
     presenceStub().presence,
     new Reflector(),
     db as never,
   );
+};
 
-const guardFor = (createdAt: string, row: Partial<ProfileRow> | null) =>
-  guardWithDb(createdAt, dbWithProfile(row));
+const guardFor = (account: Account | string, row: Partial<ProfileRow> | null) =>
+  guardWithDb(account, dbWithProfile(row));
 
 const holdOf = async (guard: AuthGuard, handler: keyof Routes = "feed") => {
   const err = await guard.canActivate(ctx({ headers: {} }, handler)).catch((e: unknown) => e);
@@ -82,7 +91,7 @@ const holdOf = async (guard: AuthGuard, handler: keyof Routes = "feed") => {
   return ((err as ForbiddenException).getResponse() as { code: string }).code;
 };
 
-const NEW = "2026-09-28T10:00:00Z";
+const NEW = "2026-10-14T10:00:00Z";
 const OLD = "2026-09-01T10:00:00Z";
 
 describe("AuthGuard", () => {
@@ -110,51 +119,79 @@ describe("AuthGuard", () => {
   });
 });
 
-describe("AuthGuard phone requirement", () => {
-  it("holds a new account without a verified phone at the phone step", async () => {
-    expect(await holdOf(guardFor(NEW, { phoneVerified: false }))).toBe(PHONE_VERIFICATION_REQUIRED);
+describe("AuthGuard email verification", () => {
+  const unverified = { createdAt: NEW, emailVerified: false };
+
+  it("holds a new account without a verified email at the email step, without a lookup", async () => {
+    const db = dbWithProfile({});
+    expect(await holdOf(guardWithDb(unverified, db))).toBe(EMAIL_VERIFICATION_REQUIRED);
+    expect(db.select).not.toHaveBeenCalled();
   });
 
-  it("lets that account reach the routes it needs to finish sign-up", async () => {
+  it("starts with accounts created at the cut-off", async () => {
+    expect(EMAIL_VERIFICATION_REQUIRED_FROM.toISOString()).toBe("2026-10-14T00:00:00.000Z");
+    const atCutOff = { createdAt: "2026-10-14T00:00:00Z", emailVerified: false };
+    expect(await holdOf(guardFor(atCutOff, {}))).toBe(EMAIL_VERIFICATION_REQUIRED);
+  });
+
+  it("leaves accounts from before the cut-off alone", async () => {
     await expect(
-      guardFor(NEW, { phoneVerified: false }).canActivate(ctx({ headers: {} }, "finishSignUp")),
+      guardFor({ createdAt: OLD, emailVerified: false }, {}).canActivate(ctx({ headers: {} })),
     ).resolves.toBe(true);
   });
 
-  it("lets a new account through once the phone is verified", async () => {
-    await expect(guardFor(NEW, {}).canActivate(ctx({ headers: {} }))).resolves.toBe(true);
-  });
-
-  it("leaves accounts from before the rule alone", async () => {
+  it("lets a new account through once the email is verified", async () => {
     await expect(
-      guardFor(OLD, { phoneVerified: false }).canActivate(ctx({ headers: {} })),
+      guardFor({ createdAt: NEW, emailVerified: true }, {}).canActivate(ctx({ headers: {} })),
     ).resolves.toBe(true);
   });
 
-  it("asks for the phone before the photos, in sign-up order", async () => {
+  it("asks for the email before the photos, in sign-up order", async () => {
+    expect(await holdOf(guardFor(unverified, { avatarKey: null, coverKey: null }))).toBe(
+      EMAIL_VERIFICATION_REQUIRED,
+    );
+  });
+
+  it("lets that account reach the routes marked for sign-up", async () => {
+    await expect(
+      guardFor(unverified, {}).canActivate(ctx({ headers: {} }, "finishSignUp")),
+    ).resolves.toBe(true);
+  });
+
+  it.each([
+    ["GET /me", MeController, MeController.prototype.me],
+    [
+      "POST /profile/email/send-code",
+      EmailVerificationController,
+      EmailVerificationController.prototype.sendCode,
+    ],
+    [
+      "POST /profile/email/verify",
+      EmailVerificationController,
+      EmailVerificationController.prototype.verify,
+    ],
+    ["GET /profile", ProfilesController, ProfilesController.prototype.getOwn],
+    ["GET /profile/options", ProfilesController, ProfilesController.prototype.options],
+    ["PATCH /profile", ProfilesController, ProfilesController.prototype.update],
+    ["POST /push/subscriptions/remove", PushController, PushController.prototype.unsubscribe],
+  ])("keeps %s reachable while the email is unverified", async (_route, cls, handler) => {
+    await expect(
+      guardFor(unverified, {}).canActivate(ctxFor({ headers: {} }, handler, cls)),
+    ).resolves.toBe(true);
+  });
+
+  it("never holds a founder", () => {
+    const founder = { email: "maxihandsome@gmail.com", emailVerified: true, createdAt: NEW };
+    expect(needsEmailVerification(founder)).toBe(false);
+    // The founder list only counts a verified address, so the same address
+    // unverified is just a new account like any other.
+    expect(needsEmailVerification({ ...founder, emailVerified: false })).toBe(true);
+  });
+
+  it("doesn't hold an account whose creation date can't be read", () => {
     expect(
-      await holdOf(guardFor(NEW, { phoneVerified: false, avatarKey: null, coverKey: null })),
-    ).toBe(PHONE_VERIFICATION_REQUIRED);
-  });
-
-  describe("while the phone step is optional", () => {
-    afterEach(() => {
-      phoneStep.required = true;
-    });
-
-    it("lets a new account in without a verified phone", async () => {
-      phoneStep.required = false;
-      await expect(
-        guardFor(NEW, { phoneVerified: false }).canActivate(ctx({ headers: {} })),
-      ).resolves.toBe(true);
-    });
-
-    it("still asks that account for its photos", async () => {
-      phoneStep.required = false;
-      expect(await holdOf(guardFor(NEW, { phoneVerified: false, avatarKey: null }))).toBe(
-        PROFILE_PHOTOS_REQUIRED,
-      );
-    });
+      needsEmailVerification({ email: "a@b.c", emailVerified: false, createdAt: "not a date" }),
+    ).toBe(false);
   });
 });
 
@@ -175,7 +212,7 @@ describe("AuthGuard profile photos", () => {
     expect(await holdOf(guardFor(NEW, { coverKey: null }))).toBe(PROFILE_PHOTOS_REQUIRED);
   });
 
-  it("applies to accounts from before the phone rule as well", async () => {
+  it("applies to accounts from before the email rule as well", async () => {
     expect(await holdOf(guardFor(OLD, { avatarKey: null, coverKey: null }))).toBe(
       PROFILE_PHOTOS_REQUIRED,
     );

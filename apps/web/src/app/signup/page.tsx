@@ -46,11 +46,7 @@ function SignupWizard() {
   // The app sends a member who left sign-up half-done back to the step they owe.
   const resume = useSearchParams().get("resume");
   const p = useSignupWizardPresenter(
-    resume === "phone"
-      ? "email"
-      : resume === "profile" || resume === "preferences"
-        ? resume
-        : undefined,
+    resume === "email" || resume === "preferences" || resume === "profile" ? resume : undefined,
   );
   const [rolesOpen, setRolesOpen] = useState(false);
 
@@ -571,10 +567,12 @@ function SignupWizard() {
                       Active
                     </span>
                   </div>
-                  <p className="mt-1.5 flex items-center gap-2 text-[13px] text-[#bfbfbf] lg:text-[17px]">
-                    <CheckCircle2 size={16} className="shrink-0 text-[#59b240]" aria-hidden />
-                    Email address verified
-                  </p>
+                  {p.welcome.emailVerified && (
+                    <p className="mt-1.5 flex items-center gap-2 text-[13px] text-[#bfbfbf] lg:text-[17px]">
+                      <CheckCircle2 size={16} className="shrink-0 text-[#59b240]" aria-hidden />
+                      Email address verified
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

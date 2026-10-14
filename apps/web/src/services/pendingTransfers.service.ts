@@ -7,7 +7,7 @@ import { ApiError } from "./apiClient";
  * wallet's check that the member it was sent as is the one signed in.
  */
 const UNREAD_CODES = new Set([
-  "PHONE_VERIFICATION_REQUIRED",
+  "EMAIL_VERIFICATION_REQUIRED",
   "PROFILE_PHOTOS_REQUIRED",
   "WRONG_ACCOUNT",
 ]);
