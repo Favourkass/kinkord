@@ -11,7 +11,6 @@ import { DRIZZLE, type Db } from "../db/db.module";
 import {
   memberBan,
   moderationLog,
-  otpChallenge,
   post,
   postMedia,
   profile,
@@ -298,7 +297,7 @@ export class ModerationService {
     };
   }
 
-  /** Suspends the account, signs it out everywhere and blocks its email, phone and IPs. */
+  /** Suspends the account, signs it out everywhere and blocks its email, verified phone and IPs. */
   async block(
     actorId: string,
     id: string,
@@ -418,10 +417,8 @@ export class ModerationService {
         email: user.email,
         emailVerified: user.emailVerified,
         username: user.username,
-        phone: profile.phone,
       })
       .from(user)
-      .leftJoin(profile, eq(profile.userId, user.id))
       .where(eq(user.id, id))
       .limit(1);
     if (!row) throw new NotFoundException("Member not found.");
@@ -431,30 +428,36 @@ export class ModerationService {
     return row;
   }
 
-  /** Where this member has signed in from, and which phones they proved they own. */
+  /**
+   * Where this member has signed in from, and the phone they proved they own:
+   * the one on their profile, once verified. An unverified number is only what
+   * they typed, and may well be someone else's.
+   */
   private async contactTrail(id: string) {
     const ipRows = await this.db
       .selectDistinct({ ip: session.ipAddress })
       .from(session)
       .where(eq(session.userId, id));
-    const phoneRows = await this.db
-      .selectDistinct({ phone: otpChallenge.destination })
-      .from(otpChallenge)
-      .where(and(eq(otpChallenge.userId, id), eq(otpChallenge.channel, "sms")));
+    const [own] = await this.db
+      .select({ phone: profile.phone, verified: profile.phoneVerified })
+      .from(profile)
+      .where(eq(profile.userId, id))
+      .limit(1);
     return {
       ips: ipRows.map((r) => r.ip).filter((ip): ip is string => Boolean(ip)),
-      verifiedPhones: phoneRows.map((r) => r.phone),
+      verifiedPhones: own?.verified && own.phone ? [own.phone] : [],
     };
   }
 
   /**
-   * Email and phones are refused outright. IPs are only flagged: mobile
-   * networks here share one address across many subscribers, so blocking it
-   * would shut out strangers.
+   * Email and the verified phone are refused outright; a number the member
+   * never verified is left alone, so a ban can't lock out its real owner. IPs
+   * are only flagged: mobile networks here share one address across many
+   * subscribers, so blocking it would shut out strangers.
    */
   private async writeRules(
     id: string,
-    target: { email: string; phone: string | null },
+    target: { email: string },
     trail: { ips: string[]; verifiedPhones: string[] },
     reason: string | null,
   ) {
@@ -465,9 +468,7 @@ export class ModerationService {
     const add = (kind: SignupRuleKind, value: string, action: SignupRuleAction) =>
       rules.set(`${kind}:${value}`, { kind, value, action });
     add("email", normalizeEmail(target.email), "block");
-    for (const phone of [target.phone, ...trail.verifiedPhones]) {
-      if (phone) add("phone", normalizePhone(phone), "block");
-    }
+    for (const phone of trail.verifiedPhones) add("phone", normalizePhone(phone), "block");
     for (const ip of trail.ips) add("ip", normalizeIp(ip), "flag");
     await this.db
       .insert(signupBlock)

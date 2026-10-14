@@ -1,19 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 import { UnauthorizedException } from "@nestjs/common";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { type Db } from "../db/db.module";
 import { type Auth } from "./auth.instance";
 import { PhoneSignInService } from "./phone-sign-in.service";
 
 const makeService = (rows: Array<{ email: string }>) => {
   const limit = vi.fn().mockResolvedValue(rows);
-  const where = vi.fn(() => ({ limit }));
+  const where = vi.fn((_clause: unknown) => ({ limit }));
   const innerJoin = vi.fn(() => ({ where }));
   const from = vi.fn(() => ({ innerJoin }));
   const select = vi.fn(() => ({ from }));
   const signInEmail = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
   const db = { select } as unknown as Db;
   const auth = { api: { signInEmail } } as unknown as Auth;
-  return { service: new PhoneSignInService(db, auth), signInEmail };
+  return { service: new PhoneSignInService(db, auth), signInEmail, where };
 };
 
 const input = { phone: "+2348035550142", password: "supersecret123", rememberMe: true };
@@ -25,6 +26,16 @@ describe("PhoneSignInService", () => {
       UnauthorizedException,
     );
     expect(signInEmail).not.toHaveBeenCalled();
+  });
+
+  it("only looks the number up among phones that were verified", async () => {
+    // Anyone can type someone else's number into their profile; that copy must
+    // neither sign in nor make the owner's own match ambiguous.
+    const { service, where } = makeService([{ email: "tega@x.dev" }]);
+    await service.signInWithPhone(input, new Headers());
+    const lookup = new PgDialect().sqlToQuery(where.mock.calls[0][0] as never);
+    expect(lookup.sql).toBe('("profile"."phone" = $1 and "profile"."phone_verified" = $2)');
+    expect(lookup.params).toEqual(["+2348035550142", true]);
   });
 
   it("rejects ambiguous phone numbers shared by two accounts", async () => {
