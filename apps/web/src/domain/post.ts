@@ -4,6 +4,7 @@
  * on a long body.
  */
 import { compactNumber, shortTimeAgo } from "@/util/format";
+import { ageTagOf, fullLocationOf } from "./member";
 import { bodyParts, clipParts, type BodyPart, type MentionPM } from "./mentions";
 
 export type PostVisibility = "public" | "friends";
@@ -184,20 +185,66 @@ export interface DraftPhotoVM {
   error: string | null;
 }
 
-/** A "People you may know" card. */
+/** Which members "Kinksters Near You" lists: women, men, or both mixed. */
+export type SuggestionShow = "women" | "men" | "all";
+
+/** One "Kinksters Near You" card, as GET /members/suggested sends it. */
+export interface FeedSuggestionPM {
+  userId: string;
+  username: string | null;
+  displayName: string;
+  avatarUrl: string | null;
+  isFollowing: boolean;
+  /** Shows the Silver check; absent from an older API, like everything below. */
+  silver?: boolean;
+  age?: number | null;
+  gender?: string | null;
+  city?: string | null;
+  state?: string | null;
+  /** ISO 3166-1 alpha-2. */
+  country?: string | null;
+  /** At most three, those on the side the viewer looks for first. */
+  roles?: string[];
+  lookingFor?: string[];
+  online?: boolean;
+}
+
+export interface FeedSuggestionsPM {
+  items: FeedSuggestionPM[];
+  /** The segment the API ranked for: the one asked for, or the member's default. */
+  show?: SuggestionShow;
+  /** The segments to offer, in order. */
+  options?: SuggestionShow[];
+}
+
+/** How many roles and looking-for values a card shows. */
+export const SUGGESTION_LIST_MAX = 3;
+
+/** A "Kinksters Near You" card. */
 export interface FeedSuggestionVM {
   userId: string;
   displayName: string;
   silver: boolean;
   organization: boolean;
-  handle: string | null;
   avatarUrl: string | null;
+  online: boolean;
+  /** "26F • Lagos, Lagos State, Nigeria"; null when unknown, and for the organization. */
+  details: string | null;
+  /** "Submissive, Switch, Brat"; null when none, and for the organization. */
+  roles: string | null;
+  /** "Friendship, Events, Vanilla dating"; null when none, and for the organization. */
+  lookingFor: string | null;
   isFollowing: boolean;
-  /** The card's button: "Add friend" / "Remove", or Follow / Following for the organization. */
-  actionLabel: string;
   /** A follow request is in flight, so the button is held. */
   busy: boolean;
   href: string | null;
+}
+
+/** One segment of the Women | Men (| All) toggle. */
+export interface SuggestionSegmentVM {
+  value: SuggestionShow;
+  label: string;
+  selected: boolean;
 }
 
 export interface CommentVM {
@@ -324,5 +371,39 @@ export function toCommentVM(
     body: pm.body,
     bodyParts: bodyParts(pm.body, pm.mentions, (u) => hrefFor(u) ?? ""),
     canDelete: pm.canDelete,
+  };
+}
+
+/**
+ * A "Kinksters Near You" card. The organization's card is just its name and
+ * the Follow button: age, place, roles and presence only describe a person.
+ */
+export function toFeedSuggestionVM(
+  pm: FeedSuggestionPM,
+  hrefFor: HrefFor,
+  busy = false,
+  organization = false,
+): FeedSuggestionVM {
+  const list = (values: string[] | undefined) =>
+    organization ? null : (values ?? []).slice(0, SUGGESTION_LIST_MAX).join(", ") || null;
+  const details = [
+    ageTagOf(pm.age ?? null, pm.gender ?? null),
+    fullLocationOf(pm.city, pm.state, pm.country),
+  ]
+    .filter(Boolean)
+    .join(" • ");
+  return {
+    userId: pm.userId,
+    displayName: pm.displayName,
+    silver: Boolean(pm.silver),
+    organization,
+    avatarUrl: pm.avatarUrl,
+    online: !organization && Boolean(pm.online),
+    details: organization ? null : details || null,
+    roles: list(pm.roles),
+    lookingFor: list(pm.lookingFor),
+    isFollowing: pm.isFollowing,
+    busy,
+    href: hrefFor(pm.username),
   };
 }

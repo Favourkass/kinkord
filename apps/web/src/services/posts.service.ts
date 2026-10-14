@@ -8,29 +8,17 @@ import {
   type CommentPM,
   type CommentsPM,
   type FeedPM,
+  type FeedSuggestionPM,
+  type FeedSuggestionsPM,
   type LikePM,
   type PostPM,
   type PostVisibility,
   type RepostPM,
   type SavePM,
+  type SuggestionShow,
 } from "@/domain/post";
 import { IMAGE_VARIANTS, buildUploadSet, type ImageVariant } from "@/util/image";
 import { api, uploadToPresignedUrl } from "./apiClient";
-
-export interface SuggestedPersonPM {
-  userId: string;
-  username: string | null;
-  displayName: string;
-  avatarUrl: string | null;
-  isFollowing: boolean;
-  /** Shows the Silver check; absent from an older API. */
-  silver?: boolean;
-}
-
-export interface SuggestedPM {
-  items: SuggestedPersonPM[];
-  total: number;
-}
 
 interface PostUploadSpec {
   key: string;
@@ -99,7 +87,12 @@ export const postsApi = {
     api.post<CommentPM>(`/posts/${encodeURIComponent(id)}/comments`, { body }),
   removeComment: (id: string) =>
     api.del<{ deleted: string }>(`/posts/comments/${encodeURIComponent(id)}`),
-  suggested: (limit = 10) => api.get<SuggestedPM>(`/members/suggested?limit=${limit}`),
+  /** "Kinksters Near You". Without `show`, the API picks the member's own default. */
+  suggested: (limit = 10, show?: SuggestionShow | null) =>
+    api.get<FeedSuggestionsPM>(`/members/suggested?limit=${limit}${show ? `&show=${show}` : ""}`),
+  /** Remove a card for good: the member is never suggested to the viewer again. */
+  dismissSuggestion: (userId: string) =>
+    api.post<{ dismissed: string }>(`/members/suggested/${encodeURIComponent(userId)}/dismiss`, {}),
   follow: (username: string) =>
     api.post<unknown>(`/follows/${encodeURIComponent(username.replace(/^@/, ""))}`, {}),
   unfollow: (username: string) =>
@@ -208,11 +201,22 @@ export function withAuthorFollow(items: PostPM[], userId: string, isFollowing: b
 }
 
 export function withSuggestionFollow(
-  items: SuggestedPersonPM[],
+  items: FeedSuggestionPM[],
   userId: string,
   isFollowing: boolean,
-): SuggestedPersonPM[] {
+): FeedSuggestionPM[] {
   return items.map((s) => (s.userId === userId ? { ...s, isFollowing } : s));
+}
+
+/** Puts back a card whose removal the API refused, where it was (once). */
+export function withSuggestionRestored(
+  items: FeedSuggestionPM[],
+  person: FeedSuggestionPM,
+  index: number,
+): FeedSuggestionPM[] {
+  if (items.some((s) => s.userId === person.userId)) return items;
+  const at = Math.min(Math.max(0, index), items.length);
+  return [...items.slice(0, at), person, ...items.slice(at)];
 }
 
 /**

@@ -1,4 +1,5 @@
 /** Copy for the home feed (Figma "Hompage Light" 344:138 / dark 837:295). */
+import type { SuggestionShow } from "@/domain/post";
 
 export const FEED_COPY = {
   composerPlaceholder: "What's on your mind?",
@@ -57,12 +58,17 @@ export const FEED_COPY = {
   feedEmptyTitle: "Your feed is quiet",
   feedEmptyBody: "Follow a few kinksters, or write the first post yourself.",
   feedError: "Could not load the feed. Refresh to try again.",
-  peopleHeading: "Kinksters near you",
-  peopleSeeAll: "See all",
-  peopleDismiss: "Hide suggestions",
-  peopleAdd: "Add friend",
-  peopleAdded: "Remove",
-  /** The official organization is followed, on its posts and in the strip. */
+  peopleHeading: "Kinksters Near You",
+  /** The sliders button: the members directory, where every filter is. */
+  peopleBrowse: "Browse all kinksters",
+  /** The Women | Men (| All) toggle. */
+  peopleShowLabel: "Show",
+  peopleShow: { women: "Women", men: "Men", all: "All" } satisfies Record<SuggestionShow, string>,
+  peopleOnline: "Online",
+  peopleLookingFor: "Looking for",
+  peopleRemove: "Remove",
+  peopleEmpty: "No one to suggest here yet.",
+  /** Members and the official organization alike are followed, on posts and in the strip. */
   follow: "Follow",
   following: "Following",
   organization: "Official",

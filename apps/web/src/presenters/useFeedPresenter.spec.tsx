@@ -19,6 +19,7 @@ const comment = vi.fn();
 const removeComment = vi.fn();
 const removePost = vi.fn();
 const suggested = vi.fn();
+const dismissSuggestion = vi.fn();
 const recordShare = vi.fn().mockResolvedValue({ postId: "p1", shares: 1 });
 const repost = vi.fn();
 const unrepost = vi.fn();
@@ -49,6 +50,7 @@ vi.mock("@/services/posts.service", async (importOriginal) => ({
     unsave: (...a: unknown[]) => unsave(...a),
     saved: (...a: unknown[]) => savedFeed(...a),
     suggested: (...a: unknown[]) => suggested(...a),
+    dismissSuggestion: (...a: unknown[]) => dismissSuggestion(...a),
     follow: (...a: unknown[]) => follow(...a),
     unfollow: (...a: unknown[]) => unfollow(...a),
   },
@@ -123,7 +125,8 @@ beforeEach(() => {
   comment.mockReset().mockResolvedValue(commentPm({ id: "c2", body: "mine" }));
   removeComment.mockReset().mockResolvedValue({ deleted: "c1" });
   removePost.mockReset().mockResolvedValue({ deleted: "p1" });
-  suggested.mockReset().mockResolvedValue({ items: [], total: 0 });
+  suggested.mockReset().mockResolvedValue({ items: [], show: "women", options: ["women", "men"] });
+  dismissSuggestion.mockReset().mockResolvedValue({ dismissed: "u3" });
   repost.mockReset().mockResolvedValue({ postId: "p1", reposts: 1, repostedByMe: true });
   unrepost.mockReset().mockResolvedValue({ postId: "p1", reposts: 0, repostedByMe: false });
   save.mockReset().mockResolvedValue({ postId: "p1", savedByMe: true });
@@ -485,7 +488,7 @@ describe("deleting a post", () => {
   });
 });
 
-describe("people you may know", () => {
+describe("Kinksters Near You", () => {
   const person = {
     userId: "u3",
     username: "kay",
@@ -493,38 +496,160 @@ describe("people you may know", () => {
     avatarUrl: null,
     isFollowing: false,
   };
+  const other = { ...person, userId: "u4", username: "lily", displayName: "Lily" };
+  const page = (items: unknown[], show = "women", options = ["women", "men"]) => ({
+    items,
+    show,
+    options,
+  });
+  const strip = async () => {
+    const hook = await loaded();
+    await waitFor(() => expect(hook.result.current.suggestionSegments).not.toHaveLength(0));
+    return hook;
+  };
+
+  it("leaves the default segment to the API and selects the one it ranked for", async () => {
+    suggested.mockResolvedValue(page([person]));
+    const { result } = await strip();
+    expect(suggested).toHaveBeenCalledWith(10, null);
+    expect(result.current.suggestions).toHaveLength(1);
+    expect(result.current.suggestionSegments).toEqual([
+      { value: "women", label: "Women", selected: true },
+      { value: "men", label: "Men", selected: false },
+    ]);
+    expect(result.current.suggestionsLoading).toBe(false);
+  });
+
+  it("offers All first to a member who sees everyone by default", async () => {
+    suggested.mockResolvedValue(page([person], "all", ["all", "women", "men"]));
+    const { result } = await strip();
+    expect(result.current.suggestionSegments.map((s) => [s.label, s.selected])).toEqual([
+      ["All", true],
+      ["Women", false],
+      ["Men", false],
+    ]);
+  });
+
+  it("builds each card from what the API sends", async () => {
+    suggested.mockResolvedValue(
+      page([
+        {
+          ...person,
+          age: 26,
+          gender: "female",
+          city: "Lagos",
+          state: "Lagos",
+          country: "NG",
+          roles: ["Submissive", "Switch"],
+          lookingFor: ["Friendship"],
+          online: true,
+          silver: true,
+        },
+      ]),
+    );
+    const { result } = await strip();
+    expect(result.current.suggestions[0]).toMatchObject({
+      details: "26F • Lagos, Lagos State, Nigeria",
+      roles: "Submissive, Switch",
+      lookingFor: "Friendship",
+      online: true,
+      silver: true,
+      organization: false,
+      href: "/u/kay",
+    });
+  });
+
+  it("switching segments asks for that list, showing it loading meanwhile", async () => {
+    suggested.mockResolvedValueOnce(page([person]));
+    const { result } = await strip();
+
+    let answer!: (value: unknown) => void;
+    suggested.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
+    act(() => result.current.showSuggestions("men"));
+    expect(result.current.suggestionsLoading).toBe(true);
+    expect(result.current.suggestions).toHaveLength(0);
+    expect(result.current.suggestionSegments.map((s) => s.selected)).toEqual([false, true]);
+    await waitFor(() => expect(suggested).toHaveBeenLastCalledWith(10, "men"));
+
+    await act(async () => answer(page([other], "men")));
+    expect(result.current.suggestionsLoading).toBe(false);
+    expect(result.current.suggestions.map((s) => s.userId)).toEqual(["u4"]);
+  });
+
+  it("does nothing when the segment already shown is tapped", async () => {
+    suggested.mockResolvedValue(page([person]));
+    const { result } = await strip();
+    act(() => result.current.showSuggestions("women"));
+    expect(result.current.suggestionsLoading).toBe(false);
+    expect(suggested).toHaveBeenCalledTimes(1);
+  });
 
   it("follows optimistically and rolls back on failure", async () => {
-    suggested.mockResolvedValue({ items: [person], total: 1 });
+    suggested.mockResolvedValue(page([person]));
     follow.mockRejectedValue(new ApiError(500, "boom"));
-    const { result } = await loaded();
-    await waitFor(() => expect(result.current.suggestions).toHaveLength(1));
+    const { result } = await strip();
 
     await act(async () => result.current.toggleFollow("u3"));
     expect(follow).toHaveBeenCalledWith("kay");
     expect(result.current.suggestions[0].isFollowing).toBe(false);
   });
 
-  it("labels a member's button Add friend, then Remove", async () => {
-    suggested.mockResolvedValue({ items: [person], total: 1 });
-    const { result } = await loaded();
-    await waitFor(() => expect(result.current.suggestions).toHaveLength(1));
-    expect(result.current.suggestions[0]).toMatchObject({
-      organization: false,
-      actionLabel: "Add friend",
-    });
+  it("follows, then unfollows on a second tap", async () => {
+    suggested.mockResolvedValue(page([person]));
+    const { result } = await strip();
 
     await act(async () => result.current.toggleFollow("u3"));
-    expect(result.current.suggestions[0].actionLabel).toBe("Remove");
+    expect(result.current.suggestions[0].isFollowing).toBe(true);
+    await act(async () => result.current.toggleFollow("u3"));
+    expect(unfollow).toHaveBeenCalledWith("kay");
+    expect(result.current.suggestions[0].isFollowing).toBe(false);
   });
 
-  it("hides the strip for the rest of the session", async () => {
-    suggested.mockResolvedValue({ items: [person], total: 1 });
-    const { result } = await loaded();
-    await waitFor(() => expect(result.current.suggestions).toHaveLength(1));
+  it("removes a card at once, and for good", async () => {
+    suggested.mockResolvedValue(page([person, other]));
+    let answer!: (value: unknown) => void;
+    dismissSuggestion.mockImplementation(() => new Promise((resolve) => (answer = resolve)));
+    const { result } = await strip();
 
-    act(() => result.current.hideSuggestions());
-    expect(result.current.suggestions).toHaveLength(0);
+    act(() => void result.current.removeSuggestion("u3"));
+    expect(result.current.suggestions.map((s) => s.userId)).toEqual(["u4"]);
+    expect(dismissSuggestion).toHaveBeenCalledWith("u3");
+    await act(async () => answer({ dismissed: "u3" }));
+    expect(result.current.suggestions.map((s) => s.userId)).toEqual(["u4"]);
+  });
+
+  it("puts the card back where it was when the API refuses", async () => {
+    suggested.mockResolvedValue(page([person, other]));
+    dismissSuggestion.mockRejectedValue(new ApiError(500, "boom"));
+    const { result } = await strip();
+
+    await act(async () => result.current.removeSuggestion("u3"));
+    expect(result.current.suggestions.map((s) => s.userId)).toEqual(["u3", "u4"]);
+  });
+
+  it("doesn't put a card back into another segment's list", async () => {
+    suggested.mockResolvedValueOnce(page([person]));
+    let refuse!: () => void;
+    dismissSuggestion.mockImplementation(
+      () => new Promise((_, reject) => (refuse = () => reject(new ApiError(500, "boom")))),
+    );
+    const { result } = await strip();
+
+    act(() => void result.current.removeSuggestion("u3"));
+    suggested.mockResolvedValueOnce(page([other], "men"));
+    act(() => result.current.showSuggestions("men"));
+    await waitFor(() => expect(result.current.suggestionsLoading).toBe(false));
+    await act(async () => refuse());
+    expect(result.current.suggestions.map((s) => s.userId)).toEqual(["u4"]);
+  });
+
+  it("sends a signed-out member to log in when they remove a card", async () => {
+    suggested.mockResolvedValue(page([person]));
+    dismissSuggestion.mockRejectedValue(new ApiError(401, "signed out"));
+    const { result } = await strip();
+
+    await act(async () => result.current.removeSuggestion("u3"));
+    expect(replace).toHaveBeenCalledWith("/login");
   });
 
   it("leaves the feed working when suggestions fail to load", async () => {
@@ -532,6 +657,8 @@ describe("people you may know", () => {
     const { result } = await loaded();
     expect(result.current.posts).toHaveLength(1);
     expect(result.current.error).toBeNull();
+    expect(result.current.suggestions).toHaveLength(0);
+    expect(result.current.suggestionSegments).toHaveLength(0);
   });
 });
 
@@ -605,20 +732,25 @@ describe("following the official organization", () => {
   });
 
   it("keeps the Kinksters strip and the posts in agreement", async () => {
-    suggested.mockResolvedValue({ items: [{ ...org, isFollowing: false }], total: 1 });
+    suggested.mockResolvedValue({
+      items: [{ ...org, isFollowing: false, age: 3, roles: ["Owner"], online: true }],
+      show: "all",
+      options: ["all", "women", "men"],
+    });
     feed.mockResolvedValue({ items: [orgPost(false)], nextCursor: null });
     const { result } = await loaded();
     await waitFor(() => expect(result.current.suggestions).toHaveLength(1));
+    // Followed like anyone, but described like no person: no age, roles or presence.
     expect(result.current.suggestions[0]).toMatchObject({
       organization: true,
-      actionLabel: "Follow",
+      isFollowing: false,
+      details: null,
+      roles: null,
+      online: false,
     });
 
     await act(async () => result.current.toggleFollow("org"));
-    expect(result.current.suggestions[0]).toMatchObject({
-      isFollowing: true,
-      actionLabel: "Following",
-    });
+    expect(result.current.suggestions[0].isFollowing).toBe(true);
     expect(result.current.posts[0].authorIsFollowing).toBe(true);
   });
 });

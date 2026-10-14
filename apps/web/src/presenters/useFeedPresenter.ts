@@ -6,19 +6,22 @@ import { FEED_COPY, FEED_PHOTO_LIMIT, FEED_SUGGESTION_LIMIT } from "@/constants/
 import { Routes } from "@/constants/Routes";
 import {
   COMMENT_BODY_MAX,
-  handleOf,
   postBodyMax,
   toCommentVM,
+  toFeedSuggestionVM,
   toPostVM,
   type CommentPM,
   type CommentVM,
   type DraftPhotoVM,
+  type FeedSuggestionPM,
   type FeedSuggestionVM,
   type PostMediaVM,
   type FeedPM as FeedPagePM,
   type PostPM,
   type PostVM,
   type PostVisibility,
+  type SuggestionSegmentVM,
+  type SuggestionShow,
 } from "@/domain/post";
 import type { KinkCurrency } from "@/domain/kinkcoins";
 import type { WalletSummaryPM } from "@/domain/wallet";
@@ -46,7 +49,7 @@ import {
   withAuthorFollow,
   withCommentDelta,
   withSuggestionFollow,
-  type SuggestedPersonPM,
+  withSuggestionRestored,
 } from "@/services/posts.service";
 
 /** Profile link for an author; null for a member who has no username yet. */
@@ -182,8 +185,16 @@ export function useFeedPresenter({
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const [suggestions, setSuggestions] = useState<SuggestedPersonPM[]>([]);
-  const [suggestionsHidden, setSuggestionsHidden] = useState(false);
+  // "Kinksters Near You". The segment asked for (null: the member's default,
+  // which the API knows), then the segment shown and those offered, as the
+  // API last answered.
+  const [suggestions, setSuggestions] = useState<FeedSuggestionPM[]>([]);
+  const [suggestionsAsked, setSuggestionsAsked] = useState<SuggestionShow | null>(null);
+  const [suggestionShow, setSuggestionShow] = useState<SuggestionShow | null>(null);
+  const [suggestionOptions, setSuggestionOptions] = useState<SuggestionShow[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  /** Bumped whenever another segment replaces the list, so a late failure can't reach the new one. */
+  const suggestionsRound = useRef(0);
   const [followBusy, setFollowBusy] = useState<string[]>([]);
 
   /** Object URLs outlive React state, so they are revoked by hand. */
@@ -241,16 +252,21 @@ export function useFeedPresenter({
     let cancelled = false;
     void (async () => {
       try {
-        const page = await postsApi.suggested(FEED_SUGGESTION_LIMIT);
-        if (!cancelled) setSuggestions(page.items);
+        const page = await postsApi.suggested(FEED_SUGGESTION_LIMIT, suggestionsAsked);
+        if (cancelled) return;
+        setSuggestions(page.items);
+        setSuggestionShow(page.show ?? null);
+        setSuggestionOptions(page.options ?? []);
       } catch {
         // The strip is a nicety; a failure just leaves it out.
+      } finally {
+        if (!cancelled) setSuggestionsLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [author, postId, saved, search, ready]);
+  }, [author, postId, saved, search, ready, suggestionsAsked]);
 
   // Revoke every preview on unmount so a long session doesn't leak blobs.
   useEffect(
@@ -608,7 +624,40 @@ export function useFeedPresenter({
 
   // ---- following --------------------------------------------------------
 
-  const hideSuggestions = useCallback(() => setSuggestionsHidden(true), []);
+  /** A segment of the toggle: its list replaces this one, and is asked for. */
+  const showSuggestions = useCallback(
+    (show: SuggestionShow) => {
+      if (show === suggestionShow) return;
+      suggestionsRound.current += 1;
+      setSuggestionsAsked(show);
+      setSuggestionShow(show);
+      setSuggestions([]);
+      setSuggestionsLoading(true);
+    },
+    [suggestionShow],
+  );
+
+  /**
+   * Remove: the card goes at once, and the member is never suggested again. If
+   * the API refuses, the card comes back where it was — unless another segment
+   * has replaced the list meanwhile.
+   */
+  const removeSuggestion = useCallback(
+    async (userId: string) => {
+      const index = suggestions.findIndex((s) => s.userId === userId);
+      if (index < 0) return;
+      const person = suggestions[index];
+      const round = suggestionsRound.current;
+      setSuggestions((prev) => prev.filter((s) => s.userId !== userId));
+      try {
+        await postsApi.dismissSuggestion(userId);
+      } catch (e) {
+        if (onUnauthorized(e) || suggestionsRound.current !== round) return;
+        setSuggestions((prev) => withSuggestionRestored(prev, person, index));
+      }
+    },
+    [suggestions, onUnauthorized],
+  );
 
   /**
    * Optimistic follow, from a suggestion card or the Follow button on the
@@ -668,29 +717,25 @@ export function useFeedPresenter({
 
   const suggestionVMs: FeedSuggestionVM[] = useMemo(
     () =>
-      suggestions.map((s) => {
-        const organization = isOfficialOrganization(s.userId);
-        return {
-          userId: s.userId,
-          displayName: s.displayName,
-          silver: Boolean(s.silver),
-          organization,
-          handle: handleOf(s.username),
-          avatarUrl: s.avatarUrl,
-          isFollowing: s.isFollowing,
-          // The organization is followed, never befriended.
-          actionLabel: organization
-            ? s.isFollowing
-              ? FEED_COPY.following
-              : FEED_COPY.follow
-            : s.isFollowing
-              ? FEED_COPY.peopleAdded
-              : FEED_COPY.peopleAdd,
-          busy: followBusy.includes(s.userId),
-          href: memberHref(s.username),
-        };
-      }),
+      suggestions.map((s) =>
+        toFeedSuggestionVM(
+          s,
+          memberHref,
+          followBusy.includes(s.userId),
+          isOfficialOrganization(s.userId),
+        ),
+      ),
     [suggestions, followBusy],
+  );
+
+  const suggestionSegments: SuggestionSegmentVM[] = useMemo(
+    () =>
+      suggestionOptions.map((value) => ({
+        value,
+        label: FEED_COPY.peopleShow[value],
+        selected: value === suggestionShow,
+      })),
+    [suggestionOptions, suggestionShow],
   );
 
   const photoVMs: DraftPhotoVM[] = useMemo(
@@ -1044,9 +1089,11 @@ export function useFeedPresenter({
     confirmDeletePost,
     deleting,
 
-    suggestions: suggestionsHidden ? [] : suggestionVMs,
-    suggestionsHidden,
-    hideSuggestions,
+    suggestions: suggestionVMs,
+    suggestionSegments,
+    suggestionsLoading,
+    showSuggestions,
+    removeSuggestion,
     toggleFollow,
   };
 }
