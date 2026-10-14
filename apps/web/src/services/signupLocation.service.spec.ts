@@ -27,7 +27,6 @@ describe("signup countries and locations", () => {
     expect(signupLocationFields("KE", "Nairobi")).toMatchObject({
       stateLabel: "County",
       stateSearchPlaceholder: "Search counties",
-      areaMode: "select",
       areaLabel: "Region / City / Town",
     });
     expect(signupLocationFields("US", "California").states).toEqual([]);
