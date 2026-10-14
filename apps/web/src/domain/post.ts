@@ -69,7 +69,7 @@ export function isFeedTab(value: unknown): value is FeedTab {
 
 /**
  * Why a tab may be empty, so the feed can say what would fill it: the viewer
- * follows nobody (Following), or has no country or state (Nearby).
+ * follows nobody (Following), or has no state (Nearby).
  */
 export type FeedHint = "no_follows" | "no_location";
 
