@@ -14,6 +14,7 @@ import {
   type RepostPM,
   type SavePM,
 } from "@/domain/post";
+import { countryName, displayState } from "@/util/format";
 import { IMAGE_VARIANTS, buildUploadSet, type ImageVariant } from "@/util/image";
 import { api, uploadToPresignedUrl } from "./apiClient";
 
@@ -25,6 +26,13 @@ export interface SuggestedPersonPM {
   isFollowing: boolean;
   /** Shows the Silver check; absent from an older API. */
   silver?: boolean;
+  age?: number | null;
+  gender?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  roles?: string[];
+  lookingFor?: string[];
 }
 
 export interface SuggestedPM {
@@ -228,4 +236,30 @@ export function postPermalink(postId: string, origin?: string): string {
 /** Bumps a post's comment count after one is added or removed. */
 export function withCommentDelta(pm: PostPM, delta: number): PostPM {
   return { ...pm, comments: Math.max(0, pm.comments + delta) };
+}
+
+/** Display-ready public details; missing values are omitted, never invented. */
+export function suggestionDetails(person: SuggestedPersonPM) {
+  const gender = person.gender?.trim().toLowerCase();
+  const letter = ["female", "woman", "f"].includes(gender ?? "")
+    ? "F"
+    : ["male", "man", "m"].includes(gender ?? "")
+      ? "M"
+      : "";
+  const age = person.age != null ? String(person.age) : "";
+  const state = person.state?.trim();
+  const code = person.country?.toUpperCase();
+  const area =
+    code === "NG"
+      ? displayState(state)
+      : code === "KE" && state && !/county$/i.test(state)
+        ? `${state} County`
+        : state;
+  return {
+    ageGender: `${age}${letter}` || null,
+    location:
+      [person.city?.trim(), area, countryName(person.country)].filter(Boolean).join(", ") || null,
+    rolesText: person.roles?.join(", ") || null,
+    lookingForText: person.lookingFor?.join(", ") || null,
+  };
 }

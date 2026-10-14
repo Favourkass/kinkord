@@ -136,6 +136,7 @@ export default function HomePage() {
         dismissLabel: FEED_COPY.peopleDismiss,
         onDismiss: feed.hideSuggestions,
         onToggleFollow: feed.toggleFollow,
+        onRemove: feed.removeSuggestion,
         organizationLabel: FEED_COPY.organization,
         verifiedOrganizationLabel: FEED_COPY.verifiedOrganization,
       }}

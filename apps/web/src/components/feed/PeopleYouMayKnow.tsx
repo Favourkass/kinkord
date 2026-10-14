@@ -1,3 +1,4 @@
+import { MapPin, Users, Target, X } from "lucide-react";
 import Link from "next/link";
 import MaskIcon from "@/components/app/MaskIcon";
 import SilverCheck from "@/components/app/SilverCheck";
@@ -12,6 +13,7 @@ export interface PeopleYouMayKnowProps {
   dismissLabel: string;
   onDismiss: () => void;
   onToggleFollow: (userId: string) => void;
+  onRemove?: (userId: string) => void;
   organizationLabel: string;
   verifiedOrganizationLabel: string;
   /** "row" is the mobile strip; "column" is the desktop right rail. */
@@ -20,7 +22,7 @@ export interface PeopleYouMayKnowProps {
 
 /**
  * "People you may know" (Figma 831:169–837:222): a photo card per member with
- * its button underneath (Add friend / Remove, or Follow for the organization).
+ * public profile details and separate Follow / Remove buttons underneath.
  * It scrolls sideways in the phone feed and stacks in the desktop rail, where
  * there is a column to put it in.
  */
@@ -32,6 +34,7 @@ export default function PeopleYouMayKnow({
   dismissLabel,
   onDismiss,
   onToggleFollow,
+  onRemove,
   organizationLabel,
   verifiedOrganizationLabel,
   layout = "row",
@@ -87,13 +90,52 @@ export default function PeopleYouMayKnow({
                   />
                 ) : null}
               </p>
-              <div className="flex items-center gap-[13px] pt-[8px]">
+              <div className="mt-2 space-y-2 text-[12px] leading-[18px] text-feed-text">
+                {(person.ageGender || person.location) && (
+                  <p className="flex items-start gap-1.5">
+                    <MapPin
+                      size={14}
+                      className="mt-0.5 shrink-0 text-kink-gold-bright"
+                      aria-hidden
+                    />
+                    <span>
+                      {person.ageGender}
+                      {person.ageGender && person.location ? " · " : ""}
+                      {person.location}
+                    </span>
+                  </p>
+                )}
+                {person.rolesText && (
+                  <p className="flex items-start gap-1.5">
+                    <Users
+                      size={15}
+                      className="mt-0.5 shrink-0 text-kink-gold-bright"
+                      aria-hidden
+                    />
+                    <span>{person.rolesText}</span>
+                  </p>
+                )}
+                {person.lookingForText && (
+                  <p className="flex items-start gap-1.5">
+                    <Target
+                      size={15}
+                      className="mt-0.5 shrink-0 text-kink-gold-bright"
+                      aria-hidden
+                    />
+                    <span>
+                      <span className="block text-feed-muted">{person.lookingForLabel}</span>
+                      {person.lookingForText}
+                    </span>
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-2 pt-3">
                 <button
                   type="button"
                   onClick={() => onToggleFollow(person.userId)}
                   disabled={person.busy || !person.href}
                   aria-pressed={person.isFollowing}
-                  className={`flex h-[23px] flex-1 items-center justify-center gap-[6px] rounded-[5px] text-[12px] font-medium disabled:opacity-50 ${
+                  className={`flex h-[34px] flex-1 items-center justify-center gap-[6px] rounded-full text-[12px] font-medium disabled:opacity-50 ${
                     person.isFollowing
                       ? "bg-feed-chip text-feed-chip-text"
                       : "bg-kink-gold-bright text-kink-ink"
@@ -102,6 +144,16 @@ export default function PeopleYouMayKnow({
                   {!person.isFollowing && <MaskIcon name="person-add" width={15} />}
                   {person.actionLabel}
                 </button>
+                {onRemove && (
+                  <button
+                    type="button"
+                    onClick={() => onRemove(person.userId)}
+                    className="flex h-[34px] flex-1 items-center justify-center gap-1 rounded-full border border-feed-muted px-2 text-[12px] text-feed-text"
+                  >
+                    <X size={14} aria-hidden />
+                    {person.removeLabel}
+                  </button>
+                )}
               </div>
             </div>
           </li>

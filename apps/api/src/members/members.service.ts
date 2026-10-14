@@ -362,7 +362,7 @@ export class MembersService {
    * "Suggested" people for a member: kinksters in their state, those in their own
    * area first (CEO brief, 2026-09-12), excluding the member and the viewer.
    */
-  async suggested(targetId: string, viewerId: string, limit: number, offset: number) {
+  async suggested(targetId: string, viewerId: string, limit: number, offset: number, feed = false) {
     const [target] = await this.db
       .select({ country: profile.country, state: profile.state, city: profile.city })
       .from(profile)
@@ -375,6 +375,11 @@ export class MembersService {
       notBanned(profile.userId),
     ];
     if (target.country) conditions.push(eq(profile.country, target.country));
+    if (feed)
+      conditions.push(
+        notBlocking(profile.userId, viewerId),
+        sql`not ${blockedBy(viewerId, profile.userId)}`,
+      );
     const where = and(...conditions);
     // Same city first when the member has one. Without a city there is nothing
     // to rank by: a constant would render as `order by 0`, which Postgres reads
@@ -393,6 +398,12 @@ export class MembersService {
         gender: profile.gender,
         city: profile.city,
         state: profile.state,
+        country: profile.country,
+        roles: profile.roles,
+        lookingFor: sql<string[]>`case when ${profile.profileVisibility} = 'friends' and not (
+          exists (select 1 from ${follow} where ${follow.followerId} = ${viewerId} and ${follow.followingId} = ${profile.userId})
+          and exists (select 1 from ${follow} where ${follow.followerId} = ${profile.userId} and ${follow.followingId} = ${viewerId})
+        ) then '[]'::jsonb else ${profile.lookingFor} end`,
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
         silver: silverCheck(profile.userId),
       })
@@ -403,7 +414,18 @@ export class MembersService {
         and(eq(viewerFollow.followerId, viewerId), eq(viewerFollow.followingId, profile.userId)),
       )
       .where(where)
-      .orderBy(...sameAreaFirst, desc(profile.createdAt))
+      .orderBy(
+        ...(feed
+          ? [
+              asc(
+                sql<number>`case when lower(trim(${profile.gender})) in ('female', 'woman', 'f') then 0 when lower(trim(${profile.gender})) in ('male', 'man', 'm') then 1 else 2 end`,
+              ),
+            ]
+          : []),
+        ...sameAreaFirst,
+        desc(profile.createdAt),
+        ...(feed ? [asc(profile.userId)] : []),
+      )
       .limit(limit)
       .offset(offset);
     const [totalRow] = await this.db.select({ total: count() }).from(profile).where(where);
@@ -424,7 +446,7 @@ export class MembersService {
    */
   async suggestedForFeed(viewerId: string, limitArg?: number) {
     const { limit } = normalizePaging(1, limitArg ?? 10);
-    const { items, total } = await this.suggested(viewerId, viewerId, limit, 0);
+    const { items, total } = await this.suggested(viewerId, viewerId, limit, 0, true);
     return {
       items: await Promise.all(
         items.map(async (r) => ({
@@ -434,6 +456,13 @@ export class MembersService {
           avatarUrl: r.avatarKey ? await this.storage.presignDownload(r.avatarKey, "md") : null,
           isFollowing: r.isFollowing,
           silver: r.silver,
+          age: ageFromDob(r.dateOfBirth),
+          gender: r.gender ?? null,
+          city: r.city ?? null,
+          state: r.state ?? null,
+          country: r.country ?? null,
+          roles: r.roles ?? [],
+          lookingFor: r.lookingFor ?? [],
         })),
       ),
       total,

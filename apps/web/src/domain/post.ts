@@ -193,11 +193,17 @@ export interface FeedSuggestionVM {
   handle: string | null;
   avatarUrl: string | null;
   isFollowing: boolean;
-  /** The card's button: "Add friend" / "Remove", or Follow / Following for the organization. */
+  /** Follow / Following; dismissing the suggestion uses a separate Remove button. */
   actionLabel: string;
   /** A follow request is in flight, so the button is held. */
   busy: boolean;
   href: string | null;
+  ageGender?: string | null;
+  location?: string | null;
+  rolesText?: string | null;
+  lookingForText?: string | null;
+  lookingForLabel?: string;
+  removeLabel?: string;
 }
 
 export interface CommentVM {

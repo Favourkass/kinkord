@@ -46,6 +46,7 @@ import {
   withAuthorFollow,
   withCommentDelta,
   withSuggestionFollow,
+  suggestionDetails,
   type SuggestedPersonPM,
 } from "@/services/posts.service";
 
@@ -608,6 +609,12 @@ export function useFeedPresenter({
 
   // ---- following --------------------------------------------------------
 
+  const removeSuggestion = useCallback(
+    (userId: string) =>
+      setSuggestions((current) => current.filter((person) => person.userId !== userId)),
+    [],
+  );
+
   const hideSuggestions = useCallback(() => setSuggestionsHidden(true), []);
 
   /**
@@ -673,6 +680,9 @@ export function useFeedPresenter({
         return {
           userId: s.userId,
           displayName: s.displayName,
+          ...suggestionDetails(s),
+          lookingForLabel: FEED_COPY.peopleLookingFor,
+          removeLabel: FEED_COPY.peopleRemove,
           silver: Boolean(s.silver),
           organization,
           handle: handleOf(s.username),
@@ -1047,6 +1057,7 @@ export function useFeedPresenter({
     suggestions: suggestionsHidden ? [] : suggestionVMs,
     suggestionsHidden,
     hideSuggestions,
+    removeSuggestion,
     toggleFollow,
   };
 }

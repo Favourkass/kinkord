@@ -60,8 +60,10 @@ export const FEED_COPY = {
   peopleHeading: "Kinksters near you",
   peopleSeeAll: "See all",
   peopleDismiss: "Hide suggestions",
-  peopleAdd: "Add friend",
-  peopleAdded: "Remove",
+  peopleAdd: "Follow",
+  peopleAdded: "Following",
+  peopleRemove: "Remove",
+  peopleLookingFor: "Looking for",
   /** The official organization is followed, on its posts and in the strip. */
   follow: "Follow",
   following: "Following",

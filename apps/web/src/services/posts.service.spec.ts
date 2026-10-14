@@ -27,6 +27,7 @@ const {
   canSubmitComment,
   canSubmitPost,
   postsApi,
+  suggestionDetails,
   remainingPhotoSlots,
   toggleLikeOnPost,
   uploadPostPhoto,
@@ -214,5 +215,48 @@ describe("uploadPostPhoto", () => {
     });
     // The original lands last, so a post never names a key whose sizes are missing.
     expect(upload.mock.calls.map((c) => c[0])).toEqual(["put-sm", "put-md", "put-original"]);
+  });
+});
+
+it("formats age, gender, full country-specific location and public profile details", () => {
+  const person = {
+    userId: "u1",
+    username: "ada",
+    displayName: "Ada",
+    avatarUrl: null,
+    isFollowing: false,
+  };
+  expect(
+    suggestionDetails({
+      ...person,
+      age: 29,
+      gender: "Female",
+      city: "Lagos",
+      state: "Lagos",
+      country: "NG",
+      roles: ["Switch", "Submissive"],
+      lookingFor: ["Friendship", "Dating"],
+    }),
+  ).toEqual({
+    ageGender: "29F",
+    location: "Lagos, Lagos State, Nigeria",
+    rolesText: "Switch, Submissive",
+    lookingForText: "Friendship, Dating",
+  });
+  expect(
+    suggestionDetails({
+      ...person,
+      age: 19,
+      gender: "Male",
+      city: "Westlands",
+      state: "Nairobi",
+      country: "KE",
+    }),
+  ).toMatchObject({ ageGender: "19M", location: "Westlands, Nairobi County, Kenya" });
+  expect(suggestionDetails(person)).toEqual({
+    ageGender: null,
+    location: null,
+    rolesText: null,
+    lookingForText: null,
   });
 });

@@ -505,17 +505,30 @@ describe("people you may know", () => {
     expect(result.current.suggestions[0].isFollowing).toBe(false);
   });
 
-  it("labels a member's button Add friend, then Remove", async () => {
+  it("labels a member's button Follow, then Following", async () => {
     suggested.mockResolvedValue({ items: [person], total: 1 });
     const { result } = await loaded();
     await waitFor(() => expect(result.current.suggestions).toHaveLength(1));
     expect(result.current.suggestions[0]).toMatchObject({
       organization: false,
-      actionLabel: "Add friend",
+      actionLabel: "Follow",
     });
 
     await act(async () => result.current.toggleFollow("u3"));
-    expect(result.current.suggestions[0].actionLabel).toBe("Remove");
+    expect(result.current.suggestions[0].actionLabel).toBe("Following");
+  });
+
+  it("removes one suggestion without unfollowing or hiding the entire strip", async () => {
+    suggested.mockResolvedValue({
+      items: [person, { ...person, userId: "u4", username: "ada", displayName: "Ada" }],
+      total: 2,
+    });
+    const { result } = await loaded();
+    await waitFor(() => expect(result.current.suggestions).toHaveLength(2));
+    act(() => result.current.removeSuggestion("u3"));
+    expect(result.current.suggestions.map((item) => item.userId)).toEqual(["u4"]);
+    expect(follow).not.toHaveBeenCalled();
+    expect(unfollow).not.toHaveBeenCalled();
   });
 
   it("hides the strip for the rest of the session", async () => {

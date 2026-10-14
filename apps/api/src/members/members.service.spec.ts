@@ -865,6 +865,13 @@ describe("MembersService.suggestedForFeed", () => {
       avatarUrl: "https://s3/avatars/kay.jpg",
       isFollowing: false,
       silver: false,
+      age: null,
+      gender: null,
+      city: null,
+      state: null,
+      country: null,
+      roles: [],
+      lookingFor: [],
     });
     expect(result.total).toBe(1);
   });
@@ -875,4 +882,60 @@ describe("MembersService.suggestedForFeed", () => {
 
     await expect(service.suggestedForFeed("u1")).resolves.toEqual({ items: [], total: 0 });
   });
+});
+
+it("ranks feed women before men and same-area/newest within each group before pagination", async () => {
+  const { service, select } = makeService();
+  const orders: SQL[][] = [];
+  select
+    .mockReturnValueOnce(chain([{ country: "NG", state: "Delta", city: "Abraka" }]))
+    .mockReturnValueOnce(orderRecordingChain([], orders))
+    .mockReturnValueOnce(chain([{ total: 0 }]));
+  await service.suggestedForFeed("me", 10);
+  const order = renderOrder(orders[0]);
+  expect(order.sql).toMatch(
+    /^case when lower\(trim\("profile"\."gender"\)\).*then 0.*then 1.*end asc/,
+  );
+  expect(order.sql).toContain('"profile"."city"');
+  expect(order.sql).toContain('"profile"."user_id" asc');
+  const selector = select.mock.calls[1][0];
+  const privacy = renderWhere(selector.lookingFor);
+  expect(privacy.sql).toContain('"profile"."profile_visibility"');
+  expect(privacy.sql).toContain("'friends'");
+  expect(privacy.sql).toContain("'[]'::jsonb");
+  expect(privacy.params).toEqual(["me", "me"]);
+});
+
+it("returns public card details and derived age without sending the birth date", async () => {
+  const { service, select } = makeService();
+  select
+    .mockReturnValueOnce(chain([{ country: "KE", state: "Nairobi", city: "Westlands" }]))
+    .mockReturnValueOnce(
+      chain([
+        {
+          userId: "woman",
+          username: "ada",
+          displayName: "Ada",
+          dateOfBirth: "2000-01-01",
+          gender: "Female",
+          city: "Westlands",
+          state: "Nairobi",
+          country: "KE",
+          roles: ["Switch"],
+          lookingFor: ["Friendship"],
+        },
+      ]),
+    )
+    .mockReturnValueOnce(chain([{ total: 1 }]));
+  const { items } = await service.suggestedForFeed("me");
+  expect(items[0]).toMatchObject({
+    age: ageFromDob("2000-01-01"),
+    gender: "Female",
+    city: "Westlands",
+    state: "Nairobi",
+    country: "KE",
+    roles: ["Switch"],
+    lookingFor: ["Friendship"],
+  });
+  expect(items[0]).not.toHaveProperty("dateOfBirth");
 });
