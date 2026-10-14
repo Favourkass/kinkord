@@ -13,6 +13,7 @@ import {
 } from "@nestjs/common";
 import { z } from "zod";
 import { AuthGuard, AuthedRequest } from "../auth/auth.guard";
+import { FEED_TABS } from "./feed-ranking";
 import { createCommentSchema, PostInteractionsService } from "./post-interactions.service";
 import { createPostSchema, PostsService, uploadUrlSchema } from "./posts.service";
 
@@ -30,6 +31,8 @@ const feedQuerySchema = z.object({
     .max(50)
     .transform((v) => v || undefined)
     .optional(),
+  /** The home feed's tab. Left out, the feed reads newest first as before the tabs. */
+  tab: z.enum(FEED_TABS).optional(),
 });
 
 const commentsQuerySchema = z.object({
@@ -65,6 +68,7 @@ export class PostsController {
       limit: parsed.data.limit,
       author: parsed.data.author,
       q: parsed.data.q,
+      tab: parsed.data.tab,
     });
   }
 

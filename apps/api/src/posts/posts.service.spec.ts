@@ -8,6 +8,14 @@ import {
   parseCursor,
   PostsService,
 } from "./posts.service";
+import { rankedTabPage } from "./feed-tabs";
+
+// For You and Nearby pick their rows in feed-tabs.ts (feed-tabs.spec.ts); here
+// they are stubbed per test, and the real thing runs otherwise.
+vi.mock("./feed-tabs", async (importOriginal) => {
+  const original = await importOriginal<typeof import("./feed-tabs")>();
+  return { ...original, rankedTabPage: vi.fn(original.rankedTabPage) };
+});
 
 /**
  * Drizzle's builders are chainable and awaited at the end, so a stub returns
@@ -70,6 +78,20 @@ function recordJoins(query: unknown, joins: SQL[]): unknown {
       return (...args: unknown[]) => {
         if (prop === "leftJoin") joins.push(args[1] as SQL);
         return recordJoins(value(...args), joins);
+      };
+    },
+  });
+}
+
+/** Wraps a stubbed query so its `.where(...)` is kept, to read the SQL back. */
+function recordWhere(query: unknown, wheres: SQL[]): unknown {
+  return new Proxy(query as object, {
+    get(target, prop) {
+      const value = Reflect.get(target, prop) as (...args: unknown[]) => unknown;
+      if (prop === "then") return value;
+      return (...args: unknown[]) => {
+        if (prop === "where") wheres.push(args[0] as SQL);
+        return recordWhere(value(...args), wheres);
       };
     },
   });
@@ -570,6 +592,123 @@ describe("the feed's visibility rules", () => {
     expect(new PgDialect().sqlToQuery(fields.viewerFollowsAuthor).sql).toBe(
       '"viewer_follows_author"."follower_id" is not null',
     );
+  });
+});
+
+describe("the home feed's tabs", () => {
+  const mk = (id: string, hour: number) => ({
+    id,
+    body: id,
+    visibility: "public" as const,
+    createdAt: new Date(`2026-09-18T${String(hour).padStart(2, "0")}:00:00.000Z`),
+    authorId: "u2",
+    repostOfId: null,
+    username: "tega",
+    displayName: "Sir T",
+    avatarKey: null,
+  });
+  /** decorate() reads media, likes, comments, reposts, liked, reposted, saved and gifts. */
+  const decorated = () => [[], [], [], [], [], [], [], []];
+
+  it("Following reads newest first: the viewer's own posts and everyone they follow, nobody blocked", async () => {
+    const wheres: SQL[] = [];
+    const svc = new PostsService(
+      makeRecordingDb(wheres) as never,
+      makeStorage() as never,
+      push as never,
+    );
+    await svc.feed("viewer-1", { tab: "following", cursor: "2026-09-18T09:00:00.000Z" });
+    const { sql, params } = new PgDialect().sqlToQuery(wheres[0]);
+    // The one visibility rule, then the cursor, then who the viewer follows.
+    expect(sql).toContain('"post"."visibility" = $1 or "post"."author_id" = $2');
+    expect(sql).toContain('"post"."created_at" < $4');
+    expect(sql).toContain(
+      '"post"."author_id" = $5 or exists (select 1 from "follow" where "follow"."follower_id" = $6 and "follow"."following_id" = "post"."author_id")',
+    );
+    expect(sql).toContain('"member_block"');
+    expect(params.slice(3, 6)).toEqual(["2026-09-18T09:00:00.000Z", "viewer-1", "viewer-1"]);
+    expect(rankedTabPage).not.toHaveBeenCalled();
+  });
+
+  it("an empty Following says the viewer follows nobody, and only then", async () => {
+    const nobody = makeDb([[], []]);
+    await expect(service(nobody).feed("u1", { tab: "following" })).resolves.toEqual({
+      items: [],
+      nextCursor: null,
+      hint: "no_follows",
+    });
+    // They follow someone who hasn't posted: just empty.
+    const quiet = makeDb([[], [{ id: "u2" }]]);
+    await expect(service(quiet).feed("u1", { tab: "following" })).resolves.toEqual({
+      items: [],
+      nextCursor: null,
+    });
+    // A page with posts on it never asks.
+    const busy = makeDb([[mk("p1", 9)], ...decorated()]);
+    const page = await service(busy).feed("u1", { tab: "following" });
+    expect(page.hint).toBeUndefined();
+    expect(busy.select).toHaveBeenCalledTimes(9);
+  });
+
+  it("For You shows the rows the ranking chose, in its order, read through the visibility rule", async () => {
+    vi.mocked(rankedTabPage).mockResolvedValueOnce({
+      ids: ["p2", "gone", "p1"],
+      nextCursor: "next",
+    });
+    const wheres: SQL[] = [];
+    // selectPosts answers newest first, and without "gone", which the viewer can no longer see.
+    const db = makeDb([[mk("p2", 8), mk("p1", 10)], ...decorated()]);
+    const recorded = { ...db, select: vi.fn(() => recordWhere(db.select(), wheres)) };
+
+    const page = await service(recorded as never).feed("viewer-1", {
+      tab: "for_you",
+      cursor: "opaque",
+      limit: 3,
+    });
+
+    expect(rankedTabPage).toHaveBeenCalledWith(recorded, "viewer-1", "for_you", "opaque", 3);
+    expect(page.items.map((i) => i.id)).toEqual(["p2", "p1"]);
+    expect(page.nextCursor).toBe("next");
+    const { sql, params } = new PgDialect().sqlToQuery(wheres[0]);
+    expect(sql).toContain('"post"."visibility" = $1 or "post"."author_id" = $2');
+    expect(sql).toContain('"post"."id" in ($4, $5, $6)');
+    expect(params.slice(3)).toEqual(["p2", "gone", "p1"]);
+  });
+
+  it("Nearby says when the viewer has no location, reading no posts", async () => {
+    vi.mocked(rankedTabPage).mockResolvedValueOnce({
+      ids: [],
+      nextCursor: null,
+      hint: "no_location",
+    });
+    const db = makeDb();
+    await expect(service(db).feed("u1", { tab: "nearby" })).resolves.toEqual({
+      items: [],
+      nextCursor: null,
+      hint: "no_location",
+    });
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it("a profile's Posts tab and a search read newest first, whatever the tab", async () => {
+    const wheres: SQL[] = [];
+    const svc = new PostsService(
+      makeRecordingDb(wheres) as never,
+      makeStorage() as never,
+      push as never,
+    );
+    vi.spyOn(svc as never, "resolveAuthor").mockResolvedValue("u2" as never);
+    await svc.feed("viewer-1", { tab: "following", author: "tega" });
+    await svc.feed("viewer-1", { tab: "for_you", q: "brunch" });
+    expect(rankedTabPage).not.toHaveBeenCalled();
+    for (const where of wheres) {
+      expect(new PgDialect().sqlToQuery(where).sql).not.toContain('"follow"."follower_id"');
+    }
+  });
+
+  it("is the feed as it always was without a tab", async () => {
+    await service(makeDb([[]])).feed("u1");
+    expect(rankedTabPage).not.toHaveBeenCalled();
   });
 });
 

@@ -57,9 +57,41 @@ export interface PostPM {
   mentions?: MentionPM[];
 }
 
+/** The home feed's tabs, as the API names them. */
+export const FEED_TABS = ["for_you", "following", "nearby"] as const;
+export type FeedTab = (typeof FEED_TABS)[number];
+/** Where the home feed opens in a new session. */
+export const DEFAULT_FEED_TAB: FeedTab = "for_you";
+
+export function isFeedTab(value: unknown): value is FeedTab {
+  return typeof value === "string" && (FEED_TABS as readonly string[]).includes(value);
+}
+
+/**
+ * Why a tab may be empty, so the feed can say what would fill it: the viewer
+ * follows nobody (Following), or has no country or state (Nearby).
+ */
+export type FeedHint = "no_follows" | "no_location";
+
 export interface FeedPM {
   items: PostPM[];
   nextCursor: string | null;
+  /** Absent from an older API, and whenever there is nothing to say. */
+  hint?: FeedHint | null;
+}
+
+/** One tab of the home feed's For You | Following | Nearby. */
+export interface FeedTabVM {
+  value: FeedTab;
+  label: string;
+  selected: boolean;
+}
+
+/** What an empty feed says, and the one thing to do about it when there is one. */
+export interface FeedEmptyVM {
+  title: string;
+  body: string | null;
+  action: { label: string; href: string } | null;
 }
 
 export interface CommentPM {
