@@ -47,11 +47,13 @@ const presenceStub = () => {
 
 interface ProfileRow {
   signupPhotosSkipped: boolean;
+  photoSkipAvailable: boolean;
   avatarKey: string | null;
   coverKey: string | null;
 }
 const finished: ProfileRow = {
   signupPhotosSkipped: false,
+  photoSkipAvailable: false,
   avatarKey: "avatars/u1/a.jpg",
   coverKey: "covers/u1/c.jpg",
 };
@@ -196,12 +198,28 @@ describe("AuthGuard email verification", () => {
 });
 
 describe("AuthGuard profile photos", () => {
-  it("allows access after the member explicitly skips photos", async () => {
+  const skipped = { avatarKey: null, coverKey: null, signupPhotosSkipped: true };
+
+  it("allows access after the member skips photos at first sign-up", async () => {
     await expect(
-      guardFor(NEW, { avatarKey: null, coverKey: null, signupPhotosSkipped: true }).canActivate(
-        ctx({ headers: {} }),
-      ),
+      guardFor(NEW, { ...skipped, photoSkipAvailable: true }).canActivate(ctx({ headers: {} })),
     ).resolves.toBe(true);
+  });
+
+  it("keeps a skipped cover optional once the member adds a profile photo", async () => {
+    await expect(
+      guardFor(NEW, {
+        ...skipped,
+        avatarKey: "avatars/u1/a.jpg",
+        photoSkipAvailable: false,
+      }).canActivate(ctx({ headers: {} })),
+    ).resolves.toBe(true);
+  });
+
+  it("asks a member who skipped, then had a photo and deleted it, for a new one", async () => {
+    expect(await holdOf(guardFor(NEW, { ...skipped, photoSkipAvailable: false }))).toBe(
+      PROFILE_PHOTOS_REQUIRED,
+    );
   });
 
   it("holds a member without a profile photo at the photo step", async () => {

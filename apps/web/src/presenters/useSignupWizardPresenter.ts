@@ -63,6 +63,8 @@ interface ProfileVM {
   avatarUrl: string | null;
   coverUrl: string | null;
   roles: string[];
+  /** Photos can be skipped only at first sign-up, before a first profile photo. */
+  canSkipPhotos?: boolean;
 }
 
 /** Resume incomplete profile setup without collecting a phone during signup. */
@@ -205,6 +207,8 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
   const [uploading, setUploading] = useState<"avatar" | "cover" | null>(null);
   const [photoConfirmed, setPhotoConfirmed] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  // Off until the profile says otherwise: a member who has had a photo can't skip.
+  const [canSkipPhotos, setCanSkipPhotos] = useState(false);
 
   const step = STAGE_STEP[stage];
 
@@ -313,14 +317,18 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
     if (emailCode.verified) setStage("preferences");
   }, [emailCode.verified]);
 
-  // Resume saved photos and roles without overwriting them.
+  // Resume saved photos and roles without overwriting them. The profile also
+  // says whether the photos may still be skipped.
   const resumedAtPhotos = initialStage === "profile";
+  const atPhotos = stage === "profile";
   useEffect(() => {
-    if (!resumedAtPhotos) return;
+    if (!atPhotos) return;
     let live = true;
     api.get<ProfileVM>("/profile").then(
       (p) => {
         if (!live) return;
+        setCanSkipPhotos(p.canSkipPhotos === true);
+        if (!resumedAtPhotos) return;
         setAvatarUrl((current) => current ?? p.avatarUrl);
         setCoverUrl((current) => current ?? p.coverUrl);
         setRoles((current) => (current.length > 0 ? current : p.roles));
@@ -330,7 +338,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
     return () => {
       live = false;
     };
-  }, [resumedAtPhotos]);
+  }, [atPhotos, resumedAtPhotos]);
 
   const uploadImage = useCallback(
     async (kind: "avatar" | "cover", rawFile: File) => {
@@ -364,6 +372,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
         );
         if (kind === "avatar") setAvatarUrl(vm.avatarUrl);
         else setCoverUrl(vm.coverUrl);
+        setCanSkipPhotos(vm.canSkipPhotos === true);
       } catch (e) {
         setProfileError(e instanceof Error ? e.message : "Upload failed. Try again.");
       } finally {
@@ -498,6 +507,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
         roleSearch,
         setRoleSearch,
         roleOptions: filterSignupRoles(KINK_ROLES, roleSearch),
+        canSkipPhotos,
         skipPhotos,
         toggleRole,
         avatarUrl,
@@ -563,6 +573,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
       profileError,
       completeProfile,
       roleSearch,
+      canSkipPhotos,
       skipPhotos,
       resumedAtPhotos,
       finish,

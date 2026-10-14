@@ -31,6 +31,12 @@ vi.mock("@/services/apiClient", () => ({
   uploadToPresignedUrl: vi.fn(async () => {}),
 }));
 
+// Uploads skip the canvas work: the file goes up as it is.
+vi.mock("@/util/image", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/util/image")>()),
+  buildUploadSet: async (file: File) => ({ original: file, variants: { sm: file, md: file } }),
+}));
+
 const sendCode = vi.fn();
 const verifyCode = vi.fn();
 vi.mock("@/services/verification.service", async (importOriginal) => ({
@@ -475,6 +481,56 @@ describe("useSignupWizardPresenter", () => {
       expect(result.current.preferencesStep.canContinue).toBe(false);
       act(() => result.current.preferencesStep.retry());
       await waitFor(() => expect(result.current.preferencesStep.canContinue).toBe(true));
+    });
+  });
+
+  describe("skipping the photos", () => {
+    const profileSays = (canSkipPhotos: boolean) => {
+      const fallback = get.getMockImplementation();
+      get.mockImplementation(async (path) =>
+        path === "/profile"
+          ? { avatarUrl: null, coverUrl: null, roles: [], canSkipPhotos }
+          : fallback!(path),
+      );
+    };
+
+    it.each([true, false])("is offered only when the profile allows it (%s)", async (allowed) => {
+      profileSays(allowed);
+      const { result } = renderHook(() => useSignupWizardPresenter("profile"));
+      expect(result.current.profileStep.canSkipPhotos).toBe(false);
+      await waitFor(() => expect(get).toHaveBeenCalledWith("/profile"));
+      await waitFor(() => expect(result.current.profileStep.canSkipPhotos).toBe(allowed));
+    });
+
+    it("is asked about on the way through sign-up too", async () => {
+      profileSays(true);
+      const { result } = renderHook(() => useSignupWizardPresenter("preferences"));
+      await waitFor(() => expect(result.current.preferencesStep.canContinue).toBe(true));
+      await act(() => result.current.preferencesStep.submit());
+      expect(result.current.stage).toBe("profile");
+      await waitFor(() => expect(result.current.profileStep.canSkipPhotos).toBe(true));
+    });
+
+    it("stops being offered once a profile photo is up", async () => {
+      profileSays(true);
+      post.mockResolvedValue({
+        key: "avatars/u1/a.jpg",
+        uploadUrl: "https://s3/put",
+        variantUploadUrls: { sm: "https://s3/sm", md: "https://s3/md" },
+        maxSizeMb: 5,
+      });
+      patch.mockResolvedValue({
+        avatarUrl: "https://media/a.jpg",
+        coverUrl: null,
+        canSkipPhotos: false,
+      });
+      const { result } = renderHook(() => useSignupWizardPresenter("profile"));
+      await waitFor(() => expect(result.current.profileStep.canSkipPhotos).toBe(true));
+      act(() => result.current.profileStep.confirmation.onConfirmedChange(true));
+      const file = new File([new Uint8Array(10)], "avatar.jpg", { type: "image/jpeg" });
+      await act(() => result.current.profileStep.uploadImage("avatar", file));
+      expect(result.current.profileStep.avatarUrl).toBe("https://media/a.jpg");
+      expect(result.current.profileStep.canSkipPhotos).toBe(false);
     });
   });
 

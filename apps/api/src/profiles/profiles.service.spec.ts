@@ -178,6 +178,9 @@ describe("ProfilesService", () => {
       phoneVerified: false,
       avatarKey: null,
       coverKey: null,
+      signupPhotosSkipped: false,
+      // A new member who has never had a profile photo.
+      photoSkipAvailable: true,
       nationality: null,
       occupation: null,
       limits: null,
@@ -263,6 +266,46 @@ describe("ProfilesService", () => {
     const other = makeService();
     await other.service.updateOwn("u1", { bio: "hello", coverKey: "covers/u1/c.jpg" }, "Favour");
     expect(other.checks.hold).not.toHaveBeenCalled();
+  });
+
+  describe("skipping the sign-up photos", () => {
+    it("is accepted at first sign-up, and the profile says it may be offered", async () => {
+      const { service, setCalls } = makeService();
+      expect((await service.getOwn("u1", "Favour")).canSkipPhotos).toBe(true);
+      await service.updateOwn("u1", { signupPhotosSkipped: true, roles: ["Switch"] }, "Favour");
+      expect(setCalls[0]).toMatchObject({ signupPhotosSkipped: true, roles: ["Switch"] });
+    });
+
+    it("is refused once the member has had a profile photo, even after deleting it", async () => {
+      const { service, setCalls, row } = makeService();
+      row.photoSkipAvailable = false;
+      expect((await service.getOwn("u1", "Favour")).canSkipPhotos).toBe(false);
+      const refused = service.updateOwn("u1", { signupPhotosSkipped: true }, "Favour");
+      expect(await responseOf(refused)).toEqual({
+        signupPhotosSkipped: ["Add a profile photo and a cover picture to continue."],
+      });
+      expect(setCalls).toHaveLength(0);
+    });
+
+    it("closes for good with the first profile photo, but not with a cover", async () => {
+      const cover = makeService();
+      await cover.service.updateOwn("u1", { coverKey: "covers/u1/c.jpg" }, "Favour");
+      expect(cover.setCalls[0]).not.toHaveProperty("photoSkipAvailable");
+
+      const avatar = makeService();
+      await avatar.service.updateOwn("u1", { avatarKey: "avatars/u1/a.jpg" }, "Favour");
+      expect(avatar.setCalls[0]).toMatchObject({
+        avatarKey: "avatars/u1/a.jpg",
+        photoSkipAvailable: false,
+      });
+    });
+
+    it("can't be undone through PATCH /profile", () => {
+      expect(updateProfileSchema.safeParse({ signupPhotosSkipped: false }).success).toBe(false);
+      expect(updateProfileSchema.parse({ signupPhotosSkipped: true }).signupPhotosSkipped).toBe(
+        true,
+      );
+    });
   });
 
   it("records a new avatar or cover in the media history, but not an unchanged key", async () => {

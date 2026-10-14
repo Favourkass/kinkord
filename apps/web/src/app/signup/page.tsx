@@ -439,7 +439,9 @@ function SignupWizard() {
             <StageHeading plain="BUILD YOUR" highlight="PROFILE" />
             {p.profileStep.resumed && (
               <p className="text-center text-[13px] text-kink-cream lg:text-[16px]">
-                Add your photos now, or skip and add them later in Edit Profile.
+                {p.profileStep.canSkipPhotos
+                  ? "Add your photos now, or skip and add them later in Edit Profile."
+                  : "Add a profile photo and a cover picture to continue."}
               </p>
             )}
             <PhotoConfirmation {...p.profileStep.confirmation} />
@@ -524,17 +526,21 @@ function SignupWizard() {
               onClick={p.profileStep.submit}
               loading={p.busy}
             />
-            <button
-              type="button"
-              onClick={p.profileStep.skipPhotos}
-              disabled={p.busy || p.profileStep.uploading !== null}
-              className="text-[14px] font-semibold text-kink-gold-bright underline disabled:opacity-50"
-            >
-              Skip photos for now
-            </button>
-            <p className="text-center text-[12px] text-kink-help">
-              You can add your profile photo and cover picture later in Edit Profile.
-            </p>
+            {p.profileStep.canSkipPhotos && (
+              <>
+                <button
+                  type="button"
+                  onClick={p.profileStep.skipPhotos}
+                  disabled={p.busy || p.profileStep.uploading !== null}
+                  className="text-[14px] font-semibold text-kink-gold-bright underline disabled:opacity-50"
+                >
+                  Skip photos for now
+                </button>
+                <p className="text-center text-[12px] text-kink-help">
+                  You can add your profile photo and cover picture later in Edit Profile.
+                </p>
+              </>
+            )}
             <p className="flex items-center gap-2 text-[11px] text-kink-help lg:text-[16px]">
               <Lock size={14} aria-hidden />
               Your information is private and secure.

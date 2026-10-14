@@ -9,11 +9,13 @@ const fixture = vi.hoisted(() => ({
   stage: "account",
   update: vi.fn(),
   emailVerified: false,
+  canSkipPhotos: true,
   resume: null as string | null,
 }));
 beforeEach(() => {
   fixture.stage = "account";
   fixture.emailVerified = false;
+  fixture.canSkipPhotos = true;
   fixture.resume = null;
   fixture.update.mockReset().mockResolvedValue({});
 });
@@ -43,7 +45,7 @@ vi.mock("@/services/apiClient", () => ({
     get: async (path: string) =>
       path === "/me"
         ? { emailVerified: fixture.emailVerified }
-        : { avatarUrl: null, coverUrl: null, roles: [] },
+        : { avatarUrl: null, coverUrl: null, roles: [], canSkipPhotos: fixture.canSkipPhotos },
     patch: (...args: unknown[]) => fixture.update(...args),
     post: vi.fn(),
   },
@@ -113,7 +115,7 @@ it("uses email verification copy without phone or SMS prompts", async () => {
 it("offers photo skipping and a searchable scrolling role list", async () => {
   fixture.stage = "profile";
   render(<SignupPage />);
-  expect(screen.getByRole("button", { name: "Skip photos for now" })).toBeTruthy();
+  expect(await screen.findByRole("button", { name: "Skip photos for now" })).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Roles" }));
   fireEvent.change(screen.getByLabelText("Search roles"), { target: { value: "aftercare" } });
   expect(screen.getByRole("region", { name: "Available roles" }).className).toContain(
@@ -222,4 +224,14 @@ it("offers the same sexualities the API accepts", () => {
   const list = source.match(/export const ORIENTATIONS = \[([^\]]*)\]/)?.[1];
   expect(list).toBeTruthy();
   expect(list!.match(/"[^"]+"/g)?.map((v) => JSON.parse(v))).toEqual(SEXUALITY_FIELD.options);
+});
+
+it("asks a member who has had a profile photo for new photos, with no skip", async () => {
+  fixture.stage = "profile";
+  fixture.canSkipPhotos = false;
+  render(<SignupPage />);
+  expect(
+    await screen.findByText("Add a profile photo and a cover picture to continue."),
+  ).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Skip photos for now" })).toBeNull();
 });

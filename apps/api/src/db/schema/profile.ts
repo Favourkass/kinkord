@@ -48,6 +48,12 @@ export const profile = pgTable("profile", {
   coverKey: text("cover_key"),
   /** Explicitly choosing to finish signup without photos. */
   signupPhotosSkipped: boolean("signup_photos_skipped").notNull().default(false),
+  /**
+   * Whether the photos can still be skipped: only at first sign-up, until the
+   * member first has a profile photo. Then it stays false, so deleting the
+   * photo later asks for a new one.
+   */
+  photoSkipAvailable: boolean("photo_skip_available").notNull().default(true),
   /** Edit Profile (CEO brief, 2026-09-12). Nationality is ISO 3166-1 alpha-2, like `country`. */
   nationality: text("nationality"),
   occupation: text("occupation"),

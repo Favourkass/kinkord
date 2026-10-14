@@ -88,9 +88,11 @@ export class AuthGuard implements CanActivate {
    *
    * - Email: accounts created since EMAIL_VERIFICATION_REQUIRED_FROM need a
    *   verified email. Founders are never held.
-   * - Photos: unless explicitly skipped, members need a profile photo and a cover picture, the
-   *   last step of sign-up. Deleting the current one from the Media tab asks
-   *   for a new one the same way.
+   * - Photos: members need a profile photo and a cover picture, the last step
+   *   of sign-up. They may skip both only at first sign-up, before they have
+   *   ever had a profile photo. A skipped cover stays optional, but once they
+   *   have had a photo, deleting it from the Media tab asks for a new one, as
+   *   it does for everyone who never skipped.
    */
   private async signUpHold(ctx: ExecutionContext, user: SignedInUser): Promise<SignUpHold | null> {
     const allowed = this.reflector.getAllAndOverride<boolean>(ALLOW_DURING_SIGN_UP, [
@@ -109,13 +111,14 @@ export class AuthGuard implements CanActivate {
         avatarKey: profile.avatarKey,
         coverKey: profile.coverKey,
         signupPhotosSkipped: profile.signupPhotosSkipped,
+        photoSkipAvailable: profile.photoSkipAvailable,
       })
       .from(profile)
       .where(eq(profile.userId, user.id))
       .limit(1);
     // Without a profile row there is nowhere to save photos, so holding the
     // member would only lock them out.
-    if (row && !row.signupPhotosSkipped && (!row.avatarKey || !row.coverKey)) {
+    if (row && photosMissing(row)) {
       return {
         code: PROFILE_PHOTOS_REQUIRED,
         message: "Add a profile photo and a cover picture to continue.",
@@ -123,6 +126,17 @@ export class AuthGuard implements CanActivate {
     }
     return null;
   }
+}
+
+/** Whether the member still owes a photo, given what they skipped and when. */
+function photosMissing(row: {
+  avatarKey: string | null;
+  coverKey: string | null;
+  signupPhotosSkipped: boolean;
+  photoSkipAvailable: boolean;
+}): boolean {
+  const avatarSkipped = row.signupPhotosSkipped && row.photoSkipAvailable;
+  return (!row.avatarKey && !avatarSkipped) || (!row.coverKey && !row.signupPhotosSkipped);
 }
 
 /** Whether this member still owes the email step before Kinkord opens up. */

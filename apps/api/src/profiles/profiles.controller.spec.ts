@@ -53,6 +53,14 @@ describe("ProfilesController", () => {
     );
   });
 
+  it("won't take a request to undo the photo skip", () => {
+    const service = serviceMock();
+    expect(() =>
+      new ProfilesController(service).update(req, { signupPhotosSkipped: false }),
+    ).toThrow(BadRequestException);
+    expect(service.updateOwn).not.toHaveBeenCalled();
+  });
+
   it("serves the option lists the pickers render", () => {
     const options = new ProfilesController(serviceMock()).options();
     expect(options.genders).toEqual(["Male", "Female"]);
