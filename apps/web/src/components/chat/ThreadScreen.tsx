@@ -27,9 +27,10 @@ export interface ThreadScreenProps {
   unavailableText: string;
   /**
    * Today's new-chat allowance, while nobody has written yet: a hint above the
-   * composer, or, once it's used, a notice in place of it.
+   * composer, or, once it's used, a notice in place of it. A notice can carry a
+   * link: to Silver, when writing first to someone abroad was refused.
    */
-  newChat: { text: string; blocking: boolean } | null;
+  newChat: { text: string; blocking: boolean; link?: { label: string; href: string } } | null;
   onlineLabel: string;
   organizationLabel: string;
   verifiedOrganizationLabel: string;
@@ -236,9 +237,17 @@ export default function ThreadScreen(p: ThreadScreenProps) {
             </button>
           </div>
         ) : p.unavailable || p.newChat?.blocking ? (
-          <p className="border-t border-app-line bg-app-surface px-[16px] py-[14px] text-center text-[13px] text-app-muted">
-            {p.unavailable ? p.unavailableText : p.newChat?.text}
-          </p>
+          <div className="border-t border-app-line bg-app-surface px-[16px] py-[14px] text-center text-[13px] text-app-muted">
+            <p>{p.unavailable ? p.unavailableText : p.newChat?.text}</p>
+            {!p.unavailable && p.newChat?.link && (
+              <Link
+                href={p.newChat.link.href}
+                className="mt-[10px] inline-block rounded-full bg-kink-gold-bright px-[14px] py-[7px] text-[13px] font-bold text-kink-ink"
+              >
+                {p.newChat.link.label}
+              </Link>
+            )}
+          </div>
         ) : (
           <>
             {(p.newChat || p.photoNotice) && (

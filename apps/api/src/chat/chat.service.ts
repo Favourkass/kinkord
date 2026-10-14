@@ -29,7 +29,7 @@ import {
 import { alias } from "drizzle-orm/pg-core";
 import { DRIZZLE, type Db } from "../db/db.module";
 import { conversation, conversationParticipant, message, profile, user } from "../db/schema";
-import { notBanned } from "../moderation/admins";
+import { isSuperAdmin, notBanned } from "../moderation/admins";
 import { ONLINE_WINDOW_SECONDS, PresenceService } from "../presence/presence.service";
 import { containsPattern } from "../push/notifications.service";
 import { PushService } from "../push/push.service";
@@ -43,6 +43,7 @@ import {
 } from "../storage/storage.service";
 import { hasSilver, silverCheck } from "../subscriptions/plans";
 import { chatDay, NEW_CHAT_LIMIT, newChatsPerDay } from "./allowance";
+import { CROSS_COUNTRY_MESSAGE, CROSS_COUNTRY_PREMIUM, differentCountries } from "./cross-country";
 import type {
   ChatAllowanceDto,
   ChatPeerDto,
@@ -144,7 +145,12 @@ export class ChatService {
       .from(conversation)
       .where(eq(conversation.dmKey, key))
       .limit(1);
-    if (!existing && newChatsPerDay(self) !== null) await this.assertCanOpenConversation(selfId);
+    // An existing thread always opens. Nobody has written in a new one yet, so
+    // opening it with someone abroad takes Silver.
+    if (!existing) {
+      await this.assertCanReach(self, otherId, null);
+      if (newChatsPerDay(self) !== null) await this.assertCanOpenConversation(selfId);
+    }
 
     // One transaction, so a thread can never exist without both members in it.
     // Re-adding the members on an existing thread is a no-op, and repairs one
@@ -238,6 +244,29 @@ export class ChatService {
     return peer.userId;
   }
 
+  /**
+   * Writing first to a member in another country is part of Silver; replies
+   * are free, so it's allowed once the other member has written in the thread
+   * (`conversationId` null: there's no thread yet). The super admins are exempt,
+   * as from the daily allowance. A same-country chat costs one small query.
+   */
+  private async assertCanReach(
+    who: Member,
+    otherId: string,
+    conversationId: string | null,
+  ): Promise<void> {
+    if (isSuperAdmin(who)) return;
+    const rows = await this.db
+      .select({ userId: profile.userId, country: profile.country })
+      .from(profile)
+      .where(inArray(profile.userId, [who.id, otherId]));
+    const countryOf = (id: string) => rows.find((r) => r.userId === id)?.country;
+    if (!differentCountries(countryOf(who.id), countryOf(otherId))) return;
+    if (conversationId && (await this.peerHasWritten(conversationId, who.id))) return;
+    if (await hasSilver(this.db, who.id)) return;
+    throw new ForbiddenException({ code: CROSS_COUNTRY_PREMIUM, message: CROSS_COUNTRY_MESSAGE });
+  }
+
   async sendMessage(
     sender: Member,
     conversationId: string,
@@ -266,6 +295,9 @@ export class ChatService {
       await this.assertPhotosAllowed(conversationId, senderId);
       await this.verifyPhoto(senderId, conversationId, input.photoKey);
     }
+    // Writing first to someone abroad takes Silver. Checked before the
+    // allowance, so a message refused here never uses it up.
+    await this.assertCanReach(sender, peerId, conversationId);
 
     const startsChat = newChatsPerDay(sender) !== null && !(await this.hasMessages(conversationId));
     const saved = startsChat

@@ -264,6 +264,17 @@ export function isNewChatLimit(body: unknown): boolean {
 }
 
 /**
+ * The API's code for a chat refused because writing first to a member in
+ * another country is part of Silver Premium. Replies are always free.
+ */
+export const CROSS_COUNTRY_PREMIUM = "CROSS_COUNTRY_PREMIUM";
+
+/** Whether an API error body is that refusal. */
+export function isCrossCountryPremium(body: unknown): boolean {
+  return (body as { code?: unknown } | null)?.code === CROSS_COUNTRY_PREMIUM;
+}
+
+/**
  * What an empty thread tells the member about today's allowance: "hint" when
  * sending here would use it, "blocked" when it's already used. Nothing once
  * the thread has messages, since replies aren't limited, and nothing for
