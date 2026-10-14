@@ -66,6 +66,8 @@ export interface MePM {
 /** GET /profile/options — every picker list, owned by the API. */
 export interface ProfileOptionsPM {
   genders: readonly string[];
+  /** Sexuality choices; the value is private to the member. */
+  orientations: readonly string[];
   relationshipStatuses: readonly string[];
   roles: readonly string[];
   kinks: readonly string[];
@@ -91,6 +93,8 @@ export type EditRowKey =
   | "displayName"
   | "bio"
   | "gender"
+  /** Sexuality: private, shown only to the member. */
+  | "orientation"
   | "dateOfBirth"
   | "nationality"
   | "relationshipStatus"

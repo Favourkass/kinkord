@@ -27,6 +27,7 @@ import {
   LANGUAGES,
   LOOKING_FOR,
   NAME_CHANGE_COOLDOWN_DAYS,
+  ORIENTATIONS,
   PROFILE_VISIBILITIES,
   RELATIONSHIP_STATUSES,
 } from "./profile-options";
@@ -84,7 +85,8 @@ export const updateProfileSchema = z.object({
   relationshipStatus: z.enum(RELATIONSHIP_STATUSES).nullable().optional(),
   lookingFor: z.array(z.enum(LOOKING_FOR)).max(10).optional(),
   interests: z.array(z.enum(KINKS)).max(20).optional(),
-  orientation: z.string().trim().min(1).max(40).nullable().optional(),
+  /** Private to the member; null clears it. */
+  orientation: z.enum(ORIENTATIONS).nullable().optional(),
   bodyType: z.string().trim().min(1).max(40).nullable().optional(),
   languages: z.array(z.enum(LANGUAGES)).max(10).optional(),
   location: z.string().trim().min(1).max(120).nullable().optional(),

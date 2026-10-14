@@ -7,6 +7,7 @@ import {
   LANGUAGES,
   LEGACY_KINK_ROLES,
   LOOKING_FOR,
+  ORIENTATIONS,
   PROFILE_OPTIONS,
   RELATIONSHIP_STATUSES,
 } from "./profile-options";
@@ -43,5 +44,12 @@ describe("profile options (CEO brief, 2026-09-12)", () => {
       expect(ACCEPTED_KINK_ROLES).toContain(legacy);
     }
     expect(PROFILE_OPTIONS.roles).toBe(KINK_ROLES);
+  });
+});
+
+describe("sexuality options (founder, 2026-10-14)", () => {
+  it("offers Straight and Bisexual, served with the other pickers", () => {
+    expect(ORIENTATIONS).toEqual(["Straight", "Bisexual"]);
+    expect(PROFILE_OPTIONS.orientations).toBe(ORIENTATIONS);
   });
 });

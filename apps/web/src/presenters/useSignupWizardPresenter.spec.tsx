@@ -173,6 +173,23 @@ describe("useSignupWizardPresenter", () => {
     );
   });
 
+  it("stores no sexuality when the member goes back to Prefer not to say", async () => {
+    const { result } = renderHook(() => useSignupWizardPresenter());
+    reachCombinedStep(result);
+    fillAccount(result);
+    fillAbout(result);
+    act(() =>
+      result.current.aboutStep.set({ ...result.current.aboutStep.draft, orientation: "Straight" }),
+    );
+    act(() => result.current.aboutStep.set({ ...result.current.aboutStep.draft, orientation: "" }));
+    expect(result.current.aboutStep.sexuality.clearLabel).toBe("Prefer not to say");
+    await act(() => result.current.submitCombinedStep());
+    expect(post).toHaveBeenCalledWith(
+      "/auth-ext/sign-up",
+      expect.objectContaining({ orientation: null }),
+    );
+  });
+
   it("skips photos and their upload confirmation while saving selected roles", async () => {
     const { result } = renderHook(() => useSignupWizardPresenter("profile"));
     await waitFor(() => expect(get).toHaveBeenCalledWith("/profile"));

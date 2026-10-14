@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { SEXUALITY_FIELD } from "@/constants/onboarding";
 import SignupPage from "./page";
 const fixture = vi.hoisted(() => ({
   stage: "account",
@@ -69,7 +72,6 @@ it("renders account signup without phone entry or phone instructions", () => {
   expect(screen.getByRole("option", { name: "Straight" })).toBeTruthy();
   expect(screen.getByRole("option", { name: "Bisexual" })).toBeTruthy();
   expect(screen.queryByRole("option", { name: "Gay" })).toBeNull();
-  expect(screen.queryByRole("option", { name: "Prefer not to say" })).toBeNull();
   fireEvent.change(sexuality, { target: { value: "Bisexual" } });
   expect((sexuality as HTMLSelectElement).value).toBe("Bisexual");
   expect(screen.getByText("Select your state")).toBeTruthy();
@@ -193,4 +195,31 @@ it("no longer knows a phone step to resume", () => {
   render(<SignupPage />);
   expect(screen.queryByRole("heading", { name: "VERIFY YOUR EMAIL" })).toBeNull();
   expect(screen.getByLabelText("Email address")).toBeTruthy();
+});
+
+it("keeps sexuality private and lets the member clear it", () => {
+  render(<SignupPage />);
+  const sexuality = screen.getByLabelText("Sexuality") as HTMLSelectElement;
+  expect(
+    screen.getByText("Only you can see this. You can change or clear it in Edit Profile."),
+  ).toBeTruthy();
+  const clear = screen.getByRole("option", { name: "Prefer not to say" }) as HTMLOptionElement;
+  expect(clear.disabled).toBe(false);
+  expect(sexuality.value).toBe("");
+  fireEvent.change(sexuality, { target: { value: "Straight" } });
+  expect(sexuality.value).toBe("Straight");
+  fireEvent.change(sexuality, { target: { value: "" } });
+  expect(sexuality.value).toBe("");
+  expect(clear.selected).toBe(true);
+});
+
+it("offers the same sexualities the API accepts", () => {
+  // The form is shown before the member can load GET /profile/options.
+  const source = readFileSync(
+    join(process.cwd(), "../api/src/profiles/profile-options.ts"),
+    "utf8",
+  );
+  const list = source.match(/export const ORIENTATIONS = \[([^\]]*)\]/)?.[1];
+  expect(list).toBeTruthy();
+  expect(list!.match(/"[^"]+"/g)?.map((v) => JSON.parse(v))).toEqual(SEXUALITY_FIELD.options);
 });

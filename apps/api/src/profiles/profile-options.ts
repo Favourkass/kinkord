@@ -8,6 +8,13 @@
 export const GENDERS = ["Male", "Female"] as const;
 export type Gender = (typeof GENDERS)[number];
 
+/**
+ * Sexuality is private: only the member sees it (founder, 2026-10-14). The web
+ * sign-up form keeps the same list (constants/onboarding.ts SEXUALITY_FIELD),
+ * since it is shown before the member can call GET /profile/options.
+ */
+export const ORIENTATIONS = ["Straight", "Bisexual"] as const;
+
 export const RELATIONSHIP_STATUSES = [
   "Single",
   "In a Relationship",
@@ -192,6 +199,7 @@ export const NAME_CHANGE_COOLDOWN_DAYS = 30;
 /** Payload of GET /profile/options. */
 export const PROFILE_OPTIONS = {
   genders: GENDERS,
+  orientations: ORIENTATIONS,
   relationshipStatuses: RELATIONSHIP_STATUSES,
   roles: KINK_ROLES,
   kinks: KINKS,

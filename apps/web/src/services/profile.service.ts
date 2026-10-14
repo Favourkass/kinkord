@@ -1,5 +1,6 @@
 import { ALL_COUNTRY_CODES } from "@/constants/countries";
 import { LAUNCH_COUNTRIES } from "@/constants/onboarding";
+import { PROFILE_EDIT_COPY } from "@/constants/profileEdit";
 import type {
   DraftIssue,
   EditorDraft,
@@ -36,6 +37,7 @@ export interface ProfilePatch {
   displayName?: string;
   bio?: string | null;
   gender?: string | null;
+  orientation?: string | null;
   dateOfBirth?: string;
   nationality?: string | null;
   relationshipStatus?: string | null;
@@ -93,6 +95,7 @@ export const SECTION_ROWS: Record<EditSectionKey, EditRowKey[]> = {
     "displayName",
     "bio",
     "gender",
+    "orientation",
     "dateOfBirth",
     "nationality",
     "relationshipStatus",
@@ -198,6 +201,16 @@ export function buildEditRow(key: EditRowKey, ctx: EditRowsContext): EditRowPM {
         key,
         value: capitalize(profile.gender) || null,
         editor: single(capitalize(profile.gender) || null, plain(options.genders)),
+      };
+    case "orientation":
+      // Private: this row is only ever built for the member's own profile.
+      return {
+        key,
+        value: profile.orientation,
+        editor: single(profile.orientation, [
+          { value: "", label: PROFILE_EDIT_COPY.preferNotToSay },
+          ...plain(options.orientations),
+        ]),
       };
     case "dateOfBirth":
       return {
@@ -373,6 +386,8 @@ export function patchFor(key: EditRowKey, draft: EditorDraft, profile: OwnProfil
       return { occupation: t || null };
     case "gender":
       return { gender: t || null };
+    case "orientation":
+      return { orientation: t || null };
     case "dateOfBirth":
       return { dateOfBirth: t };
     case "nationality":

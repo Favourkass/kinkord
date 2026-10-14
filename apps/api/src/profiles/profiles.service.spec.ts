@@ -84,6 +84,16 @@ describe("updateProfileSchema", () => {
     expect(updateProfileSchema.safeParse({ relationshipStatus: null }).success).toBe(true);
   });
 
+  it("only accepts listed sexualities, and null to clear it", () => {
+    expect(updateProfileSchema.parse({ orientation: "Bisexual" }).orientation).toBe("Bisexual");
+    expect(updateProfileSchema.parse({ orientation: "Straight" }).orientation).toBe("Straight");
+    expect(updateProfileSchema.parse({ orientation: null }).orientation).toBeNull();
+    expect(updateProfileSchema.parse({}).orientation).toBeUndefined();
+    for (const orientation of ["Gay", "Prefer not to say", "bisexual", ""]) {
+      expect(updateProfileSchema.safeParse({ orientation }).success).toBe(false);
+    }
+  });
+
   it("canonicalises gender and only accepts Male/Female (CEO brief)", () => {
     expect(updateProfileSchema.parse({ gender: "female" }).gender).toBe("Female");
     expect(updateProfileSchema.parse({ gender: " MALE " }).gender).toBe("Male");

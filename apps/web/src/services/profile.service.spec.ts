@@ -82,6 +82,7 @@ const me: MePM = {
 };
 const options: ProfileOptionsPM = {
   genders: ["Male", "Female"],
+  orientations: ["Straight", "Bisexual"],
   relationshipStatuses: ["Single", "Married"],
   roles: ["Dominant", "Switch"],
   kinks: ["Bondage", "Latex", "Wax play"],
@@ -102,6 +103,7 @@ describe("buildEditRows", () => {
       "displayName",
       "bio",
       "gender",
+      "orientation",
       "dateOfBirth",
       "nationality",
       "relationshipStatus",
@@ -133,6 +135,7 @@ describe("buildEditRows", () => {
       displayName: "Naughty Neze",
       bio: "Chill",
       gender: "Female",
+      orientation: null,
       dateOfBirth: "26 Mar 1998",
       nationality: "Nigeria",
       relationshipStatus: "Single",
@@ -188,6 +191,31 @@ describe("buildEditRows", () => {
     expect(buildEditRow("socialLinks", ctx).editor).toEqual({
       kind: "links",
       value: { facebook: "https://facebook.com/nene", x: "" },
+    });
+  });
+});
+
+describe("sexuality row", () => {
+  it("offers the API's list after a choice that clears it, and saves that as null", () => {
+    const row = buildEditRow("orientation", ctx);
+    expect(row.value).toBeNull();
+    expect(row.editor).toEqual({
+      kind: "single",
+      value: null,
+      searchable: false,
+      options: [
+        { value: "", label: "Prefer not to say" },
+        { value: "Straight", label: "Straight" },
+        { value: "Bisexual", label: "Bisexual" },
+      ],
+    });
+    const chosen = { ...ctx, profile: { ...profile, orientation: "Bisexual" } };
+    expect(buildEditRow("orientation", chosen).value).toBe("Bisexual");
+    expect(patchFor("orientation", { kind: "single", value: "Straight" }, profile)).toEqual({
+      orientation: "Straight",
+    });
+    expect(patchFor("orientation", { kind: "single", value: "" }, profile)).toEqual({
+      orientation: null,
     });
   });
 });

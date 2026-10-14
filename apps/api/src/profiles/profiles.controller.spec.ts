@@ -56,6 +56,7 @@ describe("ProfilesController", () => {
   it("serves the option lists the pickers render", () => {
     const options = new ProfilesController(serviceMock()).options();
     expect(options.genders).toEqual(["Male", "Female"]);
+    expect(options.orientations).toEqual(["Straight", "Bisexual"]);
     expect(options.relationshipStatuses).toHaveLength(17);
     expect(options.roles).toHaveLength(36);
     expect(options.kinks).toHaveLength(50);

@@ -4,6 +4,7 @@ import { fromNodeHeaders } from "better-auth/node";
 import { z } from "zod";
 import { PhoneSignInService } from "./phone-sign-in.service";
 import { isAllowedPhone, PHONE_NOT_ALLOWED } from "../profiles/phone-rules";
+import { ORIENTATIONS } from "../profiles/profile-options";
 import { SignUpService } from "./sign-up.service";
 
 const signInPhoneSchema = z.object({
@@ -48,7 +49,7 @@ const signUpSchema = z.object({
     .refine((s) => new Date(s) <= eighteenYearsAgo(), "You must be 18 or older to join")
     .nullish(),
   gender: z.string().trim().min(1).max(20).nullish(),
-  orientation: z.string().trim().min(1).max(40).nullish(),
+  orientation: z.enum(ORIENTATIONS).nullish(),
   // Optional at signup; validate any supplied number using the Settings rule.
   phone: z
     .string()

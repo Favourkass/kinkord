@@ -246,7 +246,8 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
         city: about.city.trim() || null,
         dateOfBirth: dobToIso(about),
         gender: about.gender,
-        orientation: about.orientation ?? null,
+        // "Prefer not to say" is the empty choice: nothing is stored.
+        orientation: about.orientation || null,
       });
       setStage("email");
     } catch (e) {

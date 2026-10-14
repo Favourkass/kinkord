@@ -128,9 +128,14 @@ export function signupFixFieldsMessage(fields: SignupField[], regionName = "stat
   return `Check your ${list} above.`;
 }
 
+/**
+ * Sexuality is private: only the member sees it. The options match the API's
+ * ORIENTATIONS (apps/api/src/profiles/profile-options.ts); the sign-up form
+ * shows them before the member can load GET /profile/options.
+ */
 export const SEXUALITY_FIELD = {
   label: "Sexuality",
-  placeholder: "Select your sexuality",
-  helper: "You can leave this blank.",
+  clearLabel: "Prefer not to say",
+  helper: "Only you can see this. You can change or clear it in Edit Profile.",
   options: ["Straight", "Bisexual"],
 } as const;

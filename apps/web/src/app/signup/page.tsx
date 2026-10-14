@@ -297,7 +297,7 @@ function SignupWizard() {
             <SelectField
               label={p.aboutStep.sexuality.label}
               options={p.aboutStep.sexuality.options}
-              placeholder={p.aboutStep.sexuality.placeholder}
+              clearLabel={p.aboutStep.sexuality.clearLabel}
               helper={p.aboutStep.sexuality.helper}
               value={p.aboutStep.draft.orientation ?? ""}
               onChange={(orientation) => p.aboutStep.set({ ...p.aboutStep.draft, orientation })}

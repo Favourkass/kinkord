@@ -15,6 +15,7 @@ export const ROW_ICONS: Record<EditRowKey, string> = {
   displayName: "/app/profile/edit/row-display-name.svg",
   bio: "/app/profile/edit/row-bio.svg",
   gender: "/app/profile/edit/row-gender.svg",
+  orientation: "/app/profile/edit/row-gender.svg",
   dateOfBirth: "/app/profile/edit/row-dob.svg",
   nationality: "/app/profile/edit/row-nationality.svg",
   relationshipStatus: "/app/profile/edit/row-relationship.svg",
@@ -108,6 +109,10 @@ export const PROFILE_EDIT_COPY = {
     },
     bio: { title: "Bio", help: "Up to 500 characters." },
     gender: { title: "Gender", help: null },
+    orientation: {
+      title: "Sexuality",
+      help: 'Only you can see this. Choose "Prefer not to say" to clear it.',
+    },
     dateOfBirth: { title: "Date of Birth", help: "You must be 18 or older." },
     nationality: { title: "Nationality", help: null },
     relationshipStatus: { title: "Relationship Status", help: null },
@@ -150,6 +155,8 @@ export const PROFILE_EDIT_COPY = {
     displayName: "Your display name",
   },
   empty: "Not set",
+  /** The choice that clears an optional pick, like sexuality. */
+  preferNotToSay: "Prefer not to say",
   notLinked: "Not linked",
   save: "Save",
   cancel: "Cancel",

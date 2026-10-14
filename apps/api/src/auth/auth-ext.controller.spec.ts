@@ -161,7 +161,7 @@ describe("AuthExtController", () => {
     );
   });
 
-  it.each(["Straight", "Bisexual", "Prefer not to say", null])(
+  it.each(["Straight", "Bisexual", null])(
     "stores optional sexuality %s on signup",
     async (orientation) => {
       const { controller, signUpWithProfile } = makeController();
@@ -171,6 +171,17 @@ describe("AuthExtController", () => {
         expect.objectContaining({ orientation }),
         expect.any(Headers),
       );
+    },
+  );
+
+  it.each(["Prefer not to say", "Gay", "straight", ""])(
+    "refuses sexuality %j that isn't on the list",
+    async (orientation) => {
+      const { controller, signUpWithProfile } = makeController();
+      await expect(
+        controller.signUpCombined(req, makeRes(), { ...validSignUp, orientation }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(signUpWithProfile).not.toHaveBeenCalled();
     },
   );
 

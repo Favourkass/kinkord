@@ -542,6 +542,21 @@ describe("MembersService.publicProfile visibility (Edit Profile → Privacy)", (
     expect(areFriends).not.toHaveBeenCalled();
   });
 
+  it("shows sexuality only to the member themself, never to friends or anyone else", async () => {
+    const { service, select, areFriends } = makeService();
+    areFriends.mockResolvedValueOnce(true);
+    select.mockReturnValueOnce(chain(rowFor("friends")));
+    const friend = await service.publicProfile("nene", "me");
+    expect(friend.restricted).toBe(false);
+    expect(friend.orientation).toBeNull();
+
+    select.mockReturnValueOnce(chain(rowFor("public")));
+    expect((await service.publicProfile("nene", "me")).orientation).toBeNull();
+
+    select.mockReturnValueOnce(chain(rowFor("friends")));
+    expect((await service.publicProfile("nene", "u2")).orientation).toBe("Pansexual");
+  });
+
   it("shows the Verified badge only for the profile as verified, and as the member allows", async () => {
     const { service, select } = makeService();
     const verified = (over: Record<string, unknown> = {}, visibility = "public") => {
