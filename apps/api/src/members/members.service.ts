@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import {
   and,
   asc,
@@ -21,6 +21,7 @@ import {
   follow,
   profile,
   profileMedia,
+  suggestionDismissal,
   user,
   walletBalance,
   type PostMediaKind,
@@ -34,6 +35,14 @@ import { StorageService } from "../storage/storage.service";
 import { silverCheck, silverSince } from "../subscriptions/plans";
 import { stillVerified } from "../verification/bronze-policy";
 import { FollowsService } from "./follows.service";
+import {
+  cardRoles,
+  genderShown,
+  rankCandidates,
+  resolveShow,
+  wantedSide,
+  type Show,
+} from "./matching";
 
 /** "match" ranks a search: exact name or username, then starts-with, then anywhere. */
 export type MembersSort = "recent" | "followers" | "name" | "match";
@@ -96,6 +105,10 @@ export const AVAILABLE_COUNTRIES = [{ code: "NG", name: "Nigeria" }] as const;
 
 const MAX_PAGE_SIZE = 50;
 const DEFAULT_PAGE_SIZE = 20;
+/** How many nearby members "Kinksters Near You" ranks; the best of them are shown. */
+export const SUGGESTION_POOL_SIZE = 300;
+/** A card shows this many roles and looking-for values. */
+const CARD_LIST_MAX = 3;
 
 /** Whole years from a YYYY-MM-DD birth date to `now`; null when unknown/invalid. */
 export function ageFromDob(dob: string | null | undefined, now = new Date()): number | null {
@@ -418,26 +431,129 @@ export class MembersService {
   }
 
   /**
-   * "People you may know" on the home feed. Same rule as the profile Suggested
-   * tab — `suggested` already excludes the viewer — but the feed card shows a
-   * 221x191 photo rather than a 48px row, so it asks for the medium size.
+   * "Kinksters Near You" on the home feed, ranked by matching v1 (matching.ts,
+   * docs/MATCHING.md). The pool is the viewer's country (their state when they
+   * have no country), of the gender `show` lists, leaving out the viewer,
+   * suspended members, anyone on either side of a block, and anyone the viewer
+   * already follows or removed. The nearest and most recently seen
+   * `SUGGESTION_POOL_SIZE` are scored here and the best `limit` returned.
    */
-  async suggestedForFeed(viewerId: string, limitArg?: number) {
+  async suggestedForFeed(viewerId: string, limitArg?: number, requested?: Show) {
     const { limit } = normalizePaging(1, limitArg ?? 10);
-    const { items, total } = await this.suggested(viewerId, viewerId, limit, 0);
-    return {
-      items: await Promise.all(
-        items.map(async (r) => ({
-          userId: r.userId,
-          username: r.username,
-          displayName: r.displayName,
-          avatarUrl: r.avatarKey ? await this.storage.presignDownload(r.avatarKey, "md") : null,
-          isFollowing: r.isFollowing,
-          silver: r.silver,
-        })),
-      ),
-      total,
+    const [me] = await this.db
+      .select({
+        gender: profile.gender,
+        orientation: profile.orientation,
+        roles: profile.roles,
+        interests: profile.interests,
+        lookingFor: profile.lookingFor,
+        country: profile.country,
+        state: profile.state,
+        city: profile.city,
+      })
+      .from(profile)
+      .where(eq(profile.userId, viewerId));
+    // The viewer's own sexuality, never anyone else's.
+    const { show, options } = resolveShow(requested, me?.gender, me?.orientation);
+    if (!me || (!me.country && !me.state)) return { items: [], show, options };
+
+    const conditions: SQL[] = [
+      me.country ? eq(profile.country, me.country) : eq(profile.state, me.state as string),
+      ne(profile.userId, viewerId),
+      notBanned(profile.userId),
+      notBlocking(profile.userId, viewerId),
+      sql`not ${blockedBy(viewerId, profile.userId)}`,
+      sql`not exists (select 1 from ${follow} where ${follow.followerId} = ${viewerId} and ${follow.followingId} = ${profile.userId})`,
+      sql`not exists (select 1 from ${suggestionDismissal} where ${suggestionDismissal.userId} = ${viewerId} and ${suggestionDismissal.dismissedUserId} = ${profile.userId})`,
+    ];
+    const gender = genderShown(show);
+    // Sign-up stored "female", Edit Profile "Female".
+    if (gender) conditions.push(sql`lower(${profile.gender}) = ${gender.toLowerCase()}`);
+    // Without a state there is no "same state" to put first (and a constant would be `order by 0`).
+    const sameStateFirst = me.state
+      ? [desc(sql<number>`case when ${profile.state} = ${me.state} then 1 else 0 end`)]
+      : [];
+
+    const rows = await this.db
+      .select({
+        userId: profile.userId,
+        username: user.username,
+        displayName: profile.displayName,
+        avatarKey: profile.avatarKey,
+        dateOfBirth: profile.dateOfBirth,
+        gender: profile.gender,
+        country: profile.country,
+        state: profile.state,
+        city: profile.city,
+        roles: profile.roles,
+        interests: profile.interests,
+        lookingFor: profile.lookingFor,
+        lastSeenAt: profile.lastSeenAt,
+        createdAt: user.createdAt,
+        silver: silverCheck(profile.userId),
+      })
+      .from(profile)
+      .innerJoin(user, eq(user.id, profile.userId))
+      .where(and(...conditions))
+      .orderBy(...sameStateFirst, sql`${profile.lastSeenAt} desc nulls last`)
+      .limit(SUGGESTION_POOL_SIZE);
+
+    const now = new Date();
+    const viewer = {
+      roles: me.roles ?? [],
+      kinks: me.interests ?? [],
+      lookingFor: me.lookingFor ?? [],
+      city: me.city,
+      state: me.state,
     };
+    const candidates = rows.map((r) => ({
+      ...r,
+      roles: r.roles ?? [],
+      kinks: r.interests ?? [],
+      lookingFor: r.lookingFor ?? [],
+      hasPhoto: Boolean(r.avatarKey),
+    }));
+    const wanted = wantedSide(viewer.roles);
+    const best = rankCandidates(viewer, candidates, now).slice(0, limit);
+    const items = await Promise.all(
+      best.map(async (r) => ({
+        userId: r.userId,
+        username: r.username,
+        displayName: r.displayName,
+        // The card is a tall photo, not a 48px row: the medium size.
+        avatarUrl: r.avatarKey ? await this.storage.presignDownload(r.avatarKey, "md") : null,
+        age: ageFromDob(r.dateOfBirth, now),
+        gender: r.gender,
+        city: r.city,
+        state: r.state,
+        country: r.country,
+        roles: cardRoles(r.roles, wanted, CARD_LIST_MAX),
+        lookingFor: r.lookingFor.slice(0, CARD_LIST_MAX),
+        online: PresenceService.isOnline(r.lastSeenAt, now),
+        silver: Boolean(r.silver),
+        // Members the viewer follows are never in the pool.
+        isFollowing: false,
+      })),
+    );
+    return { items, show, options };
+  }
+
+  /** Remove for good: the viewer is never suggested this member again. Doing it twice is the same as once. */
+  async dismissSuggestion(viewerId: string, dismissedUserId: string) {
+    if (viewerId === dismissedUserId) {
+      throw new BadRequestException("You can't remove yourself from your suggestions.");
+    }
+    const [target] = await this.db
+      .select({ id: user.id })
+      .from(user)
+      .where(eq(user.id, dismissedUserId))
+      .limit(1);
+    if (!target) throw new NotFoundException("Member not found.");
+    await this.db
+      .insert(suggestionDismissal)
+      .values({ userId: viewerId, dismissedUserId })
+      .onConflictDoNothing();
+    return { dismissed: dismissedUserId };
   }
 
   /**

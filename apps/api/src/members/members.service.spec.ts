@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { NotFoundException } from "@nestjs/common";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { sql, type SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { type Db } from "../db/db.module";
+import { suggestionDismissal } from "../db/schema";
 import { type StorageService } from "../storage/storage.service";
 import { type PostsService } from "../posts/posts.service";
 import { type FollowsService } from "./follows.service";
@@ -836,43 +837,224 @@ describe("post counts on the directory cards", () => {
   });
 });
 
-describe("MembersService.suggestedForFeed", () => {
-  it("asks for the medium avatar — the feed card is a photo, not a 48px row", async () => {
+/** Like `chain`, but remembers the arguments of every call by method name. */
+const callRecordingChain = (result: unknown, calls: Record<string, unknown[][]>) => {
+  const p: unknown = new Proxy(() => p, {
+    get: (_t, prop) => {
+      if (prop === "then")
+        return (res: (v: unknown) => unknown, rej: (e: unknown) => unknown) =>
+          Promise.resolve(result).then(res, rej);
+      return (...args: unknown[]) => {
+        (calls[String(prop)] ??= []).push(args);
+        return p;
+      };
+    },
+    apply: () => p,
+  });
+  return p;
+};
+
+describe("MembersService.suggestedForFeed (matching v1)", () => {
+  const me = {
+    gender: "Male",
+    orientation: "Straight",
+    roles: ["Dominant"],
+    interests: ["Bondage"],
+    lookingFor: ["Friendship"],
+    country: "NG",
+    state: "Lagos",
+    city: "Ikeja",
+  };
+  const row = (over: Record<string, unknown>) => ({
+    userId: "u0",
+    username: "someone",
+    displayName: "Someone",
+    avatarKey: null,
+    dateOfBirth: null,
+    gender: "Female",
+    country: "NG",
+    state: "Lagos",
+    city: null,
+    roles: [],
+    interests: [],
+    lookingFor: [],
+    lastSeenAt: null,
+    createdAt: new Date("2026-01-01T00:00:00Z"),
+    silver: false,
+    ...over,
+  });
+  /** The viewer's profile, then the pool; returns what the pool query was asked. */
+  const run = async (
+    viewer: Record<string, unknown> | undefined,
+    pool: unknown[],
+    limit?: number,
+    show?: "women" | "men" | "all",
+  ) => {
     const { service, select, presignDownload } = makeService();
-    // `suggested` reads the viewer's own profile, then the candidate rows, then a count.
+    const calls: Record<string, unknown[][]> = {};
     select
-      .mockReturnValueOnce(chain([{ country: "NG", state: "Delta", city: "Abraka" }]))
-      .mockReturnValueOnce(
-        chain([
-          {
-            userId: "u3",
-            username: "kay",
-            displayName: "Kay",
-            avatarKey: "avatars/kay.jpg",
-            isFollowing: false,
-          },
-        ]),
-      )
-      .mockReturnValueOnce(chain([{ total: 1 }]));
+      .mockReturnValueOnce(chain(viewer ? [viewer] : []))
+      .mockReturnValueOnce(callRecordingChain(pool, calls));
+    const result = await service.suggestedForFeed("me", limit, show);
+    const where = calls.where?.[0]?.[0] as SQL | undefined;
+    return {
+      result,
+      select,
+      presignDownload,
+      calls,
+      where: where ? renderWhere(where) : null,
+    };
+  };
 
-    const result = await service.suggestedForFeed("u1", 5);
-
-    expect(presignDownload).toHaveBeenCalledWith("avatars/kay.jpg", "md");
-    expect(result.items[0]).toEqual({
-      userId: "u3",
-      username: "kay",
-      displayName: "Kay",
-      avatarUrl: "https://s3/avatars/kay.jpg",
-      isFollowing: false,
-      silver: false,
-    });
-    expect(result.total).toBe(1);
+  it("is empty, but names the segments, for a member who has no country or state yet", async () => {
+    const { result, select } = await run({ ...me, country: null, state: null }, []);
+    expect(result).toEqual({ items: [], show: "women", options: ["women", "men"] });
+    expect(select).toHaveBeenCalledTimes(1);
   });
 
-  it("is empty rather than an error for a member who has set no state yet", async () => {
-    const { service, select } = makeService();
-    select.mockReturnValueOnce(chain([{ country: "NG", state: null, city: null }]));
+  it("ranks the pool by matching v1 and returns the best as cards", async () => {
+    const aMinuteAgo = new Date(Date.now() - 60_000);
+    const { result, presignDownload } = await run(
+      me,
+      [
+        row({ userId: "bea", username: "bea", displayName: "Bea", roles: ["Dominant"] }),
+        row({
+          userId: "ada",
+          username: "ada",
+          displayName: "Ada",
+          avatarKey: "avatars/ada.jpg",
+          dateOfBirth: "2000-01-01",
+          // Sign-up stored genders in lower case.
+          gender: "female",
+          city: "Ikeja",
+          roles: ["Voyeur", "Submissive", "Brat", "Pet"],
+          interests: ["Bondage"],
+          lookingFor: ["Friendship", "Events", "Vanilla dating", "Sexual Partner"],
+          lastSeenAt: aMinuteAgo,
+          silver: true,
+        }),
+        row({
+          userId: "cee",
+          username: "cee",
+          displayName: "Cee",
+          avatarKey: "avatars/cee.jpg",
+          state: "Ogun",
+          roles: ["Switch"],
+        }),
+      ],
+      2,
+    );
+    expect(result.show).toBe("women");
+    expect(result.options).toEqual(["women", "men"]);
+    expect(result.items.map((i) => i.userId)).toEqual(["ada", "cee"]);
+    expect(result.items[0]).toEqual({
+      userId: "ada",
+      username: "ada",
+      displayName: "Ada",
+      avatarUrl: "https://s3/avatars/ada.jpg",
+      age: ageFromDob("2000-01-01"),
+      gender: "female",
+      city: "Ikeja",
+      state: "Lagos",
+      country: "NG",
+      // The side a dom looks for comes first.
+      roles: ["Submissive", "Brat", "Pet"],
+      lookingFor: ["Friendship", "Events", "Vanilla dating"],
+      online: true,
+      silver: true,
+      isFollowing: false,
+    });
+    expect(result.items[1]).toMatchObject({ userId: "cee", online: false, roles: ["Switch"] });
+    // The tall card photo is the medium size.
+    expect(presignDownload).toHaveBeenCalledWith("avatars/ada.jpg", "md");
+  });
 
-    await expect(service.suggestedForFeed("u1")).resolves.toEqual({ items: [], total: 0 });
+  it("looks in the member's country for the gender shown, leaving out the member, anyone followed, removed, blocked or suspended", async () => {
+    const { where } = await run(me, []);
+    expect(where?.params).toEqual(expect.arrayContaining(["NG", "me", "female"]));
+    expect(where?.sql).toContain(`"profile"."country" = $1`);
+    expect(where?.sql).toContain(`lower("profile"."gender") = $`);
+    expect(where?.sql).toContain(`"profile"."user_id" <> $`);
+    expect(where?.sql).toContain(`"member_ban"`);
+    expect(where?.sql).toContain(`"member_block"`);
+    expect(where?.sql).toMatch(
+      /not exists \(select 1 from "follow" where "follow"\."follower_id" = \$\d+/,
+    );
+    expect(where?.sql).toContain(`not exists (select 1 from "suggestion_dismissal"`);
+  });
+
+  it("shows the segment asked for, and mixes both genders for All", async () => {
+    const men = await run(me, [], undefined, "men");
+    expect(men.result.show).toBe("men");
+    expect(men.where?.params).toContain("male");
+
+    const all = await run({ ...me, orientation: "Bisexual" }, []);
+    expect(all.result).toMatchObject({ show: "all", options: ["all", "women", "men"] });
+    expect(all.where?.sql).not.toContain("lower(");
+  });
+
+  it("looks in the member's state when they have no country", async () => {
+    const { where } = await run({ ...me, country: null }, []);
+    expect(where?.sql).toContain(`"profile"."state" = $1`);
+    expect(where?.params[0]).toBe("Lagos");
+    expect(where?.sql).not.toContain(`"profile"."country"`);
+  });
+
+  it("takes the nearest, most recently seen 300 into the pool", async () => {
+    const { calls } = await run(me, []);
+    expect(renderOrder(calls.orderBy[0] as SQL[])).toMatchObject({
+      sql: `case when "profile"."state" = $1 then 1 else 0 end desc, "profile"."last_seen_at" desc nulls last`,
+      params: ["Lagos"],
+    });
+    expect(calls.limit[0]).toEqual([300]);
+  });
+
+  it("orders by last seen alone for a member with a country but no state — never `order by 0`", async () => {
+    const { calls } = await run({ ...me, state: null, city: null }, []);
+    expect(renderOrder(calls.orderBy[0] as SQL[])).toEqual({
+      sql: `"profile"."last_seen_at" desc nulls last`,
+      params: [],
+    });
+  });
+});
+
+describe("MembersService.dismissSuggestion", () => {
+  const makeDismissing = (target: unknown[]) => {
+    const select = vi.fn(() => chain(target));
+    const inserts: Record<string, unknown[][]> = {};
+    const insert = vi.fn((table: unknown) => {
+      inserts.table = [[table]];
+      return callRecordingChain([], inserts);
+    });
+    const service = new MembersService(
+      { select, insert } as unknown as Db,
+      {} as StorageService,
+      {} as FollowsService,
+      {} as PostsService,
+    );
+    return { service, select, insert, inserts };
+  };
+
+  it("won't remove the member from their own suggestions", async () => {
+    const { service, select, insert } = makeDismissing([{ id: "me" }]);
+    await expect(service.dismissSuggestion("me", "me")).rejects.toBeInstanceOf(BadRequestException);
+    expect(select).not.toHaveBeenCalled();
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("404s a member who doesn't exist", async () => {
+    const { service, insert } = makeDismissing([]);
+    await expect(service.dismissSuggestion("me", "ghost")).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("records the removal once, however often it's asked for", async () => {
+    const { service, inserts } = makeDismissing([{ id: "u2" }]);
+    await expect(service.dismissSuggestion("me", "u2")).resolves.toEqual({ dismissed: "u2" });
+    expect(inserts.table[0][0]).toBe(suggestionDismissal);
+    expect(inserts.values[0]).toEqual([{ userId: "me", dismissedUserId: "u2" }]);
+    expect(inserts.onConflictDoNothing).toHaveLength(1);
   });
 });
