@@ -50,8 +50,9 @@ export function toSearchPersonVM(
     handle: pm.username ? `@${pm.username}` : null,
     details: organization
       ? null
-      : [ageTagOf(pm.age, pm.gender), locationOf(pm.city, pm.state)].filter(Boolean).join(" · ") ||
-        null,
+      : [ageTagOf(pm.age, pm.gender), locationOf(pm.city, pm.state, pm.country)]
+          .filter(Boolean)
+          .join(" · ") || null,
     avatarUrl: pm.avatarUrl,
     silver: Boolean(pm.silver),
     organization,

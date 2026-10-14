@@ -36,6 +36,9 @@ describe("toSearchPersonVM", () => {
       href: "/u/ada",
       canFollow: true,
     });
+    expect(
+      toSearchPersonVM(pm({ city: "Westlands", state: "Nairobi", country: "KE" }), href).details,
+    ).toBe("25F · Westlands, Nairobi");
   });
 
   it("suppresses personal discovery details for an organization", () => {

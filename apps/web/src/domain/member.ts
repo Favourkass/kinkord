@@ -26,6 +26,8 @@ export interface MemberCardPM {
   roles: string[];
   city: string | null;
   state: string | null;
+  /** ISO 3166-1 alpha-2; it decides how the state is named. Absent from an older API. */
+  country?: string | null;
   isOnline: boolean;
   lastSeenAt: string | null;
   postsCount: number;
@@ -67,15 +69,33 @@ export function ageTagOf(age: number | null, gender: string | null): string | nu
   return age === null ? null : `${age}${genderInitial(gender)}`;
 }
 
-/** "Abraka, Delta State" — null when neither city nor state is set. */
-export function locationOf(city: string | null, state: string | null): string | null {
-  return [city, displayState(state)].filter(Boolean).join(", ") || null;
+/**
+ * "Abraka, Delta State" (or Kenya's "Westlands, Nairobi"): the country decides
+ * how the state is named. Null when neither city nor state is set.
+ */
+export function locationOf(
+  city: string | null,
+  state: string | null,
+  country: string | null | undefined,
+): string | null {
+  return [city, displayState(state, country)].filter(Boolean).join(", ") || null;
+}
+
+/** "Abraka, Delta State, Nigeria" — the country's name too. Null when nothing is set. */
+export function fullLocationOf(
+  city: string | null | undefined,
+  state: string | null | undefined,
+  country: string | null | undefined,
+): string | null {
+  return (
+    [city, displayState(state, country), countryName(country)].filter(Boolean).join(", ") || null
+  );
 }
 
 export function toMemberCardVM(pm: MemberCardPM, organization = false): MemberCardVM {
   const ageTag = organization ? null : ageTagOf(pm.age, pm.gender);
   const roles = organization ? null : pm.roles.length > 0 ? pm.roles.join(" | ") : null;
-  const location = organization ? null : locationOf(pm.city, pm.state);
+  const location = organization ? null : locationOf(pm.city, pm.state, pm.country);
   return {
     userId: pm.userId,
     username: pm.username,
@@ -315,7 +335,7 @@ export function locationPartsOf(
   }
   if (pm.state) {
     parts.push({
-      label: displayState(pm.state),
+      label: displayState(pm.state, pm.country),
       href: placeHref({ country: pm.country, state: pm.state, city: null }),
     });
   }
@@ -343,8 +363,7 @@ export function toPublicProfileVM(
   const ageTag = ageTagOf(pm.age, pm.gender) ?? "";
   const rolesTag = pm.roles.join(" | ");
   const tagLine = [ageTag, rolesTag].filter(Boolean).join(" · ") || null;
-  const locationLine =
-    [pm.city, displayState(pm.state), countryName(pm.country)].filter(Boolean).join(", ") || null;
+  const locationLine = fullLocationOf(pm.city, pm.state, pm.country);
   return {
     userId: pm.userId,
     username: pm.username,
@@ -382,7 +401,7 @@ export function toPublicProfileVM(
       age: pm.age === null ? null : String(pm.age),
       dateOfBirth: longDate(pm.dateOfBirth),
       gender: capitalize(pm.gender) || null,
-      location: [pm.city, displayState(pm.state)].filter(Boolean).join(", ") || null,
+      location: locationOf(pm.city, pm.state, pm.country),
       relationshipStatus: pm.relationshipStatus,
       nationality: countryName(pm.nationality),
       occupation: pm.occupation,

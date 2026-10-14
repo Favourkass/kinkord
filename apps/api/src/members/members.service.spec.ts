@@ -82,8 +82,9 @@ const makeService = () => {
         avatarKey: "avatars/kay.jpg",
         dateOfBirth: null,
         gender: null,
-        city: null,
-        state: null,
+        city: "Westlands",
+        state: "Nairobi",
+        country: "KE",
         isFollowing: false,
       },
     ],
@@ -186,6 +187,7 @@ describe("MembersService", () => {
             roles: ["Submissive", "Switch"],
             city: "Asaba",
             state: "Delta",
+            country: "NG",
             lastSeenAt: new Date("2026-09-08T11:59:00Z"),
             isOnline: true,
             followers: 1234,
@@ -209,6 +211,8 @@ describe("MembersService", () => {
     expect(card.postsCount).toBe(0);
     expect(card.isOnline).toBe(true);
     expect(card.roles).toEqual(["Submissive", "Switch"]);
+    // The web names the state by the country: "Delta State", but Kenya's "Nairobi".
+    expect(card.country).toBe("NG");
     expect(card.lastSeenAt).toBe("2026-09-08T11:59:00.000Z");
     expect(typeof card.age).toBe("number");
     // Cards render the medium size, not the full-resolution original.
@@ -450,8 +454,9 @@ describe("MembersService.friends", () => {
           avatarUrl: "https://s3/avatars/kay.jpg",
           age: null,
           gender: null,
-          city: null,
-          state: null,
+          city: "Westlands",
+          state: "Nairobi",
+          country: "KE",
           isFollowing: false,
         },
       ],
