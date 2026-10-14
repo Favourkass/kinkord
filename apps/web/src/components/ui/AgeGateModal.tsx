@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import Image from "next/image";
 
 export interface AgeGatePoint {
@@ -35,11 +35,15 @@ export default function AgeGateModal({
   onConfirm,
   onDecline,
 }: AgeGateModalProps) {
+  const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     if (!open) return;
+    const element = dialog.current;
+    element?.showModal();
     const originalStyle = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
+      element?.close();
       document.body.style.overflow = originalStyle;
     };
   }, [open]);
@@ -47,11 +51,11 @@ export default function AgeGateModal({
   if (!open) return null;
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
+    <dialog
+      ref={dialog}
       aria-labelledby="age-gate-title"
-      className="fixed inset-0 z-[100] flex items-center justify-center p-3.5 sm:p-6"
+      onCancel={(event) => event.preventDefault()}
+      className="fixed inset-0 z-[100] m-0 flex h-dvh max-h-none w-screen max-w-none items-center justify-center border-0 bg-transparent p-3.5 sm:p-6"
     >
       {/* Backdrop */}
       <div
@@ -160,6 +164,6 @@ export default function AgeGateModal({
           </button>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }

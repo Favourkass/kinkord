@@ -8,6 +8,7 @@ import {
   BRAND_TAGLINE,
   COPYRIGHT_LINE,
   JOIN_AGE_DISCLAIMER,
+  MOBILE_LANDING_CONTENT,
   POLICY_LINKS,
 } from "@/constants/landing";
 import { Routes } from "@/constants/Routes";
@@ -28,10 +29,11 @@ export function getLandingVM() {
     },
     mobileHero: {
       src: "/brand/header.jpeg",
-      alt: "Kinkord adults-only community: connect, explore and belong. Meet like-minded people, explore your interests and make real connections in a safe, respectful space.",
+      alt: "Five adult community members in black outfits, with the Kinkord logo and an adults-only badge.",
       width: 720,
       height: 1080,
     },
+    mobileContent: MOBILE_LANDING_CONTENT,
     downloadCta,
     brand: BRAND_NAME,
     tagline: BRAND_TAGLINE,

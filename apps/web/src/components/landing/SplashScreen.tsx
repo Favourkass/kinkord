@@ -2,6 +2,9 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   Cookie,
+  Crown,
+  Heart,
+  MessageCircle,
   Copyright,
   FileText,
   Info,
@@ -56,7 +59,16 @@ export interface SplashScreenProps {
   logo: SplashImage;
   hero: SplashImage;
   mobileHero?: SplashImage & { width: number; height: number };
-  isDesktop?: boolean;
+  mobileContent?: {
+    eyebrow: string;
+    title: string;
+    description: string;
+    features: readonly {
+      icon: "people" | "heart" | "shield" | "messages" | "crown";
+      label: string;
+    }[];
+    footer: string;
+  };
   downloadCta: SplashAction;
   brand: string;
   tagline: string;
@@ -386,7 +398,7 @@ export default function SplashScreen({
   logo,
   hero,
   mobileHero,
-  isDesktop = true,
+  mobileContent,
   downloadCta,
   brand,
   tagline,
@@ -404,7 +416,7 @@ export default function SplashScreen({
 }: SplashScreenProps) {
   return (
     <div className="min-h-dvh bg-black">
-      {isDesktop && showAgeGate && ageGate && onConfirmAge && onDeclineAge && (
+      {showAgeGate && ageGate && onConfirmAge && onDeclineAge && (
         <AgeGateModal
           open={showAgeGate}
           title={ageGate.title}
@@ -420,59 +432,68 @@ export default function SplashScreen({
         />
       )}
 
-      {/* The mobile artwork stays in normal flow at its original aspect ratio. */}
+      {/* Only the photo portion remains; the poster’s lower copy and buttons are live UI. */}
       <div className="flex min-h-dvh flex-col bg-black lg:hidden">
         <h1 className="sr-only">{brand}</h1>
-        <Image
-          src={mobileHero?.src ?? hero.src}
-          alt={mobileHero?.alt ?? hero.alt}
-          width={mobileHero?.width ?? 720}
-          height={mobileHero?.height ?? 1080}
-          preload
-          unoptimized
-          sizes="100vw"
-          className="block h-auto w-full"
-        />
-        <div className="flex flex-col items-center gap-4 px-5 pb-8 pt-6 sm:px-7">
-          {showAgeGate && ageGate && onConfirmAge && onDeclineAge ? (
-            <section
-              aria-label={ageGate.title}
-              className="w-full max-w-[460px] rounded-2xl border border-kink-amber/50 bg-kink-surface p-5 text-center"
-            >
-              <p className="text-[15px] font-bold text-kink-gold-bright">{ageGate.badge}</p>
-              <p className="mt-3 text-[14px] text-white">{ageGate.statement}</p>
-              <p className="mt-3 text-[12px] leading-5 text-kink-mist">{ageGate.intro}</p>
-              <ul className="my-3 space-y-2 text-left text-[12px] leading-5 text-kink-mist">
-                {ageGate.points?.map((point) => (
-                  <li key={point.text}>
-                    <span aria-hidden>{point.icon}</span> {point.text}
-                  </li>
-                ))}
-              </ul>
-              <p className="text-[12px] leading-5 text-kink-mist">{ageGate.warning}</p>
-              <button
-                type="button"
-                onClick={onConfirmAge}
-                className="mt-4 w-full rounded-full bg-kink-gold-bright px-4 py-3 text-[13px] font-bold text-black"
-              >
-                {ageGate.confirmLabel}
-              </button>
-              <button
-                type="button"
-                onClick={onDeclineAge}
-                className="mt-3 w-full rounded-full border border-kink-amber/50 px-4 py-3 text-[13px] font-bold text-kink-gold-bright"
-              >
-                {ageGate.declineLabel}
-              </button>
-            </section>
-          ) : (
-            <div className="flex w-full max-w-[347px] flex-col gap-3">
-              <SignUpButton cta={signUp} />
-              <SignInButton cta={signIn} />
-              <div className="flex justify-center pt-1">
-                <DownloadPill cta={downloadCta} compact />
+        <div className="aspect-[720/630] w-full overflow-hidden">
+          <Image
+            src={mobileHero?.src ?? hero.src}
+            alt={mobileHero?.alt ?? hero.alt}
+            width={mobileHero?.width ?? 720}
+            height={mobileHero?.height ?? 1080}
+            preload
+            unoptimized
+            sizes="100vw"
+            className="block h-auto w-full"
+          />
+        </div>
+        <div className="flex flex-col items-center gap-4 px-5 pb-8 pt-5 sm:px-7">
+          {mobileContent && (
+            <>
+              <div className="text-center">
+                <p className="text-[11px] tracking-[0.3em] text-white">{mobileContent.eyebrow}</p>
+                <h2 className="mt-2 font-serif text-[36px] italic leading-tight text-kink-gold-bright sm:text-[44px]">
+                  {mobileContent.title}
+                </h2>
+                <p className="mx-auto mt-4 max-w-[390px] text-[13px] leading-5 text-white">
+                  {mobileContent.description}
+                </p>
               </div>
+              <ul className="my-2 grid w-full max-w-[460px] grid-cols-5 divide-x divide-kink-amber/40">
+                {mobileContent.features.map((feature) => {
+                  const Icon = {
+                    people: Users,
+                    heart: Heart,
+                    shield: Shield,
+                    messages: MessageCircle,
+                    crown: Crown,
+                  }[feature.icon];
+                  return (
+                    <li
+                      key={feature.icon}
+                      className="flex flex-col items-center gap-2 px-1 text-center"
+                    >
+                      <Icon size={23} className="text-kink-gold-bright" aria-hidden />
+                      <span className="text-[8px] uppercase leading-[13px] tracking-[0.08em] text-white sm:text-[10px]">
+                        {feature.label}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
+          <div className="flex w-full max-w-[347px] flex-col gap-3">
+            <SignUpButton cta={signUp} />
+            <SignInButton cta={signIn} />
+            <div className="flex justify-center pt-1">
+              <DownloadPill cta={downloadCta} compact />
             </div>
+          </div>
+          {mobileContent && (
+            <p className="my-2 text-center text-[9px] tracking-[0.2em] text-kink-mist">
+              {mobileContent.footer}
+            </p>
           )}
           <nav className="mt-2 w-full max-w-[347px] rounded-[20px] border border-kink-amber bg-kink-surface px-[22px]">
             {navLinks.map((link, i) => (

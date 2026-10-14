@@ -109,3 +109,18 @@ export const LECTURE_CATEGORIES = [
   "Workshops & Discussions",
   "General",
 ] as const;
+
+export const MOBILE_LANDING_CONTENT = {
+  eyebrow: "MORE THAN A PLATFORM",
+  title: "It's a Community.",
+  description:
+    "Connect with like-minded people, explore your desires, and be part of a safe, respectful and exciting space.",
+  features: [
+    { icon: "people", label: "Meet like-minded people" },
+    { icon: "heart", label: "Explore your interests" },
+    { icon: "shield", label: "Privacy & safety first" },
+    { icon: "messages", label: "Real connections" },
+    { icon: "crown", label: "Be your authentic self" },
+  ],
+  footer: "DIFFERENT PEOPLE · SAME DESIRES",
+} as const;
