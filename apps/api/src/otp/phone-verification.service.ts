@@ -59,7 +59,12 @@ export class PhoneVerificationService {
   }
 
   async verify(userId: string, otpId: string, code: string) {
-    const result = await this.otp.verify(userId, otpId, code);
+    // Only a code texted to the number on the profile right now verifies it.
+    const { phone } = await this.phoneFor(userId);
+    const result = await this.otp.verify(userId, otpId, code, {
+      channel: "sms",
+      destination: phone,
+    });
     if (!result.valid) return { verified: false, attemptsLeft: result.attemptsLeft ?? null };
 
     await this.db.update(profile).set({ phoneVerified: true }).where(eq(profile.userId, userId));

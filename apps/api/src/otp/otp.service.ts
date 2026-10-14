@@ -171,8 +171,19 @@ export class OtpService {
   /**
    * Redeem a code. Locks the row for the check so two racing requests cannot
    * each spend an attempt against the same counter.
+   *
+   * A code only proves what it was sent to: `expected` is the channel and the
+   * address the caller is about to mark verified, and the code must have been
+   * sent there. Otherwise a code texted to your own phone could "verify" an
+   * email address you don't own (or the other way round), and an address
+   * changed after the code went out would be verified without ever getting it.
    */
-  async verify(userId: string, id: string, code: string): Promise<OtpVerifyResult> {
+  async verify(
+    userId: string,
+    id: string,
+    code: string,
+    expected: { channel: OtpChannel; destination: string },
+  ): Promise<OtpVerifyResult> {
     if (!/^\d{6}$/.test(code)) return { valid: false };
     const now = new Date();
 
@@ -184,6 +195,11 @@ export class OtpService {
         .for("update");
 
       if (!challenge || challenge.expiresAt <= now) return { valid: false };
+      if (
+        challenge.channel !== expected.channel ||
+        challenge.destination !== expected.destination.trim().toLowerCase()
+      )
+        return { valid: false };
       if (challenge.lockedUntil && challenge.lockedUntil > now) {
         throw new TooManyOtpRequestsException("Too many wrong codes. Try again in 24 hours.");
       }
