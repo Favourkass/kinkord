@@ -1,10 +1,9 @@
 /**
  * Members directory + follow graph: API access and the pure rules the directory
- * screens share (country search, state/region lists, optimistic follow toggles).
+ * screens share (country search, optimistic follow toggles).
  */
 import { ALL_COUNTRY_CODES } from "@/constants/countries";
 import { AVAILABLE_COUNTRIES } from "@/constants/members";
-import locationOptions from "@/constants/location-options.json";
 import type { MediaPagePM, MemberCardPM, PublicProfilePM } from "@/domain/member";
 import { countryName } from "@/util/format";
 import { api } from "./apiClient";
@@ -156,19 +155,6 @@ export function searchCountries(query: string, counts: CountryCountPM[] | null):
     .sort((a, b) => a.name.localeCompare(b.name))
     .map<CountryOption>((c) => ({ ...c, flag: null, membersCount: null, available: false }));
   return [...launchedHits, ...comingSoon];
-}
-
-/** Configured states for a launched country, in the product team's order. */
-const locationCatalog = locationOptions as Record<string, Record<string, readonly string[]>>;
-
-export function statesForCountry(code: string): string[] {
-  return Object.keys(locationCatalog[code.toUpperCase()] ?? {}).sort((a, b) => a.localeCompare(b));
-}
-
-/** Regions, cities and towns within a Nigerian state or Kenyan county. */
-export function regionsForState(code: string, state: string): string[] {
-  const areas = locationCatalog[code.toUpperCase()]?.[state];
-  return Array.isArray(areas) ? [...areas] : [];
 }
 
 /** Optimistic follow flip for a directory card. */
