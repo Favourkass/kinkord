@@ -494,6 +494,7 @@ export class MembersService {
         roles: profile.roles,
         interests: profile.interests,
         lookingFor: profile.lookingFor,
+        visibility: profile.profileVisibility,
         lastSeenAt: profile.lastSeenAt,
         createdAt: user.createdAt,
         silver: silverCheck(profile.userId),
@@ -512,13 +513,19 @@ export class MembersService {
       city: me.city,
       state: me.state,
     };
-    const candidates = rows.map((r) => ({
-      ...r,
-      roles: r.roles ?? [],
-      kinks: r.interests ?? [],
-      lookingFor: r.lookingFor ?? [],
-      hasPhoto: Boolean(r.avatarKey),
-    }));
+    const candidates = rows.map((r) => {
+      // Followed members are never in the pool, so no one here is the viewer's
+      // friend: a friends-only profile's About details stay out of the card and
+      // the ranking, as on publicProfile.
+      const restricted = r.visibility === "friends";
+      return {
+        ...r,
+        roles: r.roles ?? [],
+        kinks: restricted ? [] : (r.interests ?? []),
+        lookingFor: restricted ? [] : (r.lookingFor ?? []),
+        hasPhoto: Boolean(r.avatarKey),
+      };
+    });
     const wanted = wantedSide(viewer.roles);
     const best = rankCandidates(viewer, candidates, now).slice(0, limit);
     const items = await Promise.all(

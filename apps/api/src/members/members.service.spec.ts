@@ -976,6 +976,20 @@ describe("MembersService.suggestedForFeed (matching v1)", () => {
     expect(presignDownload).toHaveBeenCalledWith("avatars/ada.jpg", "md");
   });
 
+  it("keeps a friends-only member's kinks and looking-for out of the card and the ranking", async () => {
+    const { result } = await run(me, [
+      row({
+        userId: "fay",
+        visibility: "friends",
+        interests: ["Bondage"],
+        lookingFor: ["Friendship"],
+      }),
+      row({ userId: "gil", visibility: "public", interests: ["Bondage"] }),
+    ]);
+    expect(result.items.map((i) => i.userId)).toEqual(["gil", "fay"]);
+    expect(result.items[1]).toMatchObject({ userId: "fay", lookingFor: [] });
+  });
+
   it("looks in the member's country for the gender shown, leaving out the member, anyone followed, removed, blocked or suspended", async () => {
     const { where } = await run(me, []);
     expect(where?.params).toEqual(expect.arrayContaining(["NG", "me", "female"]));
