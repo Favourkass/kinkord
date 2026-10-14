@@ -210,6 +210,37 @@ describe("useEditSectionPresenter", () => {
     expect(editor.options.map((o) => o.label)).toEqual(["Shown", "Hidden"]);
   });
 
+  it("offers the state's towns in the City editor, and saves a typed one", async () => {
+    const fetch = vi.fn(async () => new Response(JSON.stringify(["Abraka", "Asaba", "Warri"])));
+    vi.stubGlobal("fetch", fetch);
+    apiPatch.mockResolvedValue({ ...profile, city: "Ikota Villa" });
+    const { result } = renderHook(() => useEditSectionPresenter("location"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(fetch).toHaveBeenCalledWith("/locations/NG/delta.json");
+    const city = result.current.rows.findIndex((r) => r.key === "city");
+    act(() => result.current.rows[city].onClick?.());
+    await waitFor(() => {
+      const editor = result.current.editor?.editor;
+      expect(editor?.kind === "single" && editor.options.map((o) => o.value)).toEqual([
+        "Abraka",
+        "Asaba",
+        "Warri",
+      ]);
+    });
+    const editor = result.current.editor?.editor;
+    if (editor?.kind !== "single") throw new Error("expected a picker");
+    expect(editor.custom?.typedLabel("Ikota Villa")).toBe("Use “Ikota Villa”");
+    expect(result.current.editor?.labels.more).toBe("Keep typing to narrow it down");
+    act(() => result.current.editor?.onDraft({ kind: "single", value: "Ikota Villa" }));
+    act(() => result.current.editor?.onSave());
+    await waitFor(() => expect(result.current.editor).toBeNull());
+    expect(apiPatch).toHaveBeenCalledWith("/profile", {
+      city: "Ikota Villa",
+      location: "Ikota Villa, Delta State, Nigeria",
+    });
+    vi.unstubAllGlobals();
+  });
+
   it("sends an expired session back to login", async () => {
     const { ApiError } = await import("@/services/apiClient");
     apiGet.mockRejectedValue(new ApiError(401, {}));
