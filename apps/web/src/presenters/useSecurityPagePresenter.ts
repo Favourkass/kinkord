@@ -7,6 +7,7 @@ import { Routes } from "@/constants/Routes";
 import type { MePM, OwnProfilePM } from "@/domain/profile";
 import { ApiError } from "@/services/apiClient";
 import { profileApi } from "@/services/profile.service";
+import { saveSettingsPhone } from "@/services/phoneSettings.service";
 import { useVerification } from "./useVerification";
 import { useSecurityPresenter } from "./useProfilePresenter";
 
@@ -26,7 +27,25 @@ export function useSecurityPagePresenter() {
   const [pw, setPw] = useState({ current: "", next: "" });
   const sec = useSecurityPresenter((enabled) => setTwoFactorOn(enabled));
 
+  const [phoneDraft, setPhoneDraft] = useState("");
+  const [savingPhone, setSavingPhone] = useState(false);
+  const [phoneSaveError, setPhoneSaveError] = useState<string | null>(null);
   const phone = useVerification("phone");
+  const savePhone = async () => {
+    if (savingPhone) return;
+    setSavingPhone(true);
+    setPhoneSaveError(null);
+    try {
+      const saved = await saveSettingsPhone(phoneDraft);
+      setProfile(saved);
+      phone.reset();
+      setPhoneDraft("");
+    } catch (e) {
+      setPhoneSaveError(e instanceof Error ? e.message : "Could not save your number. Try again.");
+    } finally {
+      setSavingPhone(false);
+    }
+  };
   const emailCode = useVerification("email");
 
   useEffect(() => {
@@ -129,6 +148,16 @@ export function useSecurityPagePresenter() {
         description: copy.phone.description,
         verifiedNote: copy.phone.verifiedNote,
         missingNote: copy.phone.missing,
+        entry: {
+          label: copy.phone.inputLabel,
+          placeholder: copy.phone.placeholder,
+          value: phoneDraft,
+          onChange: setPhoneDraft,
+          saveLabel: copy.phone.save,
+          onSave: () => void savePhone(),
+          saving: savingPhone,
+          error: phoneSaveError,
+        },
         sentNote: phone.sentTo ? copy.phone.sentTo(phone.sentTo) : null,
         sendLabel: phone.sent ? copy.phone.resend : copy.phone.send,
         onSend: phone.sendCode,

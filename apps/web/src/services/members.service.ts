@@ -1,10 +1,9 @@
 /**
  * Members directory + follow graph: API access and the pure rules the directory
- * screens share (country search, state/region lists, optimistic follow toggles).
+ * screens share (country search, optimistic follow toggles).
  */
 import { ALL_COUNTRY_CODES } from "@/constants/countries";
 import { AVAILABLE_COUNTRIES } from "@/constants/members";
-import { NG_LGAS } from "@/constants/nigeria";
 import type { MediaPagePM, MemberCardPM, PublicProfilePM } from "@/domain/member";
 import { countryName } from "@/util/format";
 import { api } from "./apiClient";
@@ -156,17 +155,6 @@ export function searchCountries(query: string, counts: CountryCountPM[] | null):
     .sort((a, b) => a.name.localeCompare(b.name))
     .map<CountryOption>((c) => ({ ...c, flag: null, membersCount: null, available: false }));
   return [...launchedHits, ...comingSoon];
-}
-
-/** Configured states for a launched country, in the product team's order. */
-export function statesForCountry(code: string): string[] {
-  return code.toUpperCase() === "NG" ? Object.keys(NG_LGAS) : [];
-}
-
-/** Configured regions (LGAs / areas) for a state; empty when the state is unknown. */
-export function regionsForState(code: string, state: string): string[] {
-  if (code.toUpperCase() !== "NG") return [];
-  return [...(NG_LGAS[state] ?? [])];
 }
 
 /** Optimistic follow flip for a directory card. */

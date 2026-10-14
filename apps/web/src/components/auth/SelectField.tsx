@@ -11,6 +11,8 @@ interface Props {
   onChange: (v: string) => void;
   options: readonly string[];
   placeholder?: string;
+  /** Makes the empty choice selectable under this label, so a pick can be undone. */
+  clearLabel?: string;
   helper?: string;
   error?: string;
   icon?: LucideIcon;
@@ -23,6 +25,7 @@ export default function SelectField({
   onChange,
   options,
   placeholder = "Select…",
+  clearLabel,
   helper,
   error,
   icon: Icon,
@@ -49,8 +52,8 @@ export default function SelectField({
           onChange={(e) => onChange(e.target.value)}
           className="h-full w-full appearance-none bg-transparent pr-8 text-[15px] text-white outline-none [color-scheme:dark] lg:text-[20px] [&>option]:bg-kink-field"
         >
-          <option value="" disabled>
-            {placeholder}
+          <option value="" disabled={!clearLabel}>
+            {clearLabel ?? placeholder}
           </option>
           {options.map((o) => (
             <option key={o} value={o}>

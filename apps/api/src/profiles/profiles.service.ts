@@ -27,6 +27,7 @@ import {
   LANGUAGES,
   LOOKING_FOR,
   NAME_CHANGE_COOLDOWN_DAYS,
+  ORIENTATIONS,
   PROFILE_VISIBILITIES,
   RELATIONSHIP_STATUSES,
 } from "./profile-options";
@@ -66,6 +67,8 @@ export const socialLinksSchema = z
  * are free text.
  */
 export const updateProfileSchema = z.object({
+  /** Only ever set, never cleared, and only while ProfilesService allows it. */
+  signupPhotosSkipped: z.literal(true).optional(),
   displayName: z.string().trim().min(3).max(30).optional(),
   bio: z.string().trim().max(500).nullable().optional(),
   pronouns: z.string().trim().max(30).nullable().optional(),
@@ -83,7 +86,8 @@ export const updateProfileSchema = z.object({
   relationshipStatus: z.enum(RELATIONSHIP_STATUSES).nullable().optional(),
   lookingFor: z.array(z.enum(LOOKING_FOR)).max(10).optional(),
   interests: z.array(z.enum(KINKS)).max(20).optional(),
-  orientation: z.string().trim().min(1).max(40).nullable().optional(),
+  /** Private to the member; null clears it. */
+  orientation: z.enum(ORIENTATIONS).nullable().optional(),
   bodyType: z.string().trim().min(1).max(40).nullable().optional(),
   languages: z.array(z.enum(LANGUAGES)).max(10).optional(),
   location: z.string().trim().min(1).max(120).nullable().optional(),
@@ -126,6 +130,8 @@ const maxBytes = (spec: { maxMb: number }) => spec.maxMb * 1024 * 1024;
 const tooLarge = (spec: { maxMb: number }) => `Image is too large — max ${spec.maxMb}MB.`;
 
 const COOLDOWN_MS = NAME_CHANGE_COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
+
+export const PHOTOS_NEEDED = "Add a profile photo and a cover picture to continue.";
 
 /**
  * 30-day lock on display name / username changes (CEO brief): the date the next change
@@ -174,6 +180,11 @@ export class ProfilesService {
     now = new Date(),
   ) {
     const current = await this.ensureRow(userId, fallbackName);
+    // Photos can only be skipped at first sign-up, before the member has ever
+    // had a profile photo: one who deletes theirs is asked for a new one.
+    if (input.signupPhotosSkipped && !current.photoSkipAvailable) {
+      throw new BadRequestException({ signupPhotosSkipped: [PHOTOS_NEEDED] });
+    }
     for (const [field, prefix] of [
       ["avatarKey", "avatars"],
       ["coverKey", "covers"],
@@ -193,6 +204,8 @@ export class ProfilesService {
       if (next) throw new BadRequestException({ displayName: [lockMessage("display name", next)] });
       changes.displayNameChangedAt = now;
     }
+    // The first profile photo closes the skip for good.
+    if (input.avatarKey && current.photoSkipAvailable) changes.photoSkipAvailable = false;
     // A new number has not been proved, so "Basic verified" has to be earned again.
     if (input.phone !== undefined && input.phone !== current.phone) {
       changes.phoneVerified = false;
@@ -419,6 +432,8 @@ export class ProfilesService {
       phoneVerified: row.phoneVerified,
       avatarUrl: row.avatarKey ? await this.storage.presignDownload(row.avatarKey) : null,
       coverUrl: row.coverKey ? await this.storage.presignDownload(row.coverKey) : null,
+      /** Whether the sign-up photo step may offer "Skip photos for now". */
+      canSkipPhotos: row.photoSkipAvailable === true,
       nationality: row.nationality ?? null,
       occupation: row.occupation ?? null,
       limits: row.limits ?? null,

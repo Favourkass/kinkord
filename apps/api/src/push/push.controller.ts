@@ -31,7 +31,7 @@ export class PushController {
     return { ok: true };
   }
 
-  /** Allowed before phone verification too: logging out always cleans up the device. */
+  /** Allowed during the sign-up holds too: logging out always cleans up the device. */
   @Post("subscriptions/remove")
   @AllowDuringSignUp()
   async unsubscribe(@Req() req: AuthedRequest, @Body() body: unknown) {

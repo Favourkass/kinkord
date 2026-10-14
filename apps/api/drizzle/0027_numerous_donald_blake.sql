@@ -1,0 +1,1 @@
+ALTER TABLE "profile" ADD COLUMN "signup_photos_skipped" boolean DEFAULT false NOT NULL;

@@ -18,9 +18,7 @@ import {
   isCountryAvailable,
   membersApi,
   nextSort,
-  regionsForState,
   searchCountries,
-  statesForCountry,
   toggleFollowOnCard,
   toggleFollowOnFriend,
   toggleFollowOnProfile,
@@ -125,15 +123,8 @@ describe("searchCountries", () => {
   });
 });
 
-describe("states + regions", () => {
-  it("knows Nigeria's configured states and regions, and nothing for other countries", () => {
-    expect(statesForCountry("ng")).toContain("Delta");
-    expect(statesForCountry("ng").length).toBe(37);
-    expect(statesForCountry("gh")).toEqual([]);
-    expect(regionsForState("NG", "Delta")[0]).toBe("Abraka");
-    expect(regionsForState("NG", "Delta")).toContain("My region is not listed");
-    expect(regionsForState("NG", "Nowhere")).toEqual([]);
-    expect(regionsForState("GH", "Delta")).toEqual([]);
+describe("directory countries", () => {
+  it("serves launched countries only", () => {
     expect(isCountryAvailable("ng")).toBe(true);
     expect(isCountryAvailable("GH")).toBe(false);
   });

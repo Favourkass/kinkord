@@ -66,6 +66,8 @@ export interface MePM {
 /** GET /profile/options — every picker list, owned by the API. */
 export interface ProfileOptionsPM {
   genders: readonly string[];
+  /** Sexuality choices; the value is private to the member. */
+  orientations: readonly string[];
   relationshipStatuses: readonly string[];
   roles: readonly string[];
   kinks: readonly string[];
@@ -91,6 +93,8 @@ export type EditRowKey =
   | "displayName"
   | "bio"
   | "gender"
+  /** Sexuality: private, shown only to the member. */
+  | "orientation"
   | "dateOfBirth"
   | "nationality"
   | "relationshipStatus"
@@ -126,7 +130,14 @@ export type EditorSpec =
       lockedUntil: string | null;
     }
   | { kind: "textarea"; value: string; maxLength: number }
-  | { kind: "single"; value: string | null; options: EditorOption[]; searchable: boolean }
+  | {
+      kind: "single";
+      value: string | null;
+      options: EditorOption[];
+      searchable: boolean;
+      /** Also takes what was typed in the search (a town the list lacks). */
+      custom?: boolean;
+    }
   | { kind: "multi"; value: string[]; options: EditorOption[]; max: number; searchable: boolean }
   | { kind: "date"; value: string | null; max: string }
   | { kind: "links"; value: { facebook: string; x: string } };

@@ -4,6 +4,7 @@ import { fromNodeHeaders } from "better-auth/node";
 import { z } from "zod";
 import { PhoneSignInService } from "./phone-sign-in.service";
 import { isAllowedPhone, PHONE_NOT_ALLOWED } from "../profiles/phone-rules";
+import { ORIENTATIONS } from "../profiles/profile-options";
 import { SignUpService } from "./sign-up.service";
 
 const signInPhoneSchema = z.object({
@@ -48,12 +49,14 @@ const signUpSchema = z.object({
     .refine((s) => new Date(s) <= eighteenYearsAgo(), "You must be 18 or older to join")
     .nullish(),
   gender: z.string().trim().min(1).max(20).nullish(),
-  // Required: a number is what stops a removed member coming back with a fresh email.
+  orientation: z.enum(ORIENTATIONS).nullish(),
+  // Optional at signup; validate any supplied number using the Settings rule.
   phone: z
-    .string({ required_error: "Enter your phone number." })
+    .string()
     .trim()
     .regex(/^\+\d{8,15}$/, "phone must be E.164, e.g. +2348012345678")
-    .refine(isAllowedPhone, PHONE_NOT_ALLOWED),
+    .refine(isAllowedPhone, PHONE_NOT_ALLOWED)
+    .nullish(),
 });
 
 @Controller("auth-ext")
@@ -105,7 +108,8 @@ export class AuthExtController {
         city: about.city ?? null,
         dateOfBirth: about.dateOfBirth ?? null,
         gender: about.gender ?? null,
-        phone: about.phone,
+        orientation: about.orientation ?? null,
+        phone: about.phone ?? null,
       },
       fromNodeHeaders(req.headers),
     );
