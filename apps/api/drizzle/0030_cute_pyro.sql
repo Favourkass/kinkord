@@ -1,0 +1,2 @@
+CREATE INDEX "post_comment_author_idx" ON "post_comment" USING btree ("author_id","created_at");--> statement-breakpoint
+CREATE INDEX "post_share_user_idx" ON "post_share" USING btree ("user_id","created_at");

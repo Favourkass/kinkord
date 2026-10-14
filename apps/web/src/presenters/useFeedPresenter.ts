@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { FEED_COPY, FEED_PHOTO_LIMIT, FEED_SUGGESTION_LIMIT } from "@/constants/feed";
 import { Routes } from "@/constants/Routes";
 import {
   COMMENT_BODY_MAX,
+  FEED_TABS,
   postBodyMax,
   toCommentVM,
   toFeedSuggestionVM,
@@ -13,10 +14,14 @@ import {
   type CommentPM,
   type CommentVM,
   type DraftPhotoVM,
+  type FeedEmptyVM,
+  type FeedHint,
   type FeedSuggestionPM,
   type FeedSuggestionVM,
   type PostMediaVM,
   type FeedPM as FeedPagePM,
+  type FeedTab,
+  type FeedTabVM,
   type PostPM,
   type PostVM,
   type PostVisibility,
@@ -32,6 +37,7 @@ import { ApiError } from "@/services/apiClient";
 import { isOfficialOrganization } from "@/services/organization-placeholder.service";
 import { useMentionSuggestions, type MentionField } from "./useMentionSuggestions";
 import {
+  appendNewRows,
   applyLike,
   applyRepost,
   applySave,
@@ -39,6 +45,7 @@ import {
   applyToPost,
   canSubmitComment,
   canSubmitPost,
+  feedTabMemory,
   postPermalink,
   postsApi,
   remainingPhotoSlots,
@@ -54,6 +61,34 @@ import {
 
 /** Profile link for an author; null for a member who has no username yet. */
 const memberHref = (username: string | null) => (username ? Routes.member(username) : null);
+
+/** For useSyncExternalStore: nothing but this page changes the remembered tab. */
+const noOutsideChanges = () => () => {};
+/** The server has no session to remember a tab from: the client reads it before the feed loads. */
+const noTabOnTheServer = () => null;
+
+/** What an empty home feed says for each tab, and the way to fill it when there is one. */
+function emptyFeed(tab: FeedTab | null, hint: FeedHint | null): FeedEmptyVM {
+  if (tab === "following") {
+    return hint === "no_follows"
+      ? {
+          title: FEED_COPY.noFollowsTitle,
+          body: FEED_COPY.noFollowsBody,
+          action: { label: FEED_COPY.noFollowsAction, href: Routes.members },
+        }
+      : { title: FEED_COPY.followingEmpty, body: null, action: null };
+  }
+  if (tab === "nearby") {
+    return hint === "no_location"
+      ? {
+          title: FEED_COPY.noLocationTitle,
+          body: FEED_COPY.noLocationBody,
+          action: { label: FEED_COPY.noLocationAction, href: Routes.profileEditLocation },
+        }
+      : { title: FEED_COPY.nearbyEmpty, body: null, action: null };
+  }
+  return { title: FEED_COPY.feedEmptyTitle, body: FEED_COPY.feedEmptyBody, action: null };
+}
 
 interface DraftPhoto extends DraftPhotoVM {
   key: string | null;
@@ -86,7 +121,8 @@ export interface FeedOptions {
 /**
  * The feed: reading it, writing to it, and reacting to it. Serves both the home
  * feed and a profile's Posts tab, so a post behaves the same wherever it is
- * read — one like, one comment sheet, one delete.
+ * read — one like, one comment sheet, one delete. Only the home feed has the
+ * For You | Following | Nearby tabs, remembered for the browser session.
  *
  * Photos upload the moment they are picked rather than on submit, so the Post
  * button is instant on the connection most members are on — by the time the
@@ -102,9 +138,24 @@ export function useFeedPresenter({
 }: FeedOptions = {}) {
   const router = useRouter();
 
+  // The home feed's tab: the one picked here, else the one this browser
+  // session last showed. Read on the client only, and the feed waits for it,
+  // so a remembered Following never loads For You first.
+  const home = !author && !postId && !saved && !search;
+  const rememberedTab = useSyncExternalStore(
+    noOutsideChanges,
+    feedTabMemory.read,
+    noTabOnTheServer,
+  );
+  const [pickedTab, setPickedTab] = useState<FeedTab | null>(null);
+  const tab = home ? (pickedTab ?? rememberedTab) : null;
+  const listReady = ready && (!home || tab !== null);
+
   const [posts, setPosts] = useState<PostPM[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
-  const surface = `${postId ?? ""}|${author ?? ""}|${saved}|${search ?? ""}`;
+  /** Why the list may be empty, as its first page said. */
+  const [hint, setHint] = useState<FeedHint | null>(null);
+  const surface = `${postId ?? ""}|${author ?? ""}|${saved}|${search ?? ""}|${tab ?? ""}`;
   /**
    * Each first page starts a round of the list: another list, the same list
    * switched off and on again (a search cleared and typed again), or one gone
@@ -113,14 +164,15 @@ export function useFeedPresenter({
    * `loading` from the round rather than flipping a flag means walking from
    * one member's profile to another shows a load instead of a flash of the
    * previous member's posts — the page component stays mounted across that.
+   * A home feed tab is a list of its own: switching tabs starts a round too.
    */
-  const [requested, setRequested] = useState({ surface, ready, round: 1 });
-  if (requested.surface !== surface || requested.ready !== ready) {
-    setRequested({ surface, ready, round: requested.round + 1 });
+  const [requested, setRequested] = useState({ surface, ready: listReady, round: 1 });
+  if (requested.surface !== surface || requested.ready !== listReady) {
+    setRequested({ surface, ready: listReady, round: requested.round + 1 });
   }
   const round = requested.round;
   const [loadedRound, setLoadedRound] = useState(0);
-  const loading = !ready || loadedRound !== round;
+  const loading = !listReady || loadedRound !== round;
   // The round on screen, for the next pages still out when it changes.
   const shownRound = useRef(round);
   useEffect(() => {
@@ -200,14 +252,15 @@ export function useFeedPresenter({
   /** Object URLs outlive React state, so they are revoked by hand. */
   const previewUrls = useRef<string[]>([]);
 
-  /** Which page of which list to read — the five surfaces differ only here. */
+  /** Which page of which list to read — the surfaces differ only here. */
   const loadPage = useCallback(
     async (cursor: string | null): Promise<FeedPagePM> => {
       if (postId) return { items: [await postsApi.byId(postId)], nextCursor: null };
       if (saved) return postsApi.saved(cursor);
+      if (tab) return postsApi.feed(cursor, undefined, null, null, tab);
       return postsApi.feed(cursor, undefined, author, search);
     },
-    [author, postId, saved, search],
+    [author, postId, saved, search, tab],
   );
 
   const onUnauthorized = useCallback(
@@ -222,7 +275,7 @@ export function useFeedPresenter({
   );
 
   useEffect(() => {
-    if (!ready) return;
+    if (!listReady) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -230,12 +283,14 @@ export function useFeedPresenter({
         if (cancelled) return;
         setPosts(page.items);
         setCursor(page.nextCursor);
+        setHint(page.hint ?? null);
         setError(null);
       } catch (e) {
         if (cancelled || onUnauthorized(e)) return;
         // Nothing of the list before belongs under this one's error.
         setPosts([]);
         setCursor(null);
+        setHint(null);
         setError(FEED_COPY.feedError);
       } finally {
         if (!cancelled) setLoadedRound(round);
@@ -244,7 +299,7 @@ export function useFeedPresenter({
     return () => {
       cancelled = true;
     };
-  }, [round, loadPage, ready, onUnauthorized]);
+  }, [round, loadPage, listReady, onUnauthorized]);
 
   useEffect(() => {
     // Only the home feed carries the suggestions strip.
@@ -285,7 +340,7 @@ export function useFeedPresenter({
     try {
       const page = await loadPage(cursor);
       if (shownRound.current !== round) return;
-      setPosts((prev) => [...prev, ...page.items]);
+      setPosts((prev) => appendNewRows(prev, page.items));
       setCursor(page.nextCursor);
     } catch (e) {
       if (shownRound.current === round && !onUnauthorized(e)) setError(FEED_COPY.feedError);
@@ -293,6 +348,23 @@ export function useFeedPresenter({
       setLoadingMoreFor((current) => (current?.ask === ask ? null : current));
     }
   }, [cursor, loadPage, loading, loadingMore, onUnauthorized, round]);
+
+  /**
+   * Another tab: its list replaces this one, from its first page. A response
+   * still on its way for the tab left is dropped (the round has moved on).
+   */
+  const selectTab = useCallback(
+    (next: FeedTab) => {
+      if (!home || next === tab) return;
+      feedTabMemory.remember(next);
+      setPickedTab(next);
+      setPosts([]);
+      setCursor(null);
+      setHint(null);
+      setMenuFor(null);
+    },
+    [home, tab],
+  );
 
   const openMedia = useCallback((media: PostMediaVM) => setLightbox(media), []);
   const closeMedia = useCallback(() => setLightbox(null), []);
@@ -728,6 +800,22 @@ export function useFeedPresenter({
     [suggestions, followBusy],
   );
 
+  // Until the client has read the remembered tab (the server render), none is
+  // selected: better than showing For You for a frame and then another tab.
+  const tabs: FeedTabVM[] = useMemo(
+    () =>
+      home
+        ? FEED_TABS.map((value) => ({
+            value,
+            label: FEED_COPY.tabs[value],
+            selected: value === tab,
+          }))
+        : [],
+    [home, tab],
+  );
+
+  const empty = useMemo(() => emptyFeed(tab, hint), [tab, hint]);
+
   const suggestionSegments: SuggestionSegmentVM[] = useMemo(
     () =>
       suggestionOptions.map((value) => ({
@@ -1027,6 +1115,13 @@ export function useFeedPresenter({
     loading,
     error,
     posts: postVMs,
+    /** The home feed's For You | Following | Nearby; none elsewhere. */
+    tabs,
+    selectTab,
+    /** What the feed says when it has nothing to show. */
+    empty,
+    /** "Kinksters Near You" belongs to For You and Nearby, not to Following. */
+    showPeople: tab === "for_you" || tab === "nearby",
     hasMore: !loading && Boolean(cursor),
     loadingMore,
     loadMore,

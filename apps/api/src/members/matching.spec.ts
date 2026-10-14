@@ -4,12 +4,14 @@ import {
   cardRoles,
   defaultShow,
   genderShown,
+  kinkParts,
   matchScore,
   pairBonus,
   rankCandidates,
   resolveShow,
   roleSideScore,
   sameGender,
+  samePlace,
   scoreParts,
   showOptions,
   sidesOf,
@@ -265,6 +267,22 @@ describe("score parts", () => {
     });
     expect(matchScore(me, them, now)).toBe(16);
     expect(matchScore(me, candidate({ roles: ["Dominant"] }), now)).toBe(-2);
+  });
+
+  it("hands the feed the kink parts alone: no place, presence or photo", () => {
+    const me = { roles: ["Dominant"], kinks: ["Bondage"], lookingFor: ["Friendship"] };
+    const them = { roles: ["Submissive"], kinks: ["Bondage"], lookingFor: ["Events"] };
+    expect(kinkParts(me, them)).toEqual({ side: 4, pairs: 2, kinks: 1, lookingFor: 0 });
+    expect(scoreParts(viewer(me), candidate(them), now)).toMatchObject(kinkParts(me, them));
+  });
+});
+
+describe("the same place", () => {
+  it("compares case and stray spaces aside, and never matches an unknown", () => {
+    expect(samePlace("Lagos", " lagos ")).toBe(true);
+    expect(samePlace("Lagos", "Ogun")).toBe(false);
+    expect(samePlace(null, null)).toBe(false);
+    expect(samePlace("", "")).toBe(false);
   });
 });
 

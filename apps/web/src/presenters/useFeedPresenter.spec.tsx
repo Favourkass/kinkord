@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommentPM, PostPM } from "@/domain/post";
 
@@ -1668,5 +1669,246 @@ describe("post gifting presenter", () => {
       await result.current.giftDialog.onSend();
     });
     expect(giftSend.mock.calls[2]).toEqual(giftSend.mock.calls[0]);
+  });
+});
+
+describe("the home feed's tabs", () => {
+  type Tab = "for_you" | "following" | "nearby";
+  const ids = (r: { current: { posts: { id: string }[] } }) => r.current.posts.map((p) => p.id);
+  const selected = (r: { current: { tabs: { value: string; selected: boolean }[] } }) =>
+    r.current.tabs.find((t) => t.selected)?.value;
+
+  beforeEach(() => sessionStorage.clear());
+  afterEach(() => sessionStorage.clear());
+
+  it("on the server, selects no tab and loads nothing: the session's tab is the client's to read", () => {
+    sessionStorage.setItem("kinkord:feed-tab", "nearby");
+    let seen: { selected: boolean[]; loading: boolean; showPeople: boolean } | null = null;
+    function Probe() {
+      const vm = useFeedPresenter();
+      seen = {
+        selected: vm.tabs.map((t) => t.selected),
+        loading: vm.loading,
+        showPeople: vm.showPeople,
+      };
+      return null;
+    }
+    renderToString(<Probe />);
+    expect(seen).toEqual({ selected: [false, false, false], loading: true, showPeople: false });
+    expect(feed).not.toHaveBeenCalled();
+  });
+
+  it("opens on For You, asking the API for that tab", async () => {
+    const { result } = await loaded();
+    expect(feed).toHaveBeenCalledWith(null, undefined, null, null, "for_you");
+    expect(result.current.tabs).toEqual([
+      { value: "for_you", label: "For You", selected: true },
+      { value: "following", label: "Following", selected: false },
+      { value: "nearby", label: "Nearby", selected: false },
+    ]);
+    expect(result.current.showPeople).toBe(true);
+  });
+
+  it("empties the list at once on another tab, then shows that tab's first page", async () => {
+    feed.mockResolvedValueOnce({ items: [pm()], nextCursor: "c1" });
+    const { result } = await loaded();
+    let answer!: (page: unknown) => void;
+    feed.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
+
+    act(() => result.current.selectTab("following"));
+    expect(result.current.posts).toEqual([]);
+    expect(result.current.loading).toBe(true);
+    // For You's cursor would page Following from the wrong place.
+    expect(result.current.hasMore).toBe(false);
+    expect(selected(result)).toBe("following");
+    // Kinksters Near You is For You's and Nearby's, not Following's.
+    expect(result.current.showPeople).toBe(false);
+    await waitFor(() =>
+      expect(feed).toHaveBeenLastCalledWith(null, undefined, null, null, "following"),
+    );
+
+    await act(async () => answer({ items: [pm({ id: "f1", postId: "f1" })], nextCursor: null }));
+    expect(ids(result)).toEqual(["f1"]);
+    expect(result.current.loading).toBe(false);
+  });
+
+  it("drops a first page from a tab the viewer has already left", async () => {
+    const { result } = await loaded();
+    let following!: (page: unknown) => void;
+    feed.mockImplementation((_c: unknown, _l: unknown, _a: unknown, _s: unknown, tab: Tab) =>
+      tab === "following"
+        ? new Promise((resolve) => (following = resolve))
+        : Promise.resolve({ items: [pm({ id: `${tab}-1` })], nextCursor: null }),
+    );
+
+    act(() => result.current.selectTab("following"));
+    await waitFor(() =>
+      expect(feed).toHaveBeenLastCalledWith(null, undefined, null, null, "following"),
+    );
+    act(() => result.current.selectTab("nearby"));
+    await waitFor(() => expect(ids(result)).toEqual(["nearby-1"]));
+
+    await act(async () => following({ items: [pm({ id: "late" })], nextCursor: null }));
+    expect(ids(result)).toEqual(["nearby-1"]);
+    expect(selected(result)).toBe("nearby");
+  });
+
+  it("drops a next page that arrives after the tab changed", async () => {
+    let release: (page: unknown) => void = () => undefined;
+    feed.mockImplementation(
+      async (cursor: string | null, _l: unknown, _a: unknown, _s: unknown, tab: Tab) => {
+        if (tab === "for_you" && cursor) return new Promise((resolve) => (release = resolve));
+        return { items: [pm({ id: `${tab}-1` })], nextCursor: `${tab}-c1` };
+      },
+    );
+    const { result } = await loaded();
+    act(() => {
+      void result.current.loadMore();
+    });
+    act(() => result.current.selectTab("nearby"));
+    await waitFor(() => expect(ids(result)).toEqual(["nearby-1"]));
+
+    await act(async () => release({ items: [pm({ id: "for_you-2" })], nextCursor: null }));
+    expect(ids(result)).toEqual(["nearby-1"]);
+    expect(result.current.hasMore).toBe(true);
+    await act(async () => result.current.loadMore());
+    expect(feed).toHaveBeenLastCalledWith("nearby-c1", undefined, null, null, "nearby");
+  });
+
+  it("never shows a row twice when a next page repeats one", async () => {
+    feed.mockResolvedValueOnce({
+      items: [pm({ id: "p1" }), pm({ id: "p2", postId: "p2" })],
+      nextCursor: "c1",
+    });
+    const { result } = await loaded();
+    feed.mockResolvedValueOnce({
+      items: [pm({ id: "p2", postId: "p2" }), pm({ id: "p3", postId: "p3" })],
+      nextCursor: null,
+    });
+    await act(async () => result.current.loadMore());
+    expect(ids(result)).toEqual(["p1", "p2", "p3"]);
+  });
+
+  it("does nothing for the tab already shown", async () => {
+    const { result } = await loaded();
+    act(() => result.current.selectTab("for_you"));
+    expect(result.current.loading).toBe(false);
+    expect(feed).toHaveBeenCalledTimes(1);
+  });
+
+  it("remembers the tab for the browser session: the next visit opens on it, loading it once", async () => {
+    const first = await loaded();
+    act(() => first.result.current.selectTab("nearby"));
+    await waitFor(() => expect(first.result.current.loading).toBe(false));
+    first.unmount();
+    feed.mockClear();
+
+    const { result } = await loaded();
+    expect(selected(result)).toBe("nearby");
+    expect(feed).toHaveBeenCalledTimes(1);
+    expect(feed).toHaveBeenCalledWith(null, undefined, null, null, "nearby");
+  });
+
+  it("still switches tabs with session storage switched off", async () => {
+    const denied = () => {
+      throw new Error("denied");
+    };
+    const getItem = vi.spyOn(Storage.prototype, "getItem").mockImplementation(denied);
+    const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(denied);
+    try {
+      const { result } = await loaded();
+      expect(selected(result)).toBe("for_you");
+      act(() => result.current.selectTab("following"));
+      await waitFor(() =>
+        expect(feed).toHaveBeenLastCalledWith(null, undefined, null, null, "following"),
+      );
+      expect(selected(result)).toBe("following");
+    } finally {
+      getItem.mockRestore();
+      setItem.mockRestore();
+    }
+  });
+
+  it("invites a member who follows nobody to browse kinksters", async () => {
+    feed.mockImplementation(async (_c: unknown, _l: unknown, _a: unknown, _s: unknown, tab: Tab) =>
+      tab === "following"
+        ? { items: [], nextCursor: null, hint: "no_follows" }
+        : { items: [], nextCursor: null },
+    );
+    const { result } = await loaded();
+    expect(result.current.empty).toEqual({
+      title: "Your feed is quiet",
+      body: "Follow a few kinksters, or write the first post yourself.",
+      action: null,
+    });
+
+    act(() => result.current.selectTab("following"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.empty).toEqual({
+      title: "You're not following anyone yet",
+      body: "Follow kinksters to see their posts here, wherever they are.",
+      action: { label: "Browse kinksters", href: "/members" },
+    });
+  });
+
+  it("invites a member with no location to add one, and says plainly when a tab is just quiet", async () => {
+    feed.mockImplementation(async (_c: unknown, _l: unknown, _a: unknown, _s: unknown, tab: Tab) =>
+      tab === "nearby"
+        ? { items: [], nextCursor: null, hint: "no_location" }
+        : { items: [], nextCursor: null },
+    );
+    const { result } = await loaded();
+
+    act(() => result.current.selectTab("nearby"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.empty).toEqual({
+      title: "Where are you?",
+      body: "Add your location to see posts from kinksters near you.",
+      action: { label: "Add your location", href: "/profile/edit/location" },
+    });
+
+    act(() => result.current.selectTab("following"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.empty).toEqual({
+      title: "Nothing from the kinksters you follow yet.",
+      body: null,
+      action: null,
+    });
+  });
+
+  it("belongs to the home feed only", async () => {
+    sessionStorage.setItem("kinkord:feed-tab", "following");
+    const hook = renderHook(() => useFeedPresenter({ author: "tega" }));
+    await waitFor(() => expect(hook.result.current.loading).toBe(false));
+    expect(hook.result.current.tabs).toEqual([]);
+    expect(hook.result.current.showPeople).toBe(false);
+    // A profile's Posts tab reads that member's posts, whatever the home feed shows.
+    expect(feed).toHaveBeenCalledWith(null, undefined, "tega", null);
+    act(() => hook.result.current.selectTab("nearby"));
+    expect(feed).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps likes, reposts and saves working on every tab", async () => {
+    feed.mockImplementation(
+      async (_c: unknown, _l: unknown, _a: unknown, _s: unknown, tab: Tab) => ({
+        items: [pm({ id: `${tab}-row`, postId: "p1" })],
+        nextCursor: null,
+      }),
+    );
+    const { result } = await loaded();
+    act(() => result.current.selectTab("nearby"));
+    await waitFor(() => expect(ids(result)).toEqual(["nearby-row"]));
+
+    await act(async () => result.current.toggleLike("p1"));
+    await act(async () => result.current.toggleRepost("p1"));
+    await act(async () => result.current.toggleSave("p1"));
+    expect(like).toHaveBeenCalledWith("p1");
+    expect(repost).toHaveBeenCalledWith("p1");
+    expect(save).toHaveBeenCalledWith("p1");
+    expect(result.current.posts[0]).toMatchObject({
+      likedByMe: true,
+      repostedByMe: true,
+      savedByMe: true,
+    });
   });
 });

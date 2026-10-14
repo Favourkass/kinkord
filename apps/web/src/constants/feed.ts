@@ -1,5 +1,5 @@
 /** Copy for the home feed (Figma "Hompage Light" 344:138 / dark 837:295). */
-import type { SuggestionShow } from "@/domain/post";
+import type { FeedTab, SuggestionShow } from "@/domain/post";
 
 export const FEED_COPY = {
   composerPlaceholder: "What's on your mind?",
@@ -55,8 +55,24 @@ export const FEED_COPY = {
   closeComments: "Close comments",
   loadMore: "Load more",
   loading: "Loading…",
+  /** The For You | Following | Nearby tabs at the top of the home feed. */
+  tabsLabel: "Home feed",
+  tabs: { for_you: "For You", following: "Following", nearby: "Nearby" } satisfies Record<
+    FeedTab,
+    string
+  >,
   feedEmptyTitle: "Your feed is quiet",
   feedEmptyBody: "Follow a few kinksters, or write the first post yourself.",
+  /** Following, for a member who follows nobody yet. */
+  noFollowsTitle: "You're not following anyone yet",
+  noFollowsBody: "Follow kinksters to see their posts here, wherever they are.",
+  noFollowsAction: "Browse kinksters",
+  followingEmpty: "Nothing from the kinksters you follow yet.",
+  /** Nearby, for a member with no country or state on their profile. */
+  noLocationTitle: "Where are you?",
+  noLocationBody: "Add your location to see posts from kinksters near you.",
+  noLocationAction: "Add your location",
+  nearbyEmpty: "Nothing near you yet.",
   feedError: "Could not load the feed. Refresh to try again.",
   peopleHeading: "Kinksters Near You",
   /** The sliders button: the members directory, where every filter is. */

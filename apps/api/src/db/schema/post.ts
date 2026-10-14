@@ -122,7 +122,11 @@ export const postShare = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (t) => [primaryKey({ columns: [t.postId, t.userId] })],
+  (t) => [
+    primaryKey({ columns: [t.postId, t.userId] }),
+    // The home feed's For You reads a member's recent shares.
+    index("post_share_user_idx").on(t.userId, t.createdAt),
+  ],
 );
 
 export const postComment = pgTable(
@@ -139,7 +143,11 @@ export const postComment = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
-  (t) => [index("post_comment_post_idx").on(t.postId, t.createdAt)],
+  (t) => [
+    index("post_comment_post_idx").on(t.postId, t.createdAt),
+    // The home feed's For You reads a member's recent comments.
+    index("post_comment_author_idx").on(t.authorId, t.createdAt),
+  ],
 );
 
 /**

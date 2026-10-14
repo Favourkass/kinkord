@@ -33,6 +33,7 @@ export default function HomePage() {
         links: nav.links,
         labels: nav.labels,
       }}
+      tabs={{ label: FEED_COPY.tabsLabel, tabs: feed.tabs, onSelect: feed.selectTab }}
       loading={feed.loading}
       error={home.error ?? feed.error}
       posts={feed.posts}
@@ -128,29 +129,34 @@ export default function HomePage() {
           verifiedOrganization: FEED_COPY.verifiedOrganization,
         },
       }}
-      people={{
-        heading: FEED_COPY.peopleHeading,
-        people: feed.suggestions,
-        segments: feed.suggestionSegments,
-        segmentsLabel: FEED_COPY.peopleShowLabel,
-        onShow: feed.showSuggestions,
-        loading: feed.suggestionsLoading,
-        browseHref: Routes.members,
-        browseLabel: FEED_COPY.peopleBrowse,
-        onToggleFollow: feed.toggleFollow,
-        onRemove: feed.removeSuggestion,
-        labels: {
-          follow: FEED_COPY.follow,
-          following: FEED_COPY.following,
-          remove: FEED_COPY.peopleRemove,
-          online: FEED_COPY.peopleOnline,
-          lookingFor: FEED_COPY.peopleLookingFor,
-          loading: FEED_COPY.loading,
-          empty: FEED_COPY.peopleEmpty,
-          organization: FEED_COPY.organization,
-          verifiedOrganization: FEED_COPY.verifiedOrganization,
-        },
-      }}
+      people={
+        feed.showPeople
+          ? {
+              heading: FEED_COPY.peopleHeading,
+              people: feed.suggestions,
+              segments: feed.suggestionSegments,
+              segmentsLabel: FEED_COPY.peopleShowLabel,
+              onShow: feed.showSuggestions,
+              loading: feed.suggestionsLoading,
+              browseHref: Routes.members,
+              browseLabel: FEED_COPY.peopleBrowse,
+              onToggleFollow: feed.toggleFollow,
+              onRemove: feed.removeSuggestion,
+              labels: {
+                follow: FEED_COPY.follow,
+                following: FEED_COPY.following,
+                remove: FEED_COPY.peopleRemove,
+                online: FEED_COPY.peopleOnline,
+                lookingFor: FEED_COPY.peopleLookingFor,
+                loading: FEED_COPY.loading,
+                empty: FEED_COPY.peopleEmpty,
+                organization: FEED_COPY.organization,
+                verifiedOrganization: FEED_COPY.verifiedOrganization,
+              },
+            }
+          : null
+      }
+      empty={feed.empty}
       lightbox={{
         media: feed.lightbox,
         onClose: feed.closeMedia,
@@ -169,8 +175,6 @@ export default function HomePage() {
       }}
       toast={{ message: feed.shareNote, onDismiss: feed.dismissShareNote }}
       copy={{
-        emptyTitle: FEED_COPY.feedEmptyTitle,
-        emptyBody: FEED_COPY.feedEmptyBody,
         loading: FEED_COPY.loading,
         loadMore: FEED_COPY.loadMore,
         asideHeading: FEED_COPY.asideHeading,
