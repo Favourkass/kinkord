@@ -55,6 +55,8 @@ export interface AdultBadgeData {
 export interface SplashScreenProps {
   logo: SplashImage;
   hero: SplashImage;
+  mobileHero?: SplashImage & { width: number; height: number };
+  isDesktop?: boolean;
   downloadCta: SplashAction;
   brand: string;
   tagline: string;
@@ -383,6 +385,8 @@ function SignInButton({ cta }: { cta: SplashLink }) {
 export default function SplashScreen({
   logo,
   hero,
+  mobileHero,
+  isDesktop = true,
   downloadCta,
   brand,
   tagline,
@@ -400,7 +404,7 @@ export default function SplashScreen({
 }: SplashScreenProps) {
   return (
     <div className="min-h-dvh bg-black">
-      {showAgeGate && ageGate && onConfirmAge && onDeclineAge && (
+      {isDesktop && showAgeGate && ageGate && onConfirmAge && onDeclineAge && (
         <AgeGateModal
           open={showAgeGate}
           title={ageGate.title}
@@ -416,62 +420,66 @@ export default function SplashScreen({
         />
       )}
 
-      {/* Mobile splash */}
-      <div className="relative flex min-h-dvh flex-col overflow-hidden bg-black lg:hidden">
-        <div className="absolute inset-x-0 top-0 bottom-[28px] overflow-hidden">
-          <div className="absolute left-[-0.46%] top-[-10.13%] h-full w-[100.55%]">
-            <Image
-              src={hero.src}
-              alt={hero.alt}
-              fill
-              priority
-              sizes="100vw"
-              className="object-cover"
-            />
-          </div>
-        </div>
-        <div className="absolute right-[22px] top-[max(env(safe-area-inset-top,0px)+16px,36px)] z-30 pointer-events-auto">
-          <DownloadPill cta={downloadCta} compact />
-        </div>
-        <div className="relative z-10 flex flex-1 flex-col items-center px-[22px] sm:px-[27px] pb-8">
-          <Image
-            src={logo.src}
-            alt={logo.alt}
-            width={145}
-            height={145}
-            priority
-            unoptimized
-            className="mt-[68px] size-[145px]"
-          />
-          <h1 className="text-center text-[48px] font-extrabold leading-tight text-kink-amber">
-            {brand}
-          </h1>
-          <p className="mt-1 max-w-[318px] text-center text-[15px] font-extrabold leading-normal text-white">
-            {tagline}
-          </p>
-
-          {adultBadge && (
-            <div className="my-6 flex flex-col items-center text-center">
-              <AdultAgeBadge badge={adultBadge} />
-              <div className="mt-2.5 text-[13.5px] font-bold leading-tight text-white">
-                <p>{adultBadge.line1}</p>
-                <p>{adultBadge.line2}</p>
+      {/* The mobile artwork stays in normal flow at its original aspect ratio. */}
+      <div className="flex min-h-dvh flex-col bg-black lg:hidden">
+        <h1 className="sr-only">{brand}</h1>
+        <Image
+          src={mobileHero?.src ?? hero.src}
+          alt={mobileHero?.alt ?? hero.alt}
+          width={mobileHero?.width ?? 720}
+          height={mobileHero?.height ?? 1080}
+          preload
+          unoptimized
+          sizes="100vw"
+          className="block h-auto w-full"
+        />
+        <div className="flex flex-col items-center gap-4 px-5 pb-8 pt-6 sm:px-7">
+          {showAgeGate && ageGate && onConfirmAge && onDeclineAge ? (
+            <section
+              aria-label={ageGate.title}
+              className="w-full max-w-[460px] rounded-2xl border border-kink-amber/50 bg-kink-surface p-5 text-center"
+            >
+              <p className="text-[15px] font-bold text-kink-gold-bright">{ageGate.badge}</p>
+              <p className="mt-3 text-[14px] text-white">{ageGate.statement}</p>
+              <p className="mt-3 text-[12px] leading-5 text-kink-mist">{ageGate.intro}</p>
+              <ul className="my-3 space-y-2 text-left text-[12px] leading-5 text-kink-mist">
+                {ageGate.points?.map((point) => (
+                  <li key={point.text}>
+                    <span aria-hidden>{point.icon}</span> {point.text}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[12px] leading-5 text-kink-mist">{ageGate.warning}</p>
+              <button
+                type="button"
+                onClick={onConfirmAge}
+                className="mt-4 w-full rounded-full bg-kink-gold-bright px-4 py-3 text-[13px] font-bold text-black"
+              >
+                {ageGate.confirmLabel}
+              </button>
+              <button
+                type="button"
+                onClick={onDeclineAge}
+                className="mt-3 w-full rounded-full border border-kink-amber/50 px-4 py-3 text-[13px] font-bold text-kink-gold-bright"
+              >
+                {ageGate.declineLabel}
+              </button>
+            </section>
+          ) : (
+            <div className="flex w-full max-w-[347px] flex-col gap-3">
+              <SignUpButton cta={signUp} />
+              <SignInButton cta={signIn} />
+              <div className="flex justify-center pt-1">
+                <DownloadPill cta={downloadCta} compact />
               </div>
             </div>
           )}
-
-          <SignUpButton cta={signUp} />
-          <div className="mt-3 w-full max-w-[347px]">
-            <SignInButton cta={signIn} />
-          </div>
-          <nav className="mt-[24px] w-full max-w-[347px] rounded-[20px] border border-kink-amber bg-kink-surface px-[22px]">
+          <nav className="mt-2 w-full max-w-[347px] rounded-[20px] border border-kink-amber bg-kink-surface px-[22px]">
             {navLinks.map((link, i) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`flex h-[52px] items-center justify-between text-[15px] font-extrabold tracking-[0.3px] text-kink-paper ${
-                  i > 0 ? "border-t border-kink-divider" : ""
-                }`}
+                className={`flex h-[52px] items-center justify-between text-[15px] font-extrabold tracking-[0.3px] text-kink-paper ${i > 0 ? "border-t border-kink-divider" : ""}`}
               >
                 {link.label}
                 <span className="text-white">
@@ -480,14 +488,12 @@ export default function SplashScreen({
               </Link>
             ))}
           </nav>
-
           {policyLinks && policyLinks.length > 0 && (
-            <div className="mt-7 w-full max-w-[360px] sm:max-w-[460px]">
+            <div className="mt-3 w-full max-w-[460px]">
               <StarDivider />
               <PolicyButtonsGrid links={policyLinks} />
             </div>
           )}
-
           <FooterNotice copyright={copyright} allRightsReserved={allRightsReserved} />
         </div>
       </div>

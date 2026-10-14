@@ -28,6 +28,7 @@ describe("getLandingVM", () => {
   it("serves the redesign assets from public/brand", () => {
     expect(vm.logo.src).toBe("/brand/logo-badge.png");
     expect(vm.hero.src).toBe("/brand/hero-trio.jpg");
+    expect(vm.mobileHero).toMatchObject({ src: "/brand/header.jpeg", width: 720, height: 1080 });
     expect(vm.logo.alt).not.toHaveLength(0);
     expect(vm.hero.alt).not.toHaveLength(0);
   });

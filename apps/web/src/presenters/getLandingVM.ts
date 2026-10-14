@@ -26,6 +26,12 @@ export function getLandingVM() {
       src: "/brand/hero-trio.jpg",
       alt: "Three community members in black satin against a dark satin backdrop",
     },
+    mobileHero: {
+      src: "/brand/header.jpeg",
+      alt: "Kinkord adults-only community: connect, explore and belong. Meet like-minded people, explore your interests and make real connections in a safe, respectful space.",
+      width: 720,
+      height: 1080,
+    },
     downloadCta,
     brand: BRAND_NAME,
     tagline: BRAND_TAGLINE,
