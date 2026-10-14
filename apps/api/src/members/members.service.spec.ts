@@ -151,10 +151,12 @@ describe("MembersService", () => {
     select.mockReturnValueOnce(chain([{ country: "NG", members: 42 }]));
     await expect(service.countries()).resolves.toEqual([
       { code: "NG", name: "Nigeria", membersCount: 42 },
+      { code: "KE", name: "Kenya", membersCount: 0 },
     ]);
     select.mockReturnValueOnce(chain([]));
     await expect(service.countries()).resolves.toEqual([
       { code: "NG", name: "Nigeria", membersCount: 0 },
+      { code: "KE", name: "Kenya", membersCount: 0 },
     ]);
   });
 
