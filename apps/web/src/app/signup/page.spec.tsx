@@ -11,19 +11,21 @@ const fixture = vi.hoisted(() => ({
   emailVerified: false,
   canSkipPhotos: true,
   resume: null as string | null,
+  options: vi.fn(),
 }));
 beforeEach(() => {
   fixture.stage = "account";
   fixture.emailVerified = false;
   fixture.canSkipPhotos = true;
   fixture.resume = null;
+  fixture.options.mockReset().mockResolvedValue({ kinks: ["Bondage"], lookingFor: ["Friendship"] });
   fixture.update.mockReset().mockResolvedValue({});
 });
 afterEach(cleanup);
 vi.mock("@/services/profile.service", () => ({
   profileApi: {
     own: async () => ({ interests: [], lookingFor: [], limits: null }),
-    options: async () => ({ kinks: ["Bondage"], lookingFor: ["Friendship"] }),
+    options: () => fixture.options(),
     update: (...args: unknown[]) => fixture.update(...args),
   },
 }));
@@ -234,4 +236,13 @@ it("asks a member who has had a profile photo for new photos, with no skip", asy
     await screen.findByText("Add a profile photo and a cover picture to continue."),
   ).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Skip photos for now" })).toBeNull();
+});
+
+it("lets the member skip step 4 when the preference options can't load", async () => {
+  fixture.stage = "preferences";
+  fixture.options.mockRejectedValue(new Error("Could not load preferences."));
+  render(<SignupPage />);
+  fireEvent.click(await screen.findByRole("button", { name: "Skip for now" }));
+  expect(await screen.findByText("STEP 5 OF 5")).toBeTruthy();
+  expect(fixture.update).not.toHaveBeenCalled();
 });

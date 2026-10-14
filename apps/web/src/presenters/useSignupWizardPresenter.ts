@@ -198,6 +198,12 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
       setBusy(false);
     }
   }, [preferenceOptions, preferencesLoading, preferences, busy]);
+  // Preferences are optional: if they can't be loaded, the member carries on
+  // to the photos without them and can add them later in Edit Profile.
+  const skipPreferences = useCallback(() => {
+    setPreferenceEdit(null);
+    setStage("profile");
+  }, []);
 
   // step 5
   const [roles, setRoles] = useState<string[]>([]);
@@ -475,6 +481,8 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
           setPreferenceRetry((v) => v + 1);
         },
         submit: completePreferences,
+        canSkip: !preferencesLoading && preferenceOptions === null,
+        skip: skipPreferences,
         editor:
           preferenceEdit && preferenceOptions
             ? {
@@ -560,6 +568,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
       openPreference,
       applyPreference,
       completePreferences,
+      skipPreferences,
       nextVerificationStep,
       emailCode,
       accountEmailVerified,

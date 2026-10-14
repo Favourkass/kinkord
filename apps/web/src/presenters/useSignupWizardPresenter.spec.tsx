@@ -481,6 +481,16 @@ describe("useSignupWizardPresenter", () => {
       expect(result.current.preferencesStep.canContinue).toBe(false);
       act(() => result.current.preferencesStep.retry());
       await waitFor(() => expect(result.current.preferencesStep.canContinue).toBe(true));
+      expect(result.current.preferencesStep.canSkip).toBe(false);
+    });
+    it("lets the member go on to the photos without preferences when they can't load", async () => {
+      get.mockRejectedValue(new Error("Load failed"));
+      const { result } = renderHook(() => useSignupWizardPresenter("preferences"));
+      await waitFor(() => expect(result.current.preferencesStep.canSkip).toBe(true));
+      act(() => result.current.preferencesStep.skip());
+      expect(result.current.stage).toBe("profile");
+      expect(result.current.step).toBe(5);
+      expect(patch).not.toHaveBeenCalled();
     });
   });
 

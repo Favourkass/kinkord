@@ -428,6 +428,15 @@ function SignupWizard() {
               disabled={!p.preferencesStep.canContinue}
               className="max-w-[564px]"
             />
+            {p.preferencesStep.canSkip && (
+              <button
+                type="button"
+                onClick={p.preferencesStep.skip}
+                className="text-[14px] font-semibold text-kink-gold-bright underline"
+              >
+                Skip for now
+              </button>
+            )}
           </section>
           {p.preferencesStep.editor && <FieldEditorSheet {...p.preferencesStep.editor} />}
         </SignupShell>
