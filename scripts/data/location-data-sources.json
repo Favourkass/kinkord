@@ -4,6 +4,7 @@
     "NG": "36 states plus FCT; populated places and named areas, excluding abandoned/historical places",
     "KE": "47 counties; GeoNames populated places and named areas, excluding abandoned/historical places"
   },
+  "processing": "scripts/build-location-files.mjs splits the lists per state/county into apps/web/public/locations. It drops records that are not places people live (one- or two-letter names, names with digits after removing a trailing sub-area number such as \"Umoja 1\", facilities such as schools, markets and camps, addresses), removes misfiled records, adds a few well-known places, and merges the Nigerian areas signup offered before (ng-curated-areas.json).",
   "kenyaPlaces": {
     "publisher": "GeoNames",
     "url": "https://www.geonames.org/",

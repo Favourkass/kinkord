@@ -29,6 +29,7 @@ import {
   validateSignupAbout,
   signupLocationErrorMessage,
 } from "@/services/signupLocation.service";
+import { regionsForState } from "@/services/location.service";
 import { Routes } from "@/constants/Routes";
 import { filterSignupRoles } from "@/services/signupPreferences.service";
 import type { EditorDraft, ProfileOptionsPM } from "@/domain/profile";
@@ -98,15 +99,52 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
   });
   const [aboutErrors, setAboutErrors] = useState<ReturnType<typeof validateAbout>>({});
   const [customArea, setCustomArea] = useState(false);
-  const selectState = useCallback((state: string) => {
-    setCustomArea(false);
-    setAbout((current) => ({ ...current, state, city: "" }));
+  // Picking the current state or area again keeps the town typed under it.
+  const selectState = useCallback(
+    (state: string) => {
+      if (state === about.state) return;
+      setCustomArea(false);
+      setAbout((current) => ({ ...current, state, city: "" }));
+    },
+    [about.state],
+  );
+  const selectArea = useCallback(
+    (area: string) => {
+      const custom = area === OTHER_AREA;
+      if (custom ? customArea : !customArea && area === about.city) return;
+      setCustomArea(custom);
+      setAbout((current) => ({ ...current, city: custom ? "" : area }));
+    },
+    [customArea, about.city],
+  );
+  /** "Use “Ikota”" under a search: the typed town, as an unlisted one. */
+  const selectTypedArea = useCallback((city: string) => {
+    setCustomArea(true);
+    setAbout((current) => ({ ...current, city }));
   }, []);
-  const selectArea = useCallback((area: string) => {
-    const custom = area === OTHER_AREA;
-    setCustomArea(custom);
-    setAbout((current) => ({ ...current, city: custom ? "" : area }));
-  }, []);
+  // A state's towns (thousands, for some) are fetched once it is picked.
+  const [loadedAreas, setLoadedAreas] = useState<{ key: string; areas: string[] } | null>(null);
+  const areasKey = country && about.state ? `${country}|${about.state}` : null;
+  useEffect(() => {
+    if (!country || !about.state) return;
+    let live = true;
+    const key = `${country}|${about.state}`;
+    void regionsForState(country, about.state).then((areas) => {
+      if (live) setLoadedAreas({ key, areas });
+    });
+    return () => {
+      live = false;
+    };
+  }, [country, about.state]);
+  const location = useMemo(() => {
+    const areas = areasKey !== null && loadedAreas?.key === areasKey ? loadedAreas.areas : null;
+    const fields = signupLocationFields(country, about.state, customArea, {
+      areas: areas ?? [],
+      loading: areasKey !== null && areas === null,
+    });
+    const otherArea = fields.otherArea && { ...fields.otherArea, onTyped: selectTypedArea };
+    return { ...fields, otherArea };
+  }, [country, about.state, customArea, areasKey, loadedAreas, selectTypedArea]);
   const selectCountry = useCallback((value: string) => {
     setCountry(value);
     setCustomArea(false);
@@ -399,7 +437,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
         draft: about,
         set: setAbout,
         errors: aboutErrors,
-        location: signupLocationFields(country, about.state, customArea),
+        location,
         selectState,
         selectArea,
         areaValue: customArea ? OTHER_AREA : about.city,
@@ -485,6 +523,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
       country,
       selectCountry,
       customArea,
+      location,
       selectState,
       selectArea,
       ageAttested,
