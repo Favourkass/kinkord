@@ -24,6 +24,8 @@ export interface FriendRow {
   gender: string | null;
   city: string | null;
   state: string | null;
+  /** ISO 3166-1 alpha-2: the web names the state by it ("Delta State", but Kenya's "Nairobi"). */
+  country: string | null;
   isFollowing: boolean;
   /** Shows the Silver check beside their name. */
   silver: boolean;
@@ -143,6 +145,7 @@ export class FollowsService {
         gender: profile.gender,
         city: profile.city,
         state: profile.state,
+        country: profile.country,
         silver: silverCheck(user.id),
 
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
@@ -191,6 +194,7 @@ export class FollowsService {
         gender: profile.gender,
         city: profile.city,
         state: profile.state,
+        country: profile.country,
         silver: silverCheck(user.id),
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
       })
@@ -235,6 +239,7 @@ export class FollowsService {
         gender: profile.gender,
         city: profile.city,
         state: profile.state,
+        country: profile.country,
         silver: silverCheck(user.id),
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
       })
@@ -282,6 +287,7 @@ export class FollowsService {
           gender: profile.gender,
           city: profile.city,
           state: profile.state,
+          country: profile.country,
           silver: silverCheck(user.id),
         })
         .from(follow)

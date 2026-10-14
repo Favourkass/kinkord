@@ -315,6 +315,7 @@ describe("drafts", () => {
 
   it("helpers: location line, adult cutoff, sorted nationalities, API error text", () => {
     expect(locationLine("Abraka", "Delta", "NG")).toBe("Abraka, Delta State, Nigeria");
+    expect(locationLine("Nairobi", "Nairobi", "KE")).toBe("Nairobi, Nairobi, Kenya");
     expect(locationLine(null, null, null)).toBeNull();
     expect(adultCutoff(new Date("2026-09-12T10:00:00Z"))).toBe("2008-09-12");
     const [first, second] = nationalityOptions();
@@ -386,6 +387,23 @@ describe("profileApi + uploadProfileImage", () => {
     await expect(uploadProfileImage("avatar", new File([], "x.jpg"))).rejects.toThrow(/max 5MB/);
     expect(upload).not.toHaveBeenCalled();
     expect(apiPatch).not.toHaveBeenCalled();
+  });
+});
+
+describe("a member with no saved country", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("gets Nigeria's states and towns, sign-up's default, rather than Kenya's", async () => {
+    const noCountry = { ...profile, country: null, state: "Lagos" };
+    const state = buildEditRow("state", { ...ctx, profile: noCountry }).editor;
+    if (state.kind !== "single") throw new Error("state should be a single picker");
+    expect(state.options.map((o) => o.value)).toContain("Lagos");
+    expect(state.options.map((o) => o.value)).not.toContain("Nairobi");
+
+    const fetch = vi.fn(async () => new Response(JSON.stringify(["Ikeja", "Lekki"])));
+    vi.stubGlobal("fetch", fetch);
+    await expect(loadCityOptions(noCountry)).resolves.toEqual(["Ikeja", "Lekki"]);
+    expect(fetch).toHaveBeenCalledWith("/locations/NG/lagos.json");
   });
 });
 

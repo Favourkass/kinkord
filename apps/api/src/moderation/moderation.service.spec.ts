@@ -64,7 +64,6 @@ const member = {
   email: "C.Tolulope05@gmail.com",
   emailVerified: true,
   username: "downtoearth",
-  phone: "+2349054291043",
 };
 
 describe("ModerationService guard rails", () => {
@@ -87,7 +86,7 @@ describe("ModerationService.block", () => {
       [member], // the target
       [], // no staff row
       [{ ip: "102.89.84.23" }, { ip: null }], // where they signed in from
-      [{ phone: "+2349054291043" }, { phone: "08000000000" }], // phones they verified
+      [{ phone: "+2349054291043", verified: true }], // their profile's phone
       undefined, // ban row
       undefined, // sessions deleted
       undefined, // rules
@@ -109,7 +108,6 @@ describe("ModerationService.block", () => {
     expect(rules.map((r) => `${r.kind}:${r.value}:${r.action}`)).toEqual([
       "email:ctolulope05@gmail.com:block",
       "phone:+2349054291043:block",
-      "phone:+2348000000000:block",
       "ip:102.89.84.23:flag",
     ]);
     expect(rules.every((r) => r.subjectUserId === "u9" && r.reason === "harassment")).toBe(true);
@@ -119,6 +117,25 @@ describe("ModerationService.block", () => {
       action: "block",
       subjectUserId: "u9",
     });
+  });
+
+  it("never bans a phone the member didn't verify: it may be someone else's", async () => {
+    const { service, after } = make([
+      [member],
+      [],
+      [{ ip: "102.89.84.23" }],
+      [{ phone: "+2348035550142", verified: false }], // typed in, never proved
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    ]);
+    await service.block("admin1", "u9", {});
+    const rules = after("insert", signupBlock, "values") as Array<Record<string, string>>;
+    expect(rules.map((r) => `${r.kind}:${r.value}`)).toEqual([
+      "email:ctolulope05@gmail.com",
+      "ip:102.89.84.23",
+    ]);
   });
 
   it("leaves the posts alone unless asked", async () => {
@@ -151,12 +168,12 @@ describe("ModerationService.unblock", () => {
 
 describe("ModerationService.deleteMember", () => {
   it("clears their files, blocks them from returning, then deletes the account", async () => {
-    const target = { ...member, email: "x@y.com", emailVerified: false, phone: null };
+    const target = { ...member, email: "x@y.com", emailVerified: false };
     const { service, storage, indexOf, after, verification } = make([
       [target],
       [],
       [], // no IPs
-      [], // no verified phones
+      [], // no phone on their profile
       undefined, // rules
       [{ key: "posts/u9/a.jpg", posterKey: null }],
       [{ key: "avatars/u9/b.png" }],

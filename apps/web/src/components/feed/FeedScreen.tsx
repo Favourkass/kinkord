@@ -5,7 +5,7 @@ import ComposerDialog, { type ComposerDialogProps } from "./ComposerDialog";
 import ConfirmDialog, { type ConfirmDialogProps } from "./ConfirmDialog";
 import FeedShell, { type FeedShellProps } from "./FeedShell";
 import MediaLightbox, { type MediaLightboxProps } from "./MediaLightbox";
-import PeopleYouMayKnow, { type PeopleYouMayKnowProps } from "./PeopleYouMayKnow";
+import KinkstersNearYou, { type KinkstersNearYouProps } from "./KinkstersNearYou";
 import PostCard, { type PostCardProps } from "./PostCard";
 import GiftDialog, { type GiftDialogProps } from "./GiftDialog";
 import Toast, { type ToastProps } from "./Toast";
@@ -36,7 +36,7 @@ export interface FeedScreenProps {
   composerBar: ComposerBarProps;
   composerDialog: ComposerDialogProps;
   commentsPanel: CommentsPanelProps;
-  people: PeopleYouMayKnowProps;
+  people: KinkstersNearYouProps;
   lightbox: MediaLightboxProps;
   confirm: ConfirmDialogProps;
   toast: ToastProps;
@@ -86,7 +86,7 @@ export default function FeedScreen(p: FeedScreenProps) {
         {...p.shell}
         aside={
           <>
-            <PeopleYouMayKnow {...p.people} layout="column" />
+            <KinkstersNearYou {...p.people} layout="column" />
             <section className="rounded-[16px] border border-feed-line bg-feed-card p-[16px]">
               <p className="text-[14px] font-bold tracking-[1.4px] text-kink-gold-bright">
                 {p.copy.asideHeading}
@@ -120,7 +120,7 @@ export default function FeedScreen(p: FeedScreenProps) {
         {p.posts.slice(0, 1).map(card)}
         {/* The design puts the suggestions between the first and second post. */}
         <div className="lg:hidden">
-          <PeopleYouMayKnow {...p.people} />
+          <KinkstersNearYou {...p.people} />
         </div>
         {p.posts.slice(1).map(card)}
 

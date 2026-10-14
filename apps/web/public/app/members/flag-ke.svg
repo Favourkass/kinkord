@@ -1,0 +1,15 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="24" height="15.0297" viewBox="0 0 24 15.0297" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="flag/KE" clip-path="url(#clip0_ke)">
+<path d="M0 0H24V15.0297H0V0Z" fill="white"/>
+<path d="M0 0H24V4.3H0V0Z" fill="#000000"/>
+<path d="M0 5.2H24V9.83H0V5.2Z" fill="#BB0000"/>
+<path d="M0 10.73H24V15.0297H0V10.73Z" fill="#006600"/>
+<ellipse cx="12" cy="7.515" rx="2.4" ry="5.2" fill="#BB0000" stroke="#000000" stroke-width="0.5"/>
+<path d="M12 3.2V11.83" stroke="white" stroke-width="0.5"/>
+</g>
+<defs>
+<clipPath id="clip0_ke">
+<rect width="24" height="15.0297" fill="white"/>
+</clipPath>
+</defs>
+</svg>

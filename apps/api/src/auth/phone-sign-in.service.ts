@@ -1,5 +1,5 @@
 import { Inject, Injectable, UnauthorizedException } from "@nestjs/common";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { Db, DRIZZLE } from "../db/db.module";
 import { profile, user } from "../db/schema";
 import { AUTH, Auth } from "./auth.instance";
@@ -13,9 +13,13 @@ export interface PhoneSignInInput {
 const INVALID = "Invalid phone number or password.";
 
 /**
- * Signs a user in by the phone number on their profile. The phone is only a
- * lookup key — the password is still verified by Better Auth, so this leaks
- * nothing a normal failed sign-in wouldn't.
+ * Signs a user in by the verified phone number on their profile. The phone is
+ * only a lookup key — the password is still verified by Better Auth, so this
+ * leaks nothing a normal failed sign-in wouldn't.
+ *
+ * Only a verified number counts: anyone can type someone else's number into
+ * their profile, and an unverified copy must neither sign in nor make the
+ * owner's own sign-in ambiguous.
  */
 @Injectable()
 export class PhoneSignInService {
@@ -29,7 +33,7 @@ export class PhoneSignInService {
       .select({ email: user.email })
       .from(profile)
       .innerJoin(user, eq(user.id, profile.userId))
-      .where(eq(profile.phone, input.phone))
+      .where(and(eq(profile.phone, input.phone), eq(profile.phoneVerified, true)))
       .limit(2);
 
     if (rows.length !== 1) throw new UnauthorizedException(INVALID);

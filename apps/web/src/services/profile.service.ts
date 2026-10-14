@@ -1,5 +1,5 @@
 import { ALL_COUNTRY_CODES } from "@/constants/countries";
-import { LAUNCH_COUNTRIES } from "@/constants/onboarding";
+import { DEFAULT_SIGNUP_COUNTRY, LAUNCH_COUNTRIES } from "@/constants/onboarding";
 import { PROFILE_EDIT_COPY } from "@/constants/profileEdit";
 import type {
   DraftIssue,
@@ -134,8 +134,8 @@ export function locationLine(
   state: string | null,
   country: string | null,
 ): string | null {
-  const parts = [city, displayState(state), countryName(country)].filter((p): p is string =>
-    Boolean(p),
+  const parts = [city, displayState(state, country), countryName(country)].filter(
+    (p): p is string => Boolean(p),
   );
   return parts.length ? parts.join(", ") : null;
 }
@@ -149,7 +149,7 @@ export interface EditRowsContext {
   now?: Date;
 }
 
-const profileCountry = (profile: OwnProfilePM) => profile.country ?? LAUNCH_COUNTRIES[0].code;
+const profileCountry = (profile: OwnProfilePM) => profile.country ?? DEFAULT_SIGNUP_COUNTRY;
 
 /** The City editor's towns: the member's state's list, fetched the first time. */
 export function loadCityOptions(profile: OwnProfilePM): Promise<string[]> {
@@ -277,7 +277,7 @@ export function buildEditRow(key: EditRowKey, ctx: EditRowsContext): EditRowPM {
     case "state":
       return {
         key,
-        value: displayState(profile.state) || null,
+        value: displayState(profile.state, profile.country) || null,
         editor: single(profile.state, plain(statesForCountry(country)), true),
       };
     case "city":

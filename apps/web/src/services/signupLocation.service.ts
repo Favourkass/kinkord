@@ -34,7 +34,6 @@ export function signupLocationFields(
     credit: PLACE_NAMES_CREDIT,
     stateSearchPlaceholder: `Search ${county ? "counties" : "states"}`,
     states: statesForCountry(code).map((value) => ({ value, label: value })),
-    areaMode: code === "NG" || county ? "select" : "text",
     areaLabel: "Region / City / Town",
     areaPlaceholder: !state ? `Select your ${term} first` : "Select your region, city or town",
     areaSearchPlaceholder: "Search regions / cities / towns",

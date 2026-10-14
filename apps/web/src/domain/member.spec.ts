@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ageTagOf,
+  fullLocationOf,
   locationOf,
   locationPartsOf,
   socialHandle,
@@ -48,6 +49,9 @@ describe("toMemberCardVM", () => {
       organization: false,
     });
     expect(toMemberCardVM({ ...card, silver: true }).silver).toBe(true);
+    expect(
+      toMemberCardVM({ ...card, city: "Westlands", state: "Nairobi", country: "KE" }).location,
+    ).toBe("Westlands, Nairobi");
   });
 
   it("marks the configured organization without changing the source profile", () => {
@@ -125,6 +129,13 @@ describe("toPublicProfileVM", () => {
       mutualFriends: "86",
     });
     expect(vm.locationLine).toBe("Abraka, Delta State, Nigeria");
+    expect(
+      toPublicProfileVM(
+        { ...profile, country: "KE", state: "Nairobi", city: "Nairobi" },
+        () => null,
+        now,
+      ).locationLine,
+    ).toBe("Nairobi, Nairobi, Kenya");
     expect(vm.tagLine).toBe("25F · Dominant | Sadist");
     expect(vm.lastSeenAgo).toBe("an hour ago");
     expect(vm.isOnline).toBe(false);
@@ -376,16 +387,23 @@ describe("ageTagOf / locationOf", () => {
     expect(ageTagOf(null, null)).toBeNull();
   });
 
-  it("joins city and state, and suffixes the state once", () => {
-    expect(locationOf("Abraka", "Delta")).toBe("Abraka, Delta State");
-    expect(locationOf(null, "Delta")).toBe("Delta State");
-    expect(locationOf("Abraka", null)).toBe("Abraka");
-    expect(locationOf(null, "Delta State")).toBe("Delta State");
-    expect(locationOf(null, "FCT Abuja")).toBe("FCT Abuja");
+  it("joins city and state, and suffixes a Nigerian state once", () => {
+    expect(locationOf("Abraka", "Delta", "NG")).toBe("Abraka, Delta State");
+    expect(locationOf(null, "Delta", "NG")).toBe("Delta State");
+    expect(locationOf("Abraka", null, "NG")).toBe("Abraka");
+    expect(locationOf(null, "Delta State", "NG")).toBe("Delta State");
+    expect(locationOf(null, "FCT Abuja", "NG")).toBe("FCT Abuja");
+  });
+
+  it("names a Kenyan county as it is", () => {
+    expect(locationOf("Westlands", "Nairobi", "KE")).toBe("Westlands, Nairobi");
+    expect(fullLocationOf("Nairobi", "Nairobi", "KE")).toBe("Nairobi, Nairobi, Kenya");
+    expect(fullLocationOf("Ikeja", "Lagos", "NG")).toBe("Ikeja, Lagos State, Nigeria");
   });
 
   it("is null when there is no location at all, so no empty line renders", () => {
-    expect(locationOf(null, null)).toBeNull();
+    expect(locationOf(null, null, "NG")).toBeNull();
+    expect(fullLocationOf(null, null, null)).toBeNull();
   });
 });
 
@@ -417,7 +435,8 @@ describe("locationPartsOf", () => {
   it("renders a country we do not serve as plain text rather than a dead link", () => {
     // A link into an empty directory is worse than no link.
     expect(locationPartsOf({ country: "GH", state: "Accra", city: null }, href)).toEqual([
-      { label: "Accra State", href: null },
+      // Only Nigeria's regions are "States".
+      { label: "Accra", href: null },
       { label: "Ghana", href: null },
     ]);
   });

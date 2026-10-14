@@ -41,12 +41,24 @@ describe("compactNumber", () => {
 });
 
 describe("displayState", () => {
-  it("appends 'State' to bare names only", () => {
-    expect(displayState("Delta")).toBe("Delta State");
-    expect(displayState("Delta State")).toBe("Delta State");
-    expect(displayState("FCT Abuja")).toBe("FCT Abuja");
-    expect(displayState("")).toBe("");
-    expect(displayState(null)).toBe("");
+  it("appends 'State' to bare Nigerian names only", () => {
+    expect(displayState("Delta", "NG")).toBe("Delta State");
+    expect(displayState("Delta", "ng")).toBe("Delta State");
+    expect(displayState("Delta State", "NG")).toBe("Delta State");
+    expect(displayState("FCT Abuja", "NG")).toBe("FCT Abuja");
+    expect(displayState("", "NG")).toBe("");
+    expect(displayState(null, "NG")).toBe("");
+  });
+
+  it("leaves another country's regions as they are: a Kenyan county is just its name", () => {
+    expect(displayState("Nairobi", "KE")).toBe("Nairobi");
+    expect(displayState("Mombasa", "ke")).toBe("Mombasa");
+    expect(displayState("Greater Accra", "GH")).toBe("Greater Accra");
+  });
+
+  it("reads a state with no country on file as Nigerian, the only country before Kenya", () => {
+    expect(displayState("Delta", null)).toBe("Delta State");
+    expect(displayState("Lagos", undefined)).toBe("Lagos State");
   });
 });
 

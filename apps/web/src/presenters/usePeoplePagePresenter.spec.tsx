@@ -170,6 +170,24 @@ describe("usePeoplePagePresenter", () => {
     const missing = renderHook(() => usePeoplePagePresenter("ghost", null));
     await waitFor(() => expect(missing.result.current.error).toMatch(/couldn’t find/));
   });
+
+  it("names a Kenyan member's county as it is, with no Nigerian 'State'", async () => {
+    apiGet.mockImplementation((path: string) =>
+      Promise.resolve(
+        path.includes("/friends")
+          ? {
+              items: [{ ...person(1), city: "Westlands", state: "Nairobi", country: "KE" }],
+              total: 1,
+              page: 1,
+              limit: 30,
+            }
+          : profile,
+      ),
+    );
+    const { result } = renderHook(() => usePeoplePagePresenter("nene", "followers"));
+    await waitFor(() => expect(result.current.people.rows).toHaveLength(1));
+    expect(result.current.people.rows[0].location).toBe("Westlands, Nairobi");
+  });
 });
 
 describe("usePeoplePagePresenter meta line", () => {

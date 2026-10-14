@@ -28,6 +28,8 @@ export interface FriendPM {
   gender: string | null;
   city: string | null;
   state: string | null;
+  /** ISO 3166-1 alpha-2; it decides how the state is named. Absent from an older API. */
+  country?: string | null;
   isFollowing: boolean;
   /** Shows the Silver check; absent from an older API. */
   silver?: boolean;

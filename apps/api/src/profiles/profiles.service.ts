@@ -21,9 +21,9 @@ import {
 } from "../storage/storage.service";
 import { SilverChecksService } from "../subscriptions/silver-checks.service";
 import {
-  ACCEPTED_KINK_ROLES,
   GENDERS,
   KINKS,
+  KINK_ROLES,
   LANGUAGES,
   LOOKING_FOR,
   NAME_CHANGE_COOLDOWN_DAYS,
@@ -82,7 +82,7 @@ export const updateProfileSchema = z.object({
     .refine((s) => new Date(s) <= eighteenYearsAgo(), "You must be 18 or older to join")
     .optional(),
   gender: z.string().transform(canonicalGender).pipe(z.enum(GENDERS)).nullable().optional(),
-  roles: z.array(z.enum(ACCEPTED_KINK_ROLES)).max(10).optional(),
+  roles: z.array(z.enum(KINK_ROLES)).max(10).optional(),
   relationshipStatus: z.enum(RELATIONSHIP_STATUSES).nullable().optional(),
   lookingFor: z.array(z.enum(LOOKING_FOR)).max(10).optional(),
   interests: z.array(z.enum(KINKS)).max(20).optional(),
