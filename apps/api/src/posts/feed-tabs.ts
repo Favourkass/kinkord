@@ -124,11 +124,16 @@ function atOrAfter(key: FeedKey): SQL {
   return sql`(${post.createdAt}, ${post.id}) >= (${new Date(key.t).toISOString()}::timestamptz, ${key.id}::uuid)`;
 }
 
-/** Nearby: original posts by members in the viewer's country, or their state when they have none. */
+/**
+ * Nearby: original posts by members in the viewer's state, within their
+ * country when they have one, so a state of the same name across a border
+ * isn't "near".
+ */
 function nearbyConditions(viewer: Place): SQL[] {
-  const place = viewer.country
-    ? eq(profile.country, viewer.country)
-    : eq(profile.state, viewer.state ?? "");
+  const place = and(
+    eq(profile.state, viewer.state ?? ""),
+    ...(viewer.country ? [eq(profile.country, viewer.country)] : []),
+  );
   return [
     isNull(post.repostOfId),
     sql`exists (select 1 from ${profile} where ${profile.userId} = ${post.authorId} and ${place})`,
@@ -497,7 +502,7 @@ export async function rankedTabPage(
   const cursor = decodeFeedCursor(rawCursor, tab);
   const asOf = new Date(cursor?.asOf ?? now.getTime());
   const viewer = await readViewer(db, viewerId);
-  if (tab === "nearby" && !viewer.country && !viewer.state) {
+  if (tab === "nearby" && !viewer.state) {
     return { ids: [], nextCursor: null, hint: "no_location" };
   }
   const stamp = { v: 1, tab, asOf: asOf.getTime() } as const;

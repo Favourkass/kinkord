@@ -445,40 +445,40 @@ describe("diversity", () => {
 describe("Nearby's score", () => {
   const me = { city: "Ikeja", state: "Lagos", country: "NG" };
 
-  it("is closeness (city 4, state 2, country 1) × a 24-hour half-life × an engagement nudge", () => {
+  it("is closeness (own city 2, rest of the state 1) × a 24-hour half-life × an engagement nudge", () => {
     const at = (h: number) => post("p", "a", { createdAt: hoursAgo(h) });
     expect(
       nearbyScore(me, { city: "Ikeja", state: "Lagos", country: "NG" }, at(0), undefined, asOf),
-    ).toBe(4);
+    ).toBe(2);
     expect(
       nearbyScore(me, { city: null, state: "Lagos", country: "NG" }, at(24), undefined, asOf),
-    ).toBeCloseTo(1);
+    ).toBeCloseTo(0.5);
     expect(
-      nearbyScore(me, { city: null, state: "Ogun", country: "NG" }, at(0), undefined, asOf),
+      nearbyScore(me, { city: "Lekki", state: "Lagos", country: "NG" }, at(0), undefined, asOf),
     ).toBe(1);
     const busy = { likes: 9, comments: 0, reposts: 0, shares: 0 };
     expect(
-      nearbyScore(me, { city: null, state: "Ogun", country: "NG" }, at(0), busy, asOf),
+      nearbyScore(me, { city: "Lekki", state: "Lagos", country: "NG" }, at(0), busy, asOf),
     ).toBeCloseTo(1 + 0.15 * Math.log(10));
   });
 
-  it("ranks the same city first, then fresher posts, without any gender filter", () => {
+  it("ranks the viewer's own city first, then fresher posts, without any gender filter", () => {
     const ranked = rankNearby({
       viewer: me,
       asOf,
       candidates: [
-        post("ogun", "cal", { createdAt: hoursAgo(1) }),
+        post("surulere", "cal", { createdAt: hoursAgo(30) }),
         post("ikeja", "ada", { createdAt: hoursAgo(10) }),
         post("lekki", "dee", { createdAt: hoursAgo(1) }),
       ],
       authors: new Map([
         ["ada", { city: "Ikeja", state: "Lagos", country: "NG" }],
-        ["cal", { city: null, state: "Ogun", country: "NG" }],
+        ["cal", { city: "Surulere", state: "Lagos", country: "NG" }],
         ["dee", { city: "Lekki", state: "Lagos", country: "NG" }],
       ]),
       engagement: new Map(),
     });
-    expect(ranked.map((c) => c.id)).toEqual(["ikeja", "lekki", "ogun"]);
+    expect(ranked.map((c) => c.id)).toEqual(["ikeja", "lekki", "surulere"]);
   });
 });
 

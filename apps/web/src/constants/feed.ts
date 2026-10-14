@@ -68,7 +68,7 @@ export const FEED_COPY = {
   noFollowsBody: "Follow kinksters to see their posts here, wherever they are.",
   noFollowsAction: "Browse kinksters",
   followingEmpty: "Nothing from the kinksters you follow yet.",
-  /** Nearby, for a member with no country or state on their profile. */
+  /** Nearby, for a member with no state on their profile. */
   noLocationTitle: "Where are you?",
   noLocationBody: "Add your location to see posts from kinksters near you.",
   noLocationAction: "Add your location",
