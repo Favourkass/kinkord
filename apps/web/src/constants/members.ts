@@ -219,6 +219,7 @@ export const MEMBERS_COPY = {
 /** Countries the directory serves today; every other country is "Coming Soon". */
 export const AVAILABLE_COUNTRIES = [
   { code: "NG", name: "Nigeria", flag: "/app/members/flag-ng.svg" },
+  { code: "KE", name: "Kenya", flag: "/app/members/flag-ke.svg" },
 ] as const;
 
 /** Page size for the infinite-scrolling members list. */

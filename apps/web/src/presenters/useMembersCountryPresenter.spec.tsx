@@ -36,7 +36,8 @@ describe("useMembersCountryPresenter", () => {
       href: "/members/ng",
     });
     await waitFor(() => expect(result.current.rows[0].membersLabel).toBe("12.4K Members"));
-    expect(result.current.rows).toHaveLength(1);
+    // Nigeria and Kenya are both open.
+    expect(result.current.rows.map((r) => r.code)).toEqual(["NG", "KE"]);
     expect(result.current.rows[0]).toMatchObject({
       name: "Nigeria",
       flag: "/app/members/flag-ng.svg",

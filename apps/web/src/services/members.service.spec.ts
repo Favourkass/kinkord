@@ -97,6 +97,13 @@ describe("searchCountries", () => {
         membersCount: 12_400,
         available: true,
       },
+      {
+        code: "KE",
+        name: "Kenya",
+        flag: "/app/members/flag-ke.svg",
+        membersCount: expect.anything(),
+        available: true,
+      },
     ]);
   });
 
