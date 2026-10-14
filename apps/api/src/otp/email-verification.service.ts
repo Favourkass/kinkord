@@ -58,7 +58,12 @@ export class EmailVerificationService {
   }
 
   async verify(userId: string, otpId: string, code: string) {
-    const result = await this.otp.verify(userId, otpId, code);
+    // Only a code emailed to the address on the account right now verifies it.
+    const { email } = await this.accountFor(userId);
+    const result = await this.otp.verify(userId, otpId, code, {
+      channel: "email",
+      destination: email,
+    });
     if (!result.valid) return { verified: false, attemptsLeft: result.attemptsLeft ?? null };
 
     await this.db.update(user).set({ emailVerified: true }).where(eq(user.id, userId));

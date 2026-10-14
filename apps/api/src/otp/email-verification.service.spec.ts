@@ -60,6 +60,17 @@ describe("EmailVerificationService", () => {
     expect(codes.send).not.toHaveBeenCalled();
   });
 
+  it("only accepts a code emailed to the address on the account now", async () => {
+    const { db } = makeDb({ email: "tega@kinkord.com", verified: false });
+    const codes = otp();
+    const service = new EmailVerificationService(db as never, codes as never);
+    await service.verify("u1", "otp-1", "123456");
+    expect(codes.verify).toHaveBeenCalledWith("u1", "otp-1", "123456", {
+      channel: "email",
+      destination: "tega@kinkord.com",
+    });
+  });
+
   it("marks the account verified once the code checks out", async () => {
     const { db, set } = makeDb({ email: "tega@kinkord.com", verified: false });
     const service = new EmailVerificationService(db as never, otp() as never);
