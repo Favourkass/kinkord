@@ -315,6 +315,7 @@ describe("drafts", () => {
 
   it("helpers: location line, adult cutoff, sorted nationalities, API error text", () => {
     expect(locationLine("Abraka", "Delta", "NG")).toBe("Abraka, Delta State, Nigeria");
+    expect(locationLine("Nairobi", "Nairobi", "KE")).toBe("Nairobi, Nairobi, Kenya");
     expect(locationLine(null, null, null)).toBeNull();
     expect(adultCutoff(new Date("2026-09-12T10:00:00Z"))).toBe("2008-09-12");
     const [first, second] = nationalityOptions();

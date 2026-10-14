@@ -134,8 +134,8 @@ export function locationLine(
   state: string | null,
   country: string | null,
 ): string | null {
-  const parts = [city, displayState(state), countryName(country)].filter((p): p is string =>
-    Boolean(p),
+  const parts = [city, displayState(state, country), countryName(country)].filter(
+    (p): p is string => Boolean(p),
   );
   return parts.length ? parts.join(", ") : null;
 }
@@ -277,7 +277,7 @@ export function buildEditRow(key: EditRowKey, ctx: EditRowsContext): EditRowPM {
     case "state":
       return {
         key,
-        value: displayState(profile.state) || null,
+        value: displayState(profile.state, profile.country) || null,
         editor: single(profile.state, plain(statesForCountry(country)), true),
       };
     case "city":

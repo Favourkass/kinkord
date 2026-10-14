@@ -33,6 +33,7 @@ const {
   withAuthorFollow,
   withCommentDelta,
   withSuggestionFollow,
+  withSuggestionRestored,
 } = await import("./posts.service");
 
 const pm = (over: Partial<PostPM> = {}): PostPM => ({
@@ -146,6 +147,26 @@ describe("following, wherever the member shows", () => {
     expect(withSuggestionFollow(next, "u2", false)[0].isFollowing).toBe(false);
   });
 
+  it("puts a card whose removal failed back where it was, once", () => {
+    const card = (userId: string) => ({
+      userId,
+      username: userId,
+      displayName: userId,
+      avatarUrl: null,
+      isFollowing: false,
+    });
+    const ids = (list: { userId: string }[]) => list.map((s) => s.userId);
+    expect(ids(withSuggestionRestored([card("a"), card("c")], card("b"), 1))).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
+    // The list got shorter meanwhile: it goes at the end.
+    expect(ids(withSuggestionRestored([card("a")], card("b"), 4))).toEqual(["a", "b"]);
+    const back = [card("a"), card("b")];
+    expect(withSuggestionRestored(back, card("b"), 0)).toBe(back);
+  });
+
   it("sets every post by that author, a repost of theirs included, and no one else's", () => {
     const repost = pm({
       id: "r1",
@@ -189,6 +210,18 @@ describe("postsApi", () => {
   it("escapes an id rather than pasting it into the path", async () => {
     await postsApi.like("a/b");
     expect(post).toHaveBeenCalledWith("/posts/a%2Fb/like", {});
+  });
+
+  it("asks for Kinksters Near You for a segment, or leaves the default to the API", async () => {
+    await postsApi.suggested(10);
+    expect(get).toHaveBeenLastCalledWith("/members/suggested?limit=10");
+    await postsApi.suggested(10, "men");
+    expect(get).toHaveBeenLastCalledWith("/members/suggested?limit=10&show=men");
+  });
+
+  it("removes a suggestion by member id", async () => {
+    await postsApi.dismissSuggestion("u/2");
+    expect(post).toHaveBeenCalledWith("/members/suggested/u%2F2/dismiss", {});
   });
 });
 

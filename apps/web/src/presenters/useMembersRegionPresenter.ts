@@ -225,7 +225,7 @@ export function useMembersRegionPresenter(
     [items, busy, copy],
   );
 
-  const placeName = countryMode ? (countryName(country) ?? country) : displayState(state);
+  const placeName = countryMode ? (countryName(country) ?? country) : displayState(state, country);
 
   return {
     title: placeName,

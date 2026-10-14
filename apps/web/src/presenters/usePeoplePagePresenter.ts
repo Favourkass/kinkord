@@ -195,7 +195,7 @@ export function usePeoplePagePresenter(usernameParam: string, tabParam?: string 
       handle: f.username ? `@${f.username}` : null,
       avatarUrl: f.avatarUrl,
       ageTag: rowOrganization ? null : ageTagOf(f.age, f.gender),
-      location: rowOrganization ? null : locationOf(f.city, f.state),
+      location: rowOrganization ? null : locationOf(f.city, f.state, f.country),
       isFollowing: f.isFollowing,
       busy: busy.has(f.userId),
       silver: Boolean(f.silver),
