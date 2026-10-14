@@ -101,12 +101,11 @@ describe("updateProfileSchema", () => {
     expect(updateProfileSchema.safeParse({ gender: "Non-binary" }).success).toBe(false);
   });
 
-  it("only accepts listed statuses, kinks, roles (plus legacy roles), looking-for and languages", () => {
+  it("only accepts listed statuses, kinks, roles, looking-for and languages", () => {
     const ok = (body: unknown) => updateProfileSchema.safeParse(body).success;
     expect(ok({ relationshipStatus: "Head of House" })).toBe(false);
     expect(ok({ interests: ["Rope bondage", "Wax play"] })).toBe(true);
     expect(ok({ interests: ["Shibari"] })).toBe(false);
-    // "Rigger" was offered by the old signup wizard; still accepted, no longer offered.
     expect(ok({ roles: ["Domme", "Rigger"] })).toBe(true);
     expect(ok({ roles: ["Overlord"] })).toBe(false);
     expect(ok({ lookingFor: ["Events", "Mentorship / Guidance"] })).toBe(true);

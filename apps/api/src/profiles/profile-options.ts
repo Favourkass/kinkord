@@ -74,21 +74,6 @@ export const KINK_ROLES = [
   "Voyeur",
 ] as const;
 
-/**
- * Former signup roles, restored alongside the newer roles.
- */
-export const LEGACY_KINK_ROLES = [
-  "Handler",
-  "Brat Tamer",
-  "Rigger",
-  "Rope Bunny",
-  "Little",
-  "Curious",
-] as const;
-
-/** What PATCH /profile accepts for `roles`: the complete offered list. */
-export const ACCEPTED_KINK_ROLES = KINK_ROLES;
-
 export const KINKS = [
   "Anal play",
   "Auralism",
