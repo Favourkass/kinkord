@@ -1,11 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  ACCEPTED_KINK_ROLES,
   GENDERS,
   KINKS,
   KINK_ROLES,
   LANGUAGES,
-  LEGACY_KINK_ROLES,
   LOOKING_FOR,
   ORIENTATIONS,
   PROFILE_OPTIONS,
@@ -28,20 +26,9 @@ describe("profile options (CEO brief, 2026-09-12)", () => {
     expect(PROFILE_OPTIONS.nameChangeCooldownDays).toBe(30);
   });
 
-  it("has no duplicates and offers the former roles alongside the new roles", () => {
-    for (const list of [
-      RELATIONSHIP_STATUSES,
-      KINK_ROLES,
-      KINKS,
-      LOOKING_FOR,
-      LANGUAGES,
-      ACCEPTED_KINK_ROLES,
-    ]) {
+  it("has no duplicates", () => {
+    for (const list of [RELATIONSHIP_STATUSES, KINK_ROLES, KINKS, LOOKING_FOR, LANGUAGES]) {
       expect(unique(list)).toBe(true);
-    }
-    for (const legacy of LEGACY_KINK_ROLES) {
-      expect(KINK_ROLES).toContain(legacy);
-      expect(ACCEPTED_KINK_ROLES).toContain(legacy);
     }
     expect(PROFILE_OPTIONS.roles).toBe(KINK_ROLES);
   });

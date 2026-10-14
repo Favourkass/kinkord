@@ -1,14 +1,24 @@
+import { ConflictException } from "@nestjs/common";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it, vi } from "vitest";
 import { PhoneVerificationService, maskPhone } from "./phone-verification.service";
 
-function makeDb(row: { phone: string | null; verified: boolean } | undefined) {
+/**
+ * Selects answer in order: the member's own profile row, then the accounts
+ * that already have the number verified (none unless given).
+ */
+function makeDb(
+  row: { phone: string | null; verified: boolean } | undefined,
+  verifiedElsewhere: Array<{ userId: string }> = [],
+) {
+  const answers = [row ? [row] : [], verifiedElsewhere];
+  const where = vi.fn(async (_clause: unknown) => answers.shift());
   const set = vi.fn(() => ({ where: vi.fn(async () => undefined) }));
   return {
     set,
+    where,
     db: {
-      select: vi.fn(() => ({
-        from: vi.fn(() => ({ where: vi.fn(async () => (row ? [row] : [])) })),
-      })),
+      select: vi.fn(() => ({ from: vi.fn(() => ({ where })) })),
       update: vi.fn(() => ({ set })),
     },
   };
@@ -92,5 +102,35 @@ describe("PhoneVerificationService", () => {
       attemptsLeft: 2,
     });
     expect(set).not.toHaveBeenCalled();
+  });
+
+  it("refuses a number already verified on another account, once the code proves it's theirs", async () => {
+    const { db, set, where } = makeDb({ phone: "+2349127883266", verified: false }, [
+      { userId: "u2" },
+    ]);
+    const service = new PhoneVerificationService(db as never, otp() as never);
+
+    const attempt = service.verify("u1", "otp-1", "123456");
+    await expect(attempt).rejects.toBeInstanceOf(ConflictException);
+    await expect(attempt).rejects.toThrow("This number is already verified on another account.");
+    expect(set).not.toHaveBeenCalled();
+    // Only another account's verified copy counts; unverified ones are anyone's typing.
+    const lookup = new PgDialect().sqlToQuery(where.mock.calls[1][0] as never);
+    expect(lookup.sql).toBe(
+      '("profile"."phone" = $1 and "profile"."phone_verified" = $2 and "profile"."user_id" <> $3)',
+    );
+    expect(lookup.params).toEqual(["+2349127883266", true, "u1"]);
+  });
+
+  it("says nothing about other accounts to someone without the right code", async () => {
+    const { db, where } = makeDb({ phone: "+2349127883266", verified: false }, [{ userId: "u2" }]);
+    const codes = otp({ verify: vi.fn(async () => ({ valid: false, attemptsLeft: 2 })) });
+    const service = new PhoneVerificationService(db as never, codes as never);
+
+    await expect(service.verify("u1", "otp-1", "000000")).resolves.toEqual({
+      verified: false,
+      attemptsLeft: 2,
+    });
+    expect(where).toHaveBeenCalledTimes(1);
   });
 });

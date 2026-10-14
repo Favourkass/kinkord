@@ -389,6 +389,23 @@ describe("profileApi + uploadProfileImage", () => {
   });
 });
 
+describe("a member with no saved country", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("gets Nigeria's states and towns, sign-up's default, rather than Kenya's", async () => {
+    const noCountry = { ...profile, country: null, state: "Lagos" };
+    const state = buildEditRow("state", { ...ctx, profile: noCountry }).editor;
+    if (state.kind !== "single") throw new Error("state should be a single picker");
+    expect(state.options.map((o) => o.value)).toContain("Lagos");
+    expect(state.options.map((o) => o.value)).not.toContain("Nairobi");
+
+    const fetch = vi.fn(async () => new Response(JSON.stringify(["Ikeja", "Lekki"])));
+    vi.stubGlobal("fetch", fetch);
+    await expect(loadCityOptions(noCountry)).resolves.toEqual(["Ikeja", "Lekki"]);
+    expect(fetch).toHaveBeenCalledWith("/locations/NG/lagos.json");
+  });
+});
+
 describe("loadCityOptions", () => {
   afterEach(() => vi.unstubAllGlobals());
 

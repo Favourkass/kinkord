@@ -1,5 +1,5 @@
 import { ALL_COUNTRY_CODES } from "@/constants/countries";
-import { LAUNCH_COUNTRIES } from "@/constants/onboarding";
+import { DEFAULT_SIGNUP_COUNTRY, LAUNCH_COUNTRIES } from "@/constants/onboarding";
 import { PROFILE_EDIT_COPY } from "@/constants/profileEdit";
 import type {
   DraftIssue,
@@ -149,7 +149,7 @@ export interface EditRowsContext {
   now?: Date;
 }
 
-const profileCountry = (profile: OwnProfilePM) => profile.country ?? LAUNCH_COUNTRIES[0].code;
+const profileCountry = (profile: OwnProfilePM) => profile.country ?? DEFAULT_SIGNUP_COUNTRY;
 
 /** The City editor's towns: the member's state's list, fetched the first time. */
 export function loadCityOptions(profile: OwnProfilePM): Promise<string[]> {

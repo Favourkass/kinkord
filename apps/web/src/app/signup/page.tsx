@@ -221,28 +221,18 @@ function SignupWizard() {
                 onChange={p.aboutStep.selectState}
                 error={p.aboutStep.errors.state}
               />
-              {p.aboutStep.location.areaMode === "select" ? (
-                <SearchSelectField
-                  label={p.aboutStep.location.areaLabel}
-                  options={p.aboutStep.location.areas}
-                  placeholder={p.aboutStep.location.areaPlaceholder}
-                  searchPlaceholder={p.aboutStep.location.areaSearchPlaceholder}
-                  disabled={p.aboutStep.location.areaDisabled}
-                  emptyLabel={p.aboutStep.location.areaEmptyLabel}
-                  moreLabel={p.aboutStep.location.areaMoreLabel}
-                  other={p.aboutStep.location.otherArea}
-                  value={p.aboutStep.areaValue}
-                  onChange={p.aboutStep.selectArea}
-                />
-              ) : (
-                <TextField
-                  label="City / Town (optional)"
-                  icon={MapPin}
-                  placeholder="Enter your city or town"
-                  value={p.aboutStep.draft.city}
-                  onChange={(v) => p.aboutStep.set({ ...p.aboutStep.draft, city: v })}
-                />
-              )}
+              <SearchSelectField
+                label={p.aboutStep.location.areaLabel}
+                options={p.aboutStep.location.areas}
+                placeholder={p.aboutStep.location.areaPlaceholder}
+                searchPlaceholder={p.aboutStep.location.areaSearchPlaceholder}
+                disabled={p.aboutStep.location.areaDisabled}
+                emptyLabel={p.aboutStep.location.areaEmptyLabel}
+                moreLabel={p.aboutStep.location.areaMoreLabel}
+                other={p.aboutStep.location.otherArea}
+                value={p.aboutStep.areaValue}
+                onChange={p.aboutStep.selectArea}
+              />
               {p.aboutStep.location.customArea && (
                 <TextField
                   label="Region / City / Town name"

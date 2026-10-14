@@ -1,5 +1,5 @@
-import { BadRequestException, Inject, Injectable } from "@nestjs/common";
-import { eq } from "drizzle-orm";
+import { BadRequestException, ConflictException, Inject, Injectable } from "@nestjs/common";
+import { and, eq, ne } from "drizzle-orm";
 import { DRIZZLE, type Db } from "../db/db.module";
 import { profile } from "../db/schema";
 import { OtpService } from "./otp.service";
@@ -67,7 +67,23 @@ export class PhoneVerificationService {
     });
     if (!result.valid) return { verified: false, attemptsLeft: result.attemptsLeft ?? null };
 
+    // Checked only once the code is right, so only someone holding the phone
+    // ever learns that another account has verified this number.
+    if (await this.verifiedElsewhere(userId, phone)) {
+      throw new ConflictException("This number is already verified on another account.");
+    }
     await this.db.update(profile).set({ phoneVerified: true }).where(eq(profile.userId, userId));
     return { verified: true, attemptsLeft: null };
+  }
+
+  /** A number is verified on one account at most: it is what phone sign-in and a ban match on. */
+  private async verifiedElsewhere(userId: string, phone: string) {
+    const others = await this.db
+      .select({ userId: profile.userId })
+      .from(profile)
+      .where(
+        and(eq(profile.phone, phone), eq(profile.phoneVerified, true), ne(profile.userId, userId)),
+      );
+    return others.length > 0;
   }
 }

@@ -15,46 +15,6 @@ export const LAUNCH_COUNTRIES = [
  */
 export const PHONE_COUNTRY_CODES = [{ code: "NG", dialCode: "+234", flag: "🇳🇬" }] as const;
 
-export const NG_STATES = [
-  "Abia",
-  "Adamawa",
-  "Akwa Ibom",
-  "Anambra",
-  "Bauchi",
-  "Bayelsa",
-  "Benue",
-  "Borno",
-  "Cross River",
-  "Delta",
-  "Ebonyi",
-  "Edo",
-  "Ekiti",
-  "Enugu",
-  "FCT Abuja",
-  "Gombe",
-  "Imo",
-  "Jigawa",
-  "Kaduna",
-  "Kano",
-  "Katsina",
-  "Kebbi",
-  "Kogi",
-  "Kwara",
-  "Lagos",
-  "Nasarawa",
-  "Niger",
-  "Ogun",
-  "Ondo",
-  "Osun",
-  "Oyo",
-  "Plateau",
-  "Rivers",
-  "Sokoto",
-  "Taraba",
-  "Yobe",
-  "Zamfara",
-] as const;
-
 /** Signup role chips, including the ten additions; Edit Profile offers the same list via the API. */
 export const KINK_ROLES = [
   "Acolyte",
