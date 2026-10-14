@@ -4,12 +4,15 @@
  */
 import {
   COMMENT_BODY_MAX,
+  DEFAULT_FEED_TAB,
+  isFeedTab,
   POST_MEDIA_MAX,
   type CommentPM,
   type CommentsPM,
   type FeedPM,
   type FeedSuggestionPM,
   type FeedSuggestionsPM,
+  type FeedTab,
   type LikePM,
   type PostPM,
   type PostVisibility,
@@ -37,15 +40,20 @@ export interface CreatePostInput {
 }
 
 export const postsApi = {
-  /** `author` narrows the feed to one member — that is the profile Posts tab. */
-  /** `search` keeps the posts whose text contains it. */
+  /**
+   * `author` narrows the feed to one member — that is the profile Posts tab.
+   * `search` keeps the posts whose text contains it. `tab` is the home feed's
+   * For You, Following or Nearby; the API reads newest first without one.
+   */
   feed: (
     cursor?: string | null,
     limit?: number,
     author?: string | null,
     search?: string | null,
+    tab?: FeedTab | null,
   ) => {
     const qs = new URLSearchParams();
+    if (tab) qs.set("tab", tab);
     if (cursor) qs.set("cursor", cursor);
     if (limit) qs.set("limit", String(limit));
     if (author) qs.set("author", author.replace(/^@/, ""));
@@ -98,6 +106,43 @@ export const postsApi = {
   unfollow: (username: string) =>
     api.del<unknown>(`/follows/${encodeURIComponent(username.replace(/^@/, ""))}`),
 };
+
+const FEED_TAB_KEY = "kinkord:feed-tab";
+
+/**
+ * The home feed's tab, kept for this browser session, so a reload or a walk
+ * to a profile and back lands on the same tab. Session storage can be off or
+ * full (private mode): then nothing is kept and the feed opens on For You,
+ * as a new session does.
+ */
+export const feedTabMemory = {
+  /** The tab this session last showed, else For You. */
+  read(): FeedTab {
+    try {
+      const kept = sessionStorage.getItem(FEED_TAB_KEY);
+      return isFeedTab(kept) ? kept : DEFAULT_FEED_TAB;
+    } catch {
+      return DEFAULT_FEED_TAB;
+    }
+  },
+  remember(tab: FeedTab): void {
+    try {
+      sessionStorage.setItem(FEED_TAB_KEY, tab);
+    } catch {
+      // Not kept: the tab still switches, for this visit.
+    }
+  },
+};
+
+/**
+ * The next page after what is on screen, less any row already shown. A ranked
+ * page can repeat a row when the world moved between pages; showing it twice
+ * would be worse than dropping it.
+ */
+export function appendNewRows(shown: PostPM[], next: PostPM[]): PostPM[] {
+  const ids = new Set(shown.map((p) => p.id));
+  return [...shown, ...next.filter((p) => !ids.has(p.id))];
+}
 
 /**
  * One photo into the bucket, every stored size, before the post exists. The key

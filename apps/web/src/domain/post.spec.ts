@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   clampBody,
   handleOf,
+  isFeedTab,
   needsClamp,
   POST_BODY_MAX,
   POST_PREVIEW_CHARS,
@@ -42,6 +43,14 @@ const post = (over: Partial<PostPM> = {}): PostPM => ({
   repostedBy: null,
   mine: false,
   ...over,
+});
+
+describe("isFeedTab", () => {
+  it("knows the home feed's three tabs and nothing else", () => {
+    expect(["for_you", "following", "nearby"].every(isFeedTab)).toBe(true);
+    expect(isFeedTab("trending")).toBe(false);
+    expect(isFeedTab(null)).toBe(false);
+  });
 });
 
 describe("handleOf", () => {
