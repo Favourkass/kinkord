@@ -5,6 +5,7 @@ import { useEffect, useId, useRef } from "react";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import MaskIcon from "@/components/app/MaskIcon";
 import SilverCheck from "@/components/app/SilverCheck";
+import OrganizationBadge from "@/components/organization/OrganizationBadge";
 import type { CommentVM } from "@/domain/post";
 import BodyText from "./BodyText";
 import MentionSuggestions, {
@@ -41,6 +42,8 @@ export interface CommentsPanelProps {
     loading: string;
     close: string;
     mentions: string;
+    organization: string;
+    verifiedOrganization: string;
   };
 }
 
@@ -88,43 +91,63 @@ export default function CommentsPanel(p: CommentsPanelProps) {
             <p className="py-[24px] text-center text-[14px] text-feed-muted">{p.labels.empty}</p>
           )}
           <ul className="flex flex-col gap-[16px]">
-            {p.comments.map((c) => (
-              <li key={c.id} className="flex items-start gap-[10px]">
-                <AvatarCircle src={c.avatarUrl} alt="" size={32} ringClassName="bg-feed-line" />
-                <div className="min-w-0 flex-1">
-                  <p className="flex flex-wrap items-baseline gap-x-[8px]">
-                    {c.authorHref ? (
-                      <Link
-                        href={c.authorHref}
-                        className="inline-flex items-center gap-[3px] text-[13px] font-bold text-feed-text hover:underline"
-                      >
-                        {c.authorName}
-                        {c.authorSilver ? <SilverCheck size={14} /> : null}
-                      </Link>
-                    ) : (
-                      <span className="inline-flex items-center gap-[3px] text-[13px] font-bold text-feed-text">
-                        {c.authorName}
-                        {c.authorSilver ? <SilverCheck size={14} /> : null}
-                      </span>
-                    )}
-                    <span className="text-[11px] font-light text-feed-muted">{c.time}</span>
-                  </p>
-                  <p className="whitespace-pre-wrap pt-[2px] text-[14px] leading-[20px] text-feed-text">
-                    <BodyText parts={c.bodyParts} />
-                  </p>
-                </div>
-                {c.canDelete && (
-                  <button
-                    type="button"
-                    onClick={() => p.onDelete(c.id)}
-                    aria-label={p.labels.delete}
-                    className="shrink-0 text-feed-muted transition-colors hover:text-[#e5484d]"
-                  >
-                    <MaskIcon src="/app/feed/icon-close.svg" width={14} />
-                  </button>
-                )}
-              </li>
-            ))}
+            {p.comments.map((c) => {
+              const name = (
+                <>
+                  {c.authorName}
+                  {c.authorSilver ? <SilverCheck size={14} /> : null}
+                  {c.authorOrganization ? (
+                    <OrganizationBadge
+                      label={p.labels.organization}
+                      verified
+                      verifiedLabel={p.labels.verifiedOrganization}
+                      markSize={13}
+                    />
+                  ) : null}
+                </>
+              );
+              return (
+                <li key={c.id} className="flex items-start gap-[10px]">
+                  <AvatarCircle
+                    src={c.avatarUrl}
+                    alt=""
+                    size={32}
+                    ringClassName="bg-feed-line"
+                    shape={c.authorOrganization ? "square" : "circle"}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="flex flex-wrap items-baseline gap-x-[8px]">
+                      {c.authorHref ? (
+                        <Link
+                          href={c.authorHref}
+                          className="inline-flex items-center gap-[3px] text-[13px] font-bold text-feed-text hover:underline"
+                        >
+                          {name}
+                        </Link>
+                      ) : (
+                        <span className="inline-flex items-center gap-[3px] text-[13px] font-bold text-feed-text">
+                          {name}
+                        </span>
+                      )}
+                      <span className="text-[11px] font-light text-feed-muted">{c.time}</span>
+                    </p>
+                    <p className="whitespace-pre-wrap pt-[2px] text-[14px] leading-[20px] text-feed-text">
+                      <BodyText parts={c.bodyParts} />
+                    </p>
+                  </div>
+                  {c.canDelete && (
+                    <button
+                      type="button"
+                      onClick={() => p.onDelete(c.id)}
+                      aria-label={p.labels.delete}
+                      className="shrink-0 text-feed-muted transition-colors hover:text-[#e5484d]"
+                    >
+                      <MaskIcon src="/app/feed/icon-close.svg" width={14} />
+                    </button>
+                  )}
+                </li>
+              );
+            })}
           </ul>
           {p.loading && (
             <p className="py-[16px] text-center text-[13px] text-feed-muted">{p.labels.loading}</p>
@@ -146,6 +169,8 @@ export default function CommentsPanel(p: CommentsPanelProps) {
             {...p.mentions}
             id={mentionListId}
             label={p.labels.mentions}
+            organizationLabel={p.labels.organization}
+            verifiedOrganizationLabel={p.labels.verifiedOrganization}
             className="mb-[10px]"
           />
           <div className="flex items-center gap-[10px]">

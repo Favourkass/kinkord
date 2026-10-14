@@ -162,6 +162,7 @@ describe("NotificationsService.list", () => {
       id: ID,
       type: "follow",
       actor: {
+        userId: "ada",
         name: "Ada",
         username: "ada_x",
         avatarUrl: "https://media.test/avatars/ada/a.jpg",
@@ -285,6 +286,9 @@ describe("notification links and search words", () => {
     expect(notificationUrl("follow", null, null)).toBe("/notifications");
     expect(notificationUrl("like", "p1", "ada")).toBe("/p/p1");
     expect(notificationUrl("report", null, null)).toBe("/moderation/reports");
+    expect(notificationUrl("verification", null, null)).toBe("/moderation/verification");
+    expect(notificationUrl("verification_update", null, null)).toBe("/settings/verification");
+    expect(notificationUrl("verification_underage", "u9", null)).toBe("/moderation/members/u9");
     expect(notificationUrl("test", null, null)).toBe("/settings");
     expect(notificationUrl("payment", null, null)).toBe("/moderation/payments");
     expect(notificationUrl("silver_check", null, null)).toBe("/moderation/payments");

@@ -7,6 +7,7 @@ import { ApiBaseStack, ApiStack } from "../lib/api-stack";
 import { BACKUP_COPY_REGION, BackupCopiesStack, BackupStack } from "../lib/backup-stack";
 import { DnsRecordsStack } from "../lib/dns-records-stack";
 import { RealtimeStack } from "../lib/realtime-stack";
+import { VerificationStack } from "../lib/verification-stack";
 import { WebStack } from "../lib/web-stack";
 
 const app = new cdk.App();
@@ -43,6 +44,13 @@ new ApiStack(app, "KinkordApi", { env: primary, base: apiBase });
 // Live chat. Attaches its permissions to the API's existing instance role by
 // name, so it deploys without touching the API stacks.
 new RealtimeStack(app, "KinkordRealtime", {
+  env: primary,
+  apiInstanceRoleName: "KinkordApiBase-InstanceRole3CCE2F1D-oljaS88t9vMg",
+});
+
+// Identity verification's settings, read by the API at runtime. Created
+// switched off; attaches to the API's role by name like live chat.
+new VerificationStack(app, "KinkordVerification", {
   env: primary,
   apiInstanceRoleName: "KinkordApiBase-InstanceRole3CCE2F1D-oljaS88t9vMg",
 });

@@ -4,11 +4,35 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MODERATION_COPY } from "@/constants/moderation";
 import { Routes } from "@/constants/Routes";
-import { toAdminMemberDetailVM, type AdminMemberDetailPM } from "@/domain/moderation";
+import {
+  adminVerificationActions,
+  canChangeVerification,
+  stepUpMessage,
+  stepUpRefusal,
+  toAdminMemberDetailVM,
+  toAdminMemberVerificationVM,
+  twoFactorCodeInput,
+  type AdminMemberDetailPM,
+  type AdminVerificationStatePM,
+} from "@/domain/moderation";
+import { ApiError } from "@/services/apiClient";
 import { moderationService } from "@/services/moderation.service";
 import { useAdminAccessPresenter } from "./useAdminAccessPresenter";
 
-export type AdminDialogKind = "block" | "unblock" | "deletePosts" | "deletePost" | "deleteAccount";
+export type AdminDialogKind =
+  | "block"
+  | "unblock"
+  | "deletePosts"
+  | "deletePost"
+  | "deleteAccount"
+  | "revokeVerification"
+  | "reopenVerification";
+
+export interface AdminDialogField {
+  label: string;
+  value: string;
+  set: (v: string) => void;
+}
 
 export interface AdminDialogVM {
   title: string;
@@ -16,15 +40,32 @@ export interface AdminDialogVM {
   confirmLabel: string;
   cancelLabel: string;
   destructive: boolean;
-  reason: { label: string; value: string; set: (v: string) => void } | null;
+  /** A short required line above the reason, e.g. an evidence reference. */
+  input?: AdminDialogField | null;
+  reason: AdminDialogField | null;
+  /** A current authenticator code, asked for after the reason. */
+  code?: AdminDialogField | null;
   checkbox: { label: string; checked: boolean; toggle: () => void } | null;
-  typeToConfirm: { label: string; value: string; set: (v: string) => void } | null;
+  typeToConfirm: AdminDialogField | null;
   canConfirm: boolean;
   busy: boolean;
   error: string | null;
+  /** Where to put right what the error says, e.g. Security settings when 2FA is off. */
+  errorLink?: { label: string; href: string } | null;
   confirm: () => void;
   cancel: () => void;
 }
+
+const STEP_UP_LABELS = {
+  expired: MODERATION_COPY.verification.stepUp.expired,
+  retryAt: MODERATION_COPY.verification.stepUp.retryAt,
+};
+const VERIFICATION_LABELS = {
+  statuses: MODERATION_COPY.member.verificationStatuses,
+  attemptsUsed: MODERATION_COPY.member.attemptsUsed,
+  own: MODERATION_COPY.verification.own,
+  protected: MODERATION_COPY.verification.protected,
+};
 
 function messageOf(e: unknown): string {
   return e instanceof Error ? e.message : "Something went wrong. Try again.";
@@ -35,16 +76,20 @@ export function useAdminMemberPresenter(id: string) {
   const access = useAdminAccessPresenter();
   const copy = MODERATION_COPY;
   const [member, setMember] = useState<AdminMemberDetailPM | null>(null);
+  const [verification, setVerification] = useState<AdminVerificationStatePM | null>(null);
+  const [verificationError, setVerificationError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const [dialog, setDialog] = useState<AdminDialogKind | null>(null);
   const [postId, setPostId] = useState<string | null>(null);
   const [reason, setReason] = useState("");
+  const [twoFactorCode, setTwoFactorCode] = useState("");
   const [checked, setChecked] = useState(false);
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
+  const [twoFactorOff, setTwoFactorOff] = useState(false);
 
   // Bumped after every action so the page re-reads what the server now holds.
   const [version, setVersion] = useState(0);
@@ -62,6 +107,19 @@ export function useAdminMemberPresenter(id: string) {
         if (live) setLoadError(messageOf(e));
       },
     );
+    // Read on its own: the rest of the page works without it, and says when it failed.
+    moderationService.memberVerification(id).then(
+      (v) => {
+        if (!live) return;
+        setVerification(v);
+        setVerificationError(null);
+      },
+      () => {
+        if (!live) return;
+        setVerification(null);
+        setVerificationError(MODERATION_COPY.member.verificationError);
+      },
+    );
     return () => {
       live = false;
     };
@@ -73,11 +131,13 @@ export function useAdminMemberPresenter(id: string) {
     setDialog(kind);
     setPostId(targetPostId ?? null);
     setReason("");
+    setTwoFactorCode("");
     // Deleting an account also blocks by default: a deleted member who can
     // sign straight back up hasn't really been removed.
     setChecked(kind === "deleteAccount");
     setTyped("");
     setDialogError(null);
+    setTwoFactorOff(false);
     setNotice(null);
   }, []);
 
@@ -89,6 +149,7 @@ export function useAdminMemberPresenter(id: string) {
     if (!dialog) return;
     setBusy(true);
     setDialogError(null);
+    setTwoFactorOff(false);
     const why = reason.trim() || null;
     try {
       if (dialog === "block") {
@@ -103,6 +164,14 @@ export function useAdminMemberPresenter(id: string) {
       } else if (dialog === "deletePost" && postId) {
         await moderationService.deletePost(postId);
         setNotice(copy.notices.postDeleted);
+      } else if (dialog === "revokeVerification") {
+        await moderationService.stepUpVerification(twoFactorCode);
+        await moderationService.revokeVerification(id, reason.trim());
+        setNotice(copy.notices.verificationRevoked);
+      } else if (dialog === "reopenVerification") {
+        await moderationService.stepUpVerification(twoFactorCode);
+        await moderationService.reopenVerification(id, reason.trim());
+        setNotice(copy.notices.verificationReopened);
       } else if (dialog === "deleteAccount") {
         await moderationService.deleteMember(id, { block: checked, reason: why });
         router.replace(Routes.moderation);
@@ -111,19 +180,36 @@ export function useAdminMemberPresenter(id: string) {
       setDialog(null);
       setVersion((v) => v + 1);
     } catch (e) {
-      setDialogError(messageOf(e));
+      const refusal = e instanceof ApiError ? stepUpRefusal(e.status, e.body) : null;
+      setDialogError(refusal ? stepUpMessage(refusal, messageOf(e), STEP_UP_LABELS) : messageOf(e));
+      setTwoFactorOff(refusal?.kind === "twoFactorOff");
+      // A refused code can't be used again; leave the box ready for the next one.
+      if (refusal) setTwoFactorCode("");
+      // Their verification moved on since this page read it: show it as it is now.
+      if (e instanceof ApiError && e.status === 409) setVersion((v) => v + 1);
     } finally {
       setBusy(false);
     }
-  }, [checked, copy.notices, dialog, id, postId, reason, router]);
+  }, [checked, copy.notices, dialog, id, postId, reason, router, twoFactorCode]);
 
   const dialogVM = useMemo((): AdminDialogVM | null => {
     if (!dialog || !vm) return null;
     const text = copy.dialogs[dialog];
+    const verificationAction = dialog === "revokeVerification" || dialog === "reopenVerification";
     const reasonField =
-      dialog === "block" || dialog === "deleteAccount"
+      dialog === "block" || dialog === "deleteAccount" || verificationAction
         ? { label: copy.dialogs.reasonLabel, value: reason, set: setReason }
         : null;
+    const code = verificationAction
+      ? {
+          label: copy.dialogs.twoFactorCodeLabel,
+          value: twoFactorCode,
+          set: (value: string) => setTwoFactorCode(twoFactorCodeInput(value)),
+        }
+      : null;
+    // Still on offer as the page reads it now (a refusal reloads it).
+    const actions = adminVerificationActions(verification);
+    const offered = dialog === "revokeVerification" ? actions.revoke : actions.reopen;
     const checkbox =
       dialog === "block" || dialog === "deleteAccount"
         ? {
@@ -148,17 +234,40 @@ export function useAdminMemberPresenter(id: string) {
       body: text.body,
       confirmLabel: text.confirm,
       cancelLabel: copy.dialogs.cancel,
-      destructive: dialog !== "unblock",
+      destructive: dialog !== "unblock" && dialog !== "reopenVerification",
       reason: reasonField,
+      code,
       checkbox,
       typeToConfirm,
-      canConfirm: phraseOk && !busy,
+      canConfirm:
+        phraseOk &&
+        !busy &&
+        (!verificationAction ||
+          (offered && canChangeVerification({ code: twoFactorCode, reason }))),
       busy,
       error: dialogError,
+      errorLink: twoFactorOff
+        ? { label: copy.verification.stepUp.securityLink, href: Routes.settingsSecurity }
+        : null,
       confirm: () => void confirm(),
       cancel,
     };
-  }, [busy, cancel, checked, confirm, copy.dialogs, dialog, dialogError, reason, typed, vm]);
+  }, [
+    busy,
+    cancel,
+    checked,
+    confirm,
+    copy.dialogs,
+    copy.verification.stepUp.securityLink,
+    dialog,
+    dialogError,
+    reason,
+    twoFactorCode,
+    twoFactorOff,
+    typed,
+    verification,
+    vm,
+  ]);
 
   return {
     checking: access.checking,
@@ -166,6 +275,10 @@ export function useAdminMemberPresenter(id: string) {
     loading: access.isAdmin && !member && !loadError,
     error: loadError,
     vm,
+    verification: verification
+      ? toAdminMemberVerificationVM(verification, VERIFICATION_LABELS)
+      : null,
+    verificationError,
     notice,
     dialog: dialogVM,
     labels: {
@@ -174,6 +287,7 @@ export function useAdminMemberPresenter(id: string) {
       noPosts: copy.member.noPosts,
       rules: copy.member.rules,
       protectedAccount: copy.member.protected,
+      verification: copy.member.verification,
       actions: copy.member.actions,
     },
     backHref: Routes.moderation,
@@ -182,5 +296,7 @@ export function useAdminMemberPresenter(id: string) {
     onDeletePosts: () => open("deletePosts"),
     onDeleteAccount: () => open("deleteAccount"),
     onDeletePost: (targetPostId: string) => open("deletePost", targetPostId),
+    onRevokeVerification: () => open("revokeVerification"),
+    onReopenVerification: () => open("reopenVerification"),
   };
 }

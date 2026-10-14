@@ -15,5 +15,7 @@ export const SEARCH_COPY = {
   noPosts: (q: string) => `No posts contain “${q}”.`,
   follow: "Follow",
   following: "Following",
+  organization: "Official",
+  verifiedOrganization: "Official Kinkord account",
   error: "Search isn’t working right now. Try again.",
 };

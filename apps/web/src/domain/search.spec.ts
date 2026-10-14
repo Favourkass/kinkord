@@ -31,9 +31,17 @@ describe("toSearchPersonVM", () => {
       details: "25F · Ikeja, Lagos State",
       avatarUrl: "https://media/a.jpg",
       silver: true,
+      organization: false,
       isFollowing: false,
       href: "/u/ada",
       canFollow: true,
+    });
+  });
+
+  it("suppresses personal discovery details for an organization", () => {
+    expect(toSearchPersonVM(pm(), href, true)).toMatchObject({
+      organization: true,
+      details: null,
     });
   });
 

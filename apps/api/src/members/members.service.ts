@@ -17,11 +17,12 @@ import { alias } from "drizzle-orm/pg-core";
 import { Db, DRIZZLE } from "../db/db.module";
 import { notBanned } from "../moderation/admins";
 import {
-  walletBalance,
+  bronzeVerification,
   follow,
   profile,
   profileMedia,
   user,
+  walletBalance,
   type PostMediaKind,
   type ProfileMediaKind,
 } from "../db/schema";
@@ -31,6 +32,7 @@ import { containsPattern } from "../push/notifications.service";
 import { ONLINE_WINDOW_SECONDS, PresenceService } from "../presence/presence.service";
 import { StorageService } from "../storage/storage.service";
 import { silverCheck, silverSince } from "../subscriptions/plans";
+import { stillVerified } from "../verification/bronze-policy";
 import { FollowsService } from "./follows.service";
 
 /** "match" ranks a search: exact name or username, then starts-with, then anywhere. */
@@ -278,10 +280,12 @@ export class MembersService {
       .select({
         u: user,
         p: profile,
+        bronze: bronzeVerification,
         coins: sql<number>`coalesce((select ${walletBalance.available} from ${walletBalance} where ${walletBalance.userId}=${user.id} and ${user.id}=${viewerId} and ${walletBalance.currency}='coin'),0)`,
       })
       .from(user)
       .innerJoin(profile, eq(profile.userId, user.id))
+      .leftJoin(bronzeVerification, eq(bronzeVerification.userId, user.id))
       .where(and(eq(user.username, handle), notBanned(user.id)))
       .limit(1);
     if (!row) throw new NotFoundException("Member not found.");
@@ -339,7 +343,15 @@ export class MembersService {
       restricted,
       // Only you see your own birth date; everyone else gets the derived age.
       dateOfBirth: isSelf ? p.dateOfBirth : null,
-      verification: { email: u.emailVerified, phone: p.phoneVerified },
+      verification: {
+        email: u.emailVerified,
+        phone: p.phoneVerified,
+        // Only while the verified photo, birth date and gender are still the
+        // profile's; others see it only if the member shows it and may see them.
+        ...(stillVerified(row.bronze, p) && (isSelf || (p.showVerifiedBadge && !restricted))
+          ? { identity: true as const }
+          : {}),
+      },
       // The Silver check, X-style: shown with the month their Silver began.
       silver: silver ? { since: silver.toISOString() } : null,
     };

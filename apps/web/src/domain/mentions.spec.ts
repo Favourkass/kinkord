@@ -156,7 +156,12 @@ describe("toMentionSuggestionVM", () => {
       name: "Ada Okafor",
       avatarUrl: null,
       silver: true,
+      organization: false,
     });
     expect(toMentionSuggestionVM(pm({ username: null }))).toBeNull();
+  });
+
+  it("marks the official organization when the presenter says it is one", () => {
+    expect(toMentionSuggestionVM(pm(), true)?.organization).toBe(true);
   });
 });

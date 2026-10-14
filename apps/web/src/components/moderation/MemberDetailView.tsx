@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import AvatarCircle from "@/components/app/AvatarCircle";
-import type { AdminMemberDetailVM } from "@/domain/moderation";
+import type { AdminMemberDetailVM, AdminMemberVerificationVM } from "@/domain/moderation";
 import type { AdminDialogVM } from "@/presenters/useAdminMemberPresenter";
 import Badges from "./Badges";
 import ConfirmDialog from "./ConfirmDialog";
@@ -12,17 +12,23 @@ export interface MemberDetailLabels {
   noPosts: string;
   rules: string;
   protectedAccount: string;
+  verification: string;
   actions: {
     block: string;
     unblock: string;
     deletePosts: string;
     deleteAccount: string;
     deletePost: string;
+    revokeVerification: string;
+    reopenVerification: string;
   };
 }
 
 export interface MemberDetailViewProps {
   vm: AdminMemberDetailVM | null;
+  verification: AdminMemberVerificationVM | null;
+  /** Shown in the verification section when its status couldn't be read. */
+  verificationError: string | null;
   loading: boolean;
   error: string | null;
   notice: string | null;
@@ -36,6 +42,8 @@ export interface MemberDetailViewProps {
   onDeletePost: (postId: string) => void;
   /** Their Silver check, when they have Silver. */
   silverCheck?: ReactNode;
+  onRevokeVerification: () => void;
+  onReopenVerification: () => void;
 }
 
 const outline =
@@ -43,6 +51,8 @@ const outline =
 
 export default function MemberDetailView({
   vm,
+  verification,
+  verificationError,
   loading,
   error,
   notice,
@@ -55,6 +65,8 @@ export default function MemberDetailView({
   onDeleteAccount,
   onDeletePost,
   silverCheck,
+  onRevokeVerification,
+  onReopenVerification,
 }: MemberDetailViewProps) {
   return (
     <div>
@@ -99,6 +111,50 @@ export default function MemberDetailView({
               </div>
             ))}
           </dl>
+
+          {verification || verificationError ? (
+            <section className="mt-[12px] rounded-[16px] border border-app-card-border bg-app-card p-[14px]">
+              <h2 className="text-[12px] font-bold uppercase tracking-wide text-app-muted">
+                {labels.verification}
+              </h2>
+              {verificationError ? (
+                <p role="alert" className="text-[14px] text-app-danger">
+                  {verificationError}
+                </p>
+              ) : null}
+              {verification ? (
+                <>
+                  <p className="text-[15px] text-app-value">{verification.status}</p>
+                  <p className="text-[13px] text-app-subtle">{verification.attempts}</p>
+                  {verification.locked ? (
+                    <p className="pt-[8px] text-[13px] text-app-subtle">{verification.locked}</p>
+                  ) : null}
+                  {verification.revoke || verification.reopen ? (
+                    <div className="flex flex-wrap gap-[10px] pt-[10px]">
+                      {verification.reopen ? (
+                        <button
+                          type="button"
+                          onClick={onReopenVerification}
+                          className={`${outline} border-app-input-border bg-app-input text-app-value`}
+                        >
+                          {labels.actions.reopenVerification}
+                        </button>
+                      ) : null}
+                      {verification.revoke ? (
+                        <button
+                          type="button"
+                          onClick={onRevokeVerification}
+                          className={`${outline} border-app-danger bg-transparent text-app-danger`}
+                        >
+                          {labels.actions.revokeVerification}
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+            </section>
+          ) : null}
 
           {vm.protectedAccount ? (
             <p className="pt-[16px] text-[14px] text-app-subtle">{labels.protectedAccount}</p>

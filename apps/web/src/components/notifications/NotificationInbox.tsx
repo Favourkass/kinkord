@@ -14,6 +14,7 @@ import type { LucideProps } from "lucide-react";
 import type { NotificationVM } from "@/domain/notification";
 import AvatarCircle from "../app/AvatarCircle";
 import SilverCheck from "../app/SilverCheck";
+import OrganizationBadge from "../organization/OrganizationBadge";
 
 const ICONS = {
   message: MessageCircleMore,
@@ -81,6 +82,8 @@ export interface NotificationInboxProps {
     retry: string;
     refresh: string;
     open: string;
+    organization: string;
+    verifiedOrganization: string;
   };
 }
 
@@ -227,6 +230,7 @@ export default function NotificationInbox(p: NotificationInboxProps) {
                         alt=""
                         size={48}
                         ringClassName="bg-transparent"
+                        shape={item.actorOrganization ? "square" : "circle"}
                       />
                     )}
                     {item.official ? (
@@ -261,6 +265,16 @@ export default function NotificationInbox(p: NotificationInboxProps) {
                           <strong className="font-extrabold">{item.actorName}</strong>
                           {item.actorSilver ? (
                             <SilverCheck size={14} className="ml-[3px] align-[-2px]" />
+                          ) : null}
+                          {item.actorOrganization ? (
+                            <span className="ml-[4px] inline-flex align-[-2px]">
+                              <OrganizationBadge
+                                label={p.copy.organization}
+                                verified
+                                verifiedLabel={p.copy.verifiedOrganization}
+                                markSize={14}
+                              />
+                            </span>
                           ) : null}{" "}
                         </>
                       )}

@@ -319,6 +319,57 @@ describe("ProfilesService", () => {
     expect(setCalls[0]).toMatchObject({ bio: "hi" });
   });
 
+  it("keeps Kinkord out of a new display name, but lets the account that has it keep it", async () => {
+    const { service, setCalls, row, checks } = makeService();
+    await expect(
+      responseOf(service.updateOwn("u1", { displayName: "Kin_kord HQ" }, "Favour", now)),
+    ).resolves.toEqual({ displayName: ["That name is reserved."] });
+    expect(setCalls).toHaveLength(0);
+    expect(checks.hold).not.toHaveBeenCalled();
+
+    row.displayName = "Kinkord";
+    await service.updateOwn("u1", { displayName: "Kinkord Official" }, "Favour", now);
+    expect(setCalls[0]).toMatchObject({ displayName: "Kinkord Official" });
+  });
+
+  it("tells members whether they're verified, and lets them hide the badge", async () => {
+    const verifiedFor = (avatarKey: string) => ({
+      status: "verified",
+      verifiedAvatarKey: avatarKey,
+      verifiedDob: "1998-04-02",
+      verifiedGender: "female",
+    });
+    const row = {
+      ...makeService().row,
+      avatarKey: "avatars/u1/a.jpg",
+      dateOfBirth: "1998-04-02",
+      gender: "female",
+      showVerifiedBadge: false,
+    };
+    // ensureRow reads the profile, then the view reads the verification.
+    const { service: verified } = makeService({
+      selects: [[row], [verifiedFor("avatars/u1/a.jpg")]],
+    });
+    expect(await verified.getOwn("u1", "Favour")).toMatchObject({
+      identityVerified: true,
+      showVerifiedBadge: false,
+    });
+
+    const { service: replaced } = makeService({
+      selects: [[row], [verifiedFor("avatars/u1/old.jpg")]],
+    });
+    expect((await replaced.getOwn("u1", "Favour")).identityVerified).toBe(false);
+
+    // Hiding the badge is saved like any profile edit, and the member stays verified.
+    const hiding = makeService({ selects: [[row], [verifiedFor("avatars/u1/a.jpg")]] });
+    Object.assign(hiding.row, row);
+    const input = updateProfileSchema.parse({ showVerifiedBadge: false });
+    const saved = await hiding.service.updateOwn("u1", input, "Favour");
+    expect(hiding.setCalls).toEqual([{ showVerifiedBadge: false }]);
+    expect(saved).toMatchObject({ identityVerified: true, showVerifiedBadge: false });
+    expect(hiding.checks.hold).not.toHaveBeenCalled();
+  });
+
   it("exposes the new fields and lock dates in the own-profile VM", async () => {
     // getOwn reads the clock: pin it, or the 30-day lock below runs out on the
     // real calendar (it did, on 1 Oct 2026).
@@ -382,6 +433,19 @@ describe("ProfilesService", () => {
         username: ["You can change your username again on 1 Oct 2026."],
       });
       expect(transaction).not.toHaveBeenCalled();
+    });
+
+    it("keeps Kinkord out of a new handle, unless the account's handle already has it", async () => {
+      const refused = makeService({ selects: [[account]] });
+      await expect(
+        responseOf(refused.service.changeUsername("u1", "the.kinkord", now)),
+      ).resolves.toEqual({ username: ["That name is reserved."] });
+      expect(refused.transaction).not.toHaveBeenCalled();
+
+      const official = { username: "kinkord", displayUsername: "Kinkord", name: "Kinkord" };
+      const kept = makeService({ selects: [[official]] });
+      await kept.service.changeUsername("u1", "Kinkord_HQ", now);
+      expect(kept.setCalls[0]).toEqual({ username: "kinkord_hq", displayUsername: "Kinkord_HQ" });
     });
 
     it("turns a unique violation into a 409, wrapped or not", async () => {

@@ -17,6 +17,8 @@ export interface ChatListScreenProps {
   emptyTitle: string;
   emptyBody: string;
   onlineLabel: string;
+  organizationLabel: string;
+  verifiedOrganizationLabel: string;
   query: string;
   onQuery: (value: string) => void;
   /** The longest search the API takes. */
@@ -184,6 +186,8 @@ export default function ChatListScreen(p: ChatListScreenProps) {
             onlineLabel={p.onlineLabel}
             sentLabel={p.copy.sent}
             unreadLabel={p.copy.unread}
+            organizationLabel={p.organizationLabel}
+            verifiedOrganizationLabel={p.verifiedOrganizationLabel}
           />
         ))}
       </ul>

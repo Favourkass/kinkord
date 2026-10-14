@@ -43,6 +43,8 @@ export interface ComposerDialogProps {
     placeholder: string;
     visibilityLabel: string;
     mentions: string;
+    organization: string;
+    verifiedOrganization: string;
   };
 }
 
@@ -141,6 +143,8 @@ export default function ComposerDialog(p: ComposerDialogProps) {
               {...p.mentions}
               id={mentionListId}
               label={p.labels.mentions}
+              organizationLabel={p.labels.organization}
+              verifiedOrganizationLabel={p.labels.verifiedOrganization}
               className="mt-[8px]"
             />
           </div>

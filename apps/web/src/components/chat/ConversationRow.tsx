@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import SilverCheck from "@/components/app/SilverCheck";
+import OrganizationBadge from "@/components/organization/OrganizationBadge";
 import type { ConversationRowVM } from "@/domain/chat";
 import PresenceDot from "./PresenceDot";
 
@@ -10,6 +11,8 @@ export interface ConversationRowProps {
   onlineLabel: string;
   sentLabel: string;
   unreadLabel: string;
+  organizationLabel: string;
+  verifiedOrganizationLabel: string;
 }
 
 export default function ConversationRow({
@@ -17,6 +20,8 @@ export default function ConversationRow({
   onlineLabel,
   sentLabel,
   unreadLabel,
+  organizationLabel,
+  verifiedOrganizationLabel,
 }: ConversationRowProps) {
   const unread = row.unread > 0;
   return (
@@ -26,7 +31,13 @@ export default function ConversationRow({
         className={`flex items-center gap-[10px] border-b border-app-line/30 px-[10px] py-[10px] transition-colors hover:bg-app-input ${unread ? "rounded-xl bg-app-input/40" : ""}`}
       >
         <span className="relative shrink-0">
-          <AvatarCircle src={row.avatarUrl} alt="" size={48} ringClassName="bg-app-line" />
+          <AvatarCircle
+            src={row.avatarUrl}
+            alt=""
+            size={48}
+            ringClassName="bg-app-line"
+            shape={row.organization ? "square" : "circle"}
+          />
           <PresenceDot
             online={row.isOnline}
             status={row.presence}
@@ -41,6 +52,14 @@ export default function ConversationRow({
                 {row.displayName}
               </span>
               {row.silver ? <SilverCheck size={15} /> : null}
+              {row.organization ? (
+                <OrganizationBadge
+                  label={organizationLabel}
+                  verified
+                  verifiedLabel={verifiedOrganizationLabel}
+                  markSize={14}
+                />
+              ) : null}
             </span>
             <span className="shrink-0 text-[12px] text-app-muted">{row.time}</span>
           </span>

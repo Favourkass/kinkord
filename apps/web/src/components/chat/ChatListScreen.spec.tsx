@@ -16,6 +16,7 @@ const props: ChatListScreenProps = {
       href: "/messages/a",
       displayName: "Ada",
       silver: false,
+      organization: false,
       avatarUrl: null,
       preview: "Hello",
       time: "10:00",
@@ -31,6 +32,8 @@ const props: ChatListScreenProps = {
   emptyTitle: "Empty",
   emptyBody: "No chats",
   onlineLabel: "Online",
+  organizationLabel: "Org",
+  verifiedOrganizationLabel: "Verified organization",
   query: "",
   onQuery: vi.fn(),
   searchMaxLength: 100,
@@ -118,4 +121,13 @@ it("shows the Silver badge, presence and typing", () => {
   expect(screen.getByRole("img", { name: "Silver Premium" })).toBeDefined();
   expect(screen.getByRole("img", { name: "Away" })).toBeDefined();
   expect(screen.getByText("Is typing…")).toBeDefined();
+});
+
+it("marks the official organization, so nobody can pass for it in the inbox", () => {
+  render(<ChatListScreen {...props} rows={[{ ...props.rows[0], organization: true }]} />);
+  expect(screen.getByText("Org")).toBeDefined();
+  expect(screen.getByLabelText("Verified organization")).toBeDefined();
+  cleanup();
+  render(<ChatListScreen {...props} />);
+  expect(screen.queryByText("Org")).toBeNull();
 });

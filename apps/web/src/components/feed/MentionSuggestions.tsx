@@ -3,6 +3,7 @@
 import { useEffect, useRef, type KeyboardEvent } from "react";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import SilverCheck from "@/components/app/SilverCheck";
+import OrganizationBadge from "@/components/organization/OrganizationBadge";
 
 export interface MentionSuggestionsProps {
   /** The list's id: the box points at it, and at the highlighted member's row. */
@@ -14,16 +15,22 @@ export interface MentionSuggestionsProps {
     name: string;
     avatarUrl: string | null;
     silver: boolean;
+    organization: boolean;
   }>;
   highlighted: number;
   onPick: (username: string) => void;
   label: string;
+  organizationLabel: string;
+  verifiedOrganizationLabel: string;
   /** Spacing from the box: the list sits in the page's flow, where no sheet can clip it. */
   className?: string;
 }
 
 /** "@" suggestions for a box: shown by MentionSuggestions, keys offered first, caret after a pick. */
-export type MentionPickerProps = Omit<MentionSuggestionsProps, "id" | "label" | "className"> & {
+export type MentionPickerProps = Omit<
+  MentionSuggestionsProps,
+  "id" | "label" | "organizationLabel" | "verifiedOrganizationLabel" | "className"
+> & {
   /** True when the key was the list's: the box leaves it alone then. */
   onKey: (key: string) => boolean;
   /** Where the caret goes after a pick; a new `pick` each time. */
@@ -82,11 +89,24 @@ export default function MentionSuggestions(p: MentionSuggestionsProps) {
             i === p.highlighted ? "bg-feed-chip" : ""
           }`}
         >
-          <AvatarCircle src={s.avatarUrl} alt="" size={28} />
+          <AvatarCircle
+            src={s.avatarUrl}
+            alt=""
+            size={28}
+            shape={s.organization ? "square" : "circle"}
+          />
           <span className="min-w-0">
             <span className="flex min-w-0 items-center gap-[4px] text-[14px] font-bold text-feed-text">
               <span className="truncate">{s.name}</span>
               {s.silver ? <SilverCheck size={13} /> : null}
+              {s.organization ? (
+                <OrganizationBadge
+                  label={p.organizationLabel}
+                  verified
+                  verifiedLabel={p.verifiedOrganizationLabel}
+                  markSize={13}
+                />
+              ) : null}
             </span>
             <span className="block truncate text-[12px] text-feed-muted">@{s.username}</span>
           </span>

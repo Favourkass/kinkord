@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MEMBERS_COPY } from "@/constants/members";
 import { Routes } from "@/constants/Routes";
+import { withOwnBadgeVisibility } from "@/domain/member";
 import { ApiError } from "@/services/apiClient";
 import { profileApi } from "@/services/profile.service";
 import { useMemberProfilePresenter } from "./useMemberProfilePresenter";
@@ -11,9 +12,10 @@ import { useMemberProfilePresenter } from "./useMemberProfilePresenter";
 /**
  * /profile — your own profile in the designed view (Figma 1167:552), reached from the
  * tab-bar avatar and the drawer identity card. Resolves your handle, then renders the
- * same screen a member sees, with the owner's actions.
+ * same screen a member sees, with the owner's actions. `showVerifiedBadge` is your
+ * profile's setting (the page already reads it), so a hidden badge is marked as such.
  */
-export function useOwnProfilePresenter(initialTab?: string | null) {
+export function useOwnProfilePresenter(initialTab?: string | null, showVerifiedBadge = true) {
   const router = useRouter();
   const [username, setUsername] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,8 +43,13 @@ export function useOwnProfilePresenter(initialTab?: string | null) {
   }, [router]);
 
   const profile = useMemberProfilePresenter(username, initialTab);
+  const vm = useMemo(
+    () => (profile.vm ? withOwnBadgeVisibility(profile.vm, showVerifiedBadge) : profile.vm),
+    [profile.vm, showVerifiedBadge],
+  );
   return {
     ...profile,
+    vm,
     loading: error ? false : profile.loading,
     status: error ?? profile.status,
     activeTab: "profile" as const,

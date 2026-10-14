@@ -1,6 +1,7 @@
 import Link from "next/link";
 import MaskIcon from "@/components/app/MaskIcon";
 import SilverCheck from "@/components/app/SilverCheck";
+import OrganizationBadge from "@/components/organization/OrganizationBadge";
 import type { MemberCardVM } from "@/domain/member";
 
 export interface MemberCardLabels {
@@ -9,6 +10,8 @@ export interface MemberCardLabels {
   posts: string;
   followers: string;
   openProfile: string;
+  organization: string;
+  verifiedOrganization: string;
 }
 
 export interface MemberCardProps {
@@ -27,7 +30,9 @@ export interface MemberCardProps {
 export default function MemberCard({ vm, href, labels, onToggleFollow, busy }: MemberCardProps) {
   return (
     <article className="relative flex h-[75px] items-start rounded-[9px] border border-mem-list-border bg-mem-list-card pl-[12px] pr-[9px] pt-[7px] lg:h-[118px] lg:pl-[10px] lg:pr-[56px] lg:pt-[6px]">
-      <span className="relative block h-[61px] w-[81px] shrink-0 overflow-hidden rounded-[9px] border border-[#35332e] bg-[#1c1b18] lg:h-[106px] lg:w-[139px]">
+      <span
+        className={`relative block h-[61px] shrink-0 overflow-hidden rounded-[9px] border border-[#35332e] bg-[#1c1b18] lg:h-[106px] ${vm.organization ? "w-[61px] lg:w-[106px]" : "w-[81px] lg:w-[139px]"}`}
+      >
         {vm.avatarUrl ? (
           // Presigned S3 URL — next/image would need a remote pattern per bucket.
           // eslint-disable-next-line @next/next/no-img-element
@@ -52,28 +57,40 @@ export default function MemberCard({ vm, href, labels, onToggleFollow, busy }: M
         >
           <span className="truncate">{vm.title}</span>
           {vm.silver ? <SilverCheck size={13} className="lg:!size-[18px]" /> : null}
-        </Link>
-        <p className="flex items-center pt-[4px] text-[10px] font-medium leading-[12px] text-mem-list-muted lg:pt-[8px] lg:text-[16px] lg:leading-[19px]">
-          {vm.ageTag && <span>{vm.ageTag}</span>}
-          {vm.ageTag && vm.roles && (
-            <span
-              aria-hidden
-              className="mx-[5px] size-[2px] rounded-full bg-mem-dot lg:mx-[10px] lg:size-[4px]"
+          {vm.organization ? (
+            <OrganizationBadge
+              label={labels.organization}
+              verified
+              verifiedLabel={labels.verifiedOrganization}
+              markSize={14}
             />
-          )}
-          {vm.roles && <span className="truncate">{vm.roles}</span>}
-        </p>
-        <p className="flex items-center pt-[3px] text-[10px] font-medium leading-[12px] text-mem-list-muted lg:pt-[8px] lg:text-[16px] lg:leading-[19px]">
-          <span className="shrink-0 text-mem-list-muted">
-            <span className="lg:hidden">
-              <MaskIcon name="pin-small" width={10} />
+          ) : null}
+        </Link>
+        {!vm.organization ? (
+          <p className="flex items-center pt-[4px] text-[10px] font-medium leading-[12px] text-mem-list-muted lg:pt-[8px] lg:text-[16px] lg:leading-[19px]">
+            {vm.ageTag && <span>{vm.ageTag}</span>}
+            {vm.ageTag && vm.roles && (
+              <span
+                aria-hidden
+                className="mx-[5px] size-[2px] rounded-full bg-mem-dot lg:mx-[10px] lg:size-[4px]"
+              />
+            )}
+            {vm.roles && <span className="truncate">{vm.roles}</span>}
+          </p>
+        ) : null}
+        {!vm.organization ? (
+          <p className="flex items-center pt-[3px] text-[10px] font-medium leading-[12px] text-mem-list-muted lg:pt-[8px] lg:text-[16px] lg:leading-[19px]">
+            <span className="shrink-0 text-mem-list-muted">
+              <span className="lg:hidden">
+                <MaskIcon name="pin-small" width={10} />
+              </span>
+              <span className="hidden lg:block">
+                <MaskIcon name="pin-small" width={15} />
+              </span>
             </span>
-            <span className="hidden lg:block">
-              <MaskIcon name="pin-small" width={15} />
-            </span>
-          </span>
-          <span className="truncate pl-[3px] lg:pl-[6px]">{vm.location ?? ""}</span>
-        </p>
+            <span className="truncate pl-[3px] lg:pl-[6px]">{vm.location ?? ""}</span>
+          </p>
+        ) : null}
         <p className="flex items-center pt-[2px] text-[10px] leading-[12px] text-mem-list-muted lg:pt-[7px] lg:text-[16px] lg:leading-[19px]">
           <span className="font-semibold text-mem-list-text">{vm.posts}</span>
           <span className="pl-[3px] font-medium">{labels.posts}</span>

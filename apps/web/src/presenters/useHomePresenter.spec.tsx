@@ -76,6 +76,21 @@ describe("useHomePresenter", () => {
     await waitFor(() => expect(result.current.silver).toBe(true));
   });
 
+  it("knows when you've hidden your verified badge, for your own profile", async () => {
+    const { result } = renderHook(() => useHomePresenter());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    // Absent from the payload: shown, as by default.
+    expect(result.current.showVerifiedBadge).toBe(true);
+
+    apiGet.mockImplementation((path: unknown) =>
+      path === "/profile"
+        ? Promise.resolve({ ...profile, showVerifiedBadge: false })
+        : routeGet(path),
+    );
+    const hidden = renderHook(() => useHomePresenter());
+    await waitFor(() => expect(hidden.result.current.showVerifiedBadge).toBe(false));
+  });
+
   it("redirects to login when the session is gone", async () => {
     const { ApiError } = await import("@/services/apiClient");
     apiGet.mockRejectedValue(new ApiError(401, {}));
