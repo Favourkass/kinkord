@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { user } from "../db/schema";
-import { blockedBy, notBlocking } from "./blocks";
+import { blockedBy, noBlockEitherWay, notBlocking } from "./blocks";
 
 const render = (q: Parameters<PgDialect["sqlToQuery"]>[0]) => new PgDialect().sqlToQuery(q);
 
@@ -17,6 +17,15 @@ describe("block filters", () => {
     expect(render(blockedBy("u1", user.id))).toMatchObject({
       sql: 'exists (select 1 from "member_block" where "member_block"."blocker_id" = $1 and "member_block"."blocked_id" = "user"."id")',
       params: ["u1"],
+    });
+  });
+
+  it("noBlockEitherWay leaves out both sides of a block", () => {
+    expect(render(noBlockEitherWay(user.id, "u1"))).toMatchObject({
+      sql:
+        '(not exists (select 1 from "member_block" where "member_block"."blocker_id" = "user"."id" and "member_block"."blocked_id" = $1)' +
+        ' and not exists (select 1 from "member_block" where "member_block"."blocker_id" = $2 and "member_block"."blocked_id" = "user"."id"))',
+      params: ["u1", "u1"],
     });
   });
 });

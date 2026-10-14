@@ -2,9 +2,9 @@
  * Matching v1: who "Kinksters Near You" suggests to a member, and in what order.
  *
  * Pure rules with no database: MembersService gathers the pool, this module
- * decides who is shown and ranks them, so the home feed can rank by the same
- * rules later. The weights are explained in docs/MATCHING.md; change both
- * together.
+ * decides who is shown and ranks them. The home feed's For You ranks by the
+ * kink parts of the same rules (`kinkParts`, posts/feed-ranking.ts). The
+ * weights are explained in docs/MATCHING.md; change both together.
  *
  * Only the viewer's own sexuality is ever read here. Other members' sexuality
  * is private and plays no part in who they are shown to.
@@ -208,19 +208,24 @@ function shared(a: readonly string[], b: readonly string[]): number {
   return new Set(b.filter((x) => mine.has(x))).size;
 }
 
-const samePlace = (a: string | null, b: string | null) =>
+/** Both known and the same, case and stray spaces aside: "Lagos" is "lagos ". */
+export const samePlace = (a: string | null, b: string | null) =>
   Boolean(a && b && a.trim().toLowerCase() === b.trim().toLowerCase());
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 // ---- scoring ---------------------------------------------------------------
 
-/** What matching reads from the viewer: their own profile. */
-export interface MatchViewer {
+/** What the kink parts of the score read: roles, kinks and looking-for. */
+export interface KinkProfile {
   roles: readonly string[];
   /** The profile's "Kinks & interests" (`profile.interests`). */
   kinks: readonly string[];
   lookingFor: readonly string[];
+}
+
+/** What matching reads from the viewer: their own profile. */
+export interface MatchViewer extends KinkProfile {
   city: string | null;
   state: string | null;
 }
@@ -243,14 +248,14 @@ export interface ScoreParts {
   photo: number;
 }
 
-/** The score, part by part: easier to test, and to explain a ranking. */
-export function scoreParts(
-  viewer: MatchViewer,
-  candidate: MatchCandidate,
-  now = new Date(),
-): ScoreParts {
-  const sameState = samePlace(viewer.state, candidate.state);
-  const seenAgo = candidate.lastSeenAt ? now.getTime() - candidate.lastSeenAt.getTime() : null;
+export type KinkParts = Pick<ScoreParts, "side" | "pairs" | "kinks" | "lookingFor">;
+
+/**
+ * The kink parts of the score: role side, pairs, shared kinks and shared
+ * looking-for. Place, presence and photo are about meeting someone; the home
+ * feed's For You reuses only these.
+ */
+export function kinkParts(viewer: KinkProfile, candidate: KinkProfile): KinkParts {
   return {
     side: roleSideScore(wantedSide(viewer.roles), candidate.roles),
     pairs: pairBonus(viewer.roles, candidate.roles),
@@ -262,6 +267,19 @@ export function scoreParts(
       shared(viewer.lookingFor, candidate.lookingFor) * WEIGHTS.sharedLookingFor,
       WEIGHTS.sharedLookingForCap,
     ),
+  };
+}
+
+/** The score, part by part: easier to test, and to explain a ranking. */
+export function scoreParts(
+  viewer: MatchViewer,
+  candidate: MatchCandidate,
+  now = new Date(),
+): ScoreParts {
+  const sameState = samePlace(viewer.state, candidate.state);
+  const seenAgo = candidate.lastSeenAt ? now.getTime() - candidate.lastSeenAt.getTime() : null;
+  return {
+    ...kinkParts(viewer, candidate),
     // The nearer tier only: the same city (within the same state), else the same state.
     place:
       sameState && samePlace(viewer.city, candidate.city)

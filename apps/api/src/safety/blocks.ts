@@ -14,3 +14,11 @@ export function notBlocking(userId: AnyColumn, viewerId: string) {
 export function blockedBy(viewerId: string, userId: AnyColumn) {
   return sql<boolean>`exists (select 1 from ${memberBlock} where ${memberBlock.blockerId} = ${viewerId} and ${memberBlock.blockedId} = ${userId})`;
 }
+
+/**
+ * True for rows whose member and `viewerId` have no block between them, made
+ * by either: the home feed's tabs leave out both sides of a block.
+ */
+export function noBlockEitherWay(userId: AnyColumn, viewerId: string) {
+  return sql`(${notBlocking(userId, viewerId)} and not ${blockedBy(viewerId, userId)})`;
+}

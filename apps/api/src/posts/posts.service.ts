@@ -6,12 +6,11 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
-import { and, count, desc, eq, ilike, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, ilike, inArray, isNull, lt, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { Db, DRIZZLE } from "../db/db.module";
-import { notBanned } from "../moderation/admins";
 import { containsPattern } from "../push/notifications.service";
 import { PushService } from "../push/push.service";
 import {
@@ -45,6 +44,7 @@ import {
   type ImageVariant,
 } from "../storage/storage.service";
 import { hasSilver, SILVER_POST_BODY_MAX, silverCheck } from "../subscriptions/plans";
+import { visibleTo } from "./visibility";
 
 /** Photos only for now; the column takes video so the grid can grow into it. */
 const IMAGE_TYPES: Record<string, string> = {
@@ -825,32 +825,6 @@ export class PostsService {
 const tooLarge = () => `Photo is too large — max ${POST_MEDIA_MAX_MB}MB.`;
 
 const isId = (v: string | null): v is string => v !== null;
-
-/**
- * The one visibility rule: anything public, everything of the viewer's own, and
- * friends-only posts between two members who follow each other, never from a
- * suspended author. The feed, the
- * post counts and the profile Media tab all go through this, because three
- * copies of it would eventually disagree and leak somebody's friends-only post.
- */
-function visibleTo(
-  viewerId: string,
-  viewerFollows: ReturnType<typeof alias<typeof follow, string>>,
-  authorFollows: ReturnType<typeof alias<typeof follow, string>>,
-) {
-  return and(
-    notBanned(post.authorId),
-    or(
-      eq(post.visibility, "public"),
-      eq(post.authorId, viewerId),
-      and(
-        eq(post.visibility, "friends"),
-        sql`${viewerFollows.followerId} is not null`,
-        sql`${authorFollows.followerId} is not null`,
-      ),
-    ),
-  );
-}
 
 export function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, Math.floor(n)));
