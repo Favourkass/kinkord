@@ -23,22 +23,21 @@ export const ADULT_BADGE = {
 export const AGE_GATE_MODAL = {
   badge: "🔞 18+ ADULT COMMUNITY",
   title: "AGE VERIFICATION",
-  statement: "You must be 18 years of age or older to enter Kinkord.",
-  intro:
-    "Kinkord is an adult-oriented platform intended exclusively for adults. By entering, you confirm and represent that:",
+  statement: "You must be 18 or older to use Kinkord.",
+  intro: "Kinkord is for adults only. By entering, you confirm that:",
   points: [
-    { icon: "🔞", text: "You are at least 18 years old." },
-    { icon: "⚖️", text: "You are legally permitted to access this platform." },
-    { icon: "✅", text: "The age information you will provide is truthful and accurate." },
+    { icon: "🔞", text: "You are 18 or older." },
+    { icon: "⚖️", text: "You are legally allowed to use Kinkord." },
+    { icon: "✅", text: "Your age details are true and correct." },
     {
       icon: "🚫",
-      text: "You understand that minors are strictly prohibited from accessing or using Kinkord.",
+      text: "You understand that anyone under 18 is not allowed on Kinkord.",
     },
   ],
   warning:
-    "⚠️ Providing false age information or attempting to bypass Kinkord's age restrictions may result in the immediate suspension or permanent termination of your access.",
-  confirmLabel: "🛡️ I CONFIRM I AM 18 OR OLDER — ENTER",
-  declineLabel: "🚪 I AM UNDER 18 — EXIT",
+    "Providing a false age or bypassing this check may lead to your account being suspended or permanently banned.",
+  confirmLabel: "I AM 18 OR OLDER — ENTER",
+  declineLabel: "I AM UNDER 18 — EXIT",
 } as const;
 
 import { Routes } from "./Routes";

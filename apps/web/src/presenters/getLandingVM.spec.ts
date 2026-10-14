@@ -58,7 +58,7 @@ describe("getLandingVM", () => {
     expect(vm.ageGate.title).toBe("AGE VERIFICATION");
     expect(vm.ageGate.badge).toContain("18+ ADULT COMMUNITY");
     expect(vm.ageGate.points).toHaveLength(4);
-    expect(vm.ageGate.warning).toContain("Providing false age information");
+    expect(vm.ageGate.warning).toContain("Providing a false age");
     expect(vm.ageGate.confirmLabel).toContain("18 OR OLDER");
     expect(vm.ageGate.declineLabel).toContain("UNDER 18");
   });
