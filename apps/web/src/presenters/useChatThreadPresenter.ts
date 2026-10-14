@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CHAT_COPY, photosLockedText } from "@/constants/chat";
 import { Routes } from "@/constants/Routes";
 import {
+  isCrossCountryPremium,
   isNewChatLimit,
   mergeMessages,
   newChatNotice,
@@ -73,6 +74,9 @@ export function useChatThreadPresenter(conversationId: string) {
   // here: each remembered with the thread it was for.
   const [allowance, setAllowance] = useState<{ for: string; value: ChatAllowancePM } | null>(null);
   const [refusedIn, setRefusedIn] = useState<string | null>(null);
+  // The server refused writing first here: the other member is in another
+  // country, which takes Silver. Remembered with the thread it was for.
+  const [needsSilverIn, setNeedsSilverIn] = useState<string | null>(null);
   const lastMarked = useRef<string | null>(null);
   const [draftPhoto, setDraftPhoto] = useState<DraftPhoto | null>(null);
   // Someone else's photos this viewer has chosen to see, for as long as the thread is open.
@@ -224,6 +228,13 @@ export function useChatThreadPresenter(conversationId: string) {
           setSendError(null);
           return;
         }
+        if (e instanceof ApiError && isCrossCountryPremium(e.body)) {
+          // Retrying can't help without Silver: offer it instead.
+          setPending((p) => p.filter((x) => x.clientId !== clientId));
+          setNeedsSilverIn(conversationId);
+          setSendError(null);
+          return;
+        }
         setPending((p) => p.map((x) => (x.clientId === clientId ? { ...x, status: "failed" } : x)));
         setSendError(messageOf(e, "Couldn't send. Tap the message to try again."));
       }
@@ -329,6 +340,9 @@ export function useChatThreadPresenter(conversationId: string) {
     allowance: allowance?.for === conversationId ? allowance.value : null,
     refused: refusedIn === conversationId,
   });
+  // Once the other member writes here, replying is free.
+  const needsSilver =
+    needsSilverIn === conversationId && !messages.some((m) => m.senderId !== viewerId);
   const bubbles = useMemo(
     () => [
       ...messages.map((m) => toThreadMessageVM(m, viewerId, revealed)),
@@ -353,9 +367,17 @@ export function useChatThreadPresenter(conversationId: string) {
       loadingMore,
       /** The other member left or was removed: read-only from here. */
       unavailable: loaded && peer === null,
-      /** The daily new-chat allowance, shown while nobody has written yet. */
-      newChat:
-        notice === null
+      /**
+       * The daily new-chat allowance, shown while nobody has written yet; or,
+       * after writing first to someone abroad was refused, the offer of Silver.
+       */
+      newChat: needsSilver
+        ? {
+            text: CHAT_COPY.crossCountry,
+            blocking: true,
+            link: { label: CHAT_COPY.getSilver, href: Routes.subscription },
+          }
+        : notice === null
           ? null
           : {
               text: notice === "blocked" ? CHAT_COPY.newChatLimit : CHAT_COPY.newChatHint,
