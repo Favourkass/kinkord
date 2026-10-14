@@ -275,20 +275,37 @@ describe("OtpService.verify", () => {
   });
 
   it("counts down the attempts, then locks for 24 hours", async () => {
-    await expect(service.verify("u1", "challenge-1", "000000")).resolves.toEqual({
+    await expect(
+      service.verify("u1", "challenge-1", "000000", {
+        channel: "sms",
+        destination: "+2348012345678",
+      }),
+    ).resolves.toEqual({
       valid: false,
       attemptsLeft: 2,
     });
-    await expect(service.verify("u1", "challenge-1", "000000")).resolves.toEqual({
+    await expect(
+      service.verify("u1", "challenge-1", "000000", {
+        channel: "sms",
+        destination: "+2348012345678",
+      }),
+    ).resolves.toEqual({
       valid: false,
       attemptsLeft: 1,
     });
-    await expect(service.verify("u1", "challenge-1", "000000")).rejects.toThrow(/24 hours/);
+    await expect(
+      service.verify("u1", "challenge-1", "000000", {
+        channel: "sms",
+        destination: "+2348012345678",
+      }),
+    ).rejects.toThrow(/24 hours/);
     expect(fixture.challenge.lockedUntil).toBeInstanceOf(Date);
   });
 
   it("rejects a malformed code without touching the database", async () => {
-    await expect(service.verify("u1", "challenge-1", "12")).resolves.toEqual({ valid: false });
+    await expect(
+      service.verify("u1", "challenge-1", "12", { channel: "sms", destination: "+2348012345678" }),
+    ).resolves.toEqual({ valid: false });
     expect(fixture.db.transaction).not.toHaveBeenCalled();
   });
 
@@ -311,8 +328,44 @@ describe("OtpService.verify", () => {
     fixture.challenge.id = issued.id;
     fixture.challenge.codeHash = String(fixture.stored[0].codeHash);
 
-    await expect(service.verify("u1", issued.id, code!)).resolves.toEqual({ valid: true });
+    await expect(
+      service.verify("u1", issued.id, code!, { channel: "sms", destination: "+2348012345678" }),
+    ).resolves.toEqual({ valid: true });
     expect(fixture.del).toHaveBeenCalled(); // consumed, so it cannot be replayed
+  });
+
+  it("won't let a code texted to your phone verify an email address, or another number", async () => {
+    // The real code, so nothing but the channel/address check can refuse it.
+    const texter = sms();
+    const issuing = new OtpService(
+      fixture.db as never,
+      email() as never,
+      texter as never,
+      guard() as never,
+    );
+    const issued = await issuing.send("u1", "sms", "+2348012345678");
+    const { message } = texter.send.mock.calls[0][0] as { message: string };
+    const code = /\b(\d{6})\b/.exec(message)![1];
+    fixture.challenge.id = issued.id;
+    fixture.challenge.codeHash = String(fixture.stored[0].codeHash);
+    // Sending sweeps expired rows; only what verify does matters here.
+    fixture.del.mockClear();
+
+    await expect(
+      service.verify("u1", issued.id, code, {
+        channel: "email",
+        destination: "founder@kinkord.com",
+      }),
+    ).resolves.toEqual({ valid: false });
+    await expect(
+      service.verify("u1", issued.id, code, { channel: "sms", destination: "+2348099999999" }),
+    ).resolves.toEqual({ valid: false });
+    // Neither counted as a wrong guess nor spent: the right redemption still works.
+    expect(fixture.challenge.failedAttempts).toBe(0);
+    expect(fixture.del).not.toHaveBeenCalled();
+    await expect(
+      service.verify("u1", issued.id, code, { channel: "sms", destination: " +2348012345678 " }),
+    ).resolves.toEqual({ valid: true });
   });
 
   it("will not let one member redeem another member's challenge", async () => {
@@ -330,7 +383,12 @@ describe("OtpService.verify", () => {
       sms() as never,
       guard() as never,
     );
-    await expect(scoped.verify("someone-else", "challenge-1", "123456")).resolves.toEqual({
+    await expect(
+      scoped.verify("someone-else", "challenge-1", "123456", {
+        channel: "sms",
+        destination: "+2348012345678",
+      }),
+    ).resolves.toEqual({
       valid: false,
     });
   });

@@ -60,6 +60,17 @@ describe("PhoneVerificationService", () => {
     expect(codes.send).not.toHaveBeenCalled();
   });
 
+  it("only accepts a code texted to the number on the profile now", async () => {
+    const { db } = makeDb({ phone: "+2349127883266", verified: false });
+    const codes = otp();
+    const service = new PhoneVerificationService(db as never, codes as never);
+    await service.verify("u1", "otp-1", "123456");
+    expect(codes.verify).toHaveBeenCalledWith("u1", "otp-1", "123456", {
+      channel: "sms",
+      destination: "+2349127883266",
+    });
+  });
+
   it("flips the profile to verified once the code checks out", async () => {
     const { db, set } = makeDb({ phone: "+2349127883266", verified: false });
     const service = new PhoneVerificationService(db as never, otp() as never);
