@@ -44,6 +44,8 @@ import {
   type ImageVariant,
 } from "../storage/storage.service";
 import { hasSilver, SILVER_POST_BODY_MAX, silverCheck } from "../subscriptions/plans";
+import type { FeedHint, FeedTab, RankedTab } from "./feed-ranking";
+import { followingConditions, followsAnyone, rankedTabPage } from "./feed-tabs";
 import { visibleTo } from "./visibility";
 
 /** Photos only for now; the column takes video so the grid can grow into it. */
@@ -98,13 +100,22 @@ export const uploadUrlSchema = z.object({
 });
 
 export interface FeedParams {
-  /** ISO timestamp of the oldest post already shown; omit for the first page. */
+  /**
+   * Where the last page ended; omit for the first page. The ISO timestamp of
+   * the oldest post shown, except on For You and Nearby, whose cursor is
+   * opaque (feed-ranking.ts).
+   */
   cursor?: string | null;
   limit?: number;
   /** Narrows the feed to one member's posts — this is the profile Posts tab. */
   author?: string | null;
   /** Search: only posts whose text contains this. Reposts carry no text, so originals only. */
   q?: string | null;
+  /**
+   * The home feed's tab. Without one, the feed is every visible post, newest
+   * first, as before the tabs; `author` and `q` read that way whatever the tab.
+   */
+  tab?: FeedTab | null;
 }
 
 export interface PostMediaVM {
@@ -173,6 +184,11 @@ export interface FeedVM {
   items: PostVM[];
   /** Pass back as `cursor` for the next page; null when the feed is exhausted. */
   nextCursor: string | null;
+  /**
+   * Why a tab may be empty, so the app can say what would fill it: the viewer
+   * follows nobody (Following), or has no country or state (Nearby).
+   */
+  hint?: FeedHint;
 }
 
 /**
@@ -287,9 +303,15 @@ export class PostsService {
     })().catch((e: unknown) => this.log.warn(`mention notifications failed: ${String(e)}`));
   }
 
-  /** The home feed, or one member's posts when `authorId` is given. */
+  /**
+   * The home feed — For You, Following or Nearby when a tab is given — or one
+   * member's posts when `author` is, or a search when `q` is.
+   */
   async feed(viewerId: string, params: FeedParams = {}): Promise<FeedVM> {
     const limit = clamp(params.limit ?? FEED_PAGE_SIZE, 1, FEED_MAX_PAGE_SIZE);
+    const tab = params.author || params.q ? null : (params.tab ?? null);
+    if (tab === "for_you" || tab === "nearby") return this.rankedFeed(viewerId, tab, params, limit);
+    const following = tab === "following";
     const cursor = parseCursor(params.cursor);
     const authorId = params.author ? await this.resolveAuthor(params.author) : null;
     const rows = await this.selectPosts(
@@ -298,14 +320,40 @@ export class PostsService {
         ...(cursor ? [lt(post.createdAt, cursor)] : []),
         ...(authorId ? [eq(post.authorId, authorId)] : []),
         ...(params.q ? [ilike(post.body, containsPattern(params.q))] : []),
+        ...(following ? followingConditions(viewerId) : []),
       ],
       limit + 1,
     );
     const page = rows.slice(0, limit);
     const items = await this.decorate(page, viewerId);
+    const nextCursor = rows.length > limit ? (page.at(-1)?.createdAt.toISOString() ?? null) : null;
+    // An empty Following says how to fill it when the viewer follows nobody yet.
+    if (following && !cursor && !rows.length && !(await followsAnyone(this.db, viewerId))) {
+      return { items, nextCursor, hint: "no_follows" };
+    }
+    return { items, nextCursor };
+  }
+
+  /**
+   * For You and Nearby: feed-tabs.ts decides which rows and in what order; they
+   * are read here through the same visibility rule and decorated like any page.
+   */
+  private async rankedFeed(
+    viewerId: string,
+    tab: RankedTab,
+    params: FeedParams,
+    limit: number,
+  ): Promise<FeedVM> {
+    const page = await rankedTabPage(this.db, viewerId, tab, params.cursor, limit);
+    const rows = page.ids.length
+      ? await this.selectPosts(viewerId, [inArray(post.id, page.ids)], page.ids.length)
+      : [];
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    const ordered = page.ids.flatMap((id) => byId.get(id) ?? []);
     return {
-      items,
-      nextCursor: rows.length > limit ? (page.at(-1)?.createdAt.toISOString() ?? null) : null,
+      items: await this.decorate(ordered, viewerId),
+      nextCursor: page.nextCursor,
+      ...(page.hint ? { hint: page.hint } : {}),
     };
   }
 
