@@ -1,21 +1,44 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { ChevronDown, Search } from "lucide-react";
+import { optionMatcher, type SearchResult } from "@/util/textSearch";
+
+interface Option {
+  value: string;
+  label: string;
+  icon?: string;
+}
+
+/** A last row pinned under every search, for a value the list lacks. */
+export interface SearchSelectOther {
+  /** Picked as is when nothing is typed. */
+  value: string;
+  label: string;
+  /** The row once something is typed: Use “Ikota”. */
+  typedLabel: (query: string) => string;
+  /** Picks the typed text itself. */
+  onTyped: (text: string) => void;
+}
 
 interface Props {
   id?: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
-  options: readonly { value: string; label: string; icon?: string }[];
+  options: readonly Option[];
   placeholder: string;
   searchPlaceholder: string;
   emptyLabel: string;
+  /** Under a list cut short at the first matches. */
+  moreLabel?: string;
+  other?: SearchSelectOther | null;
   error?: string;
   disabled?: boolean;
   boldLabel?: boolean;
 }
+
+const NOTHING: SearchResult<Option> = { hits: [], more: false };
 
 /** Searchable display options with keyboard selection and focus dismissal. */
 export default function SearchSelectField(p: Props) {
@@ -24,15 +47,30 @@ export default function SearchSelectField(p: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
-  const hits = p.options.filter((option) =>
-    option.label.toLowerCase().includes(query.trim().toLowerCase()),
-  );
-  const selected = p.options.find((option) => option.value === p.value);
-  const choose = (value: string) => {
-    p.onChange(value);
+  // Long lists (thousands of towns) are only searched while open.
+  const match = useMemo(() => (open ? optionMatcher(p.options) : null), [open, p.options]);
+  const { hits, more } = useMemo(() => (match ? match(query) : NOTHING), [match, query]);
+  const other = p.other ?? null;
+  const typed = query.trim();
+  const rows = hits.length + (other ? 1 : 0);
+  const selected: Option | undefined =
+    p.options.find((option) => option.value === p.value) ??
+    (other && other.value === p.value ? { value: other.value, label: other.label } : undefined);
+  const close = () => {
     setOpen(false);
     document.getElementById(id)?.focus();
   };
+  const choose = (value: string) => {
+    p.onChange(value);
+    close();
+  };
+  const chooseOther = () => {
+    if (!other) return;
+    if (typed) other.onTyped(typed);
+    else p.onChange(other.value);
+    close();
+  };
+  const pick = (index: number) => (index < hits.length ? choose(hits[index].value) : chooseOther());
   return (
     <div
       className="relative w-full"
@@ -81,7 +119,7 @@ export default function SearchSelectField(p: Props) {
               aria-expanded="true"
               aria-controls={`${id}-options`}
               aria-autocomplete="list"
-              aria-activedescendant={hits[active] ? `${id}-option-${active}` : undefined}
+              aria-activedescendant={active < rows ? `${id}-option-${active}` : undefined}
               placeholder={p.searchPlaceholder}
               value={query}
               onChange={(e) => {
@@ -91,20 +129,19 @@ export default function SearchSelectField(p: Props) {
               onKeyDown={(e) => {
                 if (e.key === "Escape") {
                   e.preventDefault();
-                  setOpen(false);
-                  document.getElementById(id)?.focus();
+                  close();
                 }
                 if (e.key === "ArrowDown") {
                   e.preventDefault();
-                  setActive(Math.min(active + 1, hits.length - 1));
+                  setActive(Math.max(0, Math.min(active + 1, rows - 1)));
                 }
                 if (e.key === "ArrowUp") {
                   e.preventDefault();
                   setActive(Math.max(active - 1, 0));
                 }
-                if (e.key === "Enter" && hits[active]) {
+                if (e.key === "Enter" && active < rows) {
                   e.preventDefault();
-                  choose(hits[active].value);
+                  pick(active);
                 }
               }}
               className="w-full bg-transparent text-[15px] text-white outline-none"
@@ -114,6 +151,9 @@ export default function SearchSelectField(p: Props) {
             role="listbox"
             id={`${id}-options`}
             aria-label={p.label}
+            // iOS Safari doesn't focus a tapped button, so without this the search
+            // box's blur closes the list before the tap lands on an option.
+            onMouseDown={(e) => e.preventDefault()}
             className="max-h-[240px] overflow-y-auto"
           >
             {hits.map((option, index) => (
@@ -137,6 +177,25 @@ export default function SearchSelectField(p: Props) {
               </button>
             ))}
             {!hits.length && <p className="p-3 text-[13px] text-kink-help">{p.emptyLabel}</p>}
+            {more && p.moreLabel && (
+              <p className="px-3 py-2 text-[12px] text-kink-help">{p.moreLabel}</p>
+            )}
+            {other && (
+              <button
+                type="button"
+                role="option"
+                id={`${id}-option-${hits.length}`}
+                aria-selected={!typed && other.value === p.value}
+                onClick={chooseOther}
+                className={`sticky bottom-0 block w-full border-t border-kink-edge bg-kink-field px-3 py-3 text-left text-[15px] font-semibold ${
+                  (!typed && other.value === p.value) || active === hits.length
+                    ? "text-kink-gold-bright"
+                    : "text-white"
+                }`}
+              >
+                {typed ? other.typedLabel(typed) : other.label}
+              </button>
+            )}
           </div>
         </div>
       )}

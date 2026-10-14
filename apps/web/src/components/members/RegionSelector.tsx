@@ -8,6 +8,10 @@ export interface RegionSelectorProps {
   onOpen: () => void;
   onClose: () => void;
   onSelect: (region: string) => void;
+  /** Narrows the sheet's list as you type. */
+  search: { value: string; onChange: (value: string) => void; placeholder: string };
+  /** Under the list: loading, "keep typing", or nothing matched. */
+  status: string | null;
   sheetTitle: string;
   closeLabel: string;
   searchByRegionLabel: string;
@@ -25,6 +29,8 @@ export default function RegionSelector({
   onOpen,
   onClose,
   onSelect,
+  search,
+  status,
   sheetTitle,
   closeLabel,
   searchByRegionLabel,
@@ -82,33 +88,46 @@ export default function RegionSelector({
             className="absolute inset-0 bg-black/60"
           />
           <div
-            role="listbox"
+            role="dialog"
             aria-label={sheetTitle}
-            className="absolute inset-x-0 bottom-0 max-h-[70dvh] overflow-y-auto rounded-t-[24px] border-t border-mem-list-border bg-mem-card pb-[max(16px,env(safe-area-inset-bottom))] lg:inset-auto lg:left-1/2 lg:top-1/2 lg:w-[420px] lg:-translate-x-1/2 lg:-translate-y-1/2 lg:rounded-[24px] lg:border"
+            className="absolute inset-x-0 bottom-0 flex max-h-[70dvh] flex-col rounded-t-[24px] border-t border-mem-list-border bg-mem-card pb-[max(16px,env(safe-area-inset-bottom))] lg:inset-auto lg:left-1/2 lg:top-1/2 lg:w-[420px] lg:-translate-x-1/2 lg:-translate-y-1/2 lg:rounded-[24px] lg:border"
           >
             <p className="px-[20px] pb-[6px] pt-[18px] text-[12px] font-extrabold uppercase tracking-[1px] text-kink-gold-bright">
               {sheetTitle}
             </p>
-            {options.map((option) => {
-              const selected = option === value;
-              return (
-                <button
-                  key={option}
-                  type="button"
-                  role="option"
-                  aria-selected={selected}
-                  onClick={() => onSelect(option)}
-                  className={`flex h-[48px] w-full items-center justify-between px-[20px] text-left text-[14px] ${
-                    selected ? "font-bold text-kink-gold-bright" : "font-medium text-mem-text"
-                  }`}
-                >
-                  {option}
-                  {selected && (
-                    <MaskIcon name="chevron-right-14" width={14} className="rotate-90" />
-                  )}
-                </button>
-              );
-            })}
+            <div className="px-[20px] pb-[6px]">
+              <input
+                type="search"
+                value={search.value}
+                onChange={(e) => search.onChange(e.target.value)}
+                placeholder={search.placeholder}
+                aria-label={search.placeholder}
+                className="h-[42px] w-full rounded-[12px] border border-mem-list-border bg-transparent px-[14px] text-[14px] text-mem-text outline-none focus:border-kink-gold-bright"
+              />
+            </div>
+            <div role="listbox" aria-label={sheetTitle} className="min-h-0 flex-1 overflow-y-auto">
+              {options.map((option) => {
+                const selected = option === value;
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    role="option"
+                    aria-selected={selected}
+                    onClick={() => onSelect(option)}
+                    className={`flex h-[48px] w-full items-center justify-between px-[20px] text-left text-[14px] ${
+                      selected ? "font-bold text-kink-gold-bright" : "font-medium text-mem-text"
+                    }`}
+                  >
+                    {option}
+                    {selected && (
+                      <MaskIcon name="chevron-right-14" width={14} className="rotate-90" />
+                    )}
+                  </button>
+                );
+              })}
+              {status && <p className="px-[20px] py-[12px] text-[12px] text-mem-muted">{status}</p>}
+            </div>
           </div>
         </div>
       )}

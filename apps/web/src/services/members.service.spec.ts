@@ -18,9 +18,7 @@ import {
   isCountryAvailable,
   membersApi,
   nextSort,
-  regionsForState,
   searchCountries,
-  statesForCountry,
   toggleFollowOnCard,
   toggleFollowOnFriend,
   toggleFollowOnProfile,
@@ -125,17 +123,8 @@ describe("searchCountries", () => {
   });
 });
 
-describe("states + regions", () => {
-  it("knows configured states and regions for supported countries", () => {
-    expect(statesForCountry("ng")).toContain("Delta");
-    expect(statesForCountry("ng").length).toBe(37);
-    expect(statesForCountry("gh")).toEqual([]);
-    expect(statesForCountry("KE")).toHaveLength(47);
-    expect(statesForCountry("US")).toEqual([]);
-    expect(regionsForState("NG", "Delta")).toContain("Abraka");
-    expect(regionsForState("NG", "Delta")).toContain("Asaba");
-    expect(regionsForState("NG", "Nowhere")).toEqual([]);
-    expect(regionsForState("GH", "Delta")).toEqual([]);
+describe("directory countries", () => {
+  it("serves launched countries only", () => {
     expect(isCountryAvailable("ng")).toBe(true);
     expect(isCountryAvailable("GH")).toBe(false);
   });

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { KEEP_TYPING } from "@/constants/location";
 import { MEMBERS_COPY, MEMBERS_PAGE_SIZE } from "@/constants/members";
 import { Routes } from "@/constants/Routes";
 import {
@@ -18,12 +19,12 @@ import {
   isCountryAvailable,
   membersApi,
   nextSort,
-  regionsForState,
-  statesForCountry,
   toggleFollowOnCard,
   type MembersSort,
 } from "@/services/members.service";
+import { isKnownState, regionsForState, statesForCountry } from "@/services/location.service";
 import { countryName, displayState } from "@/util/format";
+import { optionMatcher } from "@/util/textSearch";
 
 /** Loaded pages for one country/state/region/sort key; a different key means "loading". */
 interface RegionPage {
@@ -36,6 +37,7 @@ interface RegionPage {
 
 /** Stable empty list so derived memos don't churn while a page is loading. */
 const NO_ITEMS: MemberCardPM[] = [];
+const NO_REGIONS: string[] = [];
 
 /** How long typing pauses before the list searches; clearing the box applies at once. */
 export const SEARCH_DELAY_MS = 300;
@@ -60,10 +62,6 @@ export function useMembersRegionPresenter(
   const country = countryParam.toUpperCase();
   const state = stateParam ? decodeParam(stateParam) : null;
   const countryMode = state === null;
-  const regions = useMemo(
-    () => (state ? regionsForState(country, state) : statesForCountry(country)),
-    [country, state],
-  );
 
   // null = the whole state (CEO, 2026-09-08); picking an LGA narrows the list.
   const [region, setRegion] = useState<string | null>(
@@ -74,12 +72,38 @@ export function useMembersRegionPresenter(
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
   const [sheetOpen, setSheetOpen] = useState(false);
+  // What's typed in the sheet's own search, over the states or the state's towns.
+  const [regionQuery, setRegionQuery] = useState("");
+  // A state's towns (thousands, for some) are fetched when its sheet first opens.
+  const [towns, setTowns] = useState<{ key: string; list: string[] } | null>(null);
+  const townsKey = state ? `${country}|${state}` : null;
+  useEffect(() => {
+    if (!sheetOpen || !state) return;
+    let live = true;
+    const loadedKey = `${country}|${state}`;
+    void regionsForState(country, state).then((list) => {
+      if (live) setTowns({ key: loadedKey, list });
+    });
+    return () => {
+      live = false;
+    };
+  }, [sheetOpen, country, state]);
+  const loadedTowns = towns && towns.key === townsKey ? towns.list : null;
+  const regions = useMemo(
+    () => (countryMode ? statesForCountry(country) : (loadedTowns ?? NO_REGIONS)),
+    [countryMode, country, loadedTowns],
+  );
+  const matchRegion = useMemo(
+    () => optionMatcher(regions.map((name) => ({ value: name, label: name }))),
+    [regions],
+  );
+  const regionHits = useMemo(() => matchRegion(regionQuery), [matchRegion, regionQuery]);
   const [data, setData] = useState<RegionPage | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
 
   // Country mode needs a launched country; state mode needs a state we have LGAs for.
-  const knownState = countryMode ? isCountryAvailable(country) : regions.length > 0;
+  const knownState = countryMode ? isCountryAvailable(country) : isKnownState(country, state);
   const key = knownState ? `${country}|${state ?? "*"}|${region ?? "*"}|${sort}|${search}` : null;
   const current = data?.key === key ? data : null;
   const loading = key !== null && current === null;
@@ -143,9 +167,14 @@ export function useMembersRegionPresenter(
       .finally(() => setLoadingMore(false));
   }, [country, state, region, search, sort, key, page, loading, loadingMore, more, router]);
 
+  const closeSheet = useCallback(() => {
+    setSheetOpen(false);
+    setRegionQuery("");
+  }, []);
+
   const selectRegion = useCallback(
     (next: string) => {
-      setSheetOpen(false);
+      closeSheet();
       if (countryMode) {
         // Picking a state on the country page opens that state's own list.
         if (next !== copy.allStates) router.push(Routes.membersState(country, next));
@@ -153,7 +182,7 @@ export function useMembersRegionPresenter(
       }
       setRegion(next === copy.allRegions ? null : next);
     },
-    [countryMode, copy.allStates, copy.allRegions, router, country],
+    [countryMode, copy.allStates, copy.allRegions, router, country, closeSheet],
   );
 
   const toggleSort = useCallback(() => setSort((s) => nextSort(s)), []);
@@ -217,11 +246,27 @@ export function useMembersRegionPresenter(
     selector: {
       label: copy.selectorLabel,
       value: countryMode ? copy.allStates : (region ?? copy.allRegions),
-      options: [countryMode ? copy.allStates : copy.allRegions, ...regions],
+      options: [
+        countryMode ? copy.allStates : copy.allRegions,
+        ...regionHits.hits.map((hit) => hit.label),
+      ],
       open: sheetOpen,
       onOpen: () => setSheetOpen(true),
-      onClose: () => setSheetOpen(false),
+      onClose: closeSheet,
       onSelect: selectRegion,
+      search: {
+        value: regionQuery,
+        onChange: setRegionQuery,
+        placeholder: countryMode ? copy.searchStates : copy.searchRegions,
+      },
+      status:
+        !countryMode && loadedTowns === null
+          ? copy.loadingRegions
+          : regionHits.more
+            ? KEEP_TYPING
+            : regionHits.hits.length === 0 && regionQuery.trim()
+              ? copy.noRegionMatch
+              : null,
       sheetTitle: countryMode ? copy.sheetTitleStates : copy.sheetTitle,
       closeLabel: copy.closeSheet,
       searchByRegionLabel: countryMode ? copy.searchByState : copy.searchByRegion,

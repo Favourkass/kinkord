@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { KEEP_TYPING, typedPlaceLabel } from "@/constants/location";
 import { PROFILE_EDIT_COPY, ROW_ICONS } from "@/constants/profileEdit";
 import { Routes } from "@/constants/Routes";
 import type {
@@ -21,6 +22,7 @@ import {
   draftChanged,
   fieldErrorMessage,
   initialDraft,
+  loadCityOptions,
   patchFor,
   profileApi,
   usernameFromDraft,
@@ -65,6 +67,7 @@ function toEditorVM(key: EditRowKey, spec: EditorSpec) {
         options: optionCopy
           ? spec.options.map((o) => ({ value: o.value, ...optionCopy(o.value) }))
           : spec.options,
+        custom: spec.custom ? { typedLabel: typedPlaceLabel } : undefined,
       };
     }
     case "multi":
@@ -133,9 +136,26 @@ export function useEditSectionPresenter(section: EditSectionKey) {
     };
   }, [router, copy.loadError]);
 
+  // The City editor's towns load once the member's state is known.
+  const [towns, setTowns] = useState<{ key: string; list: string[] } | null>(null);
+  const townsKey =
+    section === "location" && profile?.state ? `${profile.country}|${profile.state}` : null;
+  useEffect(() => {
+    if (!townsKey || !profile) return;
+    let live = true;
+    void loadCityOptions(profile).then((list) => {
+      if (live) setTowns({ key: townsKey, list });
+    });
+    return () => {
+      live = false;
+    };
+  }, [townsKey, profile]);
+  const cityOptions = towns && towns.key === townsKey ? towns.list : undefined;
+
   const rows = useMemo<EditRowPM[]>(
-    () => (me && profile && options ? buildEditRows(section, { profile, me, options }) : []),
-    [section, me, profile, options],
+    () =>
+      me && profile && options ? buildEditRows(section, { profile, me, options, cityOptions }) : [],
+    [section, me, profile, options, cityOptions],
   );
   const current = editor ? (rows.find((r) => r.key === editor.key) ?? null) : null;
 
@@ -227,6 +247,7 @@ export function useEditSectionPresenter(section: EditSectionKey) {
         saving: copy.saving,
         close: copy.close,
         search: copy.search,
+        more: KEEP_TYPING,
         selected:
           spec.kind === "multi" && editor.draft.kind === "multi"
             ? copy.selected(editor.draft.value.length, spec.max)

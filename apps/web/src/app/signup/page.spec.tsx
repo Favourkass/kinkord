@@ -128,9 +128,18 @@ it("offers photo skipping and a searchable scrolling role list", async () => {
   expect(screen.queryByRole("button", { name: "Bottom" })).toBeNull();
 });
 
-it("searches towns inside a state and allows an unlisted place", () => {
+it("searches towns inside a state and allows an unlisted place", async () => {
+  // The state's towns are fetched once it is picked: serve the generated file.
+  vi.stubGlobal("fetch", async (url: string) => {
+    const { readFileSync } = await import("node:fs");
+    const { resolve } = await import("node:path");
+    return new Response(readFileSync(resolve(__dirname, "../../../public", `.${url}`), "utf8"));
+  });
   render(<SignupPage />);
   expect((screen.getByLabelText("Region / City / Town") as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.getByRole("link", { name: "CC BY 4.0" }).getAttribute("href")).toBe(
+    "https://creativecommons.org/licenses/by/4.0/",
+  );
   fireEvent.click(screen.getByLabelText("State"));
   fireEvent.change(screen.getByRole("combobox", { name: "Search states" }), {
     target: { value: "Lagos" },
@@ -140,16 +149,31 @@ it("searches towns inside a state and allows an unlisted place", () => {
   fireEvent.change(screen.getByRole("combobox", { name: "Search regions / cities / towns" }), {
     target: { value: "Ikeja" },
   });
-  fireEvent.click(screen.getByRole("option", { name: "Ikeja" }));
+  fireEvent.click(await screen.findByRole("option", { name: "Ikeja" }));
   expect(screen.getByLabelText("Region / City / Town").textContent).toContain("Ikeja");
+  // "Other" stays pinned under the list, searched or not.
   fireEvent.click(screen.getByLabelText("Region / City / Town"));
-  fireEvent.change(screen.getByRole("combobox", { name: "Search regions / cities / towns" }), {
-    target: { value: "Other region" },
-  });
   fireEvent.click(screen.getByRole("option", { name: "Other region / city / town" }));
   const custom = screen.getByLabelText("Region / City / Town name") as HTMLInputElement;
   fireEvent.change(custom, { target: { value: "My village" } });
   expect(custom.value).toBe("My village");
+  // Picking "Other" or the same state again keeps what was typed.
+  fireEvent.click(screen.getByLabelText("Region / City / Town"));
+  fireEvent.click(screen.getByRole("option", { name: "Other region / city / town" }));
+  fireEvent.click(screen.getByLabelText("State"));
+  fireEvent.click(screen.getByRole("option", { name: "Lagos" }));
+  expect((screen.getByLabelText("Region / City / Town name") as HTMLInputElement).value).toBe(
+    "My village",
+  );
+  fireEvent.click(screen.getByLabelText("Region / City / Town"));
+  fireEvent.change(screen.getByRole("combobox", { name: "Search regions / cities / towns" }), {
+    target: { value: "Ikota Villa" },
+  });
+  fireEvent.click(screen.getByRole("option", { name: "Use “Ikota Villa”" }));
+  expect((screen.getByLabelText("Region / City / Town name") as HTMLInputElement).value).toBe(
+    "Ikota Villa",
+  );
+  vi.unstubAllGlobals();
 });
 
 it("offers former roles and the ten additions in the same searchable list", () => {

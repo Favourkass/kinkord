@@ -130,7 +130,14 @@ export type EditorSpec =
       lockedUntil: string | null;
     }
   | { kind: "textarea"; value: string; maxLength: number }
-  | { kind: "single"; value: string | null; options: EditorOption[]; searchable: boolean }
+  | {
+      kind: "single";
+      value: string | null;
+      options: EditorOption[];
+      searchable: boolean;
+      /** Also takes what was typed in the search (a town the list lacks). */
+      custom?: boolean;
+    }
   | { kind: "multi"; value: string[]; options: EditorOption[]; max: number; searchable: boolean }
   | { kind: "date"; value: string | null; max: string }
   | { kind: "links"; value: { facebook: string; x: string } };

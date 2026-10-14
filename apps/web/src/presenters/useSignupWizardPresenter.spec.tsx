@@ -586,3 +586,57 @@ describe("useSignupWizardPresenter", () => {
     });
   });
 });
+
+// A state's towns are fetched once it is picked: every test here serves the
+// generated /locations files from disk instead of the network.
+const townsFetch = vi.fn(async (url: string) => {
+  const { readFileSync } = await import("node:fs");
+  const { resolve } = await import("node:path");
+  return new Response(readFileSync(resolve(__dirname, "../../public", `.${url}`), "utf8"));
+});
+beforeEach(() => {
+  townsFetch.mockClear();
+  vi.stubGlobal("fetch", townsFetch);
+  return () => vi.unstubAllGlobals();
+});
+
+describe("useSignupWizardPresenter towns", () => {
+  it("fetches a state's towns once it is picked", async () => {
+    const { result } = renderHook(() => useSignupWizardPresenter());
+    expect(result.current.aboutStep.location.areas).toEqual([]);
+    expect(townsFetch).not.toHaveBeenCalled();
+    act(() => result.current.aboutStep.selectState("Oyo"));
+    expect(result.current.aboutStep.location.areaEmptyLabel).toMatch(/^Loading/);
+    await waitFor(() =>
+      expect(result.current.aboutStep.location.areas.map((o) => o.value)).toContain("Bodija"),
+    );
+    expect(townsFetch).toHaveBeenCalledWith("/locations/NG/oyo.json");
+    expect(result.current.aboutStep.location.areaEmptyLabel).toBe("No matching areas");
+    // Areas members picked from the older list are still offered.
+    expect(result.current.aboutStep.location.areas.map((o) => o.value)).toContain("Oluyole");
+  });
+
+  it("keeps a typed town when the same state or Other is picked again", () => {
+    const { result } = renderHook(() => useSignupWizardPresenter());
+    act(() => result.current.aboutStep.selectState("Lagos"));
+    act(() => result.current.aboutStep.selectArea(OTHER_AREA));
+    act(() => result.current.aboutStep.set({ ...result.current.aboutStep.draft, city: "Ikota" }));
+    act(() => result.current.aboutStep.selectArea(OTHER_AREA));
+    act(() => result.current.aboutStep.selectState("Lagos"));
+    expect(result.current.aboutStep.draft.city).toBe("Ikota");
+    expect(result.current.aboutStep.location.customArea).toBe(true);
+    act(() => result.current.aboutStep.selectState("Delta"));
+    expect(result.current.aboutStep.draft.city).toBe("");
+    expect(result.current.aboutStep.location.customArea).toBe(false);
+  });
+
+  it("takes a searched-for town nobody listed as the custom one", () => {
+    const { result } = renderHook(() => useSignupWizardPresenter());
+    act(() => result.current.aboutStep.selectState("Lagos"));
+    expect(result.current.aboutStep.location.otherArea?.typedLabel("Ikota")).toBe("Use “Ikota”");
+    act(() => result.current.aboutStep.location.otherArea?.onTyped("Ikota Villa"));
+    expect(result.current.aboutStep.areaValue).toBe(OTHER_AREA);
+    expect(result.current.aboutStep.location.customArea).toBe(true);
+    expect(result.current.aboutStep.draft.city).toBe("Ikota Villa");
+  });
+});
