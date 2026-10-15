@@ -7,32 +7,17 @@ import { ageGateService } from "@/services/ageGate.service";
 
 export type ClientLandingVM = LandingVM & {
   isInstalled: boolean;
-  isDesktop: boolean;
   onDownload: () => void;
   showAgeGate: boolean;
   onConfirmAge: () => void;
   onDeclineAge: () => void;
 };
 
-const DESKTOP = "(min-width: 1024px)";
-const subscribeDesktop = (notify: () => void) => {
-  const query = window.matchMedia?.(DESKTOP);
-  query?.addEventListener?.("change", notify);
-  return () => query?.removeEventListener?.("change", notify);
-};
-const getDesktopSnapshot = () => window.matchMedia?.(DESKTOP).matches ?? false;
-const getDesktopServerSnapshot = () => false;
-
 const subscribeAgeGate = (onStoreChange: () => void) => ageGateService.subscribe(onStoreChange);
 const getAgeGateSnapshot = () => ageGateService.isConfirmed();
 const getAgeGateServerSnapshot = () => false;
 
 export function useLandingPresenter(): ClientLandingVM {
-  const isDesktop = useSyncExternalStore(
-    subscribeDesktop,
-    getDesktopSnapshot,
-    getDesktopServerSnapshot,
-  );
   const baseVM = useMemo(() => getLandingVM(), []);
   const pwa = usePwaPresenter();
   const [dismissed, setDismissed] = useState(false);
@@ -55,7 +40,6 @@ export function useLandingPresenter(): ClientLandingVM {
   return {
     ...baseVM,
     isInstalled: pwa.isInstalled,
-    isDesktop,
     showAgeGate: !dismissed && !hasConfirmedAge,
     onConfirmAge: () => {
       setDismissed(true);

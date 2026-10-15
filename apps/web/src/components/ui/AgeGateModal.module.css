@@ -32,10 +32,23 @@
   animation: cardGlow 9s ease-in-out infinite;
 }
 .logo {
-  border: 1px solid #e8ba35;
+  isolation: isolate;
+  border: 1px solid #947421;
   background: radial-gradient(circle at 50% 40%, #6d4b1325, #070703 75%);
-  box-shadow: 0 0 18px #e2ac2240;
-  animation: logoGlow 5s ease-in-out infinite;
+  box-shadow: none;
+  animation: logoGlow 10s ease-in-out infinite;
+}
+.logo::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -14px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(ellipse, #ffbd2480, #e49a192b 45%, transparent 72%);
+  filter: blur(10px);
+  opacity: 0;
+  animation: logoHalo 10s ease-in-out infinite;
 }
 .logo::after,
 .enter::after {
@@ -61,6 +74,17 @@
     linear-gradient(#fff 0 0);
   mask-composite: exclude;
   animation: borderShine 10s linear infinite;
+}
+.logo::after {
+  background: conic-gradient(
+    from var(--age-gate-shine-angle),
+    transparent 0deg 320deg,
+    #ffd83e 337deg,
+    #fffbea 344deg,
+    #ffe66f 350deg,
+    transparent 358deg
+  );
+  animation: logoSweep 10s linear infinite;
 }
 .heading {
   animation: headingReveal 650ms ease-out both;
@@ -90,8 +114,15 @@
   animation: enterGlow 6s ease-in-out infinite;
 }
 .enter::after {
-  animation-duration: 8s;
-  animation-delay: 2s;
+  background: repeating-conic-gradient(
+    from var(--age-gate-shine-angle),
+    transparent 0deg 62deg,
+    #ffd02a 70deg,
+    #fffbea 76deg,
+    #ffe36b 80deg,
+    transparent 86deg 90deg
+  );
+  animation: borderShine 6s linear infinite;
 }
 @keyframes ambientLight {
   from {
@@ -133,13 +164,76 @@
     opacity: 0;
   }
 }
+/* One shared cycle: outline, build, full glow, border sweep, pulse, reset. */
 @keyframes logoGlow {
   0%,
+  8%,
   100% {
-    box-shadow: 0 0 14px #e2ac2235;
+    border-color: #947421;
+    box-shadow:
+      0 0 0 #ffc92800,
+      inset 0 0 0 #ffc92800;
   }
-  50% {
-    box-shadow: 0 0 24px #e2ac2265;
+  25% {
+    border-color: #ffd44c;
+    box-shadow:
+      0 0 9px #ffc92880,
+      inset 0 0 5px #ffc92830;
+  }
+  38%,
+  62%,
+  80% {
+    border-color: #fff08a;
+    box-shadow:
+      0 0 4px #fff4a9,
+      0 0 16px #ffd02ac0,
+      0 0 32px #e8a90c70,
+      inset 0 0 8px #ffc92845;
+  }
+  70%,
+  88% {
+    border-color: #ffd951;
+    box-shadow:
+      0 0 3px #ffe27390,
+      0 0 12px #ffd02a80,
+      0 0 24px #e8a90c40,
+      inset 0 0 5px #ffc92825;
+  }
+}
+@keyframes logoHalo {
+  0%,
+  8%,
+  100% {
+    opacity: 0;
+  }
+  25%,
+  70%,
+  88% {
+    opacity: 0.45;
+  }
+  38%,
+  62%,
+  80% {
+    opacity: 1;
+  }
+}
+@keyframes logoSweep {
+  0%,
+  38% {
+    --age-gate-shine-angle: 0deg;
+    opacity: 0;
+  }
+  42% {
+    opacity: 1;
+  }
+  64% {
+    --age-gate-shine-angle: 360deg;
+    opacity: 1;
+  }
+  68%,
+  100% {
+    --age-gate-shine-angle: 360deg;
+    opacity: 0;
   }
 }
 @keyframes starGlow {
@@ -181,6 +275,7 @@
   .backdrop::before,
   .card,
   .logo,
+  .logo::before,
   .logo::after,
   .heading,
   .divider::after,

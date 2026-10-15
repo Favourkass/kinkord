@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
+import { ageGateService } from "@/services/ageGate.service";
 import { useLandingPresenter } from "./useLandingPresenter";
 import { BeforeInstallPromptEvent, pwaService } from "@/services/pwa.service";
 
 describe("useLandingPresenter", () => {
   beforeEach(() => {
+    ageGateService.reset();
     localStorage.clear();
     vi.restoreAllMocks();
     // Reset shared singleton state between tests.
