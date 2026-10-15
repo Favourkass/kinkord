@@ -16,7 +16,7 @@ export default function HomeScreen() {
 
   return (
     <>
-      {splash.visible && vm.isDesktop && (
+      {splash.visible && (
         <BrandSplash
           videoSrc={splash.videoSrc}
           posterSrc={splash.posterSrc}
@@ -27,7 +27,9 @@ export default function HomeScreen() {
           onFinished={splash.onFinished}
         />
       )}
-      <SplashScreen {...vm} />
+      {/* The age question waits for the animation: it opens in the browser's top
+          layer, above the splash, and a member on their way to /home never needs it. */}
+      <SplashScreen {...vm} showAgeGate={vm.showAgeGate && !splash.visible} />
     </>
   );
 }
