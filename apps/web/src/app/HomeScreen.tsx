@@ -16,7 +16,7 @@ export default function HomeScreen() {
 
   return (
     <>
-      {splash.visible && vm.isDesktop && (
+      {splash.visible && (
         <BrandSplash
           videoSrc={splash.videoSrc}
           posterSrc={splash.posterSrc}
@@ -27,7 +27,7 @@ export default function HomeScreen() {
           onFinished={splash.onFinished}
         />
       )}
-      <SplashScreen {...vm} />
+      <SplashScreen {...vm} showAgeGate={vm.showAgeGate && !splash.visible} />
     </>
   );
 }

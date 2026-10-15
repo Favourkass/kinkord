@@ -2,10 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import Image from "next/image";
-import { Scale, CircleCheck, Ban, TriangleAlert, Shield, LogOut } from "lucide-react";
+import { TriangleAlert, Shield, LogOut } from "lucide-react";
 import styles from "./AgeGateModal.module.css";
-
-const pointIcons: Record<string, typeof Scale> = { "⚖️": Scale, "✅": CircleCheck, "🚫": Ban };
 
 export interface AgeGatePoint {
   icon: string;
@@ -110,31 +108,20 @@ export default function AgeGateModal({
         )}
         {points && points.length > 0 && (
           <ul className="mt-3 w-full space-y-3 rounded-[12px] border border-[#ad862b]/65 bg-black/70 p-3 text-left sm:p-4">
-            {points.map((point) => {
-              const Icon = pointIcons[point.icon];
-              return (
-                <li
-                  key={point.text}
-                  className="flex items-start gap-3 text-[12px] leading-[18px] text-[#f0f0f0] sm:text-[15px] sm:leading-[22px]"
+            {points.map((point) => (
+              <li
+                key={point.text}
+                className="flex items-start gap-3 text-[12px] leading-[18px] text-[#f0f0f0] sm:text-[15px] sm:leading-[22px]"
+              >
+                <span
+                  aria-hidden
+                  className="grid size-6 shrink-0 place-items-center text-[24px] leading-none"
                 >
-                  <span
-                    aria-hidden
-                    className={`grid size-6 shrink-0 place-items-center ${point.icon === "🚫" ? "text-[#ff4563]" : "text-[#ffda32]"}`}
-                  >
-                    {point.icon === "🔞" ? (
-                      <span className="grid size-6 place-items-center rounded-full border-2 border-[#ffda32] text-[10px] font-black">
-                        18+
-                      </span>
-                    ) : Icon ? (
-                      <Icon size={25} strokeWidth={2} />
-                    ) : (
-                      point.icon
-                    )}
-                  </span>
-                  <span>{point.text}</span>
-                </li>
-              );
-            })}
+                  {point.icon}
+                </span>
+                <span>{point.text}</span>
+              </li>
+            ))}
           </ul>
         )}
         {warning && (
