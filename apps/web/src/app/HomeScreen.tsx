@@ -16,7 +16,7 @@ export default function HomeScreen() {
 
   return (
     <>
-      {splash.visible && (
+      {splash.visible && vm.isDesktop && (
         <BrandSplash
           videoSrc={splash.videoSrc}
           posterSrc={splash.posterSrc}

@@ -2,6 +2,9 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   Cookie,
+  Crown,
+  Heart,
+  MessageCircle,
   Copyright,
   FileText,
   Info,
@@ -55,6 +58,17 @@ export interface AdultBadgeData {
 export interface SplashScreenProps {
   logo: SplashImage;
   hero: SplashImage;
+  mobileHero?: SplashImage & { width: number; height: number };
+  mobileContent?: {
+    eyebrow: string;
+    title: string;
+    description: string;
+    features: readonly {
+      icon: "people" | "heart" | "shield" | "messages" | "crown";
+      label: string;
+    }[];
+    footer: string;
+  };
   downloadCta: SplashAction;
   brand: string;
   tagline: string;
@@ -383,6 +397,8 @@ function SignInButton({ cta }: { cta: SplashLink }) {
 export default function SplashScreen({
   logo,
   hero,
+  mobileHero,
+  mobileContent,
   downloadCta,
   brand,
   tagline,
@@ -416,62 +432,75 @@ export default function SplashScreen({
         />
       )}
 
-      {/* Mobile splash */}
-      <div className="relative flex min-h-dvh flex-col overflow-hidden bg-black lg:hidden">
-        <div className="absolute inset-x-0 top-0 bottom-[28px] overflow-hidden">
-          <div className="absolute left-[-0.46%] top-[-10.13%] h-full w-[100.55%]">
-            <Image
-              src={hero.src}
-              alt={hero.alt}
-              fill
-              priority
-              sizes="100vw"
-              className="object-cover"
-            />
-          </div>
-        </div>
-        <div className="absolute right-[22px] top-[max(env(safe-area-inset-top,0px)+16px,36px)] z-30 pointer-events-auto">
-          <DownloadPill cta={downloadCta} compact />
-        </div>
-        <div className="relative z-10 flex flex-1 flex-col items-center px-[22px] sm:px-[27px] pb-8">
+      {/* Only the photo portion remains; the poster’s lower copy and buttons are live UI. */}
+      <div className="flex min-h-dvh flex-col bg-black lg:hidden">
+        <h1 className="sr-only">{brand}</h1>
+        <div className="aspect-[720/630] w-full overflow-hidden">
           <Image
-            src={logo.src}
-            alt={logo.alt}
-            width={145}
-            height={145}
-            priority
+            src={mobileHero?.src ?? hero.src}
+            alt={mobileHero?.alt ?? hero.alt}
+            width={mobileHero?.width ?? 720}
+            height={mobileHero?.height ?? 1080}
+            preload
             unoptimized
-            className="mt-[68px] size-[145px]"
+            sizes="100vw"
+            className="block h-auto w-full"
           />
-          <h1 className="text-center text-[48px] font-extrabold leading-tight text-kink-amber">
-            {brand}
-          </h1>
-          <p className="mt-1 max-w-[318px] text-center text-[15px] font-extrabold leading-normal text-white">
-            {tagline}
-          </p>
-
-          {adultBadge && (
-            <div className="my-6 flex flex-col items-center text-center">
-              <AdultAgeBadge badge={adultBadge} />
-              <div className="mt-2.5 text-[13.5px] font-bold leading-tight text-white">
-                <p>{adultBadge.line1}</p>
-                <p>{adultBadge.line2}</p>
+        </div>
+        <div className="flex flex-col items-center gap-4 px-5 pb-8 pt-5 sm:px-7">
+          {mobileContent && (
+            <>
+              <div className="text-center">
+                <p className="text-[11px] tracking-[0.3em] text-white">{mobileContent.eyebrow}</p>
+                <h2 className="mt-2 font-serif text-[36px] italic leading-tight text-kink-gold-bright sm:text-[44px]">
+                  {mobileContent.title}
+                </h2>
+                <p className="mx-auto mt-4 max-w-[390px] text-[13px] leading-5 text-white">
+                  {mobileContent.description}
+                </p>
               </div>
-            </div>
+              <ul className="my-2 grid w-full max-w-[460px] grid-cols-5 divide-x divide-kink-amber/40">
+                {mobileContent.features.map((feature) => {
+                  const Icon = {
+                    people: Users,
+                    heart: Heart,
+                    shield: Shield,
+                    messages: MessageCircle,
+                    crown: Crown,
+                  }[feature.icon];
+                  return (
+                    <li
+                      key={feature.icon}
+                      className="flex flex-col items-center gap-2 px-1 text-center"
+                    >
+                      <Icon size={23} className="text-kink-gold-bright" aria-hidden />
+                      <span className="text-[8px] uppercase leading-[13px] tracking-[0.08em] text-white sm:text-[10px]">
+                        {feature.label}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
           )}
-
-          <SignUpButton cta={signUp} />
-          <div className="mt-3 w-full max-w-[347px]">
+          <div className="flex w-full max-w-[347px] flex-col gap-3">
+            <SignUpButton cta={signUp} />
             <SignInButton cta={signIn} />
+            <div className="flex justify-center pt-1">
+              <DownloadPill cta={downloadCta} compact />
+            </div>
           </div>
-          <nav className="mt-[24px] w-full max-w-[347px] rounded-[20px] border border-kink-amber bg-kink-surface px-[22px]">
+          {mobileContent && (
+            <p className="my-2 text-center text-[9px] tracking-[0.2em] text-kink-mist">
+              {mobileContent.footer}
+            </p>
+          )}
+          <nav className="mt-2 w-full max-w-[347px] rounded-[20px] border border-kink-amber bg-kink-surface px-[22px]">
             {navLinks.map((link, i) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`flex h-[52px] items-center justify-between text-[15px] font-extrabold tracking-[0.3px] text-kink-paper ${
-                  i > 0 ? "border-t border-kink-divider" : ""
-                }`}
+                className={`flex h-[52px] items-center justify-between text-[15px] font-extrabold tracking-[0.3px] text-kink-paper ${i > 0 ? "border-t border-kink-divider" : ""}`}
               >
                 {link.label}
                 <span className="text-white">
@@ -480,14 +509,12 @@ export default function SplashScreen({
               </Link>
             ))}
           </nav>
-
           {policyLinks && policyLinks.length > 0 && (
-            <div className="mt-7 w-full max-w-[360px] sm:max-w-[460px]">
+            <div className="mt-3 w-full max-w-[460px]">
               <StarDivider />
               <PolicyButtonsGrid links={policyLinks} />
             </div>
           )}
-
           <FooterNotice copyright={copyright} allRightsReserved={allRightsReserved} />
         </div>
       </div>
