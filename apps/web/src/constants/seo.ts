@@ -14,9 +14,9 @@ export const FORMER_NAMES = ["BKCN", "BDSM and Kinks Club Nigeria", "Kinkstone"]
 
 export const SEO_COPY = {
   site: {
-    title: "Kinkord — The World's Kink Community",
+    title: "Kinkord — The world's kink community",
     description:
-      "Kinkord is a private, 18+ community for kinksters around the world. Connect, explore your interests, learn about consent and safety, and find your people.",
+      "Kinkord is the world's kink community. An adults-only space to connect, explore your interests, and find your people.",
     keywords: [
       "BDSM community",
       "global kink community",

@@ -28,6 +28,7 @@ describe("getLandingVM", () => {
   it("serves the redesign assets from public/brand", () => {
     expect(vm.logo.src).toBe("/brand/logo-badge.png");
     expect(vm.hero.src).toBe("/brand/hero-trio.jpg");
+    expect(vm.mobileHero).toMatchObject({ src: "/brand/header.jpeg", width: 720, height: 1080 });
     expect(vm.logo.alt).not.toHaveLength(0);
     expect(vm.hero.alt).not.toHaveLength(0);
   });
@@ -57,7 +58,7 @@ describe("getLandingVM", () => {
     expect(vm.ageGate.title).toBe("AGE VERIFICATION");
     expect(vm.ageGate.badge).toContain("18+ ADULT COMMUNITY");
     expect(vm.ageGate.points).toHaveLength(4);
-    expect(vm.ageGate.warning).toContain("Providing false age information");
+    expect(vm.ageGate.warning).toContain("Providing a false age");
     expect(vm.ageGate.confirmLabel).toContain("18 OR OLDER");
     expect(vm.ageGate.declineLabel).toContain("UNDER 18");
   });

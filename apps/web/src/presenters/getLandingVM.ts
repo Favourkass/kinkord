@@ -8,6 +8,7 @@ import {
   BRAND_TAGLINE,
   COPYRIGHT_LINE,
   JOIN_AGE_DISCLAIMER,
+  MOBILE_LANDING_CONTENT,
   POLICY_LINKS,
 } from "@/constants/landing";
 import { Routes } from "@/constants/Routes";
@@ -26,6 +27,13 @@ export function getLandingVM() {
       src: "/brand/hero-trio.jpg",
       alt: "Three community members in black satin against a dark satin backdrop",
     },
+    mobileHero: {
+      src: "/brand/header.jpeg",
+      alt: "Five adult community members in black outfits, with the Kinkord logo and an adults-only badge.",
+      width: 720,
+      height: 1080,
+    },
+    mobileContent: MOBILE_LANDING_CONTENT,
     downloadCta,
     brand: BRAND_NAME,
     tagline: BRAND_TAGLINE,
