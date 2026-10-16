@@ -1,4 +1,4 @@
-export const BRAND_NAME = "KINKORD";
+export const BRAND_NAME = "Kinkord";
 
 export const BRAND_TAGLINE =
   "Where kinksters connect, explore their interests, build meaningful relationships, and find a community where they truly belong.";
@@ -69,7 +69,7 @@ export const POLICY_LINKS: readonly PolicyLink[] = [
   { label: "Copyright Policy", href: "#", icon: "copyright" },
   { label: "Invest in Kinkord", href: Routes.invest, icon: "invest" },
   {
-    label: "Chat with us on WhatsApp",
+    label: "Kinkord on WhatsApp",
     href: WHATSAPP_COMMUNITY_URL,
     icon: "whatsapp",
   },
@@ -113,13 +113,30 @@ export const MOBILE_LANDING_CONTENT = {
   eyebrow: "MORE THAN A PLATFORM",
   title: "It's a Community.",
   description:
-    "Connect with like-minded people, explore your desires, and be part of a safe, respectful and exciting space.",
+    "Connect with like-minded kinksters, explore your desires, and be part of a safe, respectful and exciting space.",
   features: [
-    { icon: "people", label: "Meet like-minded people" },
+    { icon: "people", label: "Meet like-minded kinksters" },
     { icon: "heart", label: "Explore your interests" },
     { icon: "shield", label: "Privacy & safety first" },
     { icon: "messages", label: "Real connections" },
     { icon: "crown", label: "Be your authentic self" },
   ],
-  footer: "DIFFERENT PEOPLE · SAME DESIRES",
+  footer: "DIFFERENT KINKSTERS · SAME DESIRES",
+} as const;
+
+export const LANDING_PLATFORM_OVERVIEW = {
+  title: "What is Kinkord",
+  paragraphs: [
+    "Kinkord is an adults-only (18+) social networking and communication platform designed for kinksters interested in BDSM, alternative lifestyles, personal connections, and community engagement.",
+    "The platform provides features that enable adult users to create profiles, connect with others, communicate through private messaging, and build meaningful social connections in a digital environment.",
+    "Kinkord promotes respectful interactions, personal privacy, individual boundaries, and consent among adults. Users are expected to respect other members and comply with applicable laws and platform rules.",
+  ],
+} as const;
+
+export const LANDING_MEMBERS = {
+  label: "members",
+  countriesLabel: "countries",
+  description:
+    "A global community of kinksters connecting through meaningful conversations, friendships, and shared interests.",
+  unavailable: "—",
 } as const;

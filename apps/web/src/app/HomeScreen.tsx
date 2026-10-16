@@ -7,10 +7,8 @@ import { useLandingPresenter } from "@/presenters/useLandingPresenter";
 
 /** The landing page: the brand splash over the marketing screen. */
 export default function HomeScreen() {
-  // The logo animation covers the entry route while the session lookup runs: a
-  // signed-in visitor is bounced to /home behind it, a guest sees the marketing
-  // splash once it fades. Both are rendered, so the page is still in the HTML
-  // for crawlers and assistive tech while the overlay is up.
+  // Keep the landing content in the HTML for crawlers, but hide it from sight,
+  // keyboard focus and assistive technology until the entry animation is gone.
   const splash = useBrandSplashPresenter();
   const vm = useLandingPresenter();
 
@@ -27,7 +25,9 @@ export default function HomeScreen() {
           onFinished={splash.onFinished}
         />
       )}
-      <SplashScreen {...vm} showAgeGate={vm.showAgeGate && !splash.visible} />
+      <div hidden={splash.visible}>
+        <SplashScreen {...vm} showAgeGate={vm.showAgeGate && !splash.visible} />
+      </div>
     </>
   );
 }

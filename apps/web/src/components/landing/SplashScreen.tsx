@@ -2,9 +2,6 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   Cookie,
-  Crown,
-  Heart,
-  MessageCircle,
   Copyright,
   FileText,
   Info,
@@ -15,6 +12,7 @@ import {
   Users,
 } from "lucide-react";
 import AgeGateModal from "@/components/ui/AgeGateModal";
+import brandStyles from "./LandingBrand.module.css";
 
 export interface SplashLink {
   label: string;
@@ -57,6 +55,7 @@ export interface AdultBadgeData {
 
 export interface SplashScreenProps {
   logo: SplashImage;
+  wordmark: SplashImage & { width: number; height: number };
   hero: SplashImage;
   mobileHero?: SplashImage & { width: number; height: number };
   mobileContent?: {
@@ -69,6 +68,8 @@ export interface SplashScreenProps {
     }[];
     footer: string;
   };
+  platformOverview: { title: string; paragraphs: readonly string[] };
+  membership: { count: string; label: string; countries: string; description: string };
   downloadCta: SplashAction;
   brand: string;
   tagline: string;
@@ -189,11 +190,12 @@ function AdultAgeBadge({ badge, className = "" }: { badge: AdultBadgeData; class
       className={`inline-flex items-center gap-3 sm:gap-3.5 rounded-[22px] border-[1.5px] border-[#faab14] bg-black/50 px-5 py-2 backdrop-blur-sm shadow-md shadow-black/60 ${className}`}
       aria-label={`${badge.age} ${badge.label}`}
     >
-      <div className="flex size-[32px] sm:size-[36px] items-center justify-center rounded-full border-[1.5px] border-[#faab14]">
-        <span className="text-[13px] sm:text-[14px] font-extrabold tracking-tight text-[#faab14]">
-          {badge.age}
-        </span>
-      </div>
+      <span
+        aria-hidden="true"
+        className={`${brandStyles.emoji} text-[32px] leading-none sm:text-[36px]`}
+      >
+        🔞
+      </span>
       <span className="text-[19px] sm:text-[22px] font-black tracking-wider text-[#faab14]">
         {badge.label}
       </span>
@@ -224,28 +226,26 @@ function ContactIcon({ className = "" }: { className?: string }) {
   );
 }
 
-function CommunityNetworkIcon({ className = "" }: { className?: string }) {
+function WhatsAppIcon({ className = "" }: { className?: string }) {
   return (
     <svg
       width="20"
       height="20"
       viewBox="0 0 24 24"
       fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
       className={className}
       aria-hidden="true"
     >
-      <circle cx="12" cy="5" r="2.5" />
-      <path d="M9 10a3 3 0 0 1 6 0" />
-      <circle cx="5" cy="16" r="2" />
-      <path d="M2.5 20a2.5 2.5 0 0 1 5 0" />
-      <circle cx="19" cy="16" r="2" />
-      <path d="M16.5 20a2.5 2.5 0 0 1 5 0" />
-      <line x1="9.5" y1="9" x2="6.5" y2="14" />
-      <line x1="14.5" y1="9" x2="17.5" y2="14" />
+      <path
+        d="M21 11.5a9 9 0 0 1-13.4 7.9L3 21l1.5-4.5A9 9 0 1 1 21 11.5Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M8.3 6.9c-.3-.6-.6-.6-.9-.6h-.6c-.3 0-.6.1-.8.4-.6.6-.9 1.3-.9 2.1 0 1.3.9 2.6 1.1 2.8.1.2 1.9 3 4.6 4.1 2.2.9 2.7.7 3.2.6.5 0 1.6-.6 1.8-1.3.2-.6.2-1.2.1-1.3-.1-.1-.3-.2-.6-.4l-1.8-.8c-.3-.1-.5-.2-.7.2l-.8 1c-.1.2-.3.2-.6.1-.8-.3-1.5-.7-2.1-1.3-.5-.5-1-1.1-1.4-1.7-.1-.3 0-.4.1-.6l.5-.6c.2-.2.2-.4.3-.6.1-.1 0-.4 0-.5l-.9-1.6Z"
+        fill="currentColor"
+      />
     </svg>
   );
 }
@@ -271,7 +271,7 @@ function PolicyIcon({ type }: { type: PolicyItem["icon"] }) {
     case "invest":
       return <Landmark className="size-[18px] sm:size-[22px] text-[#faab14]" aria-hidden />;
     case "whatsapp":
-      return <CommunityNetworkIcon className="size-[18px] sm:size-[22px] text-[#faab14]" />;
+      return <WhatsAppIcon className="size-[18px] sm:size-[22px] text-[#faab14]" />;
     default:
       return <Shield className="size-[18px] sm:size-[22px] text-[#faab14]" aria-hidden />;
   }
@@ -288,7 +288,7 @@ export function PolicyButtonsGrid({ links }: { links: PolicyItem[] }) {
               <span className="shrink-0">
                 <PolicyIcon type={link.icon} />
               </span>
-              <span className="min-w-0 text-[11px] sm:text-[13px] lg:text-[14px] font-medium leading-[1.25] text-white break-words">
+              <span className="min-w-0 text-[11px] sm:text-[13px] lg:text-[14px] font-bold leading-[1.25] text-kink-gold-bright break-words">
                 {link.label}
               </span>
             </div>
@@ -297,7 +297,7 @@ export function PolicyButtonsGrid({ links }: { links: PolicyItem[] }) {
         );
 
         const className =
-          "flex min-h-[52px] sm:min-h-[58px] py-2 items-center justify-between rounded-[14px] border border-[#faab14]/40 bg-[#0c0c0b] px-2.5 sm:px-4 text-white transition hover:border-[#faab14] hover:bg-[#181815] active:scale-[0.99]";
+          "flex min-h-[52px] sm:min-h-[58px] py-2 items-center justify-between rounded-[14px] border border-[#faab14]/40 bg-[#0c0c0b] px-2.5 sm:px-4 text-kink-gold-bright transition hover:border-[#faab14] hover:bg-[#181815] active:scale-[0.99]";
 
         if (isExternal) {
           return (
@@ -332,9 +332,9 @@ function FooterNotice({
 }) {
   return (
     <div className="py-6 text-center">
-      <p className="text-[12px] sm:text-[14px] font-medium text-kink-mist">{copyright}</p>
+      <p className="text-[12px] sm:text-[14px] font-medium text-kink-gold-bright">{copyright}</p>
       {allRightsReserved && (
-        <p className="mt-1.5 flex items-center justify-center gap-1.5 text-[11px] sm:text-[13px] font-medium text-kink-mist">
+        <p className="mt-1.5 flex items-center justify-center gap-1.5 text-[11px] sm:text-[13px] font-medium text-kink-gold-bright">
           <Lock className="size-3.5 text-[#faab14]" aria-hidden />
           <span>{allRightsReserved}</span>
         </p>
@@ -374,7 +374,7 @@ function SignUpButton({ cta }: { cta: SplashLink }) {
   return (
     <Link
       href={cta.href}
-      className="flex h-[60px] w-full max-w-[347px] items-center justify-center gap-3 rounded-[10px] bg-kink-gold-bright text-[20px] font-bold text-black"
+      className={`${brandStyles.signup} flex h-[48px] w-full max-w-[300px] items-center justify-center gap-2 rounded-[10px] bg-kink-gold-bright text-[17px] font-bold text-black`}
     >
       <UserIcon />
       {cta.label}
@@ -386,7 +386,7 @@ function SignInButton({ cta }: { cta: SplashLink }) {
   return (
     <Link
       href={cta.href}
-      className="flex h-[60px] w-full max-w-[347px] items-center justify-center gap-3 rounded-[10px] border border-kink-amber text-[20px] font-bold text-kink-gold-bright uppercase"
+      className="flex h-[48px] w-full max-w-[300px] items-center justify-center gap-2 rounded-[10px] border border-kink-amber text-[17px] font-bold text-kink-gold-bright uppercase"
     >
       <SignInIcon />
       {cta.label}
@@ -394,11 +394,56 @@ function SignInButton({ cta }: { cta: SplashLink }) {
   );
 }
 
+function MembershipCount({
+  count,
+  label,
+  countries,
+  description,
+}: SplashScreenProps["membership"]) {
+  return (
+    <section className="w-full py-6 text-center" aria-label={label}>
+      <h2
+        className="flex items-center justify-center gap-2 whitespace-nowrap text-[clamp(14px,4.5vw,22px)] font-bold leading-tight text-kink-gold-bright"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        <span aria-hidden="true" className={`${brandStyles.emoji} shrink-0`}>
+          🌍
+        </span>
+        <span>
+          {count} {label}{" "}
+          <span className="mx-1 font-normal" aria-hidden="true">
+            |
+          </span>{" "}
+          {countries}
+        </span>
+      </h2>
+      <p className="mx-auto mt-3 max-w-[440px] text-sm leading-6 text-kink-mist sm:text-base">
+        {description}
+      </p>
+    </section>
+  );
+}
+
+function PlatformOverview({ title, paragraphs }: SplashScreenProps["platformOverview"]) {
+  return (
+    <section className="w-full space-y-4 rounded-2xl border border-kink-amber/30 bg-kink-surface p-5 text-left">
+      <h2 className="text-left text-xl font-bold text-kink-gold-bright">{title}</h2>
+      {paragraphs.map((paragraph) => (
+        <p key={paragraph} className="text-sm leading-6 text-kink-paper">
+          {paragraph}
+        </p>
+      ))}
+    </section>
+  );
+}
+
 export default function SplashScreen({
-  logo,
+  wordmark,
   hero,
   mobileHero,
-  mobileContent,
+  platformOverview,
+  membership,
   downloadCta,
   brand,
   tagline,
@@ -435,7 +480,7 @@ export default function SplashScreen({
       {/* Only the photo portion remains; the poster’s lower copy and buttons are live UI. */}
       <div className="flex min-h-dvh flex-col bg-black lg:hidden">
         <h1 className="sr-only">{brand}</h1>
-        <div className="aspect-[720/630] w-full overflow-hidden">
+        <div className="relative aspect-[720/900] w-full overflow-hidden">
           <Image
             src={mobileHero?.src ?? hero.src}
             alt={mobileHero?.alt ?? hero.alt}
@@ -446,64 +491,46 @@ export default function SplashScreen({
             sizes="100vw"
             className="block h-auto w-full"
           />
+          <div className="absolute inset-x-0 top-0 flex h-[12%] -translate-y-1 items-center justify-between px-3">
+            <Image
+              src={wordmark.src}
+              alt={wordmark.alt}
+              width={wordmark.width}
+              height={wordmark.height}
+              unoptimized
+              preload
+              className={`${brandStyles.wordmarkImage} h-[9vw] max-h-14 w-auto shrink-0`}
+            />
+            <span
+              role="img"
+              aria-label="Adults only, 18 plus"
+              className={`${brandStyles.emoji} text-[7vw] leading-none sm:text-[44px]`}
+            >
+              🔞
+            </span>
+          </div>
         </div>
-        <div className="flex flex-col items-center gap-4 px-5 pb-8 pt-5 sm:px-7">
-          {mobileContent && (
-            <>
-              <div className="text-center">
-                <p className="text-[11px] tracking-[0.3em] text-white">{mobileContent.eyebrow}</p>
-                <h2 className="mt-2 font-serif text-[36px] italic leading-tight text-kink-gold-bright sm:text-[44px]">
-                  {mobileContent.title}
-                </h2>
-                <p className="mx-auto mt-4 max-w-[390px] text-[13px] leading-5 text-white">
-                  {mobileContent.description}
-                </p>
-              </div>
-              <ul className="my-2 grid w-full max-w-[460px] grid-cols-5 divide-x divide-kink-amber/40">
-                {mobileContent.features.map((feature) => {
-                  const Icon = {
-                    people: Users,
-                    heart: Heart,
-                    shield: Shield,
-                    messages: MessageCircle,
-                    crown: Crown,
-                  }[feature.icon];
-                  return (
-                    <li
-                      key={feature.icon}
-                      className="flex flex-col items-center gap-2 px-1 text-center"
-                    >
-                      <Icon size={23} className="text-kink-gold-bright" aria-hidden />
-                      <span className="text-[8px] uppercase leading-[13px] tracking-[0.08em] text-white sm:text-[10px]">
-                        {feature.label}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </>
-          )}
-          <div className="flex w-full max-w-[347px] flex-col gap-3">
+        <div className="flex flex-col items-center gap-4 px-5 pb-8 pt-2 sm:px-7">
+          <div className="flex w-full max-w-[300px] flex-col gap-2.5">
             <SignUpButton cta={signUp} />
             <SignInButton cta={signIn} />
-            <div className="flex justify-center pt-1">
+            <div className="flex justify-center pt-[30px]">
               <DownloadPill cta={downloadCta} compact />
             </div>
           </div>
-          {mobileContent && (
-            <p className="my-2 text-center text-[9px] tracking-[0.2em] text-kink-mist">
-              {mobileContent.footer}
-            </p>
-          )}
+          <div className="w-full max-w-[460px]">
+            <MembershipCount {...membership} />
+            <PlatformOverview {...platformOverview} />
+          </div>
           <nav className="mt-2 w-full max-w-[347px] rounded-[20px] border border-kink-amber bg-kink-surface px-[22px]">
             {navLinks.map((link, i) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`flex h-[52px] items-center justify-between text-[15px] font-extrabold tracking-[0.3px] text-kink-paper ${i > 0 ? "border-t border-kink-divider" : ""}`}
+                className={`flex h-[52px] items-center justify-between text-[15px] font-extrabold tracking-[0.3px] text-kink-gold-bright transition hover:bg-white/5 ${i > 0 ? "border-t border-kink-divider" : ""}`}
               >
                 {link.label}
-                <span className="text-white">
+                <span className="text-kink-gold-bright">
                   <ChevronIcon />
                 </span>
               </Link>
@@ -533,8 +560,23 @@ export default function SplashScreen({
             />
           </div>
           <div className="relative z-10 flex items-start justify-between pl-[94px] pr-[93px] pt-[37px]">
-            <Image src={logo.src} alt={logo.alt} width={98} height={98} priority unoptimized />
-            <DownloadPill cta={downloadCta} />
+            <div className="flex items-center gap-4">
+              <Image
+                src={wordmark.src}
+                alt={wordmark.alt}
+                width={wordmark.width}
+                height={wordmark.height}
+                unoptimized
+                className={`${brandStyles.wordmarkImage} h-[64px] w-auto`}
+              />
+            </div>
+            <span
+              role="img"
+              aria-label="Adults only, 18 plus"
+              className={`${brandStyles.emoji} text-5xl`}
+            >
+              🔞
+            </span>
           </div>
           <div className="relative z-10 w-full max-w-[51.85%] pl-[64px] xl:pl-[118px] pr-8">
             <h1 className="mt-[120px] xl:mt-[160px] text-[72px] xl:text-[96px] font-extrabold leading-normal text-kink-gold-bright">
@@ -567,7 +609,7 @@ export default function SplashScreen({
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="flex h-[60px] min-w-[200px] xl:min-w-[216px] items-center justify-between gap-6 rounded-[10px] border border-kink-amber px-[24px] text-[18px] xl:text-[20px] font-bold text-white transition hover:bg-white/5"
+                  className="flex h-[60px] min-w-[200px] xl:min-w-[216px] items-center justify-between gap-6 rounded-[10px] border border-kink-amber px-[24px] text-[18px] xl:text-[20px] font-bold text-kink-gold-bright transition hover:bg-white/5"
                 >
                   {link.label}
                   <span className="text-kink-gold-bright">
@@ -576,6 +618,11 @@ export default function SplashScreen({
                 </Link>
               ))}
             </nav>
+
+            <div className="mt-10 max-w-[732px]">
+              <MembershipCount {...membership} />
+              <PlatformOverview {...platformOverview} />
+            </div>
 
             {policyLinks && policyLinks.length > 0 && (
               <div className="mt-[40px] max-w-[732px]">

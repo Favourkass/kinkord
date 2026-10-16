@@ -1,15 +1,22 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { communityStatsService } from "@/services/communityStats.service";
+import { act, cleanup, renderHook } from "@testing-library/react";
 import { ageGateService } from "@/services/ageGate.service";
 import { useLandingPresenter } from "./useLandingPresenter";
 import { BeforeInstallPromptEvent, pwaService } from "@/services/pwa.service";
 
 describe("useLandingPresenter", () => {
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
   beforeEach(() => {
     ageGateService.reset();
     localStorage.clear();
     vi.restoreAllMocks();
+    vi.spyOn(communityStatsService, "read").mockResolvedValue(null);
+    vi.spyOn(document, "hidden", "get").mockReturnValue(false);
     // Reset shared singleton state between tests.
     pwaService.setDeferredPrompt(null);
     pwaService.closeInstallGuide();
@@ -23,7 +30,7 @@ describe("useLandingPresenter", () => {
   it("provides landing VM data merged with PWA state and onDownload handler", () => {
     const { result } = renderHook(() => useLandingPresenter());
 
-    expect(result.current.brand).toBe("KINKORD");
+    expect(result.current.brand).toBe("Kinkord");
     expect(result.current.isInstalled).toBe(false);
     expect(result.current.downloadCta.label).toBe("Download Kinkord");
     expect(result.current.ageDisclaimer.lead).toBe("18+ Only.");
@@ -72,5 +79,37 @@ describe("useLandingPresenter", () => {
     });
 
     expect(result.current.showAgeGate).toBe(false);
+  });
+  it("uses the live count and refreshes only while the page is visible", async () => {
+    vi.useFakeTimers();
+    const read = vi.mocked(communityStatsService.read).mockResolvedValue({ members: 12487 });
+    const { result, unmount } = renderHook(() => useLandingPresenter());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(result.current.membership.count).toBe("12,487");
+    vi.spyOn(document, "hidden", "get").mockReturnValue(true);
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(read).toHaveBeenCalledTimes(1);
+    vi.spyOn(document, "hidden", "get").mockReturnValue(false);
+    read.mockResolvedValue({ members: 12488 });
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(result.current.membership.count).toBe("12,488");
+    unmount();
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(read).toHaveBeenCalledTimes(2);
+  });
+  it("shows an honest placeholder when the count is unavailable", async () => {
+    const { result } = renderHook(() => useLandingPresenter());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(result.current.membership.count).toBe("—");
   });
 });
