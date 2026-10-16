@@ -69,7 +69,6 @@ export default function SuggestedFriends(p: SuggestedFriendsProps) {
                 type="button"
                 onClick={() => p.onAdd(r)}
                 disabled={r.busy}
-                aria-pressed={r.isFollowing}
                 className="rounded-[6px] bg-[#1f2937] px-[10px] py-[4px] text-[11px] font-bold text-kink-gold-bright disabled:opacity-60"
               >
                 {r.actionLabel}

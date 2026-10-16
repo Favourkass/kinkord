@@ -1,13 +1,7 @@
 import { index, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
-/**
- * Social graph: `followerId` follows `followingId`.
- *
- * "Friends" is not a separate model — two members are friends when they follow
- * each other (mutual follows), and "mutual friends" are the friends two members
- * have in common. One table keeps Follow the single social action everywhere.
- */
+/** One-way follow graph. Friend requests and accepted friendships live separately. */
 export const follow = pgTable(
   "follow",
   {

@@ -4,6 +4,7 @@ import type { NextConfig } from "next";
 const PRIVATE_SECTIONS = [
   "home",
   "messages",
+  "friends",
   "members",
   "u",
   "p",

@@ -43,7 +43,7 @@ export class PublicProfilesController {
     return this.members.media(handle.data, req.user.id, q.data.filter, q.data.page, q.data.limit);
   }
 
-  /** People tab: friends (mutual follows), mutual-with-viewer, followers, following or suggested. */
+  /** People tab: accepted friends, mutual-with-viewer, followers, following or suggested. */
   @Get(":username/friends")
   friends(
     @Req() req: AuthedRequest,

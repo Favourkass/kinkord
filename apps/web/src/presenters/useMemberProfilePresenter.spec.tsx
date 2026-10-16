@@ -9,6 +9,17 @@ const replace = vi.fn();
 const router = { push: vi.fn(), replace };
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 
+vi.mock("@/services/friendship.service", () => ({
+  friendshipService: {
+    change: (name: string, action: string) => {
+      const member = `/friendships/${name}`;
+      return action === "dismiss" || action === "remove"
+        ? apiDel(action === "dismiss" ? `${member}/request` : member)
+        : apiPost(action === "accept" ? `${member}/accept` : member, {});
+    },
+  },
+}));
+
 const apiGet = vi.fn();
 const apiPost = vi.fn();
 const apiDel = vi.fn();
@@ -337,11 +348,14 @@ describe("useMemberProfilePresenter", () => {
       displayName: "Leather Lace",
       handle: "@leatherlace",
     });
-    expect(result.current.suggested.rows[0].actionLabel).toBe("Add");
+    expect(result.current.suggested.rows[0].actionLabel).toBe("Add Friend");
+    apiPost.mockResolvedValueOnce({ friendship: "outgoing" });
     act(() => result.current.suggested.onAdd(result.current.suggested.rows[0]));
-    expect(result.current.suggested.rows[0].isFollowing).toBe(true);
-    expect(result.current.suggested.rows[0].actionLabel).toBe("Added");
-    await waitFor(() => expect(apiPost).toHaveBeenCalledWith("/follows/leatherlace", {}));
+    await waitFor(() =>
+      expect(result.current.suggested.rows[0].actionLabel).toBe("Cancel request"),
+    );
+    expect(result.current.suggested.rows[0].isFollowing).toBe(false);
+    expect(apiPost).toHaveBeenCalledWith("/friendships/leatherlace", {});
   });
 
   it("offers Follow, not Add, when the suggestion is the official organization", async () => {
@@ -353,7 +367,7 @@ describe("useMemberProfilePresenter", () => {
       actionLabel: "Follow",
     });
     act(() => result.current.suggested.onAdd(result.current.suggested.rows[0]));
-    expect(result.current.suggested.rows[0].actionLabel).toBe("Following");
+    await waitFor(() => expect(result.current.suggested.rows[0].actionLabel).toBe("Following"));
     await waitFor(() => expect(apiPost).toHaveBeenCalledWith("/follows/leatherlace", {}));
   });
 
@@ -420,5 +434,17 @@ describe("useMemberProfilePresenter", () => {
     apiGet.mockRejectedValueOnce(new Error("boom"));
     const broken = renderHook(() => useMemberProfilePresenter("nene"));
     await waitFor(() => expect(broken.result.current.status).toMatch(/went wrong/));
+  });
+  it("adds a friend without changing follow state and refreshes the server friendship status", async () => {
+    const { result } = renderHook(() => useMemberProfilePresenter("nene"));
+    await waitFor(() => expect(result.current.vm).not.toBeNull());
+    expect(result.current.friendAction?.label).toBe("Add Friend");
+    apiPost.mockResolvedValueOnce({ friendship: "outgoing" });
+    apiGet.mockResolvedValueOnce({ ...profile, friendship: "outgoing" });
+    act(() => result.current.friendAction?.onPrimary());
+    await waitFor(() => expect(result.current.friendAction?.label).toBe("Cancel request"));
+    expect(apiPost).toHaveBeenCalledWith("/friendships/nene", {});
+    expect(result.current.vm?.isFollowing).toBe(false);
+    expect(apiPost).not.toHaveBeenCalledWith("/follows/nene", {});
   });
 });

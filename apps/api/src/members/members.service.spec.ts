@@ -104,6 +104,7 @@ const makeService = () => {
     followers,
     following,
     areFriends,
+    friendshipState: vi.fn(async () => "none"),
   } as unknown as FollowsService;
   const postCountsFor = vi.fn(async () => new Map<string, number>());
   const postMediaFor = vi.fn(async () => ({ rows: [], total: 0 }));
@@ -452,6 +453,7 @@ describe("MembersService.friends", () => {
         {
           userId: "u3",
           username: "kay",
+          friendship: "none",
           displayName: "Kay",
           avatarUrl: "https://s3/avatars/kay.jpg",
           age: null,
@@ -639,6 +641,7 @@ describe("MembersService people tabs + media (profile rebuild, 2026-09-12)", () 
     expect(page.items[0]).toEqual({
       userId: "u5",
       username: "ada",
+      friendship: "none",
       displayName: "Ada",
       avatarUrl: "https://s3/avatars/u5/a.jpg",
       age: null,

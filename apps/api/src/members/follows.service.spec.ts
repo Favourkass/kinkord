@@ -155,7 +155,7 @@ describe("FollowsService friends lists", () => {
     expect(select).toHaveBeenCalledTimes(2);
   });
 
-  it("lists mutual friends, which the viewer follows by definition", async () => {
+  it("lists mutual friends independently of follows", async () => {
     const { db, select } = makeDb();
     select.mockReturnValueOnce(
       chain([{ userId: "u4", username: "vee", displayName: "Vee", avatarKey: "a.jpg" }]),
@@ -169,7 +169,7 @@ describe("FollowsService friends lists", () => {
           username: "vee",
           displayName: "Vee",
           avatarKey: "a.jpg",
-          isFollowing: true,
+          isFollowing: false,
           silver: false,
         },
       ],
