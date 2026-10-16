@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { FRIENDSHIP_COPY } from "@/constants/friendship";
+import { friendshipActions, type FriendshipAction } from "@/domain/friendship";
+import { friendshipService } from "@/services/friendship.service";
 import { MEMBERS_COPY } from "@/constants/members";
 import { Routes } from "@/constants/Routes";
 import { kinkcoinsService } from "@/services/kinkcoins.service";
@@ -106,6 +109,8 @@ export function useMemberProfilePresenter(
   // Deep-linkable via ?tab=…; About stays the default until posts land.
   const [tab, setTab] = useState<ProfileTabKey>(isTabKey(initialTab) ? initialTab : "about");
   const [followBusy, setFollowBusy] = useState(false);
+  const [friendBusy, setFriendBusy] = useState(false);
+  const [friendError, setFriendError] = useState<string | null>(null);
   const [peopleTab, setPeopleTab] = useState<FriendsTab>("all");
   const [people, setPeople] = useState<PeopleOutcome | null>(null);
   const [suggested, setSuggested] = useState<SuggestOutcome | null>(null);
@@ -220,6 +225,27 @@ export function useMemberProfilePresenter(
       .finally(() => setFollowBusy(false));
   }, [pm, followBusy]);
 
+  const changeFriendship = useCallback(
+    async (action: FriendshipAction) => {
+      if (!pm?.username || pm.isSelf || friendBusy || !username) return;
+      setFriendBusy(true);
+      setFriendError(null);
+      try {
+        await friendshipService.change(pm.username, action);
+        const fresh = await membersApi.profile(pm.username);
+        setOutcome((previous) =>
+          previous?.username === username ? { ...previous, pm: fresh } : previous,
+        );
+        setPeople(null);
+      } catch {
+        setFriendError(FRIENDSHIP_COPY.error);
+      } finally {
+        setFriendBusy(false);
+      }
+    },
+    [pm, username, friendBusy],
+  );
+
   const markBusy = (userId: string, busy: boolean) =>
     setRowBusy((prev) => {
       const next = new Set(prev);
@@ -243,20 +269,50 @@ export function useMemberProfilePresenter(
       .finally(() => markBusy(userId, false));
   }, []);
 
-  /** "Add" on a suggested friend = follow (optimistic, reverts on failure). */
-  const addSuggested = useCallback((row: FriendRowVM) => {
-    if (!row.username) return;
-    const { userId, username: handle, isFollowing } = row;
-    const flip = (s: SuggestOutcome | null) =>
-      s
-        ? { ...s, items: s.items.map((i) => (i.userId === userId ? toggleFollowOnFriend(i) : i)) }
-        : s;
-    markBusy(userId, true);
-    setSuggested(flip);
-    void (isFollowing ? membersApi.unfollow(handle) : membersApi.follow(handle))
-      .catch(() => setSuggested(flip))
-      .finally(() => markBusy(userId, false));
-  }, []);
+  const addSuggested = useCallback(
+    (row: FriendRowVM) => {
+      if (!row.username || rowBusy.has(row.userId)) return;
+      if (row.organization) {
+        markBusy(row.userId, true);
+        void (row.isFollowing ? membersApi.unfollow(row.username) : membersApi.follow(row.username))
+          .then(() =>
+            setSuggested((previous) =>
+              previous
+                ? {
+                    ...previous,
+                    items: previous.items.map((item) =>
+                      item.userId === row.userId ? toggleFollowOnFriend(item) : item,
+                    ),
+                  }
+                : previous,
+            ),
+          )
+          .catch(() => setFriendError(FRIENDSHIP_COPY.error))
+          .finally(() => markBusy(row.userId, false));
+        return;
+      }
+      const current = currentSuggested?.items.find((item) => item.userId === row.userId);
+      const action = friendshipActions(current?.friendship ?? "none", FRIENDSHIP_COPY).action;
+      markBusy(row.userId, true);
+      void friendshipService
+        .change(row.username, action)
+        .then((result) =>
+          setSuggested((previous) =>
+            previous
+              ? {
+                  ...previous,
+                  items: previous.items.map((item) =>
+                    item.userId === row.userId ? { ...item, friendship: result.friendship } : item,
+                  ),
+                }
+              : previous,
+          ),
+        )
+        .catch(() => setFriendError(FRIENDSHIP_COPY.error))
+        .finally(() => markBusy(row.userId, false));
+    },
+    [currentSuggested, rowBusy],
+  );
 
   const share = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -361,9 +417,7 @@ export function useMemberProfilePresenter(
             ? row.isFollowing
               ? copy.following
               : copy.follow
-            : row.isFollowing
-              ? copy.desktop.added
-              : copy.desktop.add,
+            : friendshipActions(f.friendship ?? "none", FRIENDSHIP_COPY).label,
         };
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -371,6 +425,21 @@ export function useMemberProfilePresenter(
   );
   const tiles = useMemo(() => toMediaTiles(currentMedia?.items ?? []), [currentMedia]);
   const lightboxTile = lightbox ? (tiles.find((t) => t.id === lightbox.id) ?? null) : null;
+
+  const friendActions = friendshipActions(pm?.friendship ?? "none", FRIENDSHIP_COPY);
+  const friendAction =
+    pm && !pm.isSelf && !organization
+      ? {
+          label: friendActions.label,
+          secondaryLabel: friendActions.secondaryLabel,
+          busy: friendBusy,
+          error: friendError,
+          onPrimary: () => void changeFriendship(friendActions.action),
+          onSecondary: () => {
+            if (friendActions.secondaryAction) void changeFriendship(friendActions.secondaryAction);
+          },
+        }
+      : undefined;
 
   const stats = vm?.stats;
   const peopleLabel = (key: FriendsTab) =>
@@ -420,6 +489,9 @@ export function useMemberProfilePresenter(
     tabs,
     toggleFollow,
     followBusy,
+    friendAction,
+    friendRequestsHref: Routes.friendRequests,
+    friendRequestsLabel: FRIENDSHIP_COPY.title,
     /**
      * The header's Follow, handed to the Posts tab for the cards that offer one
      * (the organization's): one state, so the header and its posts always agree.

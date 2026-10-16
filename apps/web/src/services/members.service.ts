@@ -20,6 +20,7 @@ export interface StateCountPM {
 }
 
 export interface FriendPM {
+  friendship?: import("@/domain/friendship").FriendshipState;
   userId: string;
   username: string | null;
   displayName: string;

@@ -186,6 +186,35 @@ describe("PushService notifications", () => {
     expect(sent()).toMatchObject({ body: "raven followed you", url: "/u/raven" });
   });
 
+  it("notifies friend requests separately from follows and links to received requests", async () => {
+    const { db } = queuedDb([
+      [{ username: "raven", name: "Raven", displayName: null }],
+      [sub("s1")],
+      [KEYS],
+    ]);
+    new PushService(db, inbox()).friendRequest("u1", "u2", "request-1");
+    await flush();
+    expect(inboxRecord).toHaveBeenCalledWith("u2", {
+      type: "friend_request",
+      actorId: "u1",
+      subjectId: "request-1",
+    });
+    expect(sent()).toMatchObject({
+      body: "raven sent you a friend request",
+      url: "/friends/requests",
+    });
+  });
+  it("tells the requester when their request is accepted", async () => {
+    const { db } = queuedDb([
+      [{ username: "raven", name: "Raven", displayName: null }],
+      [sub("s1")],
+      [KEYS],
+    ]);
+    new PushService(db, inbox()).friendAccepted("u1", "u2", "request-1");
+    await flush();
+    expect(sent()).toMatchObject({ body: "raven accepted your friend request", url: "/u/raven" });
+  });
+
   it("tells an author about a comment, but not about their own", async () => {
     const own = queuedDb([]);
     new PushService(own.db, inbox()).newComment("p1", "u1", "u1");

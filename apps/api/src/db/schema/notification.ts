@@ -3,6 +3,8 @@ import { user } from "./auth";
 
 export type NotificationType =
   | "message"
+  | "friend_request"
+  | "friend_accepted"
   | "follow"
   | "comment"
   | "mention"

@@ -1,13 +1,14 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, count, desc, eq, ne, sql } from "drizzle-orm";
+import { and, count, desc, eq, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { Db, DRIZZLE } from "../db/db.module";
 import { PushService } from "../push/push.service";
-import { follow, profile, user } from "../db/schema";
+import { follow, friendship, profile, user } from "../db/schema";
+import { acceptedFriendship, friendshipState as stateOf, orderedPair } from "./friendship-policy";
 import { silverCheck } from "../subscriptions/plans";
 
 export interface FollowCounts {
-  /** Mutual follows — the product's definition of "friends". */
+  /** Accepted friendships, including the legacy friendships preserved at migration. */
   friends: number;
   followers: number;
   following: number;
@@ -15,6 +16,7 @@ export interface FollowCounts {
 
 /** One row of a friends list (avatar still an S3 key; the members service presigns it). */
 export interface FriendRow {
+  friendship?: import("./friendship-policy").FriendshipState;
   userId: string;
   username: string | null;
   displayName: string;
@@ -36,10 +38,7 @@ export interface FriendsPage {
   total: number;
 }
 
-/**
- * Follow is the single social action. Following is one-directional; when two
- * members follow each other they are friends. No request/accept flow.
- */
+/** Following and friendship are independent: friend reads use only accepted pairs. */
 @Injectable()
 export class FollowsService {
   constructor(
@@ -93,86 +92,91 @@ export class FollowsService {
     return Number(row?.c ?? 0);
   }
 
-  /** Friends = members `userId` follows who also follow `userId` back. */
+  async friendshipState(viewerId: string, targetId: string) {
+    if (viewerId === targetId) return "none" as const;
+    const pair = orderedPair(viewerId, targetId);
+    const [row] = await this.db
+      .select({ status: friendship.status, requesterId: friendship.requesterId })
+      .from(friendship)
+      .where(and(eq(friendship.userA, pair.userA), eq(friendship.userB, pair.userB)))
+      .limit(1);
+    return stateOf(row, viewerId);
+  }
+
   async friendsCount(userId: string): Promise<number> {
-    const back = alias(follow, "back");
     const [row] = await this.db
       .select({ c: count() })
-      .from(follow)
-      .innerJoin(
-        back,
-        and(eq(back.followerId, follow.followingId), eq(back.followingId, follow.followerId)),
-      )
-      .where(eq(follow.followerId, userId));
+      .from(friendship)
+      .where(
+        and(
+          eq(friendship.status, "accepted"),
+          or(eq(friendship.userA, userId), eq(friendship.userB, userId)),
+        ),
+      );
     return Number(row?.c ?? 0);
   }
 
-  /** Friends = they follow each other. Used to gate friends-only profiles. */
   async areFriends(a: string, b: string): Promise<boolean> {
     if (a === b) return false;
-    const back = alias(follow, "back");
+    const pair = orderedPair(a, b);
     const [row] = await this.db
       .select({ c: count() })
-      .from(follow)
-      .innerJoin(
-        back,
-        and(eq(back.followerId, follow.followingId), eq(back.followingId, follow.followerId)),
-      )
-      .where(and(eq(follow.followerId, a), eq(follow.followingId, b)));
+      .from(friendship)
+      .where(
+        and(
+          eq(friendship.userA, pair.userA),
+          eq(friendship.userB, pair.userB),
+          eq(friendship.status, "accepted"),
+        ),
+      );
     return Number(row?.c ?? 0) > 0;
   }
 
-  /**
-   * Friends of `userId` (mutual follows), newest friendship first, with whether the
-   * viewer already follows each of them.
-   */
   async friends(
     userId: string,
     viewerId: string,
     limit: number,
     offset: number,
   ): Promise<FriendsPage> {
-    const back = alias(follow, "back");
     const viewerFollow = alias(follow, "viewer_follow");
+    const peer = sql<string>`case when ${friendship.userA} = ${userId} then ${friendship.userB} else ${friendship.userA} end`;
     const rows = await this.db
       .select({
         userId: user.id,
         username: user.username,
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
-
         dateOfBirth: profile.dateOfBirth,
         gender: profile.gender,
         city: profile.city,
         state: profile.state,
         country: profile.country,
         silver: silverCheck(user.id),
-
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
       })
-      .from(follow)
-      .innerJoin(
-        back,
-        and(eq(back.followerId, follow.followingId), eq(back.followingId, follow.followerId)),
-      )
-      .innerJoin(user, eq(user.id, follow.followingId))
+      .from(friendship)
+      .innerJoin(user, eq(user.id, peer))
       .innerJoin(profile, eq(profile.userId, user.id))
       .leftJoin(
         viewerFollow,
         and(eq(viewerFollow.followerId, viewerId), eq(viewerFollow.followingId, user.id)),
       )
-      .where(eq(follow.followerId, userId))
-      .orderBy(desc(back.createdAt))
+      .where(
+        and(
+          eq(friendship.status, "accepted"),
+          or(eq(friendship.userA, userId), eq(friendship.userB, userId)),
+        ),
+      )
+      .orderBy(desc(friendship.acceptedAt))
       .limit(limit)
       .offset(offset);
-    const total = await this.friendsCount(userId);
     return {
       items: rows.map((r) => ({
         ...r,
         isFollowing: Boolean(r.isFollowing),
         silver: Boolean(r.silver),
       })),
-      total,
+      total: await this.friendsCount(userId),
     };
   }
 
@@ -266,63 +270,69 @@ export class FollowsService {
     };
   }
 
-  /** Friends `userId` and the viewer have in common. The viewer follows all of them by definition. */
+  /** Accepted friends in common; follow state remains independent. */
   async mutualFriends(
     userId: string,
     viewerId: string,
     limit: number,
     offset: number,
   ): Promise<FriendsPage> {
-    const back = alias(follow, "back");
-    const vf = alias(follow, "viewer_forward");
-    const vb = alias(follow, "viewer_back");
-    const base = () =>
-      this.db
-        .select({
-          userId: user.id,
-          username: user.username,
-          displayName: profile.displayName,
-          avatarKey: profile.avatarKey,
-          dateOfBirth: profile.dateOfBirth,
-          gender: profile.gender,
-          city: profile.city,
-          state: profile.state,
-          country: profile.country,
-          silver: silverCheck(user.id),
-        })
-        .from(follow)
-        .innerJoin(
-          back,
-          and(eq(back.followerId, follow.followingId), eq(back.followingId, follow.followerId)),
-        )
-        .innerJoin(vf, and(eq(vf.followerId, viewerId), eq(vf.followingId, follow.followingId)))
-        .innerJoin(vb, and(eq(vb.followerId, follow.followingId), eq(vb.followingId, viewerId)))
-        .innerJoin(user, eq(user.id, follow.followingId))
-        .innerJoin(profile, eq(profile.userId, user.id))
-        .where(and(eq(follow.followerId, userId), ne(follow.followingId, viewerId)));
-    const rows = await base().orderBy(desc(back.createdAt)).limit(limit).offset(offset);
-    const total = await this.mutualFriendsCount(userId, viewerId);
+    if (userId === viewerId) return { items: [], total: 0 };
+    const viewerFollow = alias(follow, "viewer_follow");
+    const rows = await this.db
+      .select({
+        userId: user.id,
+        username: user.username,
+        displayName: profile.displayName,
+        avatarKey: profile.avatarKey,
+        dateOfBirth: profile.dateOfBirth,
+        gender: profile.gender,
+        city: profile.city,
+        state: profile.state,
+        country: profile.country,
+        silver: silverCheck(user.id),
+        isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
+      })
+      .from(user)
+      .innerJoin(profile, eq(profile.userId, user.id))
+      .leftJoin(
+        viewerFollow,
+        and(eq(viewerFollow.followerId, viewerId), eq(viewerFollow.followingId, user.id)),
+      )
+      .where(
+        and(
+          acceptedFriendship(userId, user.id),
+          acceptedFriendship(viewerId, user.id),
+          ne(user.id, viewerId),
+          ne(user.id, userId),
+        ),
+      )
+      .orderBy(desc(user.createdAt))
+      .limit(limit)
+      .offset(offset);
     return {
-      items: rows.map((r) => ({ ...r, isFollowing: true, silver: Boolean(r.silver) })),
-      total,
+      items: rows.map((r) => ({
+        ...r,
+        isFollowing: Boolean(r.isFollowing),
+        silver: Boolean(r.silver),
+      })),
+      total: await this.mutualFriendsCount(userId, viewerId),
     };
   }
 
   async mutualFriendsCount(userId: string, viewerId: string): Promise<number> {
     if (userId === viewerId) return 0;
-    const back = alias(follow, "back");
-    const vf = alias(follow, "viewer_forward");
-    const vb = alias(follow, "viewer_back");
     const [row] = await this.db
       .select({ c: count() })
-      .from(follow)
-      .innerJoin(
-        back,
-        and(eq(back.followerId, follow.followingId), eq(back.followingId, follow.followerId)),
-      )
-      .innerJoin(vf, and(eq(vf.followerId, viewerId), eq(vf.followingId, follow.followingId)))
-      .innerJoin(vb, and(eq(vb.followerId, follow.followingId), eq(vb.followingId, viewerId)))
-      .where(and(eq(follow.followerId, userId), ne(follow.followingId, viewerId)));
+      .from(user)
+      .where(
+        and(
+          acceptedFriendship(userId, user.id),
+          acceptedFriendship(viewerId, user.id),
+          ne(user.id, viewerId),
+          ne(user.id, userId),
+        ),
+      );
     return Number(row?.c ?? 0);
   }
 

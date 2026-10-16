@@ -163,6 +163,36 @@ export class PushService {
     });
   }
 
+  friendRequest(requesterId: string, recipientId: string, requestId: string): void {
+    this.friendActivity("friend_request", requesterId, recipientId, requestId);
+  }
+
+  friendAccepted(acceptorId: string, requesterId: string, requestId: string): void {
+    this.friendActivity("friend_accepted", acceptorId, requesterId, requestId);
+  }
+
+  private friendActivity(
+    type: "friend_request" | "friend_accepted",
+    actorId: string,
+    recipientId: string,
+    requestId: string,
+  ): void {
+    if (actorId === recipientId) return;
+    this.notify(async () => {
+      const who = await this.member(actorId);
+      return {
+        to: recipientId,
+        event: { type, actorId, subjectId: requestId },
+        message: {
+          title: "Kinkord",
+          body: `${who.name} ${type === "friend_request" ? "sent you a friend request" : "accepted your friend request"}`,
+          url: notificationUrl(type, requestId, who.username),
+          tag: `${type}-${requestId}`,
+        },
+      };
+    });
+  }
+
   newFollower(followerId: string, followedId: string): void {
     if (followerId === followedId) return;
     this.notify(async () => {

@@ -100,6 +100,8 @@ const REPEATS: Partial<
 > = {
   like: { key: (e) => `like:${e.actorId}:${e.subjectId}`, on: "skip" },
   repost: { key: (e) => `repost:${e.actorId}:${e.subjectId}`, on: "skip" },
+  friend_request: { key: (e) => `friend_request:${e.actorId}:${dayOf(e)}`, on: "skip" },
+  friend_accepted: { key: (e) => `friend_accepted:${e.subjectId}`, on: "skip" },
   follow: { key: (e) => `follow:${e.actorId}:${dayOf(e)}`, on: "skip" },
   message: { key: (e) => `message:${e.subjectId}`, on: "bump" },
   test: { key: () => "test", on: "bump" },
@@ -110,6 +112,8 @@ const REPEATS: Partial<
 /** Words a search can use to find a kind of notification, besides names. */
 const SEARCH_WORDS: Record<NotificationType, readonly string[]> = {
   message: ["message", "messages", "chat"],
+  friend_request: ["friend", "friends", "request", "requests"],
+  friend_accepted: ["friend", "friends", "accepted"],
   follow: ["follow", "followed", "follower", "followers"],
   comment: ["comment", "commented", "comments"],
   mention: ["mention", "mentioned", "mentions"],
@@ -137,6 +141,9 @@ export function notificationUrl(
   switch (type) {
     case "message":
       return subjectId ? `/messages/${subjectId}` : "/messages";
+    case "friend_request":
+      return "/friends/requests";
+    case "friend_accepted":
     case "follow":
       return actorUsername ? `/u/${encodeURIComponent(actorUsername)}` : "/notifications";
     case "report":

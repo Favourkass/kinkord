@@ -1,3 +1,4 @@
+import FriendshipAction, { type FriendshipActionProps } from "./FriendshipAction";
 import Link from "next/link";
 import CoinBalance from "@/components/kinkcoins/CoinBalance";
 import type { CoinBalanceVM } from "@/domain/kinkcoins";
@@ -35,6 +36,9 @@ export interface ProfileSideCardProps {
   silverHref: string;
   onToggleFollow: () => void;
   followBusy: boolean;
+  friendAction?: FriendshipActionProps;
+  friendRequestsHref?: string;
+  friendRequestsLabel?: string;
 }
 
 /** Figma desktop profile left column (987:5489): 340px card with cover, avatar, details and actions. */
@@ -48,6 +52,9 @@ export default function ProfileSideCard({
   silverHref,
   onToggleFollow,
   followBusy,
+  friendAction,
+  friendRequestsHref,
+  friendRequestsLabel,
 }: ProfileSideCardProps) {
   const organization = vm.accountType === "organization";
   return (
@@ -214,6 +221,7 @@ export default function ProfileSideCard({
               {vm.isFollowing ? labels.following : labels.follow}
             </button>
           )}
+          {friendAction && <FriendshipAction {...friendAction} />}
           <a
             href={messageHref}
             className="flex flex-1 items-center justify-center gap-[8px] rounded-[12px] border border-[#1f2937] bg-[#1f2937] py-[12px] text-[13px] font-bold text-[#f9fafb]"
@@ -222,6 +230,14 @@ export default function ProfileSideCard({
             {labels.message}
           </a>
         </div>
+        {vm.isSelf && friendRequestsHref && (
+          <Link
+            href={friendRequestsHref}
+            className="block text-center text-sm font-semibold text-kink-gold-bright underline"
+          >
+            {friendRequestsLabel}
+          </Link>
+        )}
       </div>
     </section>
   );

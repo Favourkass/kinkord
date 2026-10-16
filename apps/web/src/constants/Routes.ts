@@ -1,4 +1,5 @@
 export const Routes = {
+  friendRequests: "/friends/requests",
   home: "/",
   kinkopedia: "/kinkopedia",
   about: "/about",
