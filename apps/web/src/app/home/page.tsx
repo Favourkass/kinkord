@@ -32,6 +32,8 @@ export default function HomePage() {
         onLogout: home.logout,
         links: nav.links,
         labels: nav.labels,
+        drawerNavigation: nav.drawer,
+        verificationEntry: home.verificationEntry,
       }}
       tabs={{ label: FEED_COPY.tabsLabel, tabs: feed.tabs, onSelect: feed.selectTab }}
       loading={feed.loading}

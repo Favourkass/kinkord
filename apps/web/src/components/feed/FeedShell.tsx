@@ -5,7 +5,13 @@ import MaskIcon from "@/components/app/MaskIcon";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import DesktopSidebar from "@/components/app/DesktopSidebar";
 import MobileTabBar from "@/components/app/MobileTabBar";
-import type { AppNav, AppNavLabels, AppNavLinks, AppTab } from "@/components/app/nav";
+import type {
+  AppNav,
+  AppNavLabels,
+  AppNavLinks,
+  AppTab,
+  DrawerNavigation,
+} from "@/components/app/nav";
 import SidebarDrawer from "@/components/app/SidebarDrawer";
 
 export interface FeedShellProps {
@@ -26,6 +32,10 @@ export interface FeedShellProps {
   onLogout: () => void;
   links: AppNavLinks;
   labels: AppNavLabels;
+  /** The phone drawer's account menu. */
+  drawerNavigation: DrawerNavigation;
+  /** Whether the drawer lists Verification: only while it's open to the member. */
+  verificationEntry?: boolean;
   /** Desktop right rail; hidden on a phone, where the feed carries it inline. Null on the list screens. */
   aside: ReactNode;
   children: ReactNode;
@@ -59,6 +69,8 @@ export default function FeedShell({
   onLogout,
   links,
   labels,
+  drawerNavigation,
+  verificationEntry,
   aside,
   children,
 }: FeedShellProps) {
@@ -131,8 +143,11 @@ export default function FeedShell({
           name={name}
           avatarUrl={avatarUrl}
           membersCount={membersCount}
+          verificationEntry={verificationEntry}
+          active={active}
           links={links}
           labels={labels}
+          navigation={drawerNavigation}
           onLogout={onLogout}
         />
       </div>

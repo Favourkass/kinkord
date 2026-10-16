@@ -37,12 +37,14 @@ vi.mock("@/services/apiClient", () => {
 const me = { id: "u1", name: "Tega Maxwell", username: "tegamaxwell" };
 const profile = { displayName: "SIR T", avatarUrl: "https://s3/avatar.jpg" };
 const stats = { members: 128 };
+let verification = { available: false, withdrawable: false, status: "not_started" };
 
 const routeGet = (path: unknown) => {
   if (path === "/notifications/unread-count") return Promise.resolve({ count: 0 });
   if (path === "/me") return Promise.resolve(me);
   if (path === "/profile") return Promise.resolve(profile);
   if (path === "/community/stats") return Promise.resolve(stats);
+  if (path === "/verification/bronze/status") return Promise.resolve(verification);
   return Promise.reject(new Error(`unexpected ${String(path)}`));
 };
 
@@ -97,6 +99,21 @@ describe("useHomePresenter", () => {
     const { result } = renderHook(() => useHomePresenter());
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
     expect(result.current.error).toBeNull();
+  });
+
+  it("lists Verification in the drawer only while it's open, asking once, when the drawer opens", async () => {
+    verification = { available: true, withdrawable: false, status: "not_started" };
+    const { result } = renderHook(() => useHomePresenter());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const asked = () => apiGet.mock.calls.filter(([p]) => p === "/verification/bronze/status");
+    expect(asked()).toHaveLength(0);
+    expect(result.current.verificationEntry).toBe(false);
+    act(() => result.current.openDrawer());
+    await waitFor(() => expect(result.current.verificationEntry).toBe(true));
+    act(() => result.current.closeDrawer());
+    act(() => result.current.openDrawer());
+    expect(asked()).toHaveLength(1);
+    verification = { available: false, withdrawable: false, status: "not_started" };
   });
 
   it("opens and closes the drawer, and signs out to login", async () => {

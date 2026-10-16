@@ -30,6 +30,8 @@ export default function SavedPage() {
         onLogout: home.logout,
         links: nav.links,
         labels: nav.labels,
+        drawerNavigation: nav.drawer,
+        verificationEntry: home.verificationEntry,
       }}
       heading={FEED_COPY.savedHeading}
       {...getPostList(feed, home.avatarUrl)}

@@ -34,6 +34,8 @@ export default function MessagesPage() {
       onLogout={shell.logout}
       links={nav.links}
       labels={nav.labels}
+      drawerNavigation={nav.drawer}
+      verificationEntry={shell.verificationEntry}
     >
       <ChatListScreen
         rows={list.rows}

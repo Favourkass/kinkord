@@ -35,6 +35,8 @@ export default function StartChatPage({ params }: { params: Promise<{ userId: st
       onLogout={shell.logout}
       links={nav.links}
       labels={nav.labels}
+      drawerNavigation={nav.drawer}
+      verificationEntry={shell.verificationEntry}
     >
       <div className="px-[20px] py-[48px] text-center">
         {start.premium ? (
