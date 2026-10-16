@@ -1,22 +1,51 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, asc, count, desc, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
+import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNotNull,
+  ne,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { Db, DRIZZLE } from "../db/db.module";
 import { notBanned } from "../moderation/admins";
 import {
+  bronzeVerification,
   follow,
   profile,
   profileMedia,
+  suggestionDismissal,
   user,
+  walletBalance,
   type PostMediaKind,
   type ProfileMediaKind,
 } from "../db/schema";
 import { PostsService } from "../posts/posts.service";
+import { blockedBy, notBlocking } from "../safety/blocks";
+import { containsPattern } from "../push/notifications.service";
 import { ONLINE_WINDOW_SECONDS, PresenceService } from "../presence/presence.service";
 import { StorageService } from "../storage/storage.service";
+import { silverCheck, silverSince } from "../subscriptions/plans";
+import { stillVerified } from "../verification/bronze-policy";
 import { FollowsService } from "./follows.service";
+import {
+  cardRoles,
+  genderShown,
+  rankCandidates,
+  resolveShow,
+  wantedSide,
+  type Show,
+} from "./matching";
 
-export type MembersSort = "recent" | "followers" | "name";
+/** "match" ranks a search: exact name or username, then starts-with, then anywhere. */
+export type MembersSort = "recent" | "followers" | "name" | "match";
 /** People tab (Figma 1321:14): Friends · Followers · Following · Suggested (+ mutual for the viewer). */
 export type FriendsTab = "all" | "mutual" | "followers" | "following" | "suggested";
 /** Media tab pills (Figma 1524:1786): All · Profile Photo · Photos · Videos. */
@@ -40,21 +69,49 @@ const POST_MEDIA_KINDS: Record<MediaFilter, PostMediaKind[]> = {
 };
 
 export interface ListMembersParams {
-  country: string;
+  /** Omit to look across every country: search does. */
+  country?: string | null;
   /** Omit to list the whole country (CEO, 2026-09-12: "click Nigeria → everyone in Nigeria"). */
   state?: string | null;
   /** Only meaningful together with `state`. */
   lga?: string | null;
   sort: MembersSort;
+  /** Name or username to look for, anywhere in either. */
+  q?: string | null;
+  /** Leave out members who blocked the viewer or whom the viewer blocked, as search does. */
+  hideBlocked?: boolean;
   page?: number;
   limit?: number;
 }
 
+/** A member whose display name or username contains `term`, case aside. Reads `profile` and `user`. */
+export function memberMatches(term: string): SQL {
+  const pattern = containsPattern(term);
+  return or(ilike(profile.displayName, pattern), ilike(user.username, pattern))!;
+}
+
+/** 0 for an exact name or username, 1 when either starts with `term`, else 2: best matches first. */
+export function matchRank(term: string): SQL<number> {
+  const exact = term.toLowerCase();
+  const prefix = `${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+  return sql<number>`case
+    when ${user.username} = ${exact} or lower(${profile.displayName}) = ${exact} then 0
+    when ${ilike(user.username, prefix)} or ${ilike(profile.displayName, prefix)} then 1
+    else 2 end`;
+}
+
 /** Countries the directory serves today; the client renders the rest as "coming soon". */
-export const AVAILABLE_COUNTRIES = [{ code: "NG", name: "Nigeria" }] as const;
+export const AVAILABLE_COUNTRIES = [
+  { code: "NG", name: "Nigeria" },
+  { code: "KE", name: "Kenya" },
+] as const;
 
 const MAX_PAGE_SIZE = 50;
 const DEFAULT_PAGE_SIZE = 20;
+/** How many nearby members "Kinksters Near You" ranks; the best of them are shown. */
+export const SUGGESTION_POOL_SIZE = 300;
+/** A card shows this many roles and looking-for values. */
+const CARD_LIST_MAX = 3;
 
 /** Whole years from a YYYY-MM-DD birth date to `now`; null when unknown/invalid. */
 export function ageFromDob(dob: string | null | undefined, now = new Date()): number | null {
@@ -116,15 +173,27 @@ export class MembersService {
    * Abraka → everyone in Abraka. Newest first by default, with the viewer's follow
    * state on each card. The viewer is excluded.
    */
+  /**
+   * Everyone matching a name or username, whatever their country: the app's
+   * search. Best matches first, and nobody on either side of a block.
+   */
+  search(viewerId: string, q: string, page?: number, limit?: number) {
+    return this.list({ q, sort: "match", hideBlocked: true, page, limit }, viewerId);
+  }
+
   async list(params: ListMembersParams, viewerId: string) {
     const { page, limit, offset } = normalizePaging(params.page, params.limit);
-    const conditions = [
-      eq(profile.country, params.country.toUpperCase()),
-      ne(profile.userId, viewerId),
-      notBanned(profile.userId),
-    ];
+    const conditions: SQL[] = [ne(profile.userId, viewerId), notBanned(profile.userId)];
+    if (params.country) conditions.unshift(eq(profile.country, params.country.toUpperCase()));
     if (params.state) conditions.push(eq(profile.state, params.state));
     if (params.state && params.lga) conditions.push(eq(profile.city, params.lga));
+    if (params.q) conditions.push(memberMatches(params.q));
+    if (params.hideBlocked) {
+      conditions.push(
+        notBlocking(profile.userId, viewerId),
+        sql`not ${blockedBy(viewerId, profile.userId)}`,
+      );
+    }
     const where = and(...conditions);
 
     const followerCounts = this.db
@@ -135,7 +204,8 @@ export class MembersService {
     const viewerFollow = alias(follow, "viewer_follow");
     const followers = sql<number>`coalesce(${followerCounts.followers}, 0)`;
     // Presence: active within the online window. Online members always list first.
-    const isOnline = sql<boolean>`coalesce(${profile.lastSeenAt} > now() - (${sql.raw(
+    // last_seen_at holds UTC wall time (see PresenceService.touch), so "now" is UTC too.
+    const isOnline = sql<boolean>`coalesce(${profile.lastSeenAt} > timezone('UTC', now()) - (${sql.raw(
       String(ONLINE_WINDOW_SECONDS),
     )} * interval '1 second'), false)`;
 
@@ -145,6 +215,13 @@ export class MembersService {
         : params.sort === "name"
           ? asc(profile.displayName)
           : desc(profile.createdAt);
+    // A search's best matches lead, then the handle: nothing a follow or a
+    // login moves, so its pages never repeat or skip anyone. The directory
+    // keeps who's online first. The id settles any tie.
+    const order =
+      params.sort === "match" && params.q
+        ? [asc(matchRank(params.q)), sql`${user.username} asc nulls last`, asc(profile.userId)]
+        : [desc(isOnline), secondary, asc(profile.userId)];
 
     const rows = await this.db
       .select({
@@ -157,10 +234,12 @@ export class MembersService {
         roles: profile.roles,
         city: profile.city,
         state: profile.state,
+        country: profile.country,
         lastSeenAt: profile.lastSeenAt,
         isOnline,
         followers,
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
+        silver: silverCheck(profile.userId),
       })
       .from(profile)
       .innerJoin(user, eq(user.id, profile.userId))
@@ -170,11 +249,16 @@ export class MembersService {
         and(eq(viewerFollow.followingId, profile.userId), eq(viewerFollow.followerId, viewerId)),
       )
       .where(where)
-      .orderBy(desc(isOnline), secondary)
+      .orderBy(...order)
       .limit(limit)
       .offset(offset);
 
-    const [totalRow] = await this.db.select({ total: count() }).from(profile).where(where);
+    // Joined like the page, since a search reads the username.
+    const [totalRow] = await this.db
+      .select({ total: count() })
+      .from(profile)
+      .innerJoin(user, eq(user.id, profile.userId))
+      .where(where);
 
     // One grouped query for the page rather than a count per card.
     const postCounts = await this.posts.postCountsFor(
@@ -194,11 +278,13 @@ export class MembersService {
         roles: r.roles ?? [],
         city: r.city,
         state: r.state,
+        country: r.country,
         isOnline: Boolean(r.isOnline),
         lastSeenAt: r.lastSeenAt ? r.lastSeenAt.toISOString() : null,
         postsCount: postCounts.get(r.userId) ?? 0,
         followersCount: Number(r.followers ?? 0),
         isFollowing: Boolean(r.isFollowing),
+        silver: Boolean(r.silver),
       })),
     );
 
@@ -209,9 +295,15 @@ export class MembersService {
   async publicProfile(username: string, viewerId: string) {
     const handle = username.replace(/^@/, "").toLowerCase();
     const [row] = await this.db
-      .select({ u: user, p: profile })
+      .select({
+        u: user,
+        p: profile,
+        bronze: bronzeVerification,
+        coins: sql<number>`coalesce((select ${walletBalance.available} from ${walletBalance} where ${walletBalance.userId}=${user.id} and ${user.id}=${viewerId} and ${walletBalance.currency}='coin'),0)`,
+      })
       .from(user)
       .innerJoin(profile, eq(profile.userId, user.id))
+      .leftJoin(bronzeVerification, eq(bronzeVerification.userId, user.id))
       .where(and(eq(user.username, handle), notBanned(user.id)))
       .limit(1);
     if (!row) throw new NotFoundException("Member not found.");
@@ -219,7 +311,7 @@ export class MembersService {
     const { u, p } = row;
     const isSelf = u.id === viewerId;
     const friendsOnly = p.profileVisibility === "friends" && !isSelf;
-    const [followCounts, mutualFriends, isFollowing, avatarUrl, coverUrl, isFriend] =
+    const [followCounts, mutualFriends, isFollowing, avatarUrl, coverUrl, isFriend, silver] =
       await Promise.all([
         this.follows.counts(u.id),
         isSelf ? Promise.resolve(0) : this.follows.mutualFriendsCount(u.id, viewerId),
@@ -228,6 +320,7 @@ export class MembersService {
         // Covers are full-bleed, so they keep the original.
         p.coverKey ? this.storage.presignDownload(p.coverKey) : Promise.resolve(null),
         friendsOnly ? this.follows.areFriends(viewerId, u.id) : Promise.resolve(true),
+        silverSince(this.db, u.id),
       ]);
     const counts = { ...followCounts, mutualFriends };
     // Friends-only profile seen by a non-friend: what the directory card already shows
@@ -237,6 +330,7 @@ export class MembersService {
 
     return {
       userId: u.id,
+      ...(isSelf ? { coinBalance: Number(row.coins ?? 0) } : {}),
       username: u.username,
       displayName: p.displayName,
       avatarUrl,
@@ -247,7 +341,8 @@ export class MembersService {
       city: p.city,
       age: ageFromDob(p.dateOfBirth),
       gender: p.gender,
-      orientation: hidden(p.orientation, null),
+      // Sexuality is private: only the member sees their own.
+      orientation: isSelf ? p.orientation : null,
       relationshipStatus: hidden(p.relationshipStatus, null),
       bodyType: hidden(p.bodyType, null),
       roles: p.roles ?? [],
@@ -267,7 +362,17 @@ export class MembersService {
       restricted,
       // Only you see your own birth date; everyone else gets the derived age.
       dateOfBirth: isSelf ? p.dateOfBirth : null,
-      verification: { email: u.emailVerified, phone: p.phoneVerified },
+      verification: {
+        email: u.emailVerified,
+        phone: p.phoneVerified,
+        // Only while the verified photo, birth date and gender are still the
+        // profile's; others see it only if the member shows it and may see them.
+        ...(stillVerified(row.bronze, p) && (isSelf || (p.showVerifiedBadge && !restricted))
+          ? { identity: true as const }
+          : {}),
+      },
+      // The Silver check, X-style: shown with the month their Silver began.
+      silver: silver ? { since: silver.toISOString() } : null,
     };
   }
 
@@ -306,7 +411,9 @@ export class MembersService {
         gender: profile.gender,
         city: profile.city,
         state: profile.state,
+        country: profile.country,
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
+        silver: silverCheck(profile.userId),
       })
       .from(profile)
       .innerJoin(user, eq(user.id, profile.userId))
@@ -320,31 +427,146 @@ export class MembersService {
       .offset(offset);
     const [totalRow] = await this.db.select({ total: count() }).from(profile).where(where);
     return {
-      items: rows.map((r) => ({ ...r, isFollowing: Boolean(r.isFollowing) })),
+      items: rows.map((r) => ({
+        ...r,
+        isFollowing: Boolean(r.isFollowing),
+        silver: Boolean(r.silver),
+      })),
       total: Number(totalRow?.total ?? 0),
     };
   }
 
   /**
-   * "People you may know" on the home feed. Same rule as the profile Suggested
-   * tab — `suggested` already excludes the viewer — but the feed card shows a
-   * 221x191 photo rather than a 48px row, so it asks for the medium size.
+   * "Kinksters Near You" on the home feed, ranked by matching v1 (matching.ts,
+   * docs/MATCHING.md). The pool is the viewer's country (their state when they
+   * have no country), of the gender `show` lists, leaving out the viewer,
+   * suspended members, anyone on either side of a block, and anyone the viewer
+   * already follows or removed. The nearest and most recently seen
+   * `SUGGESTION_POOL_SIZE` are scored here and the best `limit` returned.
    */
-  async suggestedForFeed(viewerId: string, limitArg?: number) {
+  async suggestedForFeed(viewerId: string, limitArg?: number, requested?: Show) {
     const { limit } = normalizePaging(1, limitArg ?? 10);
-    const { items, total } = await this.suggested(viewerId, viewerId, limit, 0);
-    return {
-      items: await Promise.all(
-        items.map(async (r) => ({
-          userId: r.userId,
-          username: r.username,
-          displayName: r.displayName,
-          avatarUrl: r.avatarKey ? await this.storage.presignDownload(r.avatarKey, "md") : null,
-          isFollowing: r.isFollowing,
-        })),
-      ),
-      total,
+    const [me] = await this.db
+      .select({
+        gender: profile.gender,
+        orientation: profile.orientation,
+        roles: profile.roles,
+        interests: profile.interests,
+        lookingFor: profile.lookingFor,
+        country: profile.country,
+        state: profile.state,
+        city: profile.city,
+      })
+      .from(profile)
+      .where(eq(profile.userId, viewerId));
+    // The viewer's own sexuality, never anyone else's.
+    const { show, options } = resolveShow(requested, me?.gender, me?.orientation);
+    if (!me || (!me.country && !me.state)) return { items: [], show, options };
+
+    const conditions: SQL[] = [
+      me.country ? eq(profile.country, me.country) : eq(profile.state, me.state as string),
+      ne(profile.userId, viewerId),
+      notBanned(profile.userId),
+      notBlocking(profile.userId, viewerId),
+      sql`not ${blockedBy(viewerId, profile.userId)}`,
+      sql`not exists (select 1 from ${follow} where ${follow.followerId} = ${viewerId} and ${follow.followingId} = ${profile.userId})`,
+      sql`not exists (select 1 from ${suggestionDismissal} where ${suggestionDismissal.userId} = ${viewerId} and ${suggestionDismissal.dismissedUserId} = ${profile.userId})`,
+    ];
+    const gender = genderShown(show);
+    // Sign-up stored "female", Edit Profile "Female".
+    if (gender) conditions.push(sql`lower(${profile.gender}) = ${gender.toLowerCase()}`);
+    // Without a state there is no "same state" to put first (and a constant would be `order by 0`).
+    const sameStateFirst = me.state
+      ? [desc(sql<number>`case when ${profile.state} = ${me.state} then 1 else 0 end`)]
+      : [];
+
+    const rows = await this.db
+      .select({
+        userId: profile.userId,
+        username: user.username,
+        displayName: profile.displayName,
+        avatarKey: profile.avatarKey,
+        dateOfBirth: profile.dateOfBirth,
+        gender: profile.gender,
+        country: profile.country,
+        state: profile.state,
+        city: profile.city,
+        roles: profile.roles,
+        interests: profile.interests,
+        lookingFor: profile.lookingFor,
+        visibility: profile.profileVisibility,
+        lastSeenAt: profile.lastSeenAt,
+        createdAt: user.createdAt,
+        silver: silverCheck(profile.userId),
+      })
+      .from(profile)
+      .innerJoin(user, eq(user.id, profile.userId))
+      .where(and(...conditions))
+      .orderBy(...sameStateFirst, sql`${profile.lastSeenAt} desc nulls last`)
+      .limit(SUGGESTION_POOL_SIZE);
+
+    const now = new Date();
+    const viewer = {
+      roles: me.roles ?? [],
+      kinks: me.interests ?? [],
+      lookingFor: me.lookingFor ?? [],
+      city: me.city,
+      state: me.state,
     };
+    const candidates = rows.map((r) => {
+      // Followed members are never in the pool, so no one here is the viewer's
+      // friend: a friends-only profile's About details stay out of the card and
+      // the ranking, as on publicProfile.
+      const restricted = r.visibility === "friends";
+      return {
+        ...r,
+        roles: r.roles ?? [],
+        kinks: restricted ? [] : (r.interests ?? []),
+        lookingFor: restricted ? [] : (r.lookingFor ?? []),
+        hasPhoto: Boolean(r.avatarKey),
+      };
+    });
+    const wanted = wantedSide(viewer.roles);
+    const best = rankCandidates(viewer, candidates, now).slice(0, limit);
+    const items = await Promise.all(
+      best.map(async (r) => ({
+        userId: r.userId,
+        username: r.username,
+        displayName: r.displayName,
+        // The card is a tall photo, not a 48px row: the medium size.
+        avatarUrl: r.avatarKey ? await this.storage.presignDownload(r.avatarKey, "md") : null,
+        age: ageFromDob(r.dateOfBirth, now),
+        gender: r.gender,
+        city: r.city,
+        state: r.state,
+        country: r.country,
+        roles: cardRoles(r.roles, wanted, CARD_LIST_MAX),
+        lookingFor: r.lookingFor.slice(0, CARD_LIST_MAX),
+        online: PresenceService.isOnline(r.lastSeenAt, now),
+        silver: Boolean(r.silver),
+        // Members the viewer follows are never in the pool.
+        isFollowing: false,
+      })),
+    );
+    return { items, show, options };
+  }
+
+  /** Remove for good: the viewer is never suggested this member again. Doing it twice is the same as once. */
+  async dismissSuggestion(viewerId: string, dismissedUserId: string) {
+    if (viewerId === dismissedUserId) {
+      throw new BadRequestException("You can't remove yourself from your suggestions.");
+    }
+    const [target] = await this.db
+      .select({ id: user.id })
+      .from(user)
+      .where(eq(user.id, dismissedUserId))
+      .limit(1);
+    if (!target) throw new NotFoundException("Member not found.");
+    await this.db
+      .insert(suggestionDismissal)
+      .values({ userId: viewerId, dismissedUserId })
+      .onConflictDoNothing();
+    return { dismissed: dismissedUserId };
   }
 
   /**
@@ -468,7 +690,9 @@ export class MembersService {
         gender: r.gender,
         city: r.city,
         state: r.state,
+        country: r.country,
         isFollowing: r.isFollowing,
+        silver: r.silver,
       })),
     );
     return { items, total: result.total, page, limit };

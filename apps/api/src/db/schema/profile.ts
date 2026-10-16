@@ -25,7 +25,7 @@ export const profile = pgTable("profile", {
   city: text("city"),
   dateOfBirth: date("date_of_birth"),
   gender: text("gender"),
-  /** Kink roles picked at step 4; free-form labels. */
+  /** Kink roles picked during profile setup; validated against the role options. */
   roles: jsonb("roles").$type<string[]>().notNull().default([]),
   relationshipStatus: text("relationship_status"),
   lookingFor: jsonb("looking_for").$type<string[]>().notNull().default([]),
@@ -46,6 +46,14 @@ export const profile = pgTable("profile", {
   /** S3 object keys; served via presigned GET. */
   avatarKey: text("avatar_key"),
   coverKey: text("cover_key"),
+  /** Explicitly choosing to finish signup without photos. */
+  signupPhotosSkipped: boolean("signup_photos_skipped").notNull().default(false),
+  /**
+   * Whether the photos can still be skipped: only at first sign-up, until the
+   * member first has a profile photo. Then it stays false, so deleting the
+   * photo later asks for a new one.
+   */
+  photoSkipAvailable: boolean("photo_skip_available").notNull().default(true),
   /** Edit Profile (CEO brief, 2026-09-12). Nationality is ISO 3166-1 alpha-2, like `country`. */
   nationality: text("nationality"),
   occupation: text("occupation"),
@@ -54,6 +62,8 @@ export const profile = pgTable("profile", {
   socialLinks: jsonb("social_links").$type<SocialLinks>().notNull().default({}),
   /** "public" (every member) or "friends" (mutual follows only). */
   profileVisibility: text("profile_visibility").notNull().default("public"),
+  /** Whether other members see the Verified badge; verifying doesn't have to be public. */
+  showVerifiedBadge: boolean("show_verified_badge").notNull().default(true),
   /** Display name and username may change once every 30 days; these stamp the last change. */
   displayNameChangedAt: timestamp("display_name_changed_at"),
   usernameChangedAt: timestamp("username_changed_at"),

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MEMBERS_COPY } from "@/constants/members";
 import { Routes } from "@/constants/Routes";
+import { kinkcoinsService } from "@/services/kinkcoins.service";
 import {
   ageTagOf,
   locationOf,
@@ -16,6 +17,7 @@ import {
   type PublicProfilePM,
 } from "@/domain/member";
 import { ApiError } from "@/services/apiClient";
+import { isOfficialOrganization } from "@/services/organization-placeholder.service";
 import {
   decodeParam,
   isCountryAvailable,
@@ -115,6 +117,9 @@ export function useMemberProfilePresenter(
   // Only an outcome for the *current* username counts; anything else means "loading".
   const current = username && outcome?.username === username ? outcome : null;
   const pm = current?.pm ?? null;
+  const organization = isOfficialOrganization(pm?.userId);
+  const peopleTabs: FriendsTab[] = organization ? ["followers", "following"] : PEOPLE_TABS;
+  const resolvedPeopleTab: FriendsTab = peopleTabs.includes(peopleTab) ? peopleTab : "followers";
 
   useEffect(() => {
     if (!username) return;
@@ -144,13 +149,13 @@ export function useMemberProfilePresenter(
   }, [username, router]);
 
   // People rows load lazily, when the tab is open, per (username, sub-tab) key.
-  const peopleKey = `${username}|${peopleTab}`;
+  const peopleKey = `${username}|${resolvedPeopleTab}`;
   const currentPeople = people?.key === peopleKey ? people : null;
   useEffect(() => {
     if (tab !== "people" || !username || !pm || currentPeople) return;
     let cancelled = false;
     void membersApi
-      .friends(username, peopleTab, 1, PEOPLE_PREVIEW)
+      .friends(username, resolvedPeopleTab, 1, PEOPLE_PREVIEW)
       .then((res) => {
         if (!cancelled)
           setPeople({ key: peopleKey, items: res.items, total: res.total, error: null });
@@ -162,7 +167,7 @@ export function useMemberProfilePresenter(
     return () => {
       cancelled = true;
     };
-  }, [tab, pm, currentPeople, username, peopleTab, peopleKey]);
+  }, [tab, pm, currentPeople, username, resolvedPeopleTab, peopleKey]);
 
   // Media tiles load lazily, when the tab is open, per (username, pill) key.
   const mediaKey = `${username}|${mediaFilter}`;
@@ -188,7 +193,7 @@ export function useMemberProfilePresenter(
   // Desktop right column: suggested kinksters (same state, own area first). Best effort.
   const currentSuggested = suggested?.username === username ? suggested : null;
   useEffect(() => {
-    if (!username || !pm || currentSuggested) return;
+    if (!username || !pm || organization || currentSuggested) return;
     let cancelled = false;
     void membersApi
       .friends(username, "suggested", 1, SUGGESTIONS)
@@ -201,7 +206,7 @@ export function useMemberProfilePresenter(
     return () => {
       cancelled = true;
     };
-  }, [pm, currentSuggested, username]);
+  }, [pm, organization, currentSuggested, username]);
 
   /** Optimistic follow flip on the profile; reverts if the API rejects. */
   const toggleFollow = useCallback(() => {
@@ -303,7 +308,11 @@ export function useMemberProfilePresenter(
       .catch(() => setLightbox((l) => (l ? { ...l, deleting: false, confirming: false } : l)));
   }, [lightbox, pm]);
 
-  const vm = useMemo(() => (pm ? toPublicProfileVM(pm, placeHref) : null), [pm]);
+  const vm = useMemo(
+    () => (pm ? toPublicProfileVM(pm, placeHref, new Date(), organization) : null),
+    [pm, organization],
+  );
+  // The organization's VM carries no presence, so it shows none.
   const presenceText = vm
     ? vm.isOnline
       ? copy.online
@@ -314,30 +323,49 @@ export function useMemberProfilePresenter(
 
   const tabs = TAB_KEYS.map((key) => ({ key, label: copy.tabs[key] }));
 
-  const toRow = (f: FriendPM): FriendRowVM => ({
-    userId: f.userId,
-    username: f.username,
-    displayName: f.displayName,
-    handle: f.username ? `@${f.username}` : null,
-    avatarUrl: f.avatarUrl,
-    ageTag: ageTagOf(f.age, f.gender),
-    location: locationOf(f.city, f.state),
-    isFollowing: f.isFollowing,
-    busy: rowBusy.has(f.userId),
-  });
+  const toRow = (f: FriendPM): FriendRowVM => {
+    const rowOrganization = isOfficialOrganization(f.userId);
+    return {
+      userId: f.userId,
+      username: f.username,
+      displayName: f.displayName,
+      handle: f.username ? `@${f.username}` : null,
+      avatarUrl: f.avatarUrl,
+      ageTag: rowOrganization ? null : ageTagOf(f.age, f.gender),
+      location: rowOrganization ? null : locationOf(f.city, f.state, f.country),
+      isFollowing: f.isFollowing,
+      busy: rowBusy.has(f.userId),
+      silver: Boolean(f.silver),
+      organization: rowOrganization,
+    };
+  };
   const peopleRows = useMemo(
     () =>
       (currentPeople?.items ?? []).map((f) => ({
         ...toRow(f),
         href: Routes.member(f.username ?? f.userId),
         // Your own friends list shows the "Friends" pill; everywhere else a Follow button.
-        pill: Boolean(pm?.isSelf) && peopleTab === "all",
+        pill: Boolean(pm?.isSelf) && resolvedPeopleTab === "all",
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [currentPeople, rowBusy, pm?.isSelf, peopleTab],
+    [currentPeople, rowBusy, pm?.isSelf, resolvedPeopleTab],
   );
-  const suggestedRows = useMemo<FriendRowVM[]>(
-    () => (currentSuggested?.items ?? []).map(toRow),
+  const suggestedRows = useMemo(
+    () =>
+      (currentSuggested?.items ?? []).map((f) => {
+        const row = toRow(f);
+        return {
+          ...row,
+          // The organization is followed, never added as a friend.
+          actionLabel: row.organization
+            ? row.isFollowing
+              ? copy.following
+              : copy.follow
+            : row.isFollowing
+              ? copy.desktop.added
+              : copy.desktop.add,
+        };
+      }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [currentSuggested, rowBusy],
   );
@@ -355,6 +383,13 @@ export function useMemberProfilePresenter(
           : key === "mutual"
             ? copy.people.tabs.mutual(stats?.mutualFriends ?? "0")
             : copy.people.tabs.suggested;
+  // Your own check leads to your Silver; someone else's to getting it.
+  const silverLabels = {
+    title: copy.silver.title,
+    body: copy.silver.body,
+    since: copy.silver.since,
+    cta: pm?.isSelf ? copy.silver.manage : copy.silver.get,
+  };
 
   return {
     loading: username === null || current === null,
@@ -367,14 +402,14 @@ export function useMemberProfilePresenter(
     activeTab: pm?.isSelf ? ("profile" as const) : undefined,
     nav: {
       brand: copy.brand,
-      searchHref: Routes.members,
+      searchHref: Routes.search,
       labels: copy.actions,
       onMore: () => undefined,
       onShare: share,
     },
     topNav: {
       brand: copy.brand,
-      searchHref: Routes.members,
+      searchHref: Routes.search,
       searchPlaceholder: copy.desktop.searchPlaceholder,
       accountLabel: copy.desktop.account,
     },
@@ -385,8 +420,27 @@ export function useMemberProfilePresenter(
     tabs,
     toggleFollow,
     followBusy,
+    /**
+     * The header's Follow, handed to the Posts tab for the cards that offer one
+     * (the organization's): one state, so the header and its posts always agree.
+     */
+    authorFollow:
+      pm && !pm.isSelf
+        ? {
+            userId: pm.userId,
+            isFollowing: pm.isFollowing,
+            busy: followBusy,
+            onToggle: toggleFollow,
+          }
+        : null,
     messageHref: pm ? Routes.messageWith(pm.userId) : Routes.messages,
     editHref: Routes.profileEdit,
+    // An organization has no coin balance on show.
+    coinBalance:
+      pm?.isSelf && !organization
+        ? kinkcoinsService.profileBalance(pm.coinBalance ?? 0)
+        : undefined,
+    silverHref: Routes.subscription,
     heroLabels: {
       follow: copy.follow,
       following: copy.following,
@@ -395,7 +449,12 @@ export function useMemberProfilePresenter(
       editProfile: copy.editProfile,
       addToStory: copy.addToStory,
       comingSoon: copy.comingSoon,
+      organization: copy.organization,
+      verifiedOrganization: copy.verifiedOrganization,
+      identityVerified: copy.about.verified.identity,
+      identityHidden: copy.about.identityHidden,
       stats: copy.stats,
+      silver: silverLabels,
     },
     sideLabels: {
       follow: copy.follow,
@@ -404,17 +463,22 @@ export function useMemberProfilePresenter(
       yourself: copy.yourself,
       editProfile: copy.editProfile,
       tagsHeading: copy.desktop.tagsHeading,
+      organization: copy.organization,
+      verifiedOrganization: copy.verifiedOrganization,
+      identityVerified: copy.about.verified.identity,
+      identityHidden: copy.about.identityHidden,
       stats: copy.stats,
+      silver: silverLabels,
     },
     aboutLabels: copy.about,
     people: {
-      subTabs: PEOPLE_TABS.map((key) => ({
+      subTabs: peopleTabs.map((key) => ({
         key,
         label: peopleLabel(key),
-        active: peopleTab === key,
+        active: resolvedPeopleTab === key,
       })),
       onSubTab: (key: string) => {
-        if (PEOPLE_TABS.includes(key as FriendsTab)) setPeopleTab(key as FriendsTab);
+        if (peopleTabs.includes(key as FriendsTab)) setPeopleTab(key as FriendsTab);
       },
       rows: peopleRows,
       labels: {
@@ -422,29 +486,33 @@ export function useMemberProfilePresenter(
         following: copy.people.following,
         friendsPill: copy.people.friendsPill,
         more: copy.people.more,
+        organization: copy.organization,
+        verifiedOrganization: copy.verifiedOrganization,
       },
       onToggleFollow: togglePersonFollow,
       loading: tab === "people" && pm !== null && currentPeople === null,
       loadingText: MEMBERS_COPY.common.loading,
       empty:
         currentPeople && currentPeople.items.length === 0 && !currentPeople.error
-          ? copy.people.empty[peopleTab]
+          ? copy.people.empty[resolvedPeopleTab]
           : null,
       error: currentPeople?.error ?? null,
       seeMoreHref:
         pm?.username && currentPeople && currentPeople.total > PEOPLE_PREVIEW
-          ? Routes.memberPeople(pm.username, peopleTab)
+          ? Routes.memberPeople(pm.username, resolvedPeopleTab)
           : null,
       seeMoreLabel: copy.people.seeMore,
     },
     suggested: {
       heading: copy.desktop.suggested,
       rows: suggestedRows,
-      addLabel: copy.desktop.add,
-      addedLabel: copy.desktop.added,
       onAdd: addSuggested,
       empty: copy.desktop.noSuggestions,
+      organizationLabel: copy.organization,
+      verifiedOrganizationLabel: copy.verifiedOrganization,
     },
+    /** The organization's profile has no "Suggested Friends" column. */
+    showSuggestedRail: !organization,
     // The Posts tab is fed by `useFeedPresenter` from the page — same posts,
     // same visibility rule and the same card as the home feed.
     media: {

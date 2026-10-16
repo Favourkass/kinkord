@@ -10,12 +10,18 @@ const makeController = () => {
   const countries = vi.fn().mockResolvedValue([]);
   const states = vi.fn().mockResolvedValue([]);
   const list = vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, limit: 20 });
+  const suggestedForFeed = vi
+    .fn()
+    .mockResolvedValue({ items: [], show: "women", options: ["women", "men"] });
+  const dismissSuggestion = vi.fn().mockResolvedValue({ dismissed: "u2" });
   const controller = new MembersController({
     countries,
     states,
     list,
+    suggestedForFeed,
+    dismissSuggestion,
   } as unknown as MembersService);
-  return { controller, countries, states, list };
+  return { controller, countries, states, list, suggestedForFeed, dismissSuggestion };
 };
 
 describe("MembersController", () => {
@@ -37,6 +43,33 @@ describe("MembersController", () => {
     expect(list).toHaveBeenCalledWith(
       { country: "NG", state: "Delta", sort: "recent", page: 1, limit: 20 },
       "me",
+    );
+  });
+
+  it("searches everyone by name or @username, and needs something to look for", async () => {
+    const { controller } = makeController();
+    const search = vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, limit: 20 });
+    (controller as unknown as { members: { search: typeof search } }).members.search = search;
+    await controller.search(req, { q: " @tega ", page: "2" });
+    expect(search).toHaveBeenCalledWith("me", "tega", 2, 20);
+    expect(() => controller.search(req, { q: " @ " })).toThrow(BadRequestException);
+    expect(() => controller.search(req, {})).toThrow(BadRequestException);
+  });
+
+  it("searches by name or @username, and ignores an empty search", async () => {
+    const { controller, list } = makeController();
+    await controller.list(req, { country: "ng", q: "  @ada " });
+    expect(list).toHaveBeenLastCalledWith(
+      { country: "NG", q: "ada", sort: "recent", page: 1, limit: 20 },
+      "me",
+    );
+    await controller.list(req, { country: "ng", q: " @ " });
+    expect(list).toHaveBeenLastCalledWith(
+      { country: "NG", q: undefined, sort: "recent", page: 1, limit: 20 },
+      "me",
+    );
+    expect(() => controller.list(req, { country: "ng", q: "x".repeat(51) })).toThrow(
+      BadRequestException,
     );
   });
 
@@ -75,5 +108,25 @@ describe("MembersController", () => {
       BadRequestException,
     );
     expect(list).not.toHaveBeenCalled();
+  });
+
+  it("ranks Kinksters Near You for the segment asked for, or the member's default", async () => {
+    const { controller, suggestedForFeed } = makeController();
+    await controller.suggested(req, {});
+    expect(suggestedForFeed).toHaveBeenLastCalledWith("me", 10, undefined);
+    await controller.suggested(req, { show: "men", limit: "5" });
+    expect(suggestedForFeed).toHaveBeenLastCalledWith("me", 5, "men");
+    expect(() => controller.suggested(req, { show: "everyone" })).toThrow(BadRequestException);
+    expect(() => controller.suggested(req, { limit: "50" })).toThrow(BadRequestException);
+    expect(suggestedForFeed).toHaveBeenCalledTimes(2);
+  });
+
+  it("removes a member from the viewer's suggestions, and refuses a blank id", async () => {
+    const { controller, dismissSuggestion } = makeController();
+    await expect(controller.dismissSuggestion(req, " u2 ")).resolves.toEqual({ dismissed: "u2" });
+    expect(dismissSuggestion).toHaveBeenCalledWith("me", "u2");
+    expect(() => controller.dismissSuggestion(req, "  ")).toThrow(BadRequestException);
+    expect(() => controller.dismissSuggestion(req, "x".repeat(65))).toThrow(BadRequestException);
+    expect(dismissSuggestion).toHaveBeenCalledTimes(1);
   });
 });

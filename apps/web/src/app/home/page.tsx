@@ -3,7 +3,7 @@
 import FeedScreen from "@/components/feed/FeedScreen";
 import { FEED_COPY, FEED_VISIBILITIES, POST_CARD_LABELS } from "@/constants/feed";
 import { Routes } from "@/constants/Routes";
-import { COMMENT_BODY_MAX, POST_BODY_MAX } from "@/domain/post";
+import { COMMENT_BODY_MAX, postBodyMax } from "@/domain/post";
 import { getAppShellNav } from "@/presenters/getAppShellNav";
 import { useFeedPresenter } from "@/presenters/useFeedPresenter";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
@@ -11,7 +11,7 @@ import { useHomePresenter } from "@/presenters/useHomePresenter";
 /** Post-login home: the feed (Figma "Hompage Light" 344:138 / dark 837:295). */
 export default function HomePage() {
   const home = useHomePresenter();
-  const feed = useFeedPresenter();
+  const feed = useFeedPresenter({ postMaxLength: postBodyMax(home.silver) });
   const nav = getAppShellNav();
 
   return (
@@ -33,6 +33,7 @@ export default function HomePage() {
         links: nav.links,
         labels: nav.labels,
       }}
+      tabs={{ label: FEED_COPY.tabsLabel, tabs: feed.tabs, onSelect: feed.selectTab }}
       loading={feed.loading}
       error={home.error ?? feed.error}
       posts={feed.posts}
@@ -47,7 +48,10 @@ export default function HomePage() {
       onComment={feed.openComments}
       onSave={feed.toggleSave}
       onShare={feed.share}
+      onGift={feed.openGift}
+      giftDialog={feed.giftDialog}
       onOpenMedia={feed.openMedia}
+      onTogglePostAuthorFollow={feed.toggleFollow}
       hasMore={feed.hasMore}
       loadingMore={feed.loadingMore}
       onLoadMore={feed.loadMore}
@@ -66,7 +70,8 @@ export default function HomePage() {
         avatarUrl: home.avatarUrl,
         draft: feed.draft,
         onDraftChange: feed.setDraft,
-        maxLength: POST_BODY_MAX,
+        mentions: feed.postMentions,
+        maxLength: postBodyMax(home.silver),
         visibility: feed.visibility,
         visibilities: FEED_VISIBILITIES,
         onVisibilityChange: (v) => feed.setVisibility(v === "friends" ? "friends" : "public"),
@@ -88,6 +93,9 @@ export default function HomePage() {
           removePhoto: FEED_COPY.removePhoto,
           placeholder: FEED_COPY.composerPlaceholder,
           visibilityLabel: FEED_COPY.visibilityLabel,
+          mentions: FEED_COPY.mentionSuggestions,
+          organization: FEED_COPY.organization,
+          verifiedOrganization: FEED_COPY.verifiedOrganization,
         },
       }}
       commentsPanel={{
@@ -99,6 +107,7 @@ export default function HomePage() {
         onLoadMore: feed.loadMoreComments,
         draft: feed.commentDraft,
         onDraftChange: feed.setCommentDraft,
+        mentions: feed.commentMentions,
         maxLength: COMMENT_BODY_MAX,
         canSubmit: feed.canComment,
         sending: feed.commentSending,
@@ -115,19 +124,39 @@ export default function HomePage() {
           loadMore: FEED_COPY.commentsMore,
           loading: FEED_COPY.loading,
           close: FEED_COPY.closeComments,
+          mentions: FEED_COPY.mentionSuggestions,
+          organization: FEED_COPY.organization,
+          verifiedOrganization: FEED_COPY.verifiedOrganization,
         },
       }}
-      people={{
-        heading: FEED_COPY.peopleHeading,
-        people: feed.suggestions,
-        addLabel: FEED_COPY.peopleAdd,
-        addedLabel: FEED_COPY.peopleAdded,
-        seeAllLabel: FEED_COPY.peopleSeeAll,
-        seeAllHref: Routes.members,
-        dismissLabel: FEED_COPY.peopleDismiss,
-        onDismiss: feed.hideSuggestions,
-        onToggleFollow: feed.toggleFollow,
-      }}
+      people={
+        feed.showPeople
+          ? {
+              heading: FEED_COPY.peopleHeading,
+              people: feed.suggestions,
+              segments: feed.suggestionSegments,
+              segmentsLabel: FEED_COPY.peopleShowLabel,
+              onShow: feed.showSuggestions,
+              loading: feed.suggestionsLoading,
+              browseHref: Routes.members,
+              browseLabel: FEED_COPY.peopleBrowse,
+              onToggleFollow: feed.toggleFollow,
+              onRemove: feed.removeSuggestion,
+              labels: {
+                follow: FEED_COPY.follow,
+                following: FEED_COPY.following,
+                remove: FEED_COPY.peopleRemove,
+                online: FEED_COPY.peopleOnline,
+                lookingFor: FEED_COPY.peopleLookingFor,
+                loading: FEED_COPY.loading,
+                empty: FEED_COPY.peopleEmpty,
+                organization: FEED_COPY.organization,
+                verifiedOrganization: FEED_COPY.verifiedOrganization,
+              },
+            }
+          : null
+      }
+      empty={feed.empty}
       lightbox={{
         media: feed.lightbox,
         onClose: feed.closeMedia,
@@ -146,8 +175,6 @@ export default function HomePage() {
       }}
       toast={{ message: feed.shareNote, onDismiss: feed.dismissShareNote }}
       copy={{
-        emptyTitle: FEED_COPY.feedEmptyTitle,
-        emptyBody: FEED_COPY.feedEmptyBody,
         loading: FEED_COPY.loading,
         loadMore: FEED_COPY.loadMore,
         asideHeading: FEED_COPY.asideHeading,

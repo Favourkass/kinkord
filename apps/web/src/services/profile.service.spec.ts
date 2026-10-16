@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MePM, OwnProfilePM, ProfileOptionsPM } from "@/domain/profile";
 
 const apiGet = vi.fn();
@@ -29,6 +29,7 @@ import {
   draftChanged,
   fieldErrorMessage,
   initialDraft,
+  loadCityOptions,
   locationLine,
   nationalityOptions,
   patchFor,
@@ -64,6 +65,8 @@ const profile: OwnProfilePM = {
   limits: null,
   socialLinks: { facebook: "https://facebook.com/nene" },
   profileVisibility: "public",
+  identityVerified: false,
+  showVerifiedBadge: true,
   displayNameChangedAt: null,
   canChangeDisplayNameAt: null,
   usernameChangedAt: "2026-09-01T00:00:00.000Z",
@@ -80,6 +83,7 @@ const me: MePM = {
 };
 const options: ProfileOptionsPM = {
   genders: ["Male", "Female"],
+  orientations: ["Straight", "Bisexual"],
   relationshipStatuses: ["Single", "Married"],
   roles: ["Dominant", "Switch"],
   kinks: ["Bondage", "Latex", "Wax play"],
@@ -100,6 +104,7 @@ describe("buildEditRows", () => {
       "displayName",
       "bio",
       "gender",
+      "orientation",
       "dateOfBirth",
       "nationality",
       "relationshipStatus",
@@ -110,12 +115,28 @@ describe("buildEditRows", () => {
     ]);
   });
 
+  it("offers the verified badge switch only to a verified member", () => {
+    const verified = { ...ctx, profile: { ...profile, identityVerified: true } };
+    expect(buildEditRows("privacy", verified).map((r) => r.key)).toContain("verifiedBadge");
+    expect(buildEditRow("verifiedBadge", verified)).toMatchObject({
+      value: "show",
+      editor: { kind: "single", value: "show" },
+    });
+    expect(patchFor("verifiedBadge", { kind: "single", value: "hide" }, profile)).toEqual({
+      showVerifiedBadge: false,
+    });
+    expect(patchFor("verifiedBadge", { kind: "single", value: "show" }, profile)).toEqual({
+      showVerifiedBadge: true,
+    });
+  });
+
   it("formats the display values from the profile", () => {
     expect(valuesOf("basic")).toEqual({
       username: "@Nene",
       displayName: "Naughty Neze",
       bio: "Chill",
       gender: "Female",
+      orientation: null,
       dateOfBirth: "26 Mar 1998",
       nationality: "Nigeria",
       relationshipStatus: "Single",
@@ -164,13 +185,52 @@ describe("buildEditRows", () => {
     });
     const state = buildEditRow("state", ctx).editor;
     if (state.kind === "single") expect(state.options.map((o) => o.value)).toContain("Delta");
-    const city = buildEditRow("city", ctx).editor;
-    if (city.kind === "single") expect(city.options.map((o) => o.value)).toContain("Abraka");
-    const noState = buildEditRow("city", { ...ctx, profile: { ...profile, state: null } }).editor;
+    // The state's towns load separately; a town the list lacks can be typed in.
+    expect(buildEditRow("city", ctx).editor).toMatchObject({ options: [], custom: true });
+    expect(buildEditRow("city", { ...ctx, cityOptions: ["Abraka", "Warri"] }).editor).toEqual({
+      kind: "single",
+      value: "Abraka",
+      options: [
+        { value: "Abraka", label: "Abraka" },
+        { value: "Warri", label: "Warri" },
+      ],
+      searchable: true,
+      custom: true,
+    });
+    const noState = buildEditRow("city", {
+      ...ctx,
+      profile: { ...profile, state: null },
+      cityOptions: ["Abraka"],
+    }).editor;
     if (noState.kind === "single") expect(noState.options).toEqual([]);
     expect(buildEditRow("socialLinks", ctx).editor).toEqual({
       kind: "links",
       value: { facebook: "https://facebook.com/nene", x: "" },
+    });
+  });
+});
+
+describe("sexuality row", () => {
+  it("offers the API's list after a choice that clears it, and saves that as null", () => {
+    const row = buildEditRow("orientation", ctx);
+    expect(row.value).toBeNull();
+    expect(row.editor).toEqual({
+      kind: "single",
+      value: null,
+      searchable: false,
+      options: [
+        { value: "", label: "Prefer not to say" },
+        { value: "Straight", label: "Straight" },
+        { value: "Bisexual", label: "Bisexual" },
+      ],
+    });
+    const chosen = { ...ctx, profile: { ...profile, orientation: "Bisexual" } };
+    expect(buildEditRow("orientation", chosen).value).toBe("Bisexual");
+    expect(patchFor("orientation", { kind: "single", value: "Straight" }, profile)).toEqual({
+      orientation: "Straight",
+    });
+    expect(patchFor("orientation", { kind: "single", value: "" }, profile)).toEqual({
+      orientation: null,
     });
   });
 });
@@ -225,6 +285,11 @@ describe("drafts", () => {
       city: "Warri",
       location: "Warri, Delta State, Nigeria",
     });
+    // A typed town nobody listed saves the same way.
+    expect(patchFor("city", { kind: "single", value: " Ikota Villa " }, profile)).toEqual({
+      city: "Ikota Villa",
+      location: "Ikota Villa, Delta State, Nigeria",
+    });
     expect(patchFor("country", { kind: "single", value: "NG" }, profile)).toEqual({
       country: "NG",
       state: null,
@@ -250,6 +315,7 @@ describe("drafts", () => {
 
   it("helpers: location line, adult cutoff, sorted nationalities, API error text", () => {
     expect(locationLine("Abraka", "Delta", "NG")).toBe("Abraka, Delta State, Nigeria");
+    expect(locationLine("Nairobi", "Nairobi", "KE")).toBe("Nairobi, Nairobi, Kenya");
     expect(locationLine(null, null, null)).toBeNull();
     expect(adultCutoff(new Date("2026-09-12T10:00:00Z"))).toBe("2008-09-12");
     const [first, second] = nationalityOptions();
@@ -321,5 +387,35 @@ describe("profileApi + uploadProfileImage", () => {
     await expect(uploadProfileImage("avatar", new File([], "x.jpg"))).rejects.toThrow(/max 5MB/);
     expect(upload).not.toHaveBeenCalled();
     expect(apiPatch).not.toHaveBeenCalled();
+  });
+});
+
+describe("a member with no saved country", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("gets Nigeria's states and towns, sign-up's default, rather than Kenya's", async () => {
+    const noCountry = { ...profile, country: null, state: "Lagos" };
+    const state = buildEditRow("state", { ...ctx, profile: noCountry }).editor;
+    if (state.kind !== "single") throw new Error("state should be a single picker");
+    expect(state.options.map((o) => o.value)).toContain("Lagos");
+    expect(state.options.map((o) => o.value)).not.toContain("Nairobi");
+
+    const fetch = vi.fn(async () => new Response(JSON.stringify(["Ikeja", "Lekki"])));
+    vi.stubGlobal("fetch", fetch);
+    await expect(loadCityOptions(noCountry)).resolves.toEqual(["Ikeja", "Lekki"]);
+    expect(fetch).toHaveBeenCalledWith("/locations/NG/lagos.json");
+  });
+});
+
+describe("loadCityOptions", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("loads the towns of the member's state, and nothing without a state", async () => {
+    const fetch = vi.fn(async () => new Response(JSON.stringify(["Abraka", "Warri"])));
+    vi.stubGlobal("fetch", fetch);
+    await expect(loadCityOptions(profile)).resolves.toEqual(["Abraka", "Warri"]);
+    expect(fetch).toHaveBeenCalledWith("/locations/NG/delta.json");
+    await expect(loadCityOptions({ ...profile, state: null })).resolves.toEqual([]);
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });

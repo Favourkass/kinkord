@@ -1,10 +1,9 @@
 /**
  * Members directory + follow graph: API access and the pure rules the directory
- * screens share (country search, state/region lists, optimistic follow toggles).
+ * screens share (country search, optimistic follow toggles).
  */
 import { ALL_COUNTRY_CODES } from "@/constants/countries";
 import { AVAILABLE_COUNTRIES } from "@/constants/members";
-import { NG_LGAS } from "@/constants/nigeria";
 import type { MediaPagePM, MemberCardPM, PublicProfilePM } from "@/domain/member";
 import { countryName } from "@/util/format";
 import { api } from "./apiClient";
@@ -29,7 +28,11 @@ export interface FriendPM {
   gender: string | null;
   city: string | null;
   state: string | null;
+  /** ISO 3166-1 alpha-2; it decides how the state is named. Absent from an older API. */
+  country?: string | null;
   isFollowing: boolean;
+  /** Shows the Silver check; absent from an older API. */
+  silver?: boolean;
 }
 
 export interface FriendsPagePM {
@@ -71,6 +74,8 @@ export interface MembersPageParams {
   state?: string | null;
   /** LGA / area filter within `state`; omit to list the whole state (CEO, 2026-09-08). */
   region?: string | null;
+  /** A name or @username to look for. */
+  q?: string | null;
   page: number;
   limit: number;
   sort?: MembersSort;
@@ -84,10 +89,16 @@ export const membersApi = {
     const qs = new URLSearchParams({ country: p.country.toUpperCase() });
     if (p.state) qs.set("state", p.state);
     if (p.state && p.region) qs.set("lga", p.region);
+    if (p.q) qs.set("q", p.q);
     qs.set("page", String(p.page));
     qs.set("limit", String(p.limit));
     if (p.sort) qs.set("sort", p.sort);
     return api.get<MembersPagePM>(`/members?${qs.toString()}`);
+  },
+  /** The app's search: everyone matching a name or @username, best matches first. */
+  search: (q: string, page: number, limit: number) => {
+    const qs = new URLSearchParams({ q, page: String(page), limit: String(limit) });
+    return api.get<MembersPagePM>(`/members/search?${qs.toString()}`);
   },
   profile: (username: string) =>
     api.get<PublicProfilePM>(`/profiles/${encodeURIComponent(username.replace(/^@/, ""))}`),
@@ -146,17 +157,6 @@ export function searchCountries(query: string, counts: CountryCountPM[] | null):
     .sort((a, b) => a.name.localeCompare(b.name))
     .map<CountryOption>((c) => ({ ...c, flag: null, membersCount: null, available: false }));
   return [...launchedHits, ...comingSoon];
-}
-
-/** Configured states for a launched country, in the product team's order. */
-export function statesForCountry(code: string): string[] {
-  return code.toUpperCase() === "NG" ? Object.keys(NG_LGAS) : [];
-}
-
-/** Configured regions (LGAs / areas) for a state; empty when the state is unknown. */
-export function regionsForState(code: string, state: string): string[] {
-  if (code.toUpperCase() !== "NG") return [];
-  return [...(NG_LGAS[state] ?? [])];
 }
 
 /** Optimistic follow flip for a directory card. */

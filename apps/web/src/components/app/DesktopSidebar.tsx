@@ -1,4 +1,6 @@
+import Image from "next/image";
 import Link from "next/link";
+import { Coins } from "lucide-react";
 import AvatarCircle from "./AvatarCircle";
 import MaskIcon, { type MaskIconName } from "./MaskIcon";
 import type { AppNav, AppNavLabels, AppNavLinks } from "./nav";
@@ -33,8 +35,13 @@ export default function DesktopSidebar({
   labels,
   onLogout,
 }: DesktopSidebarProps) {
-  const unread = { home: 0, chat: messagesCount, notifications: notificationsCount ?? 0 };
-  const unreadLabel = (key: "home" | "chat" | "notifications") =>
+  const unread = {
+    home: 0,
+    search: 0,
+    chat: messagesCount,
+    notifications: notificationsCount ?? 0,
+  };
+  const unreadLabel = (key: "home" | "search" | "chat" | "notifications") =>
     key === "chat" && messagesCount > 0
       ? `${labels.chat}, ${messagesCount} unread messages`
       : key === "notifications" && (unread.notifications > 0 || notificationsUnread)
@@ -43,11 +50,12 @@ export default function DesktopSidebar({
           : `${labels.notifications}, unread notifications`
         : undefined;
   const items: Array<{
-    key: "home" | "chat" | "notifications";
+    key: "home" | "search" | "chat" | "notifications";
     icon: MaskIconName;
     iconClass: string;
   }> = [
     { key: "home", icon: "home-solid", iconClass: "text-kink-amber" },
+    { key: "search", icon: "search", iconClass: "text-side-text" },
     { key: "chat", icon: "chat", iconClass: "text-side-text" },
     { key: "notifications", icon: "bell-outline", iconClass: "text-side-text" },
   ];
@@ -98,6 +106,18 @@ export default function DesktopSidebar({
           </span>
           {labels.profile}
         </Link>
+        {links.kinkcoins && labels.kinkcoins && (
+          <Link
+            href={links.kinkcoins}
+            aria-current={active === "kinkcoins" ? "page" : undefined}
+            className={row(active === "kinkcoins")}
+          >
+            <span className="grid size-[29px] place-items-center">
+              <Coins size={27} />
+            </span>
+            <span className="text-[18px]">{labels.kinkcoins}</span>
+          </Link>
+        )}
       </nav>
       <div className="mt-auto">
         <div className="ml-[7px] w-[307px] border-t-[1.5px] border-side-divider" />
@@ -110,6 +130,12 @@ export default function DesktopSidebar({
             <MaskIcon src="/app/feed/icon-bookmark.svg" width={29} />
           </span>
           {labels.saved}
+        </Link>
+        <Link href={links.subscription} className={`mt-[24px] ${row(false)}`}>
+          <span className="grid size-[29px] place-items-center">
+            <Image src="/app/subscription/silver-crest.png" alt="" width={29} height={26} />
+          </span>
+          {labels.subscription}
         </Link>
         <Link
           href={links.settings}

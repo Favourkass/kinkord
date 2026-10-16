@@ -1,7 +1,12 @@
 import Link from "next/link";
+import CoinBalance from "@/components/kinkcoins/CoinBalance";
+import type { CoinBalanceVM } from "@/domain/kinkcoins";
 import MaskIcon from "@/components/app/MaskIcon";
+import VerifiedMark from "@/components/brand/VerifiedMark";
 import type { PublicProfileVM } from "@/domain/member";
 import ExpandableAvatar from "./ExpandableAvatar";
+import SilverBadge, { type SilverBadgeLabels } from "./SilverBadge";
+import OrganizationBadge from "@/components/organization/OrganizationBadge";
 
 export interface ProfileHeroLabels {
   follow: string;
@@ -12,16 +17,26 @@ export interface ProfileHeroLabels {
   /** Own profile (Figma 1167:552); inert until stories ship. */
   addToStory: string;
   comingSoon: string;
+  /** Shown when the member's identity is verified and they show it. */
+  identityVerified: string;
+  /** Beside your own badge when you've hidden it from others. */
+  identityHidden: string;
   stats: { friends: string; followers: string; following: string };
+  silver: SilverBadgeLabels;
+  organization: string;
+  verifiedOrganization: string;
 }
 
 export interface ProfileHeroProps {
   vm: PublicProfileVM;
+  coinBalance?: CoinBalanceVM;
   /** "Online" / "Last seen an hour ago"; null when never seen. */
   presenceText: string | null;
   labels: ProfileHeroLabels;
   messageHref: string;
   editHref: string;
+  /** Where the Silver check's note leads. */
+  silverHref: string;
   onToggleFollow: () => void;
   followBusy: boolean;
 }
@@ -34,13 +49,16 @@ export interface ProfileHeroProps {
  */
 export default function ProfileHero({
   vm,
+  coinBalance,
   presenceText,
   labels,
   messageHref,
   editHref,
+  silverHref,
   onToggleFollow,
   followBusy,
 }: ProfileHeroProps) {
+  const organization = vm.accountType === "organization";
   return (
     <section>
       <div className="relative h-[240px]">
@@ -58,7 +76,10 @@ export default function ProfileHero({
           )}
         </div>
         <div className="absolute left-[20px] top-[114px] size-[110px]">
-          <span aria-hidden className="absolute inset-0 rounded-full bg-pf-surface" />
+          <span
+            aria-hidden
+            className={`absolute inset-0 ${organization ? "rounded-[20px]" : "rounded-full"} bg-pf-surface`}
+          />
           {vm.avatarUrl ? (
             <ExpandableAvatar
               src={vm.avatarUrl}
@@ -67,9 +88,12 @@ export default function ProfileHero({
               closeLabel="Close"
               wrapperClassName="absolute left-[5px] top-[8px] size-[100px]"
               className="size-[100px]"
+              shape={organization ? "square" : "circle"}
             />
           ) : (
-            <span className="absolute left-[5px] top-[8px] grid size-[100px] place-items-center rounded-full bg-pf-surface-2 text-pf-muted">
+            <span
+              className={`absolute left-[5px] top-[8px] grid size-[100px] place-items-center ${organization ? "rounded-[18px]" : "rounded-full"} bg-pf-surface-2 text-pf-muted`}
+            >
               <MaskIcon name="people" width={40} />
             </span>
           )}
@@ -83,18 +107,44 @@ export default function ProfileHero({
 
       <div className="flex flex-col items-center gap-[10px] px-[16px] pb-[16px]">
         <p className="flex items-baseline gap-[6px]">
-          <span className="text-[22px] font-bold leading-[27px] text-pf-text">
+          <span className="inline-flex items-center gap-[4px] text-[22px] font-bold leading-[27px] text-pf-text">
             {vm.displayName}
+            {vm.silver ? (
+              <SilverBadge since={vm.silver.since} labels={labels.silver} href={silverHref} />
+            ) : null}
+            {organization ? (
+              <OrganizationBadge
+                label={labels.organization}
+                verified={vm.organizationVerified}
+                verifiedLabel={labels.verifiedOrganization}
+                markSize={16}
+              />
+            ) : null}
           </span>
           {vm.handle && (
             <span className="text-[16px] leading-[19px] text-pf-muted">· {vm.handle}</span>
           )}
         </p>
-        <p className="flex items-center gap-[12px] text-[13px] font-bold leading-[16px] text-pf-muted">
-          <span>
-            {vm.stats.friends} {labels.stats.friends}
+        {vm.verification.level === "identity" ? (
+          <span className="flex flex-wrap items-center justify-center gap-x-[8px] gap-y-[4px]">
+            <span className="flex items-center gap-[6px] rounded-full border border-kink-gold-bright/60 px-[12px] py-[4px] text-[12px] font-bold text-kink-gold-bright">
+              <VerifiedMark size={16} />
+              {labels.identityVerified}
+            </span>
+            {vm.verification.hiddenFromOthers ? (
+              <span className="text-[12px] text-pf-muted">{labels.identityHidden}</span>
+            ) : null}
           </span>
-          <span aria-hidden>·</span>
+        ) : null}
+        <p className="flex items-center gap-[12px] text-[13px] font-bold leading-[16px] text-pf-muted">
+          {vm.stats.friends !== null ? (
+            <>
+              <span>
+                {vm.stats.friends} {labels.stats.friends}
+              </span>
+              <span aria-hidden>·</span>
+            </>
+          ) : null}
           <span>
             {vm.stats.followers} {labels.stats.followers}
           </span>
@@ -103,6 +153,7 @@ export default function ProfileHero({
             {vm.stats.following} {labels.stats.following}
           </span>
         </p>
+        {coinBalance && <CoinBalance balance={coinBalance} />}
         {vm.locationParts.length > 0 && (
           <p className="flex items-center gap-[4px] text-[13px] font-bold leading-[16px] text-pf-muted">
             <MaskIcon name="map-pin" width={14} className="text-kink-gold-bright" />

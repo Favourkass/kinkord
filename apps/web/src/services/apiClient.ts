@@ -7,7 +7,7 @@ const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
  * step each one sends them back to.
  */
 const SIGN_UP_STEP_FOR_CODE = new Map([
-  ["PHONE_VERIFICATION_REQUIRED", "phone"],
+  ["EMAIL_VERIFICATION_REQUIRED", "email"],
   ["PROFILE_PHOTOS_REQUIRED", "profile"],
 ]);
 
@@ -70,6 +70,8 @@ export const api = {
     request<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
   post: <T>(path: string, body: unknown) =>
     request<T>(path, { method: "POST", body: JSON.stringify(body) }),
+  put: <T>(path: string, body: unknown) =>
+    request<T>(path, { method: "PUT", body: JSON.stringify(body) }),
   del: <T>(path: string) => request<T>(path, { method: "DELETE" }),
 };
 

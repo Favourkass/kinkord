@@ -1,7 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
-import { clamp, createPostSchema, parseCursor, PostsService } from "./posts.service";
+import {
+  clamp,
+  createPostSchema,
+  LONG_POST_NEEDS_SILVER,
+  parseCursor,
+  PostsService,
+} from "./posts.service";
+import { rankedTabPage } from "./feed-tabs";
+
+// For You and Nearby pick their rows in feed-tabs.ts (feed-tabs.spec.ts); here
+// they are stubbed per test, and the real thing runs otherwise.
+vi.mock("./feed-tabs", async (importOriginal) => {
+  const original = await importOriginal<typeof import("./feed-tabs")>();
+  return { ...original, rankedTabPage: vi.fn(original.rankedTabPage) };
+});
 
 /**
  * Drizzle's builders are chainable and awaited at the end, so a stub returns
@@ -55,6 +69,34 @@ function makeRecordingDb(wheres: SQL[]) {
   return { select: vi.fn(() => chain()) };
 }
 
+/** Wraps a stubbed query so each `.leftJoin(table, on)` keeps its `on`, to read the SQL back. */
+function recordJoins(query: unknown, joins: SQL[]): unknown {
+  return new Proxy(query as object, {
+    get(target, prop) {
+      const value = Reflect.get(target, prop) as (...args: unknown[]) => unknown;
+      if (prop === "then") return value;
+      return (...args: unknown[]) => {
+        if (prop === "leftJoin") joins.push(args[1] as SQL);
+        return recordJoins(value(...args), joins);
+      };
+    },
+  });
+}
+
+/** Wraps a stubbed query so its `.where(...)` is kept, to read the SQL back. */
+function recordWhere(query: unknown, wheres: SQL[]): unknown {
+  return new Proxy(query as object, {
+    get(target, prop) {
+      const value = Reflect.get(target, prop) as (...args: unknown[]) => unknown;
+      if (prop === "then") return value;
+      return (...args: unknown[]) => {
+        if (prop === "where") wheres.push(args[0] as SQL);
+        return recordWhere(value(...args), wheres);
+      };
+    },
+  });
+}
+
 /** A one-off chainable that resolves to `rows`, for a hand-built db stub. */
 function chainOnce(rows: unknown[]): unknown {
   const p: unknown = new Proxy(() => p, {
@@ -80,7 +122,7 @@ function makeStorage() {
   };
 }
 
-const push = { newRepost: vi.fn() };
+const push = { newRepost: vi.fn(), newMention: vi.fn() };
 
 const service = (db = makeDb(), storage = makeStorage()) =>
   new PostsService(db as never, storage as never, push as never);
@@ -146,11 +188,77 @@ describe("PostsService.presignMediaUpload", () => {
   });
 });
 
+describe("PostsService.notifyMentions", () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it("tells mentioned members who can see the post, never the writer or the excepted", async () => {
+    push.newMention.mockClear();
+    const svc = service(
+      makeDb([
+        [
+          { username: "self", id: "u1" },
+          { username: "two", id: "u2" },
+          { username: "three", id: "u3" },
+          { username: "four", id: "u4" },
+        ],
+      ]),
+    );
+    // u3 can't see this friends-only post: a link would only say "not found".
+    vi.spyOn(svc, "canSee").mockImplementation(async (_post, viewer) => viewer !== "u3");
+    svc.notifyMentions("p1", "u1", "@self @two @three @four @ghost", ["u4"]);
+    await settle();
+    expect(push.newMention.mock.calls).toEqual([["p1", "u2", "u1"]]);
+  });
+
+  it("asks nothing when nobody is mentioned, and never fails the post", async () => {
+    const db = makeDb();
+    service(db).notifyMentions("p1", "u1", "no handles here");
+    expect(db.select).not.toHaveBeenCalled();
+    const broken = {
+      ...makeDb(),
+      select: vi.fn(() => {
+        throw new Error("db down");
+      }),
+    };
+    expect(() => service(broken).notifyMentions("p1", "u1", "@ada hi")).not.toThrow();
+    await settle();
+  });
+});
+
 describe("PostsService.create", () => {
   let storage: ReturnType<typeof makeStorage>;
 
   beforeEach(() => {
     storage = makeStorage();
+  });
+
+  it("keeps a Basic member's post to 2,000 characters", async () => {
+    await expect(
+      service(makeDb([[]]), storage).create("u1", {
+        body: "x".repeat(2001),
+        visibility: "public",
+        media: [],
+      }),
+    ).rejects.toThrow(LONG_POST_NEEDS_SILVER);
+  });
+
+  it("lets a Silver member write a longer post", async () => {
+    const silver = [{ end: new Date(Date.now() + 86_400_000) }];
+    // Past the length check, it fails on the media instead.
+    await expect(
+      service(makeDb([silver]), storage).create("u1", {
+        body: "x".repeat(25_000),
+        visibility: "public",
+        media: [{ key: "posts/u2/stolen.jpg", kind: "image" }],
+      }),
+    ).rejects.toThrow(/unknown upload/);
+  });
+
+  it("caps everyone at Silver's 25,000 characters", () => {
+    const parse = (body: string) =>
+      createPostSchema.safeParse({ body, visibility: "public" }).success;
+    expect(parse("x".repeat(25_000))).toBe(true);
+    expect(parse("x".repeat(25_001))).toBe(false);
   });
 
   it("refuses a key belonging to somebody else", async () => {
@@ -281,6 +389,7 @@ describe("PostsService.byId", () => {
     over.liked ?? [],
     over.reposted ?? [],
     over.saved ?? [],
+    over.gifts ?? [],
   ];
 
   it("carries the counts, the viewer's own reactions, and a small avatar", async () => {
@@ -290,6 +399,7 @@ describe("PostsService.byId", () => {
       ...decorated({
         media: [{ id: "m1", postId: "p1", kind: "image", key: "posts/u2/a.jpg", position: 0 }],
         likes: [{ postId: "p1", n: 3 }],
+        gifts: [{ postId: "p1", n: 5 }],
         comments: [{ postId: "p1", n: 2 }],
         reposts: [{ postId: "p1", n: 9 }],
         liked: [{ postId: "p1" }],
@@ -304,6 +414,7 @@ describe("PostsService.byId", () => {
       id: "p1",
       postId: "p1",
       likes: 3,
+      gifts: 5,
       comments: 2,
       reposts: 9,
       likedByMe: true,
@@ -311,10 +422,26 @@ describe("PostsService.byId", () => {
       savedByMe: true,
       repostedBy: null,
       mine: false,
-      author: { username: "tega", displayName: "Sir T" },
+      author: { username: "tega", displayName: "Sir T", silver: false },
     });
     expect(vm?.media[0].thumbUrl).toContain("v=md");
     expect(storage.presignDownload).toHaveBeenCalledWith("avatars/u2/a.jpg", "sm");
+  });
+
+  it("links only the @handles that are members", async () => {
+    const db = makeDb([
+      [{ ...row, body: "brunch with @Tega and @ghost" }],
+      ...decorated(),
+      [{ username: "tega" }],
+    ]);
+    const vm = await service(db, makeStorage()).byId("p1", "u1");
+    expect(vm?.mentions).toEqual([{ handle: "tega", username: "tega" }]);
+  });
+
+  it("shows the Silver check on an author who has it", async () => {
+    const db = makeDb([[{ ...row, silver: true }], ...decorated({})]);
+    const vm = await service(db, makeStorage()).byId("p1", "u1");
+    expect(vm?.author.silver).toBe(true);
   });
 
   it("marks a member's own post so the delete menu can appear", async () => {
@@ -353,6 +480,36 @@ describe("PostsService.byId", () => {
     expect(vm?.repostedBy).toEqual({ userId: "u1", username: "favour", displayName: "Favour" });
     expect(vm?.likes).toBe(4);
     expect(vm?.mine).toBe(true);
+  });
+
+  it("says whether the viewer follows the author, so a card needs no profile request", async () => {
+    const followed = makeDb([[{ ...row, viewerFollowsAuthor: true }], ...decorated()]);
+    expect((await service(followed).byId("p1", "u1"))?.author.isFollowing).toBe(true);
+    const stranger = makeDb([[{ ...row, viewerFollowsAuthor: false }], ...decorated()]);
+    expect((await service(stranger).byId("p1", "u1"))?.author.isFollowing).toBe(false);
+  });
+
+  it("takes a repost's follow from the original's author, not from whoever reposted it", async () => {
+    const repostRow = {
+      ...row,
+      id: "r1",
+      body: null,
+      authorId: "u1",
+      repostOfId: "p1",
+      viewerFollowsAuthor: false,
+    };
+    const joins: SQL[] = [];
+    const db = makeDb([[repostRow], [{ ...row, viewerFollowsAuthor: true }], ...decorated()]);
+    const recorded = { ...db, select: vi.fn(() => recordJoins(db.select(), joins)) };
+
+    const vm = await service(recorded as never).byId("r1", "viewer-1");
+
+    expect(vm?.author).toMatchObject({ userId: "u2", isFollowing: true });
+    // The originals query joins the viewer's own follow of each original's author.
+    const original = new PgDialect().sqlToQuery(joins.at(-1)!);
+    expect(original.sql).toContain('"viewer_follows_author"."follower_id" = $1');
+    expect(original.sql).toContain('"viewer_follows_author"."following_id" = "post"."author_id"');
+    expect(original.params).toEqual(["viewer-1"]);
   });
 
   it("drops a repost whose original has been deleted rather than showing a hole", async () => {
@@ -416,9 +573,142 @@ describe("the feed's visibility rules", () => {
     expect(params[3]).toBe("2026-09-18T09:00:00.000Z");
   });
 
+  it("searches post text within the same visibility rules, wildcards taken literally", async () => {
+    const { sql, params } = await feedSql({ q: "50%_off" });
+    expect(sql).toContain('"post"."visibility" = $1 or "post"."author_id" = $2');
+    expect(sql).toContain('"post"."body" ilike $4');
+    expect(params[3]).toBe("%50\\%\\_off%");
+  });
+
   it("leaves the cursor out of the query on the first page", async () => {
     const { sql } = await feedSql();
     expect(sql).not.toContain('"post"."created_at" <');
+  });
+
+  it("reads whether the viewer follows each author off the rule's own join", async () => {
+    const db = makeRecordingDb([]);
+    await new PostsService(db as never, makeStorage() as never, push as never).feed("viewer-1");
+    const [fields] = db.select.mock.calls[0] as unknown as [{ viewerFollowsAuthor: SQL }];
+    expect(new PgDialect().sqlToQuery(fields.viewerFollowsAuthor).sql).toBe(
+      '"viewer_follows_author"."follower_id" is not null',
+    );
+  });
+});
+
+describe("the home feed's tabs", () => {
+  const mk = (id: string, hour: number) => ({
+    id,
+    body: id,
+    visibility: "public" as const,
+    createdAt: new Date(`2026-09-18T${String(hour).padStart(2, "0")}:00:00.000Z`),
+    authorId: "u2",
+    repostOfId: null,
+    username: "tega",
+    displayName: "Sir T",
+    avatarKey: null,
+  });
+  /** decorate() reads media, likes, comments, reposts, liked, reposted, saved and gifts. */
+  const decorated = () => [[], [], [], [], [], [], [], []];
+
+  it("Following reads newest first: the viewer's own posts and everyone they follow, nobody blocked", async () => {
+    const wheres: SQL[] = [];
+    const svc = new PostsService(
+      makeRecordingDb(wheres) as never,
+      makeStorage() as never,
+      push as never,
+    );
+    await svc.feed("viewer-1", { tab: "following", cursor: "2026-09-18T09:00:00.000Z" });
+    const { sql, params } = new PgDialect().sqlToQuery(wheres[0]);
+    // The one visibility rule, then the cursor, then who the viewer follows.
+    expect(sql).toContain('"post"."visibility" = $1 or "post"."author_id" = $2');
+    expect(sql).toContain('"post"."created_at" < $4');
+    expect(sql).toContain(
+      '"post"."author_id" = $5 or exists (select 1 from "follow" where "follow"."follower_id" = $6 and "follow"."following_id" = "post"."author_id")',
+    );
+    expect(sql).toContain('"member_block"');
+    expect(params.slice(3, 6)).toEqual(["2026-09-18T09:00:00.000Z", "viewer-1", "viewer-1"]);
+    expect(rankedTabPage).not.toHaveBeenCalled();
+  });
+
+  it("an empty Following says the viewer follows nobody, and only then", async () => {
+    const nobody = makeDb([[], []]);
+    await expect(service(nobody).feed("u1", { tab: "following" })).resolves.toEqual({
+      items: [],
+      nextCursor: null,
+      hint: "no_follows",
+    });
+    // They follow someone who hasn't posted: just empty.
+    const quiet = makeDb([[], [{ id: "u2" }]]);
+    await expect(service(quiet).feed("u1", { tab: "following" })).resolves.toEqual({
+      items: [],
+      nextCursor: null,
+    });
+    // A page with posts on it never asks.
+    const busy = makeDb([[mk("p1", 9)], ...decorated()]);
+    const page = await service(busy).feed("u1", { tab: "following" });
+    expect(page.hint).toBeUndefined();
+    expect(busy.select).toHaveBeenCalledTimes(9);
+  });
+
+  it("For You shows the rows the ranking chose, in its order, read through the visibility rule", async () => {
+    vi.mocked(rankedTabPage).mockResolvedValueOnce({
+      ids: ["p2", "gone", "p1"],
+      nextCursor: "next",
+    });
+    const wheres: SQL[] = [];
+    // selectPosts answers newest first, and without "gone", which the viewer can no longer see.
+    const db = makeDb([[mk("p2", 8), mk("p1", 10)], ...decorated()]);
+    const recorded = { ...db, select: vi.fn(() => recordWhere(db.select(), wheres)) };
+
+    const page = await service(recorded as never).feed("viewer-1", {
+      tab: "for_you",
+      cursor: "opaque",
+      limit: 3,
+    });
+
+    expect(rankedTabPage).toHaveBeenCalledWith(recorded, "viewer-1", "for_you", "opaque", 3);
+    expect(page.items.map((i) => i.id)).toEqual(["p2", "p1"]);
+    expect(page.nextCursor).toBe("next");
+    const { sql, params } = new PgDialect().sqlToQuery(wheres[0]);
+    expect(sql).toContain('"post"."visibility" = $1 or "post"."author_id" = $2');
+    expect(sql).toContain('"post"."id" in ($4, $5, $6)');
+    expect(params.slice(3)).toEqual(["p2", "gone", "p1"]);
+  });
+
+  it("Nearby says when the viewer has no location, reading no posts", async () => {
+    vi.mocked(rankedTabPage).mockResolvedValueOnce({
+      ids: [],
+      nextCursor: null,
+      hint: "no_location",
+    });
+    const db = makeDb();
+    await expect(service(db).feed("u1", { tab: "nearby" })).resolves.toEqual({
+      items: [],
+      nextCursor: null,
+      hint: "no_location",
+    });
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it("a profile's Posts tab and a search read newest first, whatever the tab", async () => {
+    const wheres: SQL[] = [];
+    const svc = new PostsService(
+      makeRecordingDb(wheres) as never,
+      makeStorage() as never,
+      push as never,
+    );
+    vi.spyOn(svc as never, "resolveAuthor").mockResolvedValue("u2" as never);
+    await svc.feed("viewer-1", { tab: "following", author: "tega" });
+    await svc.feed("viewer-1", { tab: "for_you", q: "brunch" });
+    expect(rankedTabPage).not.toHaveBeenCalled();
+    for (const where of wheres) {
+      expect(new PgDialect().sqlToQuery(where).sql).not.toContain('"follow"."follower_id"');
+    }
+  });
+
+  it("is the feed as it always was without a tab", async () => {
+    await service(makeDb([[]])).feed("u1");
+    expect(rankedTabPage).not.toHaveBeenCalled();
   });
 });
 
@@ -590,5 +880,33 @@ describe("repost notifications", () => {
     await svc.repost("r1", "u1");
     expect(push.newRepost).toHaveBeenCalledTimes(1);
     expect(push.newRepost).toHaveBeenCalledWith("p1", "u2", "u1");
+  });
+});
+
+describe("share counts", () => {
+  const withTx = (db: ReturnType<typeof makeDb>) =>
+    Object.assign(db, { transaction: vi.fn(async (cb: (tx: unknown) => unknown) => cb(db)) });
+  it("counts a member's first share of the original post, after visibility is checked", async () => {
+    const db = withTx(makeDb([[{ postId: "original" }], [{ shares: 4 }]]));
+    const svc = service(db);
+    vi.spyOn(svc, "byId").mockResolvedValue({ postId: "original" } as never);
+    expect(await svc.share("repost", "viewer")).toEqual({ postId: "original", shares: 4 });
+    expect(svc.byId).toHaveBeenCalledWith("repost", "viewer");
+    expect(db.insert).toHaveBeenCalledOnce();
+    expect(db.update).toHaveBeenCalledOnce();
+  });
+  it("doesn't count the same member sharing it again", async () => {
+    const db = withTx(makeDb([[], [{ shares: 4 }]]));
+    const svc = service(db);
+    vi.spyOn(svc, "byId").mockResolvedValue({ postId: "original" } as never);
+    expect(await svc.share("original", "viewer")).toEqual({ postId: "original", shares: 4 });
+    expect(db.update).not.toHaveBeenCalled();
+  });
+  it("does not count shares of inaccessible posts", async () => {
+    const db = makeDb();
+    const svc = service(db);
+    vi.spyOn(svc, "byId").mockResolvedValue(null);
+    await expect(svc.share("private", "viewer")).rejects.toThrow("Post not found");
+    expect(db.update).not.toHaveBeenCalled();
   });
 });

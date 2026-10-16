@@ -3,35 +3,50 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
-import { and, count, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, ilike, inArray, isNull, lt, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { Db, DRIZZLE } from "../db/db.module";
-import { notBanned } from "../moderation/admins";
+import { containsPattern } from "../push/notifications.service";
 import { PushService } from "../push/push.service";
 import {
   follow,
+  memberSubscription,
   post,
   postComment,
   postLike,
+  postShare,
   postMedia,
   postSave,
   profile,
   user,
+  walletGift,
   POST_BODY_MAX,
   POST_MEDIA_MAX,
   type PostMediaKind,
   type PostVisibility,
 } from "../db/schema";
 import {
+  knownHandles,
+  membersToTell,
+  mentionCandidates,
+  mentionsIn,
+  type Mention,
+} from "./mentions";
+import {
   IMAGE_VARIANTS,
   StorageService,
   variantKey,
   type ImageVariant,
 } from "../storage/storage.service";
+import { hasSilver, SILVER_POST_BODY_MAX, silverCheck } from "../subscriptions/plans";
+import type { FeedHint, FeedTab, RankedTab } from "./feed-ranking";
+import { followingConditions, followsAnyone, rankedTabPage } from "./feed-tabs";
+import { visibleTo } from "./visibility";
 
 /** Photos only for now; the column takes video so the grid can grow into it. */
 const IMAGE_TYPES: Record<string, string> = {
@@ -49,12 +64,18 @@ export const FEED_MAX_PAGE_SIZE = 30;
 export const COMMENT_PAGE_SIZE = 10;
 export const COMMENT_MAX_PAGE_SIZE = 50;
 
+/** Said when a Basic member's post is longer than POST_BODY_MAX. */
+export const LONG_POST_NEEDS_SILVER = `Posts can be up to ${POST_BODY_MAX.toLocaleString(
+  "en-US",
+)} characters. Silver members can write up to ${SILVER_POST_BODY_MAX.toLocaleString("en-US")}.`;
+
 /** `posts/<userId>/<uuid>.jpg` — the prefix is what proves a key belongs to its uploader. */
 export const POST_MEDIA_PREFIX = "posts";
 
 export const createPostSchema = z
   .object({
-    body: z.string().trim().max(POST_BODY_MAX).optional(),
+    // Silver's limit; everyone else's is checked in create(), where the plan is known.
+    body: z.string().trim().max(SILVER_POST_BODY_MAX).optional(),
     visibility: z.enum(["public", "friends"]).default("public"),
     media: z
       .array(
@@ -79,11 +100,22 @@ export const uploadUrlSchema = z.object({
 });
 
 export interface FeedParams {
-  /** ISO timestamp of the oldest post already shown; omit for the first page. */
+  /**
+   * Where the last page ended; omit for the first page. The ISO timestamp of
+   * the oldest post shown, except on For You and Nearby, whose cursor is
+   * opaque (feed-ranking.ts).
+   */
   cursor?: string | null;
   limit?: number;
   /** Narrows the feed to one member's posts — this is the profile Posts tab. */
   author?: string | null;
+  /** Search: only posts whose text contains this. Reposts carry no text, so originals only. */
+  q?: string | null;
+  /**
+   * The home feed's tab. Without one, the feed is every visible post, newest
+   * first, as before the tabs; `author` and `q` read that way whatever the tab.
+   */
+  tab?: FeedTab | null;
 }
 
 export interface PostMediaVM {
@@ -100,6 +132,11 @@ export interface PostAuthorVM {
   username: string | null;
   displayName: string;
   avatarUrl: string | null;
+  /** Shows the Silver check beside their name. */
+  silver: boolean;
+  subscribed: boolean;
+  /** Whether the viewer follows them, so a post can offer Follow without a profile request. */
+  isFollowing: boolean;
 }
 
 export interface PostVM {
@@ -117,6 +154,8 @@ export interface PostVM {
   author: PostAuthorVM;
   media: PostMediaVM[];
   likes: number;
+  shares: number;
+  gifts: number;
   comments: number;
   reposts: number;
   likedByMe: boolean;
@@ -126,6 +165,8 @@ export interface PostVM {
   repostedBy: Pick<PostAuthorVM, "userId" | "username" | "displayName"> | null;
   /** Whether the viewer may delete this row — their own post or their own repost. */
   mine: boolean;
+  /** Each @handle in the body that names a member, and whom: the ones the app links. */
+  mentions: Mention[];
 }
 
 export interface RepostVM {
@@ -143,6 +184,11 @@ export interface FeedVM {
   items: PostVM[];
   /** Pass back as `cursor` for the next page; null when the feed is exhausted. */
   nextCursor: string | null;
+  /**
+   * Why a tab may be empty, so the app can say what would fill it: the viewer
+   * follows nobody (Following), or has no state (Nearby).
+   */
+  hint?: FeedHint;
 }
 
 /**
@@ -157,6 +203,8 @@ export interface FeedVM {
  */
 @Injectable()
 export class PostsService {
+  private readonly log = new Logger(PostsService.name);
+
   constructor(
     @Inject(DRIZZLE) private readonly db: Db,
     private readonly storage: StorageService,
@@ -197,6 +245,9 @@ export class PostsService {
   }
 
   async create(userId: string, input: CreatePostInput): Promise<PostVM> {
+    if ((input.body?.length ?? 0) > POST_BODY_MAX && !(await hasSilver(this.db, userId))) {
+      throw new BadRequestException(LONG_POST_NEEDS_SILVER);
+    }
     await this.verifyMedia(userId, input.media);
     const [row] = await this.db
       .insert(post)
@@ -216,14 +267,51 @@ export class PostsService {
         })),
       );
     }
+    this.notifyMentions(row.id, userId, input.body);
     const vm = await this.byId(row.id, userId);
     if (!vm) throw new NotFoundException("Post not found");
     return vm;
   }
 
-  /** The home feed, or one member's posts when `authorId` is given. */
+  /** Whether the viewer can read this post, by the feed's own rules. */
+  async canSee(postId: string, viewerId: string): Promise<boolean> {
+    return (await this.selectPosts(viewerId, [eq(post.id, postId)], 1)).length > 0;
+  }
+
+  /**
+   * Tells the members a post or a comment on it mentions, once each and ten at
+   * most: members who exist, can see the post (a friends-only post's link would
+   * only say "not found"), and aren't the writer or `except` (a post's author
+   * already hears of a comment). A block is honoured where the inbox records it.
+   * Never fails the post or comment.
+   */
+  notifyMentions(
+    postId: string,
+    actorId: string,
+    text: string | null | undefined,
+    except: string[] = [],
+  ): void {
+    const names = mentionCandidates(text);
+    if (!names.length) return;
+    void (async () => {
+      const members = await knownHandles(this.db, names);
+      for (const name of membersToTell(mentionsIn(text, members))) {
+        const id = members.get(name) as string;
+        if (id === actorId || except.includes(id)) continue;
+        if (await this.canSee(postId, id)) this.push.newMention(postId, id, actorId);
+      }
+    })().catch((e: unknown) => this.log.warn(`mention notifications failed: ${String(e)}`));
+  }
+
+  /**
+   * The home feed — For You, Following or Nearby when a tab is given — or one
+   * member's posts when `author` is, or a search when `q` is.
+   */
   async feed(viewerId: string, params: FeedParams = {}): Promise<FeedVM> {
     const limit = clamp(params.limit ?? FEED_PAGE_SIZE, 1, FEED_MAX_PAGE_SIZE);
+    const tab = params.author || params.q ? null : (params.tab ?? null);
+    if (tab === "for_you" || tab === "nearby") return this.rankedFeed(viewerId, tab, params, limit);
+    const following = tab === "following";
     const cursor = parseCursor(params.cursor);
     const authorId = params.author ? await this.resolveAuthor(params.author) : null;
     const rows = await this.selectPosts(
@@ -231,14 +319,41 @@ export class PostsService {
       [
         ...(cursor ? [lt(post.createdAt, cursor)] : []),
         ...(authorId ? [eq(post.authorId, authorId)] : []),
+        ...(params.q ? [ilike(post.body, containsPattern(params.q))] : []),
+        ...(following ? followingConditions(viewerId) : []),
       ],
       limit + 1,
     );
     const page = rows.slice(0, limit);
     const items = await this.decorate(page, viewerId);
+    const nextCursor = rows.length > limit ? (page.at(-1)?.createdAt.toISOString() ?? null) : null;
+    // An empty Following says how to fill it when the viewer follows nobody yet.
+    if (following && !cursor && !rows.length && !(await followsAnyone(this.db, viewerId))) {
+      return { items, nextCursor, hint: "no_follows" };
+    }
+    return { items, nextCursor };
+  }
+
+  /**
+   * For You and Nearby: feed-tabs.ts decides which rows and in what order; they
+   * are read here through the same visibility rule and decorated like any page.
+   */
+  private async rankedFeed(
+    viewerId: string,
+    tab: RankedTab,
+    params: FeedParams,
+    limit: number,
+  ): Promise<FeedVM> {
+    const page = await rankedTabPage(this.db, viewerId, tab, params.cursor, limit);
+    const rows = page.ids.length
+      ? await this.selectPosts(viewerId, [inArray(post.id, page.ids)], page.ids.length)
+      : [];
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    const ordered = page.ids.flatMap((id) => byId.get(id) ?? []);
     return {
-      items,
-      nextCursor: rows.length > limit ? (page.at(-1)?.createdAt.toISOString() ?? null) : null,
+      items: await this.decorate(ordered, viewerId),
+      nextCursor: page.nextCursor,
+      ...(page.hint ? { hint: page.hint } : {}),
     };
   }
 
@@ -468,6 +583,32 @@ export class PostsService {
   }
 
   /** Usernames are stored lowercase by the username plugin; accept "@Handle" too. */
+  /**
+   * Counts a completed native share or link copy, against the original visible
+   * post. Each member counts once per post, however often they share it.
+   */
+  async share(postId: string, viewerId: string) {
+    const visible = await this.byId(postId, viewerId);
+    if (!visible) throw new NotFoundException("Post not found");
+    return this.db.transaction(async (tx) => {
+      const [first] = await tx
+        .insert(postShare)
+        .values({ postId: visible.postId, userId: viewerId })
+        .onConflictDoNothing()
+        .returning({ postId: postShare.postId });
+      const live = and(eq(post.id, visible.postId), isNull(post.deletedAt));
+      const [row] = first
+        ? await tx
+            .update(post)
+            .set({ shares: sql`${post.shares} + 1` })
+            .where(live)
+            .returning({ shares: post.shares })
+        : await tx.select({ shares: post.shares }).from(post).where(live);
+      if (!row) throw new NotFoundException("Post not found");
+      return { postId: visible.postId, shares: row.shares };
+    });
+  }
+
   private async resolveAuthor(username: string): Promise<string> {
     const handle = username.replace(/^@/, "").toLowerCase();
     const [row] = await this.db
@@ -490,6 +631,7 @@ export class PostsService {
       .select({
         id: post.id,
         body: post.body,
+        shares: post.shares,
         visibility: post.visibility,
         createdAt: post.createdAt,
         authorId: post.authorId,
@@ -497,6 +639,10 @@ export class PostsService {
         username: user.username,
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
+        silver: silverCheck(post.authorId),
+        subscribed: sql<boolean>`exists (select 1 from ${memberSubscription} where ${memberSubscription.userId} = ${post.authorId} and ${memberSubscription.currentPeriodEnd} > now())`,
+        // The visibility rule's own join, so it costs nothing extra.
+        viewerFollowsAuthor: sql<boolean>`${viewerFollows.followerId} is not null`,
       })
       .from(post)
       .innerJoin(user, eq(user.id, post.authorId))
@@ -522,11 +668,13 @@ export class PostsService {
    * asserted again here: a repost must never become a way to see a friends-only
    * post, however the row got written.
    */
-  private async originalsById(ids: string[]) {
+  private async originalsById(ids: string[], viewerId: string) {
+    const viewerFollows = alias(follow, "viewer_follows_author");
     const rows = await this.db
       .select({
         id: post.id,
         body: post.body,
+        shares: post.shares,
         visibility: post.visibility,
         createdAt: post.createdAt,
         authorId: post.authorId,
@@ -534,10 +682,18 @@ export class PostsService {
         username: user.username,
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
+        silver: silverCheck(post.authorId),
+        subscribed: sql<boolean>`exists (select 1 from ${memberSubscription} where ${memberSubscription.userId} = ${post.authorId} and ${memberSubscription.currentPeriodEnd} > now())`,
+        // A repost's card shows the original's author, so it's their follow that counts.
+        viewerFollowsAuthor: sql<boolean>`${viewerFollows.followerId} is not null`,
       })
       .from(post)
       .innerJoin(user, eq(user.id, post.authorId))
       .leftJoin(profile, eq(profile.userId, post.authorId))
+      .leftJoin(
+        viewerFollows,
+        and(eq(viewerFollows.followerId, viewerId), eq(viewerFollows.followingId, post.authorId)),
+      )
       .where(and(inArray(post.id, ids), isNull(post.deletedAt), eq(post.visibility, "public")));
     return new Map(rows.map((r) => [r.id, r]));
   }
@@ -552,7 +708,9 @@ export class PostsService {
     // A repost carries no words or photos of its own; its content is the post
     // it points at, so that is what gets counted, reacted to and rendered.
     const originalIds = [...new Set(rows.map((r) => r.repostOfId).filter(isId))];
-    const originals = originalIds.length ? await this.originalsById(originalIds) : new Map();
+    const originals = originalIds.length
+      ? await this.originalsById(originalIds, viewerId)
+      : new Map();
     const pairs = rows
       .map((row) => ({
         row,
@@ -566,7 +724,7 @@ export class PostsService {
     if (!pairs.length) return [];
 
     const ids = [...new Set(pairs.map((p) => p.content.id))];
-    const [media, likes, comments, reposts, liked, reposted, saved] = await Promise.all([
+    const [media, likes, comments, reposts, liked, reposted, saved, gifts] = await Promise.all([
       this.db
         .select()
         .from(postMedia)
@@ -601,8 +759,14 @@ export class PostsService {
         .select({ postId: postSave.postId })
         .from(postSave)
         .where(and(inArray(postSave.postId, ids), eq(postSave.userId, viewerId))),
+      this.db
+        .select({ postId: walletGift.postId, n: count() })
+        .from(walletGift)
+        .where(inArray(walletGift.postId, ids))
+        .groupBy(walletGift.postId),
     ]);
 
+    const giftCount = new Map(gifts.map((r) => [r.postId, Number(r.n)]));
     const likeCount = new Map(likes.map((r) => [r.postId, Number(r.n)]));
     const commentCount = new Map(comments.map((r) => [r.postId, Number(r.n)]));
     const repostCount = new Map(reposts.map((r) => [r.postId, Number(r.n)]));
@@ -626,6 +790,11 @@ export class PostsService {
     // Post headers are 36px circles — the small size is a few KB.
     const avatar = (key: string | null) =>
       key ? this.storage.presignDownload(key, "sm") : Promise.resolve(null);
+    // One lookup for every @handle on the page; none when nobody is mentioned.
+    const members = await knownHandles(
+      this.db,
+      pairs.flatMap(({ content }) => mentionCandidates(content.body)),
+    );
 
     return Promise.all(
       pairs.map(async ({ row, content }) => ({
@@ -640,9 +809,14 @@ export class PostsService {
           username: content.username,
           displayName: content.displayName ?? content.username ?? "Member",
           avatarUrl: await avatar(content.avatarKey),
+          silver: Boolean(content.silver),
+          subscribed: Boolean(content.subscribed),
+          isFollowing: Boolean(content.viewerFollowsAuthor),
         },
         media: mediaByPost.get(content.id) ?? [],
         likes: likeCount.get(content.id) ?? 0,
+        shares: content.shares ?? 0,
+        gifts: giftCount.get(content.id) ?? 0,
         comments: commentCount.get(content.id) ?? 0,
         reposts: repostCount.get(content.id) ?? 0,
         likedByMe: likedByMe.has(content.id),
@@ -657,6 +831,7 @@ export class PostsService {
                 displayName: row.displayName ?? row.username ?? "Member",
               },
         mine: row.authorId === viewerId,
+        mentions: mentionsIn(content.body, members),
       })),
     );
   }
@@ -698,32 +873,6 @@ export class PostsService {
 const tooLarge = () => `Photo is too large — max ${POST_MEDIA_MAX_MB}MB.`;
 
 const isId = (v: string | null): v is string => v !== null;
-
-/**
- * The one visibility rule: anything public, everything of the viewer's own, and
- * friends-only posts between two members who follow each other, never from a
- * suspended author. The feed, the
- * post counts and the profile Media tab all go through this, because three
- * copies of it would eventually disagree and leak somebody's friends-only post.
- */
-function visibleTo(
-  viewerId: string,
-  viewerFollows: ReturnType<typeof alias<typeof follow, string>>,
-  authorFollows: ReturnType<typeof alias<typeof follow, string>>,
-) {
-  return and(
-    notBanned(post.authorId),
-    or(
-      eq(post.visibility, "public"),
-      eq(post.authorId, viewerId),
-      and(
-        eq(post.visibility, "friends"),
-        sql`${viewerFollows.followerId} is not null`,
-        sql`${authorFollows.followerId} is not null`,
-      ),
-    ),
-  );
-}
 
 export function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, Math.floor(n)));

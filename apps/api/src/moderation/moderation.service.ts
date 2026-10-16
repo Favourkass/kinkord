@@ -1,10 +1,16 @@
-import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import {
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { BronzeService } from "../verification/bronze.service";
 import { DRIZZLE, type Db } from "../db/db.module";
 import {
   memberBan,
   moderationLog,
-  otpChallenge,
   post,
   postMedia,
   profile,
@@ -18,7 +24,7 @@ import {
 } from "../db/schema";
 import { PostsService } from "../posts/posts.service";
 import { IMAGE_VARIANTS, StorageService, variantKey } from "../storage/storage.service";
-import { isAdmin, isSuperAdmin } from "./admins";
+import { founderAccount, isAdmin, isBanned, isSuperAdmin } from "./admins";
 import { normalizeEmail, normalizeIp, normalizePhone } from "./signup-rules";
 
 const SEARCH_LIMIT = 30;
@@ -68,6 +74,19 @@ export interface AdminMemberDetail extends AdminMemberSummary {
   rules: AdminBlockRule[];
 }
 
+/** Someone with the admin tools. */
+export interface AdminTeamMember {
+  id: string;
+  name: string;
+  displayName: string | null;
+  username: string | null;
+  avatarUrl: string | null;
+  /** An admin by their verified email (SUPER_ADMIN_EMAILS), so not removable here. */
+  founder: boolean;
+  /** When they were made an admin; null for a founder. */
+  since: string | null;
+}
+
 export interface NewBlockRule {
   kind: SignupRuleKind;
   value: string;
@@ -107,6 +126,7 @@ export class ModerationService {
     @Inject(DRIZZLE) private readonly db: Db,
     private readonly storage: StorageService,
     private readonly posts: PostsService,
+    private readonly verification: BronzeService,
   ) {}
 
   private summarySelect() {
@@ -153,6 +173,88 @@ export class ModerationService {
     return isAdmin(this.db, who);
   }
 
+  private teamSelect() {
+    return this.db
+      .select({
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        email: user.email,
+        emailVerified: user.emailVerified,
+        displayName: profile.displayName,
+        avatarKey: profile.avatarKey,
+        since: staff.createdAt,
+      })
+      .from(user)
+      .leftJoin(profile, eq(profile.userId, user.id))
+      .leftJoin(staff, eq(staff.userId, user.id));
+  }
+
+  private async toTeamMember(
+    r: Awaited<ReturnType<ModerationService["teamSelect"]>>[number],
+  ): Promise<AdminTeamMember> {
+    const founder = isSuperAdmin(r);
+    return {
+      id: r.id,
+      name: r.name,
+      displayName: r.displayName,
+      username: r.username,
+      avatarUrl: r.avatarKey ? await this.storage.presignDownload(r.avatarKey, "sm") : null,
+      founder,
+      since: founder ? null : (r.since?.toISOString() ?? null),
+    };
+  }
+
+  /** The founders, then everyone they made an admin, longest-serving first. */
+  async team(): Promise<AdminTeamMember[]> {
+    const rows = await this.teamSelect()
+      .where(or(founderAccount(user), isNotNull(staff.userId)))
+      .orderBy(asc(staff.createdAt), asc(user.createdAt));
+    const team = await Promise.all(rows.map((r) => this.toTeamMember(r)));
+    return team.sort((a, b) => Number(b.founder) - Number(a.founder));
+  }
+
+  /**
+   * Gives the member with this username the admin tools. Only the founders may
+   * (the controller checks). Making an admin twice changes nothing.
+   */
+  async addAdmin(actorId: string, username: string): Promise<AdminTeamMember> {
+    const handle = username.trim().replace(/^@/, "").toLowerCase();
+    const [row] = await this.teamSelect().where(eq(user.username, handle)).limit(1);
+    if (!row) throw new NotFoundException(`No member has the username @${handle}.`);
+    // Admins can't be blocked, so a blocked admin couldn't be dealt with here.
+    if (await isBanned(this.db, row.id)) {
+      throw new ConflictException(`@${handle} is blocked. Unblock them first.`);
+    }
+    if (isSuperAdmin(row) || row.since) return this.toTeamMember(row);
+    const [added] = await this.db
+      .insert(staff)
+      .values({ userId: row.id })
+      .onConflictDoNothing()
+      .returning({ since: staff.createdAt });
+    if (added) await this.log(actorId, "add-admin", row.id, null, `@${handle}`);
+    return this.toTeamMember({ ...row, since: added?.since ?? new Date() });
+  }
+
+  /** Takes the admin tools away. A founder's come from their email, so they stay. */
+  async removeAdmin(actorId: string, id: string): Promise<{ removed: string }> {
+    const [row] = await this.db
+      .select({ email: user.email, emailVerified: user.emailVerified, username: user.username })
+      .from(user)
+      .where(eq(user.id, id))
+      .limit(1);
+    if (row && isSuperAdmin(row)) {
+      throw new ForbiddenException("The founders are admins by their email and can't be removed.");
+    }
+    const [removed] = await this.db
+      .delete(staff)
+      .where(eq(staff.userId, id))
+      .returning({ userId: staff.userId });
+    if (!removed) throw new NotFoundException("That member isn't an admin.");
+    await this.log(actorId, "remove-admin", id, null, row?.username ? `@${row.username}` : null);
+    return { removed: id };
+  }
+
   /** Newest members first; with a query, anyone whose name, handle, email or phone contains it. */
   async searchMembers(query: string): Promise<AdminMemberSummary[]> {
     const q = query.trim();
@@ -195,7 +297,7 @@ export class ModerationService {
     };
   }
 
-  /** Suspends the account, signs it out everywhere and blocks its email, phone and IPs. */
+  /** Suspends the account, signs it out everywhere and blocks its email, verified phone and IPs. */
   async block(
     actorId: string,
     id: string,
@@ -240,6 +342,10 @@ export class ModerationService {
     const target = await this.moderatable(actorId, id);
     const reason = opts.reason?.trim() || null;
     if (opts.block) await this.writeRules(id, target, await this.contactTrail(id), reason);
+    // Queue Didit's ID/selfie erasure before the attempt rows cascade away, and
+    // with a ban, hold the identity so it can't verify a new account unseen.
+    // If this durable write fails, keep the account so the deletion can be retried safely.
+    await this.verification.forgetMember(id, { hold: opts.block });
     const keys = await this.storedKeysOf(id);
     await Promise.all(
       keys.flatMap((k) => [
@@ -311,10 +417,8 @@ export class ModerationService {
         email: user.email,
         emailVerified: user.emailVerified,
         username: user.username,
-        phone: profile.phone,
       })
       .from(user)
-      .leftJoin(profile, eq(profile.userId, user.id))
       .where(eq(user.id, id))
       .limit(1);
     if (!row) throw new NotFoundException("Member not found.");
@@ -324,30 +428,36 @@ export class ModerationService {
     return row;
   }
 
-  /** Where this member has signed in from, and which phones they proved they own. */
+  /**
+   * Where this member has signed in from, and the phone they proved they own:
+   * the one on their profile, once verified. An unverified number is only what
+   * they typed, and may well be someone else's.
+   */
   private async contactTrail(id: string) {
     const ipRows = await this.db
       .selectDistinct({ ip: session.ipAddress })
       .from(session)
       .where(eq(session.userId, id));
-    const phoneRows = await this.db
-      .selectDistinct({ phone: otpChallenge.destination })
-      .from(otpChallenge)
-      .where(and(eq(otpChallenge.userId, id), eq(otpChallenge.channel, "sms")));
+    const [own] = await this.db
+      .select({ phone: profile.phone, verified: profile.phoneVerified })
+      .from(profile)
+      .where(eq(profile.userId, id))
+      .limit(1);
     return {
       ips: ipRows.map((r) => r.ip).filter((ip): ip is string => Boolean(ip)),
-      verifiedPhones: phoneRows.map((r) => r.phone),
+      verifiedPhones: own?.verified && own.phone ? [own.phone] : [],
     };
   }
 
   /**
-   * Email and phones are refused outright. IPs are only flagged: mobile
-   * networks here share one address across many subscribers, so blocking it
-   * would shut out strangers.
+   * Email and the verified phone are refused outright; a number the member
+   * never verified is left alone, so a ban can't lock out its real owner. IPs
+   * are only flagged: mobile networks here share one address across many
+   * subscribers, so blocking it would shut out strangers.
    */
   private async writeRules(
     id: string,
-    target: { email: string; phone: string | null },
+    target: { email: string },
     trail: { ips: string[]; verifiedPhones: string[] },
     reason: string | null,
   ) {
@@ -358,9 +468,7 @@ export class ModerationService {
     const add = (kind: SignupRuleKind, value: string, action: SignupRuleAction) =>
       rules.set(`${kind}:${value}`, { kind, value, action });
     add("email", normalizeEmail(target.email), "block");
-    for (const phone of [target.phone, ...trail.verifiedPhones]) {
-      if (phone) add("phone", normalizePhone(phone), "block");
-    }
+    for (const phone of trail.verifiedPhones) add("phone", normalizePhone(phone), "block");
     for (const ip of trail.ips) add("ip", normalizeIp(ip), "flag");
     await this.db
       .insert(signupBlock)

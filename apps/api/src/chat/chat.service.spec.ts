@@ -6,12 +6,15 @@ import {
 } from "@nestjs/common";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { type SQL } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
 import { PgDialect } from "drizzle-orm/pg-core";
-import { conversation, conversationParticipant, message } from "../db/schema";
+import { conversation, conversationParticipant, message, profile } from "../db/schema";
 import type { PushService } from "../push/push.service";
 import type { RealtimeService } from "../realtime/realtime.service";
 import type { StorageService } from "../storage/storage.service";
+import { SILVER_NEW_CHATS_PER_DAY } from "../subscriptions/plans";
 import { NEW_CHAT_LIMIT } from "./allowance";
+import { CROSS_COUNTRY_MESSAGE, CROSS_COUNTRY_PREMIUM } from "./cross-country";
 import {
   CHAT_PHOTO_MAX_MB,
   ChatService,
@@ -103,6 +106,15 @@ const row = (id: string, over: Record<string, unknown> = {}) => ({
   deletedAt: null,
   ...over,
 });
+/** Both members' saved countries, as the cross-country check reads them for u1 and u2. */
+const countries = (u1: string | null, u2: string | null) => [
+  { userId: "u1", country: u1 },
+  { userId: "u2", country: u2 },
+];
+/** Same country: nothing more is asked. */
+const nigerians = countries("NG", "NG");
+/** Silver running, as hasSilver reads it. */
+const onSilver = [{ end: new Date(Date.now() + 86_400_000) }];
 
 describe("ChatService.startDm", () => {
   it("won't open a thread with yourself", async () => {
@@ -129,6 +141,7 @@ describe("ChatService.startDm", () => {
     const { service, after } = make([
       [{ id: "u2" }], // target
       [], // no thread yet
+      nigerians, // the same country
       [{ n: 0 }], // under the daily cap
       [{ id: "c9" }], // created
       undefined, // members added
@@ -142,7 +155,12 @@ describe("ChatService.startDm", () => {
   });
 
   it("stops someone opening too many new threads in a day", async () => {
-    const { service } = make([[{ id: "u2" }], [], [{ n: MAX_NEW_CONVERSATIONS_PER_DAY }]]);
+    const { service } = make([
+      [{ id: "u2" }],
+      [],
+      nigerians,
+      [{ n: MAX_NEW_CONVERSATIONS_PER_DAY }],
+    ]);
     const err = await service.startDm(member("u1"), "u2").catch((e: unknown) => e);
     expect(err).toBeInstanceOf(HttpException);
     expect((err as HttpException).getStatus()).toBe(429);
@@ -193,6 +211,7 @@ describe("ChatService.sendMessage", () => {
       [{ userId: "u1" }], // a member of the thread
       [{ userId: "u2" }], // the other member is still here
       [{ n: 0 }], // not sending too fast
+      nigerians, // in the same country
       [{ id: "m0" }], // the thread already has messages: not a new chat
       [saved],
       undefined,
@@ -225,6 +244,7 @@ describe("ChatService.sendMessage", () => {
       [{ userId: "u1" }],
       [{ userId: "u2" }],
       [{ n: 0 }],
+      nigerians,
       [{ id: "m0" }],
       [saved],
       undefined,
@@ -242,6 +262,7 @@ describe("ChatService.sendMessage", () => {
       [{ userId: "u1" }],
       [{ userId: "u2" }],
       [{ n: 0 }],
+      nigerians,
       [{ id: "m0" }],
       [saved],
       undefined,
@@ -264,7 +285,9 @@ describe("ChatService.sendMessage", () => {
         [{ userId: "u1" }],
         [{ userId: "u2" }],
         [{ n: 0 }],
+        nigerians,
         [], // nobody has written in this thread yet
+        [], // on Basic: no Silver
         undefined, // the member's new-chat lock
         [{ n: 0 }], // no chats started today
         [saved],
@@ -287,7 +310,9 @@ describe("ChatService.sendMessage", () => {
         [{ userId: "u1" }],
         [{ userId: "u2" }],
         [{ n: 0 }],
+        nigerians,
         [], // an empty thread: this would be a new chat
+        [], // on Basic
         undefined, // lock
         [{ n: 1 }], // today's chat is already used
       ]);
@@ -301,6 +326,26 @@ describe("ChatService.sendMessage", () => {
         resetsAt: expect.stringMatching(/T23:00:00\.000Z$/),
       });
       expect(after("insert", message, "values")).toBeUndefined();
+    });
+
+    it("lets a Silver member start more new chats a day", async () => {
+      const saved = row("m1", { senderId: "u1", body: "hi" });
+      const { service, left } = make([
+        [{ userId: "u1" }],
+        [{ userId: "u2" }],
+        [{ n: 0 }],
+        nigerians,
+        [], // an empty thread
+        onSilver,
+        undefined, // lock
+        [{ n: SILVER_NEW_CHATS_PER_DAY - 1 }], // one left today
+        [saved],
+        undefined,
+      ]);
+      await expect(service.sendMessage(member("u1"), "c1", { body: "hi" })).resolves.toMatchObject({
+        id: "m1",
+      });
+      expect(left()).toBe(0);
     });
 
     it("doesn't limit the super admins", async () => {
@@ -321,6 +366,187 @@ describe("ChatService.sendMessage", () => {
   });
 });
 
+describe("chats across countries need Silver to start", () => {
+  const abroad = countries("NG", "KE");
+  const refusal = { code: CROSS_COUNTRY_PREMIUM, message: CROSS_COUNTRY_MESSAGE };
+  const askedWhereTheyLive = (calls: Array<{ op: string; args: unknown[] }>) =>
+    calls.some((c) => c.op === "from" && c.args[0] === profile);
+
+  describe("opening a thread", () => {
+    it("refuses a free member a new thread with someone in another country", async () => {
+      const { service, calls, left } = make([
+        [{ id: "u2" }], // target
+        [], // no thread yet
+        abroad,
+        [], // on Basic
+      ]);
+      const err = await service.startDm(member("u1"), "u2").catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(ForbiddenException);
+      expect((err as HttpException).getResponse()).toEqual(refusal);
+      expect(calls.some((c) => c.op === "insert")).toBe(false);
+      expect(left()).toBe(0);
+    });
+
+    it("always opens a thread the pair already has", async () => {
+      const { service, calls, left } = make([[{ id: "u2" }], [{ id: "c1" }], undefined]);
+      await expect(service.startDm(member("u1"), "u2")).resolves.toBe("c1");
+      expect(askedWhereTheyLive(calls)).toBe(false);
+      expect(left()).toBe(0);
+    });
+
+    it("lets a Silver member open one, still under the cap on new threads", async () => {
+      const { service, left } = make([
+        [{ id: "u2" }],
+        [],
+        abroad,
+        onSilver,
+        [{ n: 0 }], // under the daily cap
+        [{ id: "c9" }],
+        undefined,
+      ]);
+      await expect(service.startDm(member("u1"), "u2")).resolves.toBe("c9");
+      expect(left()).toBe(0);
+    });
+
+    it("lets the super admins open one without asking where anyone lives", async () => {
+      const { service, calls, left } = make([[{ id: "u2" }], [], [{ id: "c9" }], undefined]);
+      await expect(service.startDm(admin, "u2")).resolves.toBe("c9");
+      expect(askedWhereTheyLive(calls)).toBe(false);
+      expect(left()).toBe(0);
+    });
+
+    it("reads a member with no country saved as Nigerian", async () => {
+      const home = make([
+        [{ id: "u2" }],
+        [],
+        countries(null, "NG"),
+        [{ n: 0 }],
+        [{ id: "c9" }],
+        undefined,
+      ]);
+      await expect(home.service.startDm(member("u1"), "u2")).resolves.toBe("c9");
+      const away = make([[{ id: "u2" }], [], countries(null, "KE"), []]);
+      await expect(away.service.startDm(member("u1"), "u2")).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+    });
+  });
+
+  describe("writing in a thread", () => {
+    /** The database's answers up to the check, for u1 writing to u2 in c1. */
+    const upToCheck = [[{ userId: "u1" }], [{ userId: "u2" }], [{ n: 0 }]];
+
+    it("refuses a free member's first message to someone in another country", async () => {
+      const { service, push, realtime } = make([
+        ...upToCheck,
+        abroad,
+        [], // u2 hasn't written here
+        [], // on Basic
+      ]);
+      const err = await service
+        .sendMessage(member("u1"), "c1", { body: "hi" })
+        .catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(ForbiddenException);
+      expect((err as HttpException).getStatus()).toBe(403);
+      expect((err as HttpException).getResponse()).toEqual(refusal);
+      expect(push.newMessage).not.toHaveBeenCalled();
+      expect(realtime.notify).not.toHaveBeenCalled();
+    });
+
+    it("doesn't use up the daily allowance on a message it refuses", async () => {
+      const { service, calls, left } = make([...upToCheck, abroad, [], []]);
+      await service.sendMessage(member("u1"), "c1", { body: "hi" }).catch(() => undefined);
+      // Refused before the new-chat lock and count: nothing was saved to count.
+      expect(calls.some((c) => c.op === "execute" || c.op === "insert")).toBe(false);
+      expect(left()).toBe(0);
+    });
+
+    it("lets a free member reply once the other member has written", async () => {
+      const saved = row("m2", { senderId: "u1", body: "hi" });
+      const { service, left } = make([
+        ...upToCheck,
+        abroad,
+        [{ id: "m1" }], // u2 wrote first
+        [{ id: "m1" }], // the thread has messages: not a new chat
+        [saved],
+        undefined,
+      ]);
+      await expect(service.sendMessage(member("u1"), "c1", { body: "hi" })).resolves.toMatchObject({
+        id: "m2",
+      });
+      expect(left()).toBe(0);
+    });
+
+    it("lets a Silver member write first, as one of today's new chats", async () => {
+      const saved = row("m1", { senderId: "u1", body: "hi" });
+      const { service, calls, left } = make([
+        ...upToCheck,
+        abroad,
+        [], // u2 hasn't written here
+        onSilver,
+        [], // an empty thread: a new chat
+        onSilver, // Silver's allowance
+        undefined, // lock
+        [{ n: 0 }], // no chats started today
+        [saved],
+        undefined,
+      ]);
+      await expect(service.sendMessage(member("u1"), "c1", { body: "hi" })).resolves.toMatchObject({
+        id: "m1",
+      });
+      expect(calls.some((c) => c.op === "execute")).toBe(true);
+      expect(left()).toBe(0);
+    });
+
+    it("lets the super admins write without asking where anyone lives", async () => {
+      const saved = row("m1", { senderId: "a1", body: "hi" });
+      const { service, calls, left } = make([
+        [{ userId: "a1" }],
+        [{ userId: "u2" }],
+        [{ n: 0 }],
+        [saved],
+        undefined,
+      ]);
+      await expect(service.sendMessage(admin, "c1", { body: "hi" })).resolves.toMatchObject({
+        id: "m1",
+      });
+      expect(askedWhereTheyLive(calls)).toBe(false);
+      expect(left()).toBe(0);
+    });
+
+    it("asks nothing more in a chat within one country, after one query for both", async () => {
+      const saved = row("m1", { senderId: "u1", body: "hi" });
+      const { service, calls, left } = make([
+        ...upToCheck,
+        nigerians,
+        [], // an empty thread: the free allowance applies as before
+        [], // on Basic
+        undefined, // lock
+        [{ n: 0 }],
+        [saved],
+        undefined,
+      ]);
+      await expect(service.sendMessage(member("u1"), "c1", { body: "hi" })).resolves.toMatchObject({
+        id: "m1",
+      });
+      expect(calls.filter((c) => c.op === "from" && c.args[0] === profile)).toHaveLength(1);
+      expect(left()).toBe(0);
+    });
+
+    it("reads a member with no country saved as Nigerian", async () => {
+      const saved = row("m2", { senderId: "u1", body: "hi" });
+      const home = make([...upToCheck, countries("NG", null), [{ id: "m1" }], [saved], undefined]);
+      await expect(home.service.sendMessage(member("u1"), "c1", { body: "hi" })).resolves.toEqual(
+        expect.objectContaining({ id: "m2" }),
+      );
+      const away = make([...upToCheck, countries("KE", null), [], []]);
+      await expect(
+        away.service.sendMessage(member("u1"), "c1", { body: "hi" }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+  });
+});
+
 describe("ChatService.allowance", () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -329,11 +555,19 @@ describe("ChatService.allowance", () => {
   it("reports today's use and when it resets, at Lagos midnight", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-30T10:00:00Z"));
-    const { service } = make([[{ n: 1 }]]);
+    const { service } = make([[], [{ n: 1 }]]);
     await expect(service.allowance(member("u1"))).resolves.toEqual({
       newChatsPerDay: 1,
       usedToday: 1,
       resetsAt: "2026-09-30T23:00:00.000Z",
+    });
+  });
+
+  it("gives Silver members their larger allowance", async () => {
+    const { service } = make([[{ end: new Date(Date.now() + 86_400_000) }], [{ n: 2 }]]);
+    await expect(service.allowance(member("u1"))).resolves.toMatchObject({
+      newChatsPerDay: SILVER_NEW_CHATS_PER_DAY,
+      usedToday: 2,
     });
   });
 
@@ -405,6 +639,7 @@ describe("ChatService.listConversations", () => {
           displayName: "Ada",
           avatarKey: "avatars/u2/a.png",
           lastSeenAt: new Date(),
+          silver: true,
         },
       ],
       [row("m1")],
@@ -419,6 +654,8 @@ describe("ChatService.listConversations", () => {
         displayName: "Ada",
         avatarUrl: "https://media/avatars/u2/a.png?sm",
         online: true,
+        presence: "online",
+        silver: true,
       },
       lastMessage: { id: "m1", body: "hello" },
       unreadCount: 2,
@@ -593,6 +830,7 @@ describe("chat photos", () => {
       const { service, storage, after } = make([
         ...upToPhoto,
         [{ id: "m0" }], // the other member has written here
+        nigerians,
         [{ id: "m0" }], // the thread has messages: not a new chat
         [saved],
         undefined,
@@ -618,6 +856,7 @@ describe("chat photos", () => {
       const { service, after } = make([
         ...upToPhoto,
         [{ id: "m0" }],
+        nigerians,
         [{ id: "m0" }],
         [saved],
         undefined,
@@ -632,6 +871,7 @@ describe("chat photos", () => {
       const { service, storage } = make([
         ...upToPhoto,
         [{ id: "m0" }],
+        nigerians,
         [{ id: "m0" }],
         [saved],
         undefined,
@@ -766,9 +1006,24 @@ describe("blocks in chat", () => {
       [],
     ]);
     await expect(service.listConversations("u1")).resolves.toEqual([]);
-    expect(whereSql(calls, 1)).toContain(
-      '"member_block"."blocker_id" = "conversation_participant"."user_id"',
-    );
+    // The peers query leaves them out, and so does the inbox's own condition, before the limit.
+    const wheres = calls
+      .filter((c) => c.op === "where")
+      .map((c) => {
+        try {
+          return new PgDialect().sqlToQuery(c.args[0] as SQL).sql;
+        } catch {
+          return "";
+        }
+      });
+    expect(
+      wheres.some((w) =>
+        w.includes('"member_block"."blocker_id" = "conversation_participant"."user_id"'),
+      ),
+    ).toBe(true);
+    expect(
+      wheres.some((w) => w.includes('"member_block"."blocker_id" = "inbox_peer"."user_id"')),
+    ).toBe(true);
   });
 });
 
@@ -788,5 +1043,153 @@ describe("chat unread badge", () => {
   });
   it("returns zero when no messages are unread", async () => {
     await expect(make([[{ total: 0 }]]).service.unreadCount("u1")).resolves.toEqual({ count: 0 });
+  });
+});
+
+describe("ChatService.setTyping", () => {
+  it("publishes only to the authorised peer without writing to the database", async () => {
+    const { service, realtime, calls } = make([
+      [{ userId: "u1" }],
+      [{ userId: "u2", blockedByMe: false }],
+    ]);
+    await service.setTyping("u1", "c1", true);
+    expect(realtime.notify).toHaveBeenCalledWith(["u2"], {
+      type: "typing",
+      conversationId: "c1",
+      typing: true,
+    });
+    expect(calls.some((c) => ["update", "insert", "delete"].includes(c.op))).toBe(false);
+  });
+  it("suppresses repeated hints but sends stop immediately", async () => {
+    const { service, realtime, calls } = make([
+      [{ userId: "u1" }],
+      [{ userId: "u2", blockedByMe: false }],
+      [{ userId: "u1" }],
+      [{ userId: "u2", blockedByMe: false }],
+    ]);
+    await service.setTyping("u1", "c1", true);
+    const count = calls.length;
+    await service.setTyping("u1", "c1", true);
+    expect(calls).toHaveLength(count);
+    await service.setTyping("u1", "c1", false);
+    expect(realtime.notify).toHaveBeenCalledTimes(2);
+    expect(realtime.notify).toHaveBeenLastCalledWith(
+      ["u2"],
+      expect.objectContaining({ typing: false }),
+    );
+  });
+  it("passes the app's 5-second heartbeat even when it arrives a little early", async () => {
+    vi.useFakeTimers();
+    try {
+      const { service, realtime } = make([
+        [{ userId: "u1" }],
+        [{ userId: "u2", blockedByMe: false }],
+        [{ userId: "u1" }],
+        [{ userId: "u2", blockedByMe: false }],
+      ]);
+      await service.setTyping("u1", "c1", true);
+      vi.advanceTimersByTime(4_950);
+      await service.setTyping("u1", "c1", true);
+      expect(realtime.notify).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("sends one hint for many sent at once", async () => {
+    const { service, realtime } = make([
+      [{ userId: "u1" }],
+      [{ userId: "u2", blockedByMe: false }],
+    ]);
+    await Promise.all(Array.from({ length: 25 }, () => service.setTyping("u1", "c1", true)));
+    expect(realtime.notify).toHaveBeenCalledTimes(1);
+  });
+  it("gives the slot back when the member isn't allowed, so nothing is held for them", async () => {
+    const { service, realtime } = make([
+      [],
+      [{ userId: "u1" }],
+      [{ userId: "u2", blockedByMe: false }],
+    ]);
+    await expect(service.setTyping("u1", "c1", true)).rejects.toBeInstanceOf(NotFoundException);
+    await service.setTyping("u1", "c1", true);
+    expect(realtime.notify).toHaveBeenCalledTimes(1);
+  });
+  it("can't be flipped between typing and not to flood the other member", async () => {
+    const answers = Array.from({ length: 20 }, (_, i) =>
+      i % 2 ? [{ userId: "u2", blockedByMe: false }] : [{ userId: "u1" }],
+    );
+    const { service, realtime } = make(answers);
+    for (let i = 0; i < 10; i++) await service.setTyping("u1", "c1", i % 2 === 0);
+    // One start and one stop inside the same second; the other eight are dropped.
+    expect(realtime.notify).toHaveBeenCalledTimes(2);
+  });
+  it("rejects non-members and blocked peers", async () => {
+    await expect(make([[]]).service.setTyping("u1", "c1", true)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    const blocked = make([[{ userId: "u1" }], [{ userId: "u2", blockedByMe: true }]]);
+    await expect(blocked.service.setTyping("u1", "c1", true)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(blocked.realtime.notify).not.toHaveBeenCalled();
+  });
+});
+
+describe("ChatService inbox tabs", () => {
+  const service = () =>
+    new ChatService(
+      drizzle.mock() as never,
+      {} as StorageService,
+      {} as RealtimeService,
+      {} as PushService,
+    );
+  const render = (where: SQL) => new PgDialect().sqlToQuery(where).sql.replace(/\s+/g, " ");
+  const inbox = (s: ChatService, filter: "all" | "unread" | "online") =>
+    (s as unknown as { inbox(u: string, q: string, f: string): SQL }).inbox("u1", "", filter);
+
+  it("applies who's still here, and the tab, before the page limit", () => {
+    const all = render(inbox(service(), "all"));
+    expect(all).toContain('"inbox_peer"."conversation_id" = "conversation"."id"');
+    expect(all).toContain('"member_ban"."user_id" = "inbox_peer"."user_id"');
+    expect(all).toContain('"member_block"."blocker_id" = "inbox_peer"."user_id"');
+    expect(all).toContain('"conversation"."created_by" = $');
+    expect(all).not.toContain("last_read_at");
+    const unread = render(inbox(service(), "unread"));
+    expect(unread).toContain('"inbox_message"."sender_id" <> $');
+    expect(unread).toContain(
+      `"inbox_message"."created_at" > coalesce("conversation_participant"."last_read_at", 'epoch')`,
+    );
+    const online = render(inbox(service(), "online"));
+    expect(online).toContain(
+      `"inbox_peer_profile"."last_seen_at" > timezone('UTC', now()) - (300 * interval '1 second')`,
+    );
+  });
+});
+
+describe("ChatService inbox search", () => {
+  it("looks through every chat: the other member's names, or any message still there", () => {
+    const db = drizzle.mock();
+    const service = new ChatService(
+      db as never,
+      {} as StorageService,
+      {} as RealtimeService,
+      {} as PushService,
+    );
+    const where = (service as unknown as { matching(u: string, p: string): SQL }).matching(
+      "u1",
+      "%ada\\_%",
+    );
+    const { sql, params } = new PgDialect().sqlToQuery(where);
+    expect(sql).toContain('from "conversation_participant" "search_participant"');
+    expect(sql).toContain('"search_participant"."conversation_id" = "conversation"."id"');
+    expect(sql).toContain('"search_participant"."user_id" <> $');
+    expect(sql).toContain('"search_profile"."display_name" ilike $');
+    expect(sql).toContain('"search_user"."username" ilike $');
+    // The account name only when it's what the inbox shows: no display name, no username.
+    expect(sql).toContain(
+      '("search_profile"."display_name" is null and "search_user"."username" is null and "search_user"."name" ilike $',
+    );
+    expect(sql).toContain('"search_message"."deleted_at" is null');
+    expect(sql).toContain('"search_message"."body" ilike $');
+    expect(params).toEqual(["u1", "%ada\\_%", "%ada\\_%", "%ada\\_%", "%ada\\_%"]);
   });
 });

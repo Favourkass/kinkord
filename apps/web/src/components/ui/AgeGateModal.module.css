@@ -1,0 +1,288 @@
+@property --age-gate-shine-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.backdrop {
+  overflow: hidden;
+  background: #030302;
+}
+.backdrop::before {
+  content: "";
+  position: absolute;
+  inset: -35%;
+  background: linear-gradient(
+    120deg,
+    transparent 25%,
+    #b77a1217 39%,
+    transparent 48%,
+    #d4971920 63%,
+    transparent 73%
+  );
+  animation: ambientLight 24s ease-in-out infinite alternate;
+}
+.card {
+  isolation: isolate;
+  border-color: #bc942f;
+  background: linear-gradient(155deg, #100e07fa, #050505 55%, #0b0903);
+  box-shadow:
+    0 0 22px #c7931515,
+    0 22px 70px #000b;
+  animation: cardGlow 9s ease-in-out infinite;
+}
+.logo {
+  isolation: isolate;
+  border: 1px solid #947421;
+  background: radial-gradient(circle at 50% 40%, #6d4b1325, #070703 75%);
+  box-shadow: none;
+  animation: logoGlow 10s ease-in-out infinite;
+}
+.logo::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -14px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(ellipse, #ffbd2480, #e49a192b 45%, transparent 72%);
+  filter: blur(10px);
+  opacity: 0;
+  animation: logoHalo 10s ease-in-out infinite;
+}
+.logo::after,
+.enter::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 2px;
+  pointer-events: none;
+  background: conic-gradient(
+    from var(--age-gate-shine-angle),
+    transparent 0deg 265deg,
+    #ffe98799 302deg,
+    #fff4c7 315deg,
+    transparent 333deg
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: borderShine 10s linear infinite;
+}
+.logo::after {
+  background: conic-gradient(
+    from var(--age-gate-shine-angle),
+    transparent 0deg 320deg,
+    #ffd83e 337deg,
+    #fffbea 344deg,
+    #ffe66f 350deg,
+    transparent 358deg
+  );
+  animation: logoSweep 10s linear infinite;
+}
+.heading {
+  animation: headingReveal 650ms ease-out both;
+}
+.divider {
+  overflow: hidden;
+}
+.divider::after {
+  content: "";
+  position: absolute;
+  top: calc(50% - 0.5px);
+  left: 0;
+  width: 30%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #fff0a1, transparent);
+  animation: dividerShine 9s ease-in-out infinite;
+}
+.star {
+  filter: drop-shadow(0 0 5px #f6d14a80);
+  animation: starGlow 4s ease-in-out infinite;
+}
+.enter {
+  position: relative;
+  border: 1px solid #ffe95d;
+  background: linear-gradient(180deg, #ffed63, #ffd719 55%, #f2b90a);
+  box-shadow: 0 0 16px #f6c72242;
+  animation: enterGlow 6s ease-in-out infinite;
+}
+.enter::after {
+  background: repeating-conic-gradient(
+    from var(--age-gate-shine-angle),
+    transparent 0deg 62deg,
+    #ffd02a 70deg,
+    #fffbea 76deg,
+    #ffe36b 80deg,
+    transparent 86deg 90deg
+  );
+  animation: borderShine 6s linear infinite;
+}
+@keyframes ambientLight {
+  from {
+    transform: translate3d(-7%, -4%, 0);
+    opacity: 0.5;
+  }
+  to {
+    transform: translate3d(7%, 4%, 0);
+    opacity: 1;
+  }
+}
+@keyframes borderShine {
+  to {
+    --age-gate-shine-angle: 360deg;
+  }
+}
+@keyframes headingReveal {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes dividerShine {
+  0%,
+  18% {
+    transform: translateX(-110%);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.65;
+  }
+  75%,
+  100% {
+    transform: translateX(440%);
+    opacity: 0;
+  }
+}
+/* One shared cycle: outline, build, full glow, border sweep, pulse, reset. */
+@keyframes logoGlow {
+  0%,
+  8%,
+  100% {
+    border-color: #947421;
+    box-shadow:
+      0 0 0 #ffc92800,
+      inset 0 0 0 #ffc92800;
+  }
+  25% {
+    border-color: #ffd44c;
+    box-shadow:
+      0 0 9px #ffc92880,
+      inset 0 0 5px #ffc92830;
+  }
+  38%,
+  62%,
+  80% {
+    border-color: #fff08a;
+    box-shadow:
+      0 0 4px #fff4a9,
+      0 0 16px #ffd02ac0,
+      0 0 32px #e8a90c70,
+      inset 0 0 8px #ffc92845;
+  }
+  70%,
+  88% {
+    border-color: #ffd951;
+    box-shadow:
+      0 0 3px #ffe27390,
+      0 0 12px #ffd02a80,
+      0 0 24px #e8a90c40,
+      inset 0 0 5px #ffc92825;
+  }
+}
+@keyframes logoHalo {
+  0%,
+  8%,
+  100% {
+    opacity: 0;
+  }
+  25%,
+  70%,
+  88% {
+    opacity: 0.45;
+  }
+  38%,
+  62%,
+  80% {
+    opacity: 1;
+  }
+}
+@keyframes logoSweep {
+  0%,
+  38% {
+    --age-gate-shine-angle: 0deg;
+    opacity: 0;
+  }
+  42% {
+    opacity: 1;
+  }
+  64% {
+    --age-gate-shine-angle: 360deg;
+    opacity: 1;
+  }
+  68%,
+  100% {
+    --age-gate-shine-angle: 360deg;
+    opacity: 0;
+  }
+}
+@keyframes starGlow {
+  0%,
+  100% {
+    opacity: 0.75;
+    filter: drop-shadow(0 0 3px #f6d14a60);
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 8px #f6d14aaa);
+  }
+}
+@keyframes enterGlow {
+  0%,
+  100% {
+    box-shadow: 0 0 12px #f6c72235;
+  }
+  50% {
+    box-shadow: 0 0 24px #f6c72265;
+  }
+}
+@keyframes cardGlow {
+  0%,
+  100% {
+    border-color: #a78026;
+    box-shadow:
+      0 0 18px #c7931510,
+      0 22px 70px #000b;
+  }
+  50% {
+    border-color: #d0a63e;
+    box-shadow:
+      0 0 26px #c7931525,
+      0 22px 70px #000b;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .backdrop::before,
+  .card,
+  .logo,
+  .logo::before,
+  .logo::after,
+  .heading,
+  .divider::after,
+  .star,
+  .enter,
+  .enter::after {
+    animation: none;
+    transform: none;
+  }
+}

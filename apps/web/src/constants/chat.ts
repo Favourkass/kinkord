@@ -1,10 +1,33 @@
+/** The longest inbox search the API takes. */
+export const INBOX_SEARCH_MAX = 100;
+
 /** Copy for the chat screens. */
 export const CHAT_COPY = {
   heading: "Messages",
+  inbox: {
+    search: "Search chats…",
+    searchLabel: "Search chats",
+    clear: "Clear search",
+    filtersLabel: "Show or hide chat filters",
+    menu: "More options",
+    navigation: "Open menu",
+    newChat: "New message",
+    settings: "Settings",
+    sent: "Sent",
+    unread: "unread messages",
+    filters: { all: "All", unread: "Unread", online: "Online" },
+    filteredEmpty: "No chats found",
+    filteredBody: "Try another search or choose a different filter.",
+  },
   loading: "Loading conversations…",
   emptyTitle: "No messages yet",
   emptyBody: "Open someone's profile and tap Message to start a conversation.",
   online: "Online",
+  /** Beside the official organization's name, so nobody can pass for it in a chat. */
+  organization: "Official",
+  verifiedOrganization: "Official Kinkord account",
+  presence: { online: "Online", away: "Away", offline: "Offline" },
+  typing: "Is typing…",
   back: "Back",
   threadEmpty: "Say hi — this is the start of your conversation.",
   unavailable: "This member is no longer on Kinkord.",
@@ -17,6 +40,10 @@ export const CHAT_COPY = {
   newChatHint: "You can start one new chat a day. Sending a message here uses today's.",
   newChatLimit:
     "You've already started a new chat today. You can message someone new after midnight. Replies in your existing chats aren't limited.",
+  /** A free member writing first to someone in another country. */
+  crossCountry:
+    "Messaging members in another country is part of Silver Premium. You can always reply if they message you first.",
+  getSilver: "Get Silver Premium",
   photoAdd: "Add a photo",
   photoRemove: "Remove photo",
   photoUploading: "Uploading…",

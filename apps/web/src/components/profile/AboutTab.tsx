@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
 import MaskIcon from "@/components/app/MaskIcon";
-import type { PublicProfileVM, SocialPlatform } from "@/domain/member";
+import VerifiedMark from "@/components/brand/VerifiedMark";
+import type { PublicProfileVM, SocialLinkVM, SocialPlatform } from "@/domain/member";
 
 export interface AboutLabels {
   aboutMe: string;
+  aboutUs: string;
   personal: string;
   age: string;
   dateOfBirth: string;
@@ -23,7 +25,10 @@ export interface AboutLabels {
   noSocial: string;
   platforms: Record<SocialPlatform, string>;
   verification: string;
-  verified: { basic: string; none: string };
+  verified: { identity: string; basic: string; none: string };
+  identityDetail: string;
+  /** Beside your own badge when you've hidden it from others. */
+  identityHidden: string;
   verifiedDetail: (email: boolean, phone: boolean) => string;
   tagline: string;
   memberSince: (date: string) => string;
@@ -76,6 +81,44 @@ function Card({ icon, title, children }: { icon: string; title: string; children
   );
 }
 
+/** Each link as a tappable row: the platform, the handle, out to the site. */
+function SocialLinks({
+  links,
+  platforms,
+}: {
+  links: SocialLinkVM[];
+  platforms: Record<SocialPlatform, string>;
+}) {
+  return (
+    <div className="flex flex-col gap-[8px]">
+      {links.map((link) => (
+        <a
+          key={link.platform}
+          href={link.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-[12px] rounded-[12px] border border-pf-border bg-pf-surface-2 p-[12px]"
+        >
+          <span
+            className={`grid size-[36px] shrink-0 place-items-center rounded-full text-white ${
+              link.platform === "facebook" ? "bg-[#1877f2]" : "border border-[#333333] bg-black"
+            }`}
+          >
+            <MaskIcon src={ICONS[link.platform]} width={18} />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="text-[13px] font-semibold text-pf-text">
+              {platforms[link.platform]}
+            </span>
+            <span className="truncate text-[12px] text-pf-muted">{link.handle}</span>
+          </span>
+          <MaskIcon src={ICONS.chevron} width={16} className="text-pf-muted" />
+        </a>
+      ))}
+    </div>
+  );
+}
+
 function Tags({ items }: { items: string[] }) {
   return (
     <ul className="flex flex-wrap gap-[8px]">
@@ -121,6 +164,21 @@ export default function AboutTab({ vm, labels }: AboutTabProps) {
       ) : null}
     </div>
   );
+
+  if (vm.accountType === "organization") {
+    return (
+      <div className="flex flex-col gap-[16px] px-[16px] pb-[40px] pt-[16px] lg:p-0">
+        <Card icon={ICONS.aboutMe} title={labels.aboutUs}>
+          <p className={`text-[14px] leading-[1.5] ${vm.bio ? "text-pf-body" : "text-pf-muted"}`}>
+            {vm.bio ?? labels.notShared}
+          </p>
+          {vm.socialLinks.length > 0 ? (
+            <SocialLinks links={vm.socialLinks} platforms={labels.platforms} />
+          ) : null}
+        </Card>
+      </div>
+    );
+  }
 
   if (vm.restricted) {
     return (
@@ -184,48 +242,28 @@ export default function AboutTab({ vm, labels }: AboutTabProps) {
         {vm.socialLinks.length === 0 ? (
           <p className="text-[13px] text-pf-muted">{labels.noSocial}</p>
         ) : (
-          <div className="flex flex-col gap-[8px]">
-            {vm.socialLinks.map((link) => (
-              <a
-                key={link.platform}
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-[12px] rounded-[12px] border border-pf-border bg-pf-surface-2 p-[12px]"
-              >
-                <span
-                  className={`grid size-[36px] shrink-0 place-items-center rounded-full text-white ${
-                    link.platform === "facebook"
-                      ? "bg-[#1877f2]"
-                      : "border border-[#333333] bg-black"
-                  }`}
-                >
-                  <MaskIcon src={ICONS[link.platform]} width={18} />
-                </span>
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="text-[13px] font-semibold text-pf-text">
-                    {labels.platforms[link.platform]}
-                  </span>
-                  <span className="truncate text-[12px] text-pf-muted">{link.handle}</span>
-                </span>
-                <MaskIcon src={ICONS.chevron} width={16} className="text-pf-muted" />
-              </a>
-            ))}
-          </div>
+          <SocialLinks links={vm.socialLinks} platforms={labels.platforms} />
         )}
       </Card>
 
       <Card icon={ICONS.verification} title={labels.verification}>
         <div className="flex items-center gap-[12px] rounded-[12px] border border-kink-gold-bright/30 bg-kink-gold-bright/10 p-[12px]">
-          <span className="grid size-[36px] shrink-0 place-items-center rounded-full bg-kink-gold-bright text-black">
-            <MaskIcon src={ICONS.verified} width={18} />
-          </span>
+          {vm.verification.level === "identity" ? (
+            <VerifiedMark size={36} />
+          ) : (
+            <span className="grid size-[36px] shrink-0 place-items-center rounded-full bg-kink-gold-bright text-black">
+              <MaskIcon src={ICONS.verified} width={18} />
+            </span>
+          )}
           <span className="flex min-w-0 flex-col">
             <span className="text-[13px] font-semibold text-pf-text">
               {labels.verified[vm.verification.level]}
             </span>
             <span className="text-[12px] text-pf-muted">
-              {labels.verifiedDetail(vm.verification.email, vm.verification.phone)}
+              {vm.verification.level === "identity"
+                ? labels.identityDetail
+                : labels.verifiedDetail(vm.verification.email, vm.verification.phone)}
+              {vm.verification.hiddenFromOthers ? ` · ${labels.identityHidden}` : null}
             </span>
           </span>
         </div>

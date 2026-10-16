@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   ageTagOf,
+  fullLocationOf,
   locationOf,
   locationPartsOf,
   socialHandle,
   toMediaTiles,
   toMemberCardVM,
   toPublicProfileVM,
+  withOwnBadgeVisibility,
   type MemberCardPM,
   type PlaceHref,
   type PublicProfilePM,
@@ -43,6 +45,22 @@ describe("toMemberCardVM", () => {
       posts: "24",
       followers: "1.2K",
       isFollowing: false,
+      silver: false,
+      organization: false,
+    });
+    expect(toMemberCardVM({ ...card, silver: true }).silver).toBe(true);
+    expect(
+      toMemberCardVM({ ...card, city: "Westlands", state: "Nairobi", country: "KE" }).location,
+    ).toBe("Westlands, Nairobi");
+  });
+
+  it("marks the configured organization without changing the source profile", () => {
+    expect(toMemberCardVM(card, true)).toMatchObject({
+      userId: "u1",
+      organization: true,
+      ageTag: null,
+      roles: null,
+      location: null,
     });
   });
 
@@ -111,6 +129,13 @@ describe("toPublicProfileVM", () => {
       mutualFriends: "86",
     });
     expect(vm.locationLine).toBe("Abraka, Delta State, Nigeria");
+    expect(
+      toPublicProfileVM(
+        { ...profile, country: "KE", state: "Nairobi", city: "Nairobi" },
+        () => null,
+        now,
+      ).locationLine,
+    ).toBe("Nairobi, Nairobi, Kenya");
     expect(vm.tagLine).toBe("25F · Dominant | Sadist");
     expect(vm.lastSeenAgo).toBe("an hour ago");
     expect(vm.isOnline).toBe(false);
@@ -118,6 +143,16 @@ describe("toPublicProfileVM", () => {
     expect(vm.joined).toBe("March 2023");
     expect(vm.basic.age).toBe("25");
     expect(vm.isFollowing).toBe(true);
+    expect(vm.silver).toBeNull();
+  });
+
+  it("carries the Silver check with the month it began", () => {
+    const vm = toPublicProfileVM(
+      { ...profile, silver: { since: "2026-10-06T12:00:00.000Z" } },
+      () => null,
+      now,
+    );
+    expect(vm.silver).toEqual({ since: "October 2026" });
   });
 
   it("degrades gracefully when optional fields are missing", () => {
@@ -142,6 +177,35 @@ describe("toPublicProfileVM", () => {
     expect(vm.languages).toBeNull();
     expect(vm.basic.age).toBeNull();
     expect(vm.lastSeenAgo).toBeNull();
+  });
+
+  it("leaves what only describes a person off the official organization's profile", () => {
+    const placeHref: PlaceHref = () => "/members/NG";
+    const person = toPublicProfileVM(profile, placeHref, now);
+    expect(person).toMatchObject({ accountType: "person", organizationVerified: false });
+
+    const vm = toPublicProfileVM(
+      { ...profile, isOnline: true, socialLinks: { x: "https://x.com/kinkord" } },
+      placeHref,
+      now,
+      true,
+    );
+    expect(vm).toMatchObject({
+      accountType: "organization",
+      organizationVerified: true,
+      isOnline: false,
+      lastSeenAgo: null,
+      locationLine: null,
+      locationParts: [],
+      tagLine: null,
+      stats: { friends: null, followers: "2.3K", following: "980" },
+    });
+    // What the organization says about itself stays, its links included.
+    expect(vm.displayName).toBe(profile.displayName);
+    expect(vm.bio).toBe(profile.bio);
+    expect(vm.socialLinks).toEqual([
+      { platform: "x", url: "https://x.com/kinkord", handle: "@kinkord" },
+    ]);
   });
 });
 
@@ -216,6 +280,26 @@ describe("About cards + media (profile rebuild, 2026-09-12)", () => {
     expect(locked.restricted).toBe(true);
     expect(locked.socialLinks).toEqual([]);
     expect(locked.verification.level).toBe("none");
+  });
+
+  it("puts a verified identity above email and phone", () => {
+    const vm = toPublicProfileVM({
+      ...base,
+      verification: { email: true, phone: true, identity: true },
+    });
+    expect(vm.verification.level).toBe("identity");
+  });
+
+  it("marks your own verified badge when you've hidden it from others", () => {
+    const verified = { email: true, phone: true, identity: true as const };
+    const own = toPublicProfileVM({ ...base, isSelf: true, verification: verified });
+    expect(withOwnBadgeVisibility(own, false).verification.hiddenFromOthers).toBe(true);
+    // Shown to others, someone else's profile, or no badge to hide: unchanged.
+    expect(withOwnBadgeVisibility(own, true)).toBe(own);
+    const theirs = toPublicProfileVM({ ...base, verification: verified });
+    expect(withOwnBadgeVisibility(theirs, false)).toBe(theirs);
+    const unverified = toPublicProfileVM({ ...base, isSelf: true });
+    expect(withOwnBadgeVisibility(unverified, false)).toBe(unverified);
   });
 
   it("derives handles from links and features the current profile photo", () => {
@@ -303,16 +387,23 @@ describe("ageTagOf / locationOf", () => {
     expect(ageTagOf(null, null)).toBeNull();
   });
 
-  it("joins city and state, and suffixes the state once", () => {
-    expect(locationOf("Abraka", "Delta")).toBe("Abraka, Delta State");
-    expect(locationOf(null, "Delta")).toBe("Delta State");
-    expect(locationOf("Abraka", null)).toBe("Abraka");
-    expect(locationOf(null, "Delta State")).toBe("Delta State");
-    expect(locationOf(null, "FCT Abuja")).toBe("FCT Abuja");
+  it("joins city and state, and suffixes a Nigerian state once", () => {
+    expect(locationOf("Abraka", "Delta", "NG")).toBe("Abraka, Delta State");
+    expect(locationOf(null, "Delta", "NG")).toBe("Delta State");
+    expect(locationOf("Abraka", null, "NG")).toBe("Abraka");
+    expect(locationOf(null, "Delta State", "NG")).toBe("Delta State");
+    expect(locationOf(null, "FCT Abuja", "NG")).toBe("FCT Abuja");
+  });
+
+  it("names a Kenyan county as it is", () => {
+    expect(locationOf("Westlands", "Nairobi", "KE")).toBe("Westlands, Nairobi");
+    expect(fullLocationOf("Nairobi", "Nairobi", "KE")).toBe("Nairobi, Nairobi, Kenya");
+    expect(fullLocationOf("Ikeja", "Lagos", "NG")).toBe("Ikeja, Lagos State, Nigeria");
   });
 
   it("is null when there is no location at all, so no empty line renders", () => {
-    expect(locationOf(null, null)).toBeNull();
+    expect(locationOf(null, null, "NG")).toBeNull();
+    expect(fullLocationOf(null, null, null)).toBeNull();
   });
 });
 
@@ -344,7 +435,8 @@ describe("locationPartsOf", () => {
   it("renders a country we do not serve as plain text rather than a dead link", () => {
     // A link into an empty directory is worse than no link.
     expect(locationPartsOf({ country: "GH", state: "Accra", city: null }, href)).toEqual([
-      { label: "Accra State", href: null },
+      // Only Nigeria's regions are "States".
+      { label: "Accra", href: null },
       { label: "Ghana", href: null },
     ]);
   });

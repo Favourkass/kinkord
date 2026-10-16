@@ -198,6 +198,24 @@ export class PushService {
     });
   }
 
+  /** A post or a comment mentioned them: who, not what. */
+  newMention(postId: string, mentionedId: string, actorId: string): void {
+    if (mentionedId === actorId) return;
+    this.notify(async () => {
+      const who = await this.member(actorId);
+      return {
+        to: mentionedId,
+        event: { type: "mention", actorId, subjectId: postId },
+        message: {
+          title: "Kinkord",
+          body: `${who.name} mentioned you`,
+          url: notificationUrl("mention", postId, null),
+          tag: `mention-${postId}`,
+        },
+      };
+    });
+  }
+
   newLike(postId: string, authorId: string, actorId: string): void {
     this.postActivity("like", "liked", postId, authorId, actorId);
   }
@@ -235,24 +253,92 @@ export class PushService {
    * who or why: that's for the moderation screen.
    */
   newReport(): void {
+    this.toAdmins("report", "New report to review");
+  }
+
+  /** A member sent proof of a transfer: the admins check it against the bank statement. */
+  newPayment(): void {
+    this.toAdmins("payment", "New payment to verify");
+  }
+
+  /** A Silver member changed their name, username or photo: their check waits for an admin. */
+  silverCheckReview(): void {
+    this.toAdmins("silver_check", "A Silver badge needs review");
+  }
+
+  /** An admin confirmed the member's transfer: Silver is on. */
+  paymentVerified(userId: string, paymentId: string): void {
+    this.toMember(userId, "payment_verified", paymentId, "Your Silver Premium is active");
+  }
+
+  /** An admin couldn't match the transfer; the subscription screen says why. */
+  paymentRejected(userId: string, paymentId: string): void {
+    this.toMember(userId, "payment_rejected", paymentId, "We couldn't confirm your payment");
+  }
+
+  /** A verification Didit couldn't settle is waiting for an admin; says nothing about whose. */
+  newVerificationReview(): void {
+    this.toAdmins("verification", "New verification to review");
+  }
+
+  /** A member's ID says they may be under 18: the admins look at the account. */
+  verificationUnderage(memberId: string): void {
+    this.toAdmins("verification_underage", "A member's ID shows they may be under 18", memberId);
+  }
+
+  /** The member's own verification moved on; the details are on their verification page. */
+  verificationUpdate(userId: string): void {
+    this.toMember(
+      userId,
+      "verification_update",
+      null,
+      "Your identity verification has an update",
+      `verification-${userId}`,
+    );
+  }
+
+  private toAdmins(
+    type: "report" | "payment" | "silver_check" | "verification" | "verification_underage",
+    body: string,
+    subjectId: string | null = null,
+  ): void {
     void adminUserIds(this.db)
       .then((ids) =>
         Promise.all(
           ids.map((id) =>
             this.deliver(
               id,
-              { type: "report" },
+              { type, subjectId: subjectId ?? undefined },
               {
                 title: "Kinkord",
-                body: "New report to review",
-                url: notificationUrl("report", null, null),
-                tag: "report",
+                body,
+                url: notificationUrl(type, subjectId, null),
+                tag: subjectId ? `${type}-${subjectId}` : type,
               },
             ),
           ),
         ),
       )
       .catch((e) => this.log.warn(`push failed: ${String(e)}`));
+  }
+
+  private toMember(
+    userId: string,
+    type: "payment_verified" | "payment_rejected" | "verification_update",
+    subjectId: string | null,
+    body: string,
+    tag = `payment-${subjectId}`,
+  ): void {
+    this.notify(async () => ({
+      to: userId,
+      event: { type, subjectId: subjectId ?? undefined },
+      message: {
+        title: "Kinkord",
+        body,
+        url: notificationUrl(type, subjectId, null),
+        tag,
+      },
+    }));
   }
 
   /** Fire and forget: a notification that can't go out never fails what caused it. */

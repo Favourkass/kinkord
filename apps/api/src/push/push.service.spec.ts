@@ -202,6 +202,22 @@ describe("PushService notifications", () => {
     expect(sent()).toMatchObject({ body: "Ada commented on your post", url: "/p/p1" });
   });
 
+  it("tells a member they were mentioned, who by, and never themselves", async () => {
+    const own = queuedDb([]);
+    new PushService(own.db, inbox()).newMention("p1", "u1", "u1");
+    await flush();
+    expect(own.calls).toHaveLength(0);
+
+    const { db } = queuedDb([
+      [{ username: "ada", name: "Adaeze", displayName: "Ada" }],
+      [sub("s1")],
+      [KEYS],
+    ]);
+    new PushService(db, inbox()).newMention("p1", "u2", "u1");
+    await flush();
+    expect(sent()).toMatchObject({ body: "Ada mentioned you", url: "/p/p1" });
+  });
+
   it("pings every moderator about a new report, saying nothing about who or why", async () => {
     const { db } = queuedDb([
       [{ id: "f1" }], // the founder's verified account
@@ -217,6 +233,71 @@ describe("PushService notifications", () => {
       body: "New report to review",
       url: "/moderation/reports",
       tag: "report",
+      notificationId: "notification-1",
+    });
+  });
+
+  it("pings every admin about a payment to verify, saying nothing about whose", async () => {
+    const { db } = queuedDb([[{ id: "f1" }], [], [sub("s1")], [KEYS]]);
+    new PushService(db, inbox()).newPayment();
+    await flush();
+    expect(inboxRecord).toHaveBeenCalledWith("f1", { type: "payment" });
+    expect(sent()).toEqual({
+      title: "Kinkord",
+      body: "New payment to verify",
+      url: "/moderation/payments",
+      tag: "payment",
+      notificationId: "notification-1",
+    });
+  });
+
+  it("asks the admins to look at a Silver check after a profile change", async () => {
+    const { db } = queuedDb([[{ id: "f1" }], [], [sub("s1")], [KEYS]]);
+    new PushService(db, inbox()).silverCheckReview();
+    await flush();
+    expect(inboxRecord).toHaveBeenCalledWith("f1", { type: "silver_check" });
+    expect(sent()).toMatchObject({
+      body: "A Silver badge needs review",
+      url: "/moderation/payments",
+      tag: "silver_check",
+    });
+  });
+
+  it("tells a member their payment was confirmed, or wasn't", async () => {
+    const verified = queuedDb([[sub("s1")], [KEYS]]);
+    new PushService(verified.db, inbox()).paymentVerified("u2", "pay1");
+    await flush();
+    expect(inboxRecord).toHaveBeenCalledWith("u2", {
+      type: "payment_verified",
+      subjectId: "pay1",
+    });
+    expect(sent()).toMatchObject({
+      body: "Your Silver Premium is active",
+      url: "/subscription",
+      tag: "payment-pay1",
+    });
+
+    sendNotification.mockClear();
+    const rejected = queuedDb([[sub("s1")], [KEYS]]);
+    new PushService(rejected.db, inbox()).paymentRejected("u2", "pay2");
+    await flush();
+    expect(sent()).toMatchObject({
+      body: "We couldn't confirm your payment",
+      url: "/subscription",
+      tag: "payment-pay2",
+    });
+  });
+
+  it("pings every moderator about a verification waiting for them, saying nothing about whose", async () => {
+    const { db } = queuedDb([[{ id: "f1" }], [], [sub("s1")], [KEYS]]);
+    new PushService(db, inbox()).newVerificationReview();
+    await flush();
+    expect(inboxRecord).toHaveBeenCalledWith("f1", { type: "verification" });
+    expect(sent()).toEqual({
+      title: "Kinkord",
+      body: "New verification to review",
+      url: "/moderation/verification",
+      tag: "verification",
       notificationId: "notification-1",
     });
   });

@@ -6,6 +6,7 @@
     "cdk": "cdk",
     "synth": "cdk synth",
     "deploy": "cdk deploy",
+    "test": "tsx --test lib/verification-stack.spec.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

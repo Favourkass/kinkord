@@ -1,4 +1,4 @@
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthedRequest } from "../auth/auth.guard";
 import { ModerationController } from "./moderation.controller";
@@ -7,6 +7,10 @@ import type { ModerationService } from "./moderation.service";
 
 const founder = { user: { id: "u1", email: "maxihandsome@gmail.com", emailVerified: true } };
 const req = founder as unknown as AuthedRequest;
+/** An admin by a staff row, not a founder. */
+const teammate = {
+  user: { id: "u7", email: "jane@example.com", emailVerified: true },
+} as unknown as AuthedRequest;
 
 function make() {
   const service = {
@@ -14,6 +18,9 @@ function make() {
     block: vi.fn(async () => ({ blocked: "u9", postsRemoved: 0 })),
     deleteMember: vi.fn(async () => ({ deleted: "u9" })),
     addRule: vi.fn(async () => ({ id: "r1" })),
+    team: vi.fn(async () => []),
+    addAdmin: vi.fn(async () => ({ id: "u7" })),
+    removeAdmin: vi.fn(async () => ({ removed: "u7" })),
   };
   const reports = {
     list: vi.fn(async () => []),
@@ -88,5 +95,34 @@ describe("ModerationController", () => {
       controller.addRule(req, { kind: "username", value: "x", action: "block" }),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(service.addRule).not.toHaveBeenCalled();
+  });
+
+  it("shows every admin the team, and only the founders that they can change it", async () => {
+    const { controller } = make();
+    await expect(controller.team(req)).resolves.toEqual({ admins: [], canManage: true });
+    await expect(controller.team(teammate)).resolves.toEqual({ admins: [], canManage: false });
+  });
+
+  it("adds an admin by username, without the @ and in lower case", async () => {
+    const { controller, service } = make();
+    await controller.addAdmin(req, { username: " @LadyJane " });
+    expect(service.addAdmin).toHaveBeenCalledWith("u1", "ladyjane");
+    await expect(controller.addAdmin(req, { username: "@" })).rejects.toThrow(
+      "Enter their username.",
+    );
+    await expect(controller.addAdmin(req, {})).rejects.toBeInstanceOf(BadRequestException);
+    expect(service.addAdmin).toHaveBeenCalledTimes(1);
+  });
+
+  it("lets only the founders add or remove admins", async () => {
+    const { controller, service } = make();
+    await expect(controller.addAdmin(teammate, { username: "ladyjane" })).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    await expect(controller.removeAdmin(teammate, "u8")).rejects.toBeInstanceOf(ForbiddenException);
+    expect(service.addAdmin).not.toHaveBeenCalled();
+    expect(service.removeAdmin).not.toHaveBeenCalled();
+    await controller.removeAdmin(req, "u7");
+    expect(service.removeAdmin).toHaveBeenCalledWith("u1", "u7");
   });
 });

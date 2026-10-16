@@ -52,15 +52,18 @@ describe("getPostList", () => {
     const toggleRepost = vi.fn();
     const toggleSave = vi.fn();
     const share = vi.fn();
-    const props = getPostList(feed({ toggleRepost, toggleSave, share }), null);
+    const openGift = vi.fn();
+    const props = getPostList(feed({ toggleRepost, toggleSave, share, openGift }), null);
 
     props.onRepost("p1");
     props.onSave("p1");
     props.onShare("p1");
+    props.onGift("p1", "star");
 
     expect(toggleRepost).toHaveBeenCalledWith("p1");
     expect(toggleSave).toHaveBeenCalledWith("p1");
     expect(share).toHaveBeenCalledWith("p1");
+    expect(openGift).toHaveBeenCalledWith("p1", "star");
   });
 
   it("keeps the overlays shut when nothing is selected", () => {

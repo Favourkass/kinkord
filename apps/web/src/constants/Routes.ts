@@ -4,6 +4,8 @@ export const Routes = {
   about: "/about",
   team: "/about/team",
   contact: "/contact",
+  /** Privacy notice for identity verification, linked before members consent. */
+  verificationPrivacy: "/privacy/verification",
   invest: "/invest",
   lectures: "/lectures",
   lecture: (slug: string) => `/lectures/${slug}`,
@@ -17,6 +19,9 @@ export const Routes = {
   moderationMember: (id: string) => `/moderation/members/${encodeURIComponent(id)}`,
   moderationBlocklist: "/moderation/blocklist",
   moderationReports: "/moderation/reports",
+  moderationPayments: "/moderation/payments",
+  moderationVerification: "/moderation/verification",
+  moderationAdmins: "/moderation/admins",
   signup: "/signup",
   login: "/login",
   appHome: "/home",
@@ -24,9 +29,17 @@ export const Routes = {
   messageThread: (conversationId: string) => `/messages/${encodeURIComponent(conversationId)}`,
   /** Opens (or reuses) the 1:1 thread with a member, then lands in it. */
   messageWith: (userId: string) => `/messages/with/${encodeURIComponent(userId)}`,
+  kinkcoins: "/kinkcoins",
+  kinkcoinsBuy: "/kinkcoins/buy",
+  kinkcoinsHistory: "/kinkcoins/history",
+  kinkcoinsPay: (id: string) => `/kinkcoins/pay/${encodeURIComponent(id)}`,
+  moderationWallet: "/moderation/wallet",
+  kinkcoinsBanks: "/kinkcoins/bank-accounts",
+  kinkcoinsWithdraw: "/kinkcoins/withdraw",
   settings: "/settings",
   /** Password + 2FA moved here from /profile (CEO, 2026-09-12: "we still need to keep the change password and co"). */
   settingsSecurity: "/settings/security",
+  settingsVerification: "/settings/verification",
   // Edit Profile hub (Figma 1542:30) and its five sections.
   profileEdit: "/profile/edit",
   profileEditPhotos: "/profile/edit/photos",
@@ -40,6 +53,9 @@ export const Routes = {
   profile: "/profile",
   // Members directory: country -> state -> members in that state.
   members: "/members",
+  /** The app's search: people and posts. */
+  search: "/search",
+  searchFor: (q: string) => `/search?q=${encodeURIComponent(q)}`,
   membersCountry: (country: string) => `/members/${country.toLowerCase()}`,
   membersState: (country: string, state: string) =>
     `/members/${country.toLowerCase()}/${encodeURIComponent(state)}`,
@@ -56,4 +72,8 @@ export const Routes = {
   post: (id: string) => `/p/${encodeURIComponent(id)}`,
   /** The viewer's saved posts. */
   saved: "/saved",
+  /** Silver Premium: the plans, then paying by bank transfer and sending proof. */
+  subscription: "/subscription",
+  subscriptionPay: (paymentId: string) => `/subscription/pay/${encodeURIComponent(paymentId)}`,
+  subscriptionProof: (paymentId: string) => `/subscription/proof/${encodeURIComponent(paymentId)}`,
 } as const;

@@ -2,11 +2,14 @@ import MaskIcon from "@/components/app/MaskIcon";
 import type { MemberCardVM, RegionRowVM } from "@/domain/member";
 import InfiniteSentinel from "./InfiniteSentinel";
 import MemberCard, { type MemberCardLabels } from "./MemberCard";
+import MembersSearch, { type MembersSearchProps } from "./MembersSearch";
 import RegionSelector, { type RegionSelectorProps } from "./RegionSelector";
 
 export interface RegionListProps {
   title: string;
   subtitle: string;
+  /** Name or @username search, within the place shown. */
+  search: MembersSearchProps;
   selector: RegionSelectorProps;
   /** "256" */
   count: string;
@@ -44,6 +47,9 @@ export default function RegionList(p: RegionListProps) {
       ) : (
         <>
           <div className="pt-[14px] lg:pt-[18px]">
+            <MembersSearch {...p.search} />
+          </div>
+          <div className="pt-[12px] lg:pt-[18px]">
             <RegionSelector {...p.selector} />
           </div>
           <div className="flex items-center pt-[26px] lg:pt-[47px]">

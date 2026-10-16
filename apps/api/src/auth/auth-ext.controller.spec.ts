@@ -144,20 +144,55 @@ describe("AuthExtController", () => {
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  it("refuses a sign-up without a phone number", async () => {
+  it.each([undefined, null])("accepts signup with optional phone %s", async (phone) => {
     const { controller, signUpWithProfile } = makeController();
     const withoutPhone = Object.fromEntries(
       Object.entries(validSignUp).filter(([field]) => field !== "phone"),
     );
-    const err = await controller.signUpCombined(req, makeRes(), withoutPhone).catch((e) => e);
-    expect(err).toBeInstanceOf(BadRequestException);
-    expect((err as BadRequestException).getResponse()).toMatchObject({
-      phone: ["Enter your phone number."],
-    });
-    await expect(
-      controller.signUpCombined(req, makeRes(), { ...validSignUp, phone: null }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-    expect(signUpWithProfile).not.toHaveBeenCalled();
+    await controller.signUpCombined(
+      req,
+      makeRes(),
+      phone === undefined ? withoutPhone : { ...withoutPhone, phone },
+    );
+    expect(signUpWithProfile).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ phone: null }),
+      expect.any(Headers),
+    );
+  });
+
+  it.each(["Straight", "Bisexual", null])(
+    "stores optional sexuality %s on signup",
+    async (orientation) => {
+      const { controller, signUpWithProfile } = makeController();
+      await controller.signUpCombined(req, makeRes(), { ...validSignUp, orientation });
+      expect(signUpWithProfile).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ orientation }),
+        expect.any(Headers),
+      );
+    },
+  );
+
+  it.each(["Prefer not to say", "Gay", "straight", ""])(
+    "refuses sexuality %j that isn't on the list",
+    async (orientation) => {
+      const { controller, signUpWithProfile } = makeController();
+      await expect(
+        controller.signUpCombined(req, makeRes(), { ...validSignUp, orientation }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(signUpWithProfile).not.toHaveBeenCalled();
+    },
+  );
+
+  it("does not require sexuality when omitted", async () => {
+    const { controller, signUpWithProfile } = makeController();
+    await controller.signUpCombined(req, makeRes(), validSignUp);
+    expect(signUpWithProfile).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ orientation: null }),
+      expect.any(Headers),
+    );
   });
 
   it("rejects a sign-up whose date of birth is under 18", async () => {

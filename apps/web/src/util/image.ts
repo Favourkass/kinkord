@@ -19,6 +19,8 @@ export const IMAGE_UPLOAD_PRESETS = {
   post: { maxDim: 1440, quality: 0.82, maxBytes: 600 * 1024 },
   /** Chat photos open full screen like a post photo, over the same phone connection. */
   chat: { maxDim: 1440, quality: 0.82, maxBytes: 600 * 1024 },
+  /** A payment receipt is read for its small print: names, amounts, a reference. */
+  receipt: { maxDim: 2000, quality: 0.88, maxBytes: 1.5 * 1024 * 1024 },
 } as const satisfies Record<string, CompressOptions>;
 
 export type UploadKind = keyof typeof IMAGE_UPLOAD_PRESETS;

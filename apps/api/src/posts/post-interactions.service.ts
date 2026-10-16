@@ -12,7 +12,9 @@ import {
   user,
   COMMENT_BODY_MAX,
 } from "../db/schema";
+import { knownHandles, mentionCandidates, mentionsIn, type Mention } from "./mentions";
 import { StorageService } from "../storage/storage.service";
+import { silverCheck } from "../subscriptions/plans";
 import {
   clamp,
   parseCursor,
@@ -35,7 +37,11 @@ export interface CommentVM {
     username: string | null;
     displayName: string;
     avatarUrl: string | null;
+    /** Shows the Silver check beside their name. */
+    silver: boolean;
   };
+  /** Each @handle in the body that names a member, and whom: the ones the app links. */
+  mentions: Mention[];
   /** Whether the viewer may delete it: their own comment, or any comment on their post. */
   canDelete: boolean;
 }
@@ -120,6 +126,7 @@ export class PostInteractionsService {
         username: user.username,
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
+        silver: silverCheck(postComment.authorId),
       })
       .from(postComment)
       .innerJoin(user, eq(user.id, postComment.authorId))
@@ -138,16 +145,22 @@ export class PostInteractionsService {
       .select({ total: count() })
       .from(postComment)
       .where(and(eq(postComment.postId, postId), isNull(postComment.deletedAt)));
+    const members = await knownHandles(
+      this.db,
+      page.flatMap((r) => mentionCandidates(r.body)),
+    );
     const items = await Promise.all(
       page.map(async (r) => ({
         id: r.id,
         body: r.body,
+        mentions: mentionsIn(r.body, members),
         createdAt: r.createdAt.toISOString(),
         author: {
           userId: r.authorId,
           username: r.username,
           displayName: r.displayName ?? r.username ?? "Member",
           avatarUrl: r.avatarKey ? await this.storage.presignDownload(r.avatarKey, "sm") : null,
+          silver: Boolean(r.silver),
         },
         canDelete: r.authorId === viewerId || authorId === viewerId,
       })),
@@ -167,24 +180,30 @@ export class PostInteractionsService {
       .values({ postId, authorId: userId, body })
       .returning();
     this.push.newComment(postId, authorId, userId);
+    // The post's author hears of the comment already; once is enough.
+    this.posts.notifyMentions(postId, userId, body, [authorId]);
     const [me] = await this.db
       .select({
         username: user.username,
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
+        silver: silverCheck(user.id),
       })
       .from(user)
       .leftJoin(profile, eq(profile.userId, user.id))
       .where(eq(user.id, userId));
+    const members = await knownHandles(this.db, mentionCandidates(row.body));
     return {
       id: row.id,
       body: row.body,
+      mentions: mentionsIn(row.body, members),
       createdAt: row.createdAt.toISOString(),
       author: {
         userId: userId,
         username: me?.username ?? null,
         displayName: me?.displayName ?? me?.username ?? "Member",
         avatarUrl: me?.avatarKey ? await this.storage.presignDownload(me.avatarKey, "sm") : null,
+        silver: Boolean(me?.silver),
       },
       canDelete: true,
     };

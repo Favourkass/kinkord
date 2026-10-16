@@ -1,4 +1,5 @@
 /** Copy for the home feed (Figma "Hompage Light" 344:138 / dark 837:295). */
+import type { FeedTab, SuggestionShow } from "@/domain/post";
 
 export const FEED_COPY = {
   composerPlaceholder: "What's on your mind?",
@@ -26,6 +27,10 @@ export const FEED_COPY = {
   unrepost: "Undo repost",
   repostedBy: (name: string) => `${name} reposted`,
   share: "Share",
+  gift: "Gift",
+  coin: "Coin",
+  star: "Star",
+  crown: "Crown",
   shareCopied: "Link copied",
   postHeading: "Post",
   postGone: "This post is no longer available.",
@@ -42,20 +47,48 @@ export const FEED_COPY = {
   comments: "Comments",
   commentsEmpty: "No comments yet. Be the first.",
   commentPlaceholder: "Write a comment…",
+  /** The list of members to mention, while "@" is typed. */
+  mentionSuggestions: "Members to mention",
   commentSubmit: "Send",
   commentDelete: "Delete comment",
   commentsMore: "Load more comments",
   closeComments: "Close comments",
   loadMore: "Load more",
   loading: "Loading…",
+  /** The For You | Following | Nearby tabs at the top of the home feed. */
+  tabsLabel: "Home feed",
+  tabs: { for_you: "For You", following: "Following", nearby: "Nearby" } satisfies Record<
+    FeedTab,
+    string
+  >,
   feedEmptyTitle: "Your feed is quiet",
   feedEmptyBody: "Follow a few kinksters, or write the first post yourself.",
+  /** Following, for a member who follows nobody yet. */
+  noFollowsTitle: "You're not following anyone yet",
+  noFollowsBody: "Follow kinksters to see their posts here, wherever they are.",
+  noFollowsAction: "Browse kinksters",
+  followingEmpty: "Nothing from the kinksters you follow yet.",
+  /** Nearby, for a member with no state on their profile. */
+  noLocationTitle: "Where are you?",
+  noLocationBody: "Add your location to see posts from kinksters near you.",
+  noLocationAction: "Add your location",
+  nearbyEmpty: "Nothing near you yet.",
   feedError: "Could not load the feed. Refresh to try again.",
-  peopleHeading: "People you may know",
-  peopleSeeAll: "See all",
-  peopleDismiss: "Hide suggestions",
-  peopleAdd: "Add friend",
-  peopleAdded: "Remove",
+  peopleHeading: "Kinksters Near You",
+  /** The sliders button: the members directory, where every filter is. */
+  peopleBrowse: "Browse all kinksters",
+  /** The Women | Men (| All) toggle. */
+  peopleShowLabel: "Show",
+  peopleShow: { women: "Women", men: "Men", all: "All" } satisfies Record<SuggestionShow, string>,
+  peopleOnline: "Online",
+  peopleLookingFor: "Looking for",
+  peopleRemove: "Remove",
+  peopleEmpty: "No one to suggest here yet.",
+  /** Members and the official organization alike are followed, on posts and in the strip. */
+  follow: "Follow",
+  following: "Following",
+  organization: "Official",
+  verifiedOrganization: "Official Kinkord account",
   /** Desktop right rail, which the mobile frame has no room for. */
   asideHeading: "Kinkord",
   asideTagline: "The world's kink community",
@@ -82,9 +115,17 @@ export const POST_CARD_LABELS = {
   save: FEED_COPY.save,
   unsave: FEED_COPY.unsave,
   share: FEED_COPY.share,
+  gift: FEED_COPY.gift,
+  coin: FEED_COPY.coin,
+  star: FEED_COPY.star,
+  crown: FEED_COPY.crown,
   more: FEED_COPY.more,
   less: FEED_COPY.less,
   menu: FEED_COPY.postMenu,
   delete: FEED_COPY.deletePost,
   repostedBy: FEED_COPY.repostedBy,
+  organization: FEED_COPY.organization,
+  verifiedOrganization: FEED_COPY.verifiedOrganization,
+  follow: FEED_COPY.follow,
+  following: FEED_COPY.following,
 } as const;

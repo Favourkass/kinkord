@@ -4,31 +4,24 @@
  */
 import {
   COMMENT_BODY_MAX,
+  DEFAULT_FEED_TAB,
+  isFeedTab,
   POST_MEDIA_MAX,
   type CommentPM,
   type CommentsPM,
   type FeedPM,
+  type FeedSuggestionPM,
+  type FeedSuggestionsPM,
+  type FeedTab,
   type LikePM,
   type PostPM,
   type PostVisibility,
   type RepostPM,
   type SavePM,
+  type SuggestionShow,
 } from "@/domain/post";
 import { IMAGE_VARIANTS, buildUploadSet, type ImageVariant } from "@/util/image";
 import { api, uploadToPresignedUrl } from "./apiClient";
-
-export interface SuggestedPersonPM {
-  userId: string;
-  username: string | null;
-  displayName: string;
-  avatarUrl: string | null;
-  isFollowing: boolean;
-}
-
-export interface SuggestedPM {
-  items: SuggestedPersonPM[];
-  total: number;
-}
 
 interface PostUploadSpec {
   key: string;
@@ -47,12 +40,24 @@ export interface CreatePostInput {
 }
 
 export const postsApi = {
-  /** `author` narrows the feed to one member — that is the profile Posts tab. */
-  feed: (cursor?: string | null, limit?: number, author?: string | null) => {
+  /**
+   * `author` narrows the feed to one member — that is the profile Posts tab.
+   * `search` keeps the posts whose text contains it. `tab` is the home feed's
+   * For You, Following or Nearby; the API reads newest first without one.
+   */
+  feed: (
+    cursor?: string | null,
+    limit?: number,
+    author?: string | null,
+    search?: string | null,
+    tab?: FeedTab | null,
+  ) => {
     const qs = new URLSearchParams();
+    if (tab) qs.set("tab", tab);
     if (cursor) qs.set("cursor", cursor);
     if (limit) qs.set("limit", String(limit));
     if (author) qs.set("author", author.replace(/^@/, ""));
+    if (search) qs.set("q", search);
     const q = qs.toString();
     return api.get<FeedPM>(`/posts/feed${q ? `?${q}` : ""}`);
   },
@@ -66,6 +71,8 @@ export const postsApi = {
   remove: (id: string) => api.del<{ deleted: string }>(`/posts/${encodeURIComponent(id)}`),
   like: (id: string) => api.post<LikePM>(`/posts/${encodeURIComponent(id)}/like`, {}),
   unlike: (id: string) => api.del<LikePM>(`/posts/${encodeURIComponent(id)}/like`),
+  share: (id: string) =>
+    api.post<{ postId: string; shares: number }>(`/posts/${encodeURIComponent(id)}/share`, {}),
   repost: (id: string) => api.post<RepostPM>(`/posts/${encodeURIComponent(id)}/repost`, {}),
   unrepost: (id: string) => api.del<RepostPM>(`/posts/${encodeURIComponent(id)}/repost`),
   save: (id: string) => api.post<SavePM>(`/posts/${encodeURIComponent(id)}/save`, {}),
@@ -88,12 +95,54 @@ export const postsApi = {
     api.post<CommentPM>(`/posts/${encodeURIComponent(id)}/comments`, { body }),
   removeComment: (id: string) =>
     api.del<{ deleted: string }>(`/posts/comments/${encodeURIComponent(id)}`),
-  suggested: (limit = 10) => api.get<SuggestedPM>(`/members/suggested?limit=${limit}`),
+  /** "Kinksters Near You". Without `show`, the API picks the member's own default. */
+  suggested: (limit = 10, show?: SuggestionShow | null) =>
+    api.get<FeedSuggestionsPM>(`/members/suggested?limit=${limit}${show ? `&show=${show}` : ""}`),
+  /** Remove a card for good: the member is never suggested to the viewer again. */
+  dismissSuggestion: (userId: string) =>
+    api.post<{ dismissed: string }>(`/members/suggested/${encodeURIComponent(userId)}/dismiss`, {}),
   follow: (username: string) =>
     api.post<unknown>(`/follows/${encodeURIComponent(username.replace(/^@/, ""))}`, {}),
   unfollow: (username: string) =>
     api.del<unknown>(`/follows/${encodeURIComponent(username.replace(/^@/, ""))}`),
 };
+
+const FEED_TAB_KEY = "kinkord:feed-tab";
+
+/**
+ * The home feed's tab, kept for this browser session, so a reload or a walk
+ * to a profile and back lands on the same tab. Session storage can be off or
+ * full (private mode): then nothing is kept and the feed opens on For You,
+ * as a new session does.
+ */
+export const feedTabMemory = {
+  /** The tab this session last showed, else For You. */
+  read(): FeedTab {
+    try {
+      const kept = sessionStorage.getItem(FEED_TAB_KEY);
+      return isFeedTab(kept) ? kept : DEFAULT_FEED_TAB;
+    } catch {
+      return DEFAULT_FEED_TAB;
+    }
+  },
+  remember(tab: FeedTab): void {
+    try {
+      sessionStorage.setItem(FEED_TAB_KEY, tab);
+    } catch {
+      // Not kept: the tab still switches, for this visit.
+    }
+  },
+};
+
+/**
+ * The next page after what is on screen, less any row already shown. A ranked
+ * page can repeat a row when the world moved between pages; showing it twice
+ * would be worse than dropping it.
+ */
+export function appendNewRows(shown: PostPM[], next: PostPM[]): PostPM[] {
+  const ids = new Set(shown.map((p) => p.id));
+  return [...shown, ...next.filter((p) => !ids.has(p.id))];
+}
 
 /**
  * One photo into the bucket, every stored size, before the post exists. The key
@@ -185,8 +234,34 @@ export function remainingPhotoSlots(current: number): number {
   return Math.max(0, POST_MEDIA_MAX - current);
 }
 
-export function toggleFollowOnSuggestion(pm: SuggestedPersonPM): SuggestedPersonPM {
-  return { ...pm, isFollowing: !pm.isFollowing };
+/**
+ * Whether the viewer follows a member, set on every place the feed shows them —
+ * each of their posts (a repost's author is the original's) and their
+ * suggestion card — so one follow can't leave two of them disagreeing.
+ */
+export function withAuthorFollow(items: PostPM[], userId: string, isFollowing: boolean): PostPM[] {
+  return items.map((p) =>
+    p.author.userId === userId ? { ...p, author: { ...p.author, isFollowing } } : p,
+  );
+}
+
+export function withSuggestionFollow(
+  items: FeedSuggestionPM[],
+  userId: string,
+  isFollowing: boolean,
+): FeedSuggestionPM[] {
+  return items.map((s) => (s.userId === userId ? { ...s, isFollowing } : s));
+}
+
+/** Puts back a card whose removal the API refused, where it was (once). */
+export function withSuggestionRestored(
+  items: FeedSuggestionPM[],
+  person: FeedSuggestionPM,
+  index: number,
+): FeedSuggestionPM[] {
+  if (items.some((s) => s.userId === person.userId)) return items;
+  const at = Math.min(Math.max(0, index), items.length);
+  return [...items.slice(0, at), person, ...items.slice(at)];
 }
 
 /**

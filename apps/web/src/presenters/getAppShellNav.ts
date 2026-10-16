@@ -5,21 +5,27 @@ import { Routes } from "@/constants/Routes";
 export interface AppShellNavVM {
   links: {
     home: string;
+    search: string;
     members: string;
     chat: string;
     notifications: string;
     profile: string;
     settings: string;
     saved: string;
+    kinkcoins: string;
+    subscription: string;
   };
   labels: {
     home: string;
+    search: string;
     members: string;
     chat: string;
     notifications: string;
     profile: string;
     settings: string;
     saved: string;
+    kinkcoins: string;
+    subscription: string;
     logout: string;
   };
 }
@@ -29,12 +35,15 @@ export function getAppShellNav(): AppShellNavVM {
   return {
     links: {
       home: Routes.appHome,
+      search: Routes.search,
       members: Routes.members,
       chat: Routes.messages,
       notifications: Routes.notifications,
       profile: Routes.profile,
       settings: Routes.settings,
       saved: Routes.saved,
+      kinkcoins: Routes.kinkcoins,
+      subscription: Routes.subscription,
     },
     labels: { ...MEMBERS_COPY.nav },
   };

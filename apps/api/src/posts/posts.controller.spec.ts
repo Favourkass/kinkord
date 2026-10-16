@@ -37,6 +37,44 @@ describe("PostsController", () => {
       cursor: undefined,
       limit: 5,
       author: "tega",
+      q: undefined,
+      tab: undefined,
+    });
+  });
+
+  it("passes the home feed's tab and its opaque cursor through", async () => {
+    const posts = postsService();
+    await controller(posts).feed(req("u1"), { tab: "nearby", cursor: "eyJ2IjoxfQ" });
+    expect(posts.feed).toHaveBeenCalledWith("u1", {
+      cursor: "eyJ2IjoxfQ",
+      limit: undefined,
+      author: undefined,
+      q: undefined,
+      tab: "nearby",
+    });
+  });
+
+  it("refuses a tab the feed doesn't have", () => {
+    expect(() => controller().feed(req("u1"), { tab: "trending" })).toThrow();
+  });
+
+  it("passes a search term to the feed, and drops an empty one", async () => {
+    const posts = postsService();
+    await controller(posts).feed(req("u1"), { q: "  brunch " });
+    expect(posts.feed).toHaveBeenLastCalledWith("u1", {
+      cursor: undefined,
+      limit: undefined,
+      author: undefined,
+      q: "brunch",
+      tab: undefined,
+    });
+    await controller(posts).feed(req("u1"), { q: "   " });
+    expect(posts.feed).toHaveBeenLastCalledWith("u1", {
+      cursor: undefined,
+      limit: undefined,
+      author: undefined,
+      q: undefined,
+      tab: undefined,
     });
   });
 

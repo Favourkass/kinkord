@@ -14,6 +14,7 @@ export interface ExpandableAvatarProps {
   fetchPriority?: "high" | "low" | "auto";
   /** Accessible label for the close button. Defaults to "Close". */
   closeLabel?: string;
+  shape?: "circle" | "square";
 }
 
 /**
@@ -30,6 +31,7 @@ export default function ExpandableAvatar({
   wrapperClassName,
   fetchPriority,
   closeLabel = "Close",
+  shape = "circle",
 }: ExpandableAvatarProps) {
   const [open, setOpen] = useState(false);
   const layoutId = `avatar-${useId()}`;
@@ -92,6 +94,7 @@ export default function ExpandableAvatar({
     ? { duration: 0 }
     : { type: "spring" as const, stiffness: 320, damping: 32, mass: 0.9 };
   const fade = { duration: reduced ? 0 : 0.2 };
+  const rounding = shape === "square" ? "rounded-[18px]" : "rounded-full";
 
   return (
     <>
@@ -113,7 +116,7 @@ export default function ExpandableAvatar({
               fetchPriority={fetchPriority}
               decoding="async"
               draggable={false}
-              className="size-full rounded-full object-cover"
+              className={`size-full object-cover ${rounding}`}
             />
           </motion.button>
         ) : null}
@@ -150,7 +153,7 @@ export default function ExpandableAvatar({
               transition={spring}
               // Equal width & height = a perfect square, then flex centers it.
               // min(90vw, 90dvh, 480px) keeps it comfortable on phones and desktops.
-              className="relative z-[1] h-[min(90vw,90dvh,480px)] w-[min(90vw,90dvh,480px)] cursor-zoom-out rounded-full object-cover shadow-[0_24px_80px_rgba(0,0,0,0.6)]"
+              className={`relative z-[1] h-[min(90vw,90dvh,480px)] w-[min(90vw,90dvh,480px)] cursor-zoom-out object-cover shadow-[0_24px_80px_rgba(0,0,0,0.6)] ${rounding}`}
             />
           </motion.div>
         ) : null}

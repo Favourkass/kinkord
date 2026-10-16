@@ -10,10 +10,20 @@ export function compactNumber(n: number): string {
   return `${text}${unit.s}`;
 }
 
-/** "Delta" -> "Delta State"; leaves "FCT Abuja" and already-suffixed names alone. */
-export function displayState(state: string | null | undefined): string {
+/**
+ * A state as its country names it. Nigeria's are States: "Delta" -> "Delta
+ * State", leaving "FCT Abuja" and already-suffixed names alone. Anywhere else
+ * the name stands alone: Kenya's "Nairobi" county is just "Nairobi". With no
+ * country on file it's read as Nigerian, the only country before Kenya.
+ */
+export function displayState(
+  state: string | null | undefined,
+  country: string | null | undefined,
+): string {
   const s = (state ?? "").trim();
   if (!s) return "";
+  const code = (country ?? "").trim().toUpperCase();
+  if (code && code !== "NG") return s;
   if (/\bstate$/i.test(s) || /^FCT\b/i.test(s)) return s;
   return `${s} State`;
 }

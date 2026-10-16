@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PostPM } from "@/domain/post";
 
 const get = vi.fn();
@@ -22,16 +22,20 @@ vi.mock("@/util/image", async (importOriginal) => ({
 }));
 
 const {
+  appendNewRows,
   applyLike,
   applyToPost,
   canSubmitComment,
   canSubmitPost,
+  feedTabMemory,
   postsApi,
   remainingPhotoSlots,
-  toggleFollowOnSuggestion,
   toggleLikeOnPost,
   uploadPostPhoto,
+  withAuthorFollow,
   withCommentDelta,
+  withSuggestionFollow,
+  withSuggestionRestored,
 } = await import("./posts.service");
 
 const pm = (over: Partial<PostPM> = {}): PostPM => ({
@@ -130,8 +134,8 @@ describe("comment counts", () => {
   });
 });
 
-describe("toggleFollowOnSuggestion", () => {
-  it("flips the button without waiting for the round trip", () => {
+describe("following, wherever the member shows", () => {
+  it("sets the suggestion card without waiting for the round trip", () => {
     const person = {
       userId: "u2",
       username: "tega",
@@ -139,7 +143,44 @@ describe("toggleFollowOnSuggestion", () => {
       avatarUrl: null,
       isFollowing: false,
     };
-    expect(toggleFollowOnSuggestion(person).isFollowing).toBe(true);
+    const other = { ...person, userId: "u3", username: "kay" };
+    const next = withSuggestionFollow([person, other], "u2", true);
+    expect(next.map((s) => s.isFollowing)).toEqual([true, false]);
+    expect(withSuggestionFollow(next, "u2", false)[0].isFollowing).toBe(false);
+  });
+
+  it("puts a card whose removal failed back where it was, once", () => {
+    const card = (userId: string) => ({
+      userId,
+      username: userId,
+      displayName: userId,
+      avatarUrl: null,
+      isFollowing: false,
+    });
+    const ids = (list: { userId: string }[]) => list.map((s) => s.userId);
+    expect(ids(withSuggestionRestored([card("a"), card("c")], card("b"), 1))).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
+    // The list got shorter meanwhile: it goes at the end.
+    expect(ids(withSuggestionRestored([card("a")], card("b"), 4))).toEqual(["a", "b"]);
+    const back = [card("a"), card("b")];
+    expect(withSuggestionRestored(back, card("b"), 0)).toBe(back);
+  });
+
+  it("sets every post by that author, a repost of theirs included, and no one else's", () => {
+    const repost = pm({
+      id: "r1",
+      repostedBy: { userId: "u1", username: "me", displayName: "Me" },
+    });
+    const someoneElse = pm({
+      id: "p2",
+      postId: "p2",
+      author: { userId: "u3", username: "kay", displayName: "Kay", avatarUrl: null },
+    });
+    const next = withAuthorFollow([pm(), repost, someoneElse], "u2", true);
+    expect(next.map((p) => p.author.isFollowing)).toEqual([true, true, undefined]);
   });
 });
 
@@ -154,6 +195,18 @@ describe("postsApi", () => {
     expect(get).toHaveBeenCalledWith("/posts/feed?cursor=2026-09-18T09%3A00%3A00.000Z&limit=5");
   });
 
+  it("asks for the posts that contain a search", async () => {
+    await postsApi.feed(null, undefined, null, "brunch & tea");
+    expect(get).toHaveBeenCalledWith("/posts/feed?q=brunch+%26+tea");
+  });
+
+  it("asks for a home feed tab, with the opaque cursor it handed out", async () => {
+    await postsApi.feed(null, undefined, null, null, "following");
+    expect(get).toHaveBeenLastCalledWith("/posts/feed?tab=following");
+    await postsApi.feed("eyJ2IjoxfQ", undefined, null, null, "for_you");
+    expect(get).toHaveBeenLastCalledWith("/posts/feed?tab=for_you&cursor=eyJ2IjoxfQ");
+  });
+
   it("sends media as keys and drops an empty body rather than posting a blank", async () => {
     await postsApi.create({ body: "  ", visibility: "friends", mediaKeys: ["posts/u1/a.jpg"] });
     expect(post).toHaveBeenCalledWith("/posts", {
@@ -166,6 +219,65 @@ describe("postsApi", () => {
   it("escapes an id rather than pasting it into the path", async () => {
     await postsApi.like("a/b");
     expect(post).toHaveBeenCalledWith("/posts/a%2Fb/like", {});
+  });
+
+  it("asks for Kinksters Near You for a segment, or leaves the default to the API", async () => {
+    await postsApi.suggested(10);
+    expect(get).toHaveBeenLastCalledWith("/members/suggested?limit=10");
+    await postsApi.suggested(10, "men");
+    expect(get).toHaveBeenLastCalledWith("/members/suggested?limit=10&show=men");
+  });
+
+  it("removes a suggestion by member id", async () => {
+    await postsApi.dismissSuggestion("u/2");
+    expect(post).toHaveBeenCalledWith("/members/suggested/u%2F2/dismiss", {});
+  });
+});
+
+describe("the next page", () => {
+  it("joins the list without repeating a row already shown", () => {
+    const shown = [pm({ id: "p1" }), pm({ id: "r1", postId: "p1" })];
+    const next = [pm({ id: "p1" }), pm({ id: "p2", postId: "p2" })];
+    expect(appendNewRows(shown, next).map((p) => p.id)).toEqual(["p1", "r1", "p2"]);
+    expect(appendNewRows([], next).map((p) => p.id)).toEqual(["p1", "p2"]);
+  });
+});
+
+describe("the home feed's tab, for the session", () => {
+  const storage = () => {
+    const kept = new Map<string, string>();
+    return {
+      getItem: (k: string) => kept.get(k) ?? null,
+      setItem: (k: string, v: string) => void kept.set(k, v),
+    };
+  };
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("opens on For You in a new session, then on the tab last shown", () => {
+    vi.stubGlobal("sessionStorage", storage());
+    expect(feedTabMemory.read()).toBe("for_you");
+    feedTabMemory.remember("nearby");
+    expect(feedTabMemory.read()).toBe("nearby");
+  });
+
+  it("ignores anything kept that isn't a tab", () => {
+    const kept = storage();
+    kept.setItem("kinkord:feed-tab", "trending");
+    vi.stubGlobal("sessionStorage", kept);
+    expect(feedTabMemory.read()).toBe("for_you");
+  });
+
+  it("works with storage switched off: For You, and nothing thrown", () => {
+    vi.stubGlobal("sessionStorage", {
+      getItem: () => {
+        throw new Error("denied");
+      },
+      setItem: () => {
+        throw new Error("denied");
+      },
+    });
+    expect(feedTabMemory.read()).toBe("for_you");
+    expect(() => feedTabMemory.remember("following")).not.toThrow();
   });
 });
 

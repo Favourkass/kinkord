@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { KEEP_TYPING } from "@/constants/location";
 import { MEMBERS_COPY, MEMBERS_PAGE_SIZE } from "@/constants/members";
 import { Routes } from "@/constants/Routes";
 import {
@@ -11,18 +12,19 @@ import {
   type RegionRowVM,
 } from "@/domain/member";
 import { ApiError } from "@/services/apiClient";
+import { isOfficialOrganization } from "@/services/organization-placeholder.service";
 import {
   decodeParam,
   hasMore,
   isCountryAvailable,
   membersApi,
   nextSort,
-  regionsForState,
-  statesForCountry,
   toggleFollowOnCard,
   type MembersSort,
 } from "@/services/members.service";
+import { isKnownState, regionsForState, statesForCountry } from "@/services/location.service";
 import { countryName, displayState } from "@/util/format";
+import { optionMatcher } from "@/util/textSearch";
 
 /** Loaded pages for one country/state/region/sort key; a different key means "loading". */
 interface RegionPage {
@@ -35,6 +37,12 @@ interface RegionPage {
 
 /** Stable empty list so derived memos don't churn while a page is loading. */
 const NO_ITEMS: MemberCardPM[] = [];
+const NO_REGIONS: string[] = [];
+
+/** How long typing pauses before the list searches; clearing the box applies at once. */
+export const SEARCH_DELAY_MS = 300;
+/** The API's limit on a search (GET /members q): longer would be refused. */
+export const SEARCH_MAX_LENGTH = 50;
 
 /**
  * Members list at every level of the directory (Figma 907:1410 list layout):
@@ -54,24 +62,49 @@ export function useMembersRegionPresenter(
   const country = countryParam.toUpperCase();
   const state = stateParam ? decodeParam(stateParam) : null;
   const countryMode = state === null;
-  const regions = useMemo(
-    () => (state ? regionsForState(country, state) : statesForCountry(country)),
-    [country, state],
-  );
 
   // null = the whole state (CEO, 2026-09-08); picking an LGA narrows the list.
   const [region, setRegion] = useState<string | null>(
     initialRegion ? decodeParam(initialRegion) : null,
   );
   const [sort, setSort] = useState<MembersSort>("recent");
+  // What's typed, and what the list searches once typing pauses.
+  const [query, setQuery] = useState("");
+  const [search, setSearch] = useState("");
   const [sheetOpen, setSheetOpen] = useState(false);
+  // What's typed in the sheet's own search, over the states or the state's towns.
+  const [regionQuery, setRegionQuery] = useState("");
+  // A state's towns (thousands, for some) are fetched when its sheet first opens.
+  const [towns, setTowns] = useState<{ key: string; list: string[] } | null>(null);
+  const townsKey = state ? `${country}|${state}` : null;
+  useEffect(() => {
+    if (!sheetOpen || !state) return;
+    let live = true;
+    const loadedKey = `${country}|${state}`;
+    void regionsForState(country, state).then((list) => {
+      if (live) setTowns({ key: loadedKey, list });
+    });
+    return () => {
+      live = false;
+    };
+  }, [sheetOpen, country, state]);
+  const loadedTowns = towns && towns.key === townsKey ? towns.list : null;
+  const regions = useMemo(
+    () => (countryMode ? statesForCountry(country) : (loadedTowns ?? NO_REGIONS)),
+    [countryMode, country, loadedTowns],
+  );
+  const matchRegion = useMemo(
+    () => optionMatcher(regions.map((name) => ({ value: name, label: name }))),
+    [regions],
+  );
+  const regionHits = useMemo(() => matchRegion(regionQuery), [matchRegion, regionQuery]);
   const [data, setData] = useState<RegionPage | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
 
   // Country mode needs a launched country; state mode needs a state we have LGAs for.
-  const knownState = countryMode ? isCountryAvailable(country) : regions.length > 0;
-  const key = knownState ? `${country}|${state ?? "*"}|${region ?? "*"}|${sort}` : null;
+  const knownState = countryMode ? isCountryAvailable(country) : isKnownState(country, state);
+  const key = knownState ? `${country}|${state ?? "*"}|${region ?? "*"}|${sort}|${search}` : null;
   const current = data?.key === key ? data : null;
   const loading = key !== null && current === null;
   const items = current?.items ?? NO_ITEMS;
@@ -79,12 +112,18 @@ export function useMembersRegionPresenter(
   const page = current?.page ?? 1;
   const error = current?.error ?? null;
 
-  // First page whenever the region / sort / route changes; stale responses are dropped.
+  useEffect(() => {
+    const term = query.trim().slice(0, SEARCH_MAX_LENGTH);
+    const t = setTimeout(() => setSearch(term), term ? SEARCH_DELAY_MS : 0);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  // First page whenever the region / sort / search / route changes; stale responses are dropped.
   useEffect(() => {
     if (!key) return;
     let cancelled = false;
     void membersApi
-      .page({ country, state, region, page: 1, limit: MEMBERS_PAGE_SIZE, sort })
+      .page({ country, state, region, q: search, page: 1, limit: MEMBERS_PAGE_SIZE, sort })
       .then((res) => {
         if (!cancelled) setData({ key, items: res.items, total: res.total, page: 1, error: null });
       })
@@ -99,7 +138,7 @@ export function useMembersRegionPresenter(
     return () => {
       cancelled = true;
     };
-  }, [country, state, region, sort, key, router]);
+  }, [country, state, region, search, sort, key, router]);
 
   const more = hasMore(items.length, total);
 
@@ -108,7 +147,7 @@ export function useMembersRegionPresenter(
     const next = page + 1;
     setLoadingMore(true);
     void membersApi
-      .page({ country, state, region, page: next, limit: MEMBERS_PAGE_SIZE, sort })
+      .page({ country, state, region, q: search, page: next, limit: MEMBERS_PAGE_SIZE, sort })
       .then((res) =>
         setData((prev) =>
           prev && prev.key === key
@@ -126,11 +165,16 @@ export function useMembersRegionPresenter(
         );
       })
       .finally(() => setLoadingMore(false));
-  }, [country, state, region, sort, key, page, loading, loadingMore, more, router]);
+  }, [country, state, region, search, sort, key, page, loading, loadingMore, more, router]);
+
+  const closeSheet = useCallback(() => {
+    setSheetOpen(false);
+    setRegionQuery("");
+  }, []);
 
   const selectRegion = useCallback(
     (next: string) => {
-      setSheetOpen(false);
+      closeSheet();
       if (countryMode) {
         // Picking a state on the country page opens that state's own list.
         if (next !== copy.allStates) router.push(Routes.membersState(country, next));
@@ -138,7 +182,7 @@ export function useMembersRegionPresenter(
       }
       setRegion(next === copy.allRegions ? null : next);
     },
-    [countryMode, copy.allStates, copy.allRegions, router, country],
+    [countryMode, copy.allStates, copy.allRegions, router, country, closeSheet],
   );
 
   const toggleSort = useCallback(() => setSort((s) => nextSort(s)), []);
@@ -170,7 +214,7 @@ export function useMembersRegionPresenter(
   const rows = useMemo<RegionRowVM[]>(
     () =>
       items.map((pm) => {
-        const card = toMemberCardVM(pm);
+        const card = toMemberCardVM(pm, isOfficialOrganization(pm.userId));
         return {
           card,
           href: Routes.member(pm.username ?? pm.userId),
@@ -181,7 +225,7 @@ export function useMembersRegionPresenter(
     [items, busy, copy],
   );
 
-  const placeName = countryMode ? (countryName(country) ?? country) : displayState(state);
+  const placeName = countryMode ? (countryName(country) ?? country) : displayState(state, country);
 
   return {
     title: placeName,
@@ -191,14 +235,38 @@ export function useMembersRegionPresenter(
       : countryMode
         ? MEMBERS_COPY.state.notAvailable
         : copy.unknownState,
+    search: {
+      value: query,
+      onChange: setQuery,
+      placeholder: copy.searchPlaceholder,
+      label: copy.searchLabel,
+      iconSize: countryMode ? (24 as const) : (26 as const),
+      maxLength: SEARCH_MAX_LENGTH,
+    },
     selector: {
       label: copy.selectorLabel,
       value: countryMode ? copy.allStates : (region ?? copy.allRegions),
-      options: [countryMode ? copy.allStates : copy.allRegions, ...regions],
+      options: [
+        countryMode ? copy.allStates : copy.allRegions,
+        ...regionHits.hits.map((hit) => hit.label),
+      ],
       open: sheetOpen,
       onOpen: () => setSheetOpen(true),
-      onClose: () => setSheetOpen(false),
+      onClose: closeSheet,
       onSelect: selectRegion,
+      search: {
+        value: regionQuery,
+        onChange: setRegionQuery,
+        placeholder: countryMode ? copy.searchStates : copy.searchRegions,
+      },
+      status:
+        !countryMode && loadedTowns === null
+          ? copy.loadingRegions
+          : regionHits.more
+            ? KEEP_TYPING
+            : regionHits.hits.length === 0 && regionQuery.trim()
+              ? copy.noRegionMatch
+              : null,
       sheetTitle: countryMode ? copy.sheetTitleStates : copy.sheetTitle,
       closeLabel: copy.closeSheet,
       searchByRegionLabel: countryMode ? copy.searchByState : copy.searchByRegion,
@@ -216,6 +284,8 @@ export function useMembersRegionPresenter(
       following: copy.following,
       posts: copy.posts,
       followers: copy.followers,
+      organization: MEMBERS_COPY.profile.organization,
+      verifiedOrganization: MEMBERS_COPY.profile.verifiedOrganization,
     },
     loading,
     loadingMore,
@@ -224,10 +294,13 @@ export function useMembersRegionPresenter(
     onToggleFollow: toggleFollow,
     empty:
       !loading && !error && knownState && items.length === 0
-        ? copy.empty(region ?? placeName)
+        ? search
+          ? copy.noMatch(search, region ?? placeName)
+          : copy.empty(region ?? placeName)
         : null,
     loadingMoreText: copy.loadingMore,
-    endText: items.length > 0 && !more ? copy.end : null,
+    // "Everyone here" isn't true of a search's results.
+    endText: items.length > 0 && !more && !search ? copy.end : null,
     error,
   };
 }

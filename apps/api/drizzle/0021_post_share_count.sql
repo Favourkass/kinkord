@@ -1,0 +1,1 @@
+ALTER TABLE "post" ADD COLUMN "shares" integer DEFAULT 0 NOT NULL;

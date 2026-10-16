@@ -17,6 +17,7 @@ const fields = {
   city: "Sapele",
   dateOfBirth: "1999-08-04",
   gender: "male",
+  orientation: "Bisexual",
   phone: "+2348031234567",
 };
 
@@ -56,6 +57,20 @@ const make = (opts: {
 };
 
 describe("SignUpService", () => {
+  it("creates a profile without a phone and skips the phone-only moderation check", async () => {
+    const { service, set, review } = make({
+      signUpResponse: new Response(JSON.stringify({ user: { id: "u1" } }), { status: 200 }),
+    });
+    const result = await service.signUpWithProfile(
+      account,
+      { ...fields, phone: null },
+      new Headers(),
+    );
+    expect(result.status).toBe(200);
+    expect(set).toHaveBeenCalledWith({ ...fields, phone: null });
+    expect(review).not.toHaveBeenCalled();
+  });
+
   it("forwards Better Auth's rejection and never touches the profile", async () => {
     const res = new Response(JSON.stringify({ message: "Email already exists" }), { status: 422 });
     const { service, update } = make({ signUpResponse: res });

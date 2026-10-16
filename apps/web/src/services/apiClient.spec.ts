@@ -35,6 +35,16 @@ describe("api.request", () => {
     await expect(api.del("/follows/nene")).resolves.toEqual({ ok: true });
     expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: "DELETE" });
   });
+
+  it("sends a JSON body with PUT for api.put", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(okJson({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    await api.put("/admin/payments/settings", { bankName: "UBA" });
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({
+      method: "PUT",
+      body: JSON.stringify({ bankName: "UBA" }),
+    });
+  });
 });
 
 describe("uploadToPresignedUrl", () => {
@@ -78,19 +88,30 @@ describe("uploadToPresignedUrl", () => {
   });
 });
 
-describe("new accounts without a verified phone", () => {
+describe("new accounts without a verified email", () => {
   const blocked = () =>
     errJson(403, {
-      code: "PHONE_VERIFICATION_REQUIRED",
-      message: "Verify your phone number to continue.",
+      code: "EMAIL_VERIFICATION_REQUIRED",
+      message: "Verify your email address to continue.",
     });
 
-  it("are sent back to the phone step, and still see the error", async () => {
+  it("are sent back to the email step, and still see the error", async () => {
     const assign = vi.fn();
     vi.stubGlobal("window", { location: { pathname: "/home", assign } });
     vi.spyOn(globalThis, "fetch").mockResolvedValue(blocked());
     await expect(api.get("/posts")).rejects.toBeInstanceOf(ApiError);
-    expect(assign).toHaveBeenCalledWith("/signup?resume=phone");
+    expect(assign).toHaveBeenCalledWith("/signup?resume=email");
+    vi.unstubAllGlobals();
+  });
+
+  it("aren't sent to a phone step that no longer exists", async () => {
+    const assign = vi.fn();
+    vi.stubGlobal("window", { location: { pathname: "/home", assign } });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      errJson(403, { code: "PHONE_VERIFICATION_REQUIRED", message: "Verify your phone." }),
+    );
+    await expect(api.get("/posts")).rejects.toBeInstanceOf(ApiError);
+    expect(assign).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
 

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CHAT_COPY, photosLockedText } from "@/constants/chat";
 import { Routes } from "@/constants/Routes";
 import {
+  isCrossCountryPremium,
   isNewChatLimit,
   mergeMessages,
   newChatNotice,
@@ -19,9 +20,11 @@ import type { PostMediaVM } from "@/domain/post";
 import type { RealtimeEventPM } from "@/domain/realtime";
 import { ApiError } from "@/services/apiClient";
 import { chatService } from "@/services/chat.service";
+import { isOfficialOrganization } from "@/services/organization-placeholder.service";
 import { useHomePresenter } from "./useHomePresenter";
 import { useChatSafety } from "./useChatSafety";
 import { usePolling } from "./usePolling";
+import { useTypingIndicators } from "./useTypingIndicators";
 import { useRealtime } from "./useRealtime";
 
 /** How often an open thread asks for new messages without a live connection. */
@@ -57,6 +60,7 @@ interface DraftPhoto {
  */
 export function useChatThreadPresenter(conversationId: string) {
   const shell = useHomePresenter();
+  const { active: typing, receive: receiveTyping, clear: clearTyping } = useTypingIndicators();
   const [viewerId, setViewerId] = useState<string | null>(null);
   const [summary, setSummary] = useState<ConversationThreadPM | null>(null);
   const [messages, setMessages] = useState<ChatMessagePM[]>([]);
@@ -70,6 +74,9 @@ export function useChatThreadPresenter(conversationId: string) {
   // here: each remembered with the thread it was for.
   const [allowance, setAllowance] = useState<{ for: string; value: ChatAllowancePM } | null>(null);
   const [refusedIn, setRefusedIn] = useState<string | null>(null);
+  // The server refused writing first here: the other member is in another
+  // country, which takes Silver. Remembered with the thread it was for.
+  const [needsSilverIn, setNeedsSilverIn] = useState<string | null>(null);
   const lastMarked = useRef<string | null>(null);
   const [draftPhoto, setDraftPhoto] = useState<DraftPhoto | null>(null);
   // Someone else's photos this viewer has chosen to see, for as long as the thread is open.
@@ -142,10 +149,15 @@ export function useChatThreadPresenter(conversationId: string) {
   const onRealtime = useCallback(
     (e: RealtimeEventPM) => {
       if (e.type === "message" && e.conversationId === conversationId) void pollNew();
+      if ((e.type === "typing" || e.type === "message") && e.conversationId === conversationId)
+        receiveTyping(e);
     },
-    [conversationId, pollNew],
+    [conversationId, pollNew, receiveTyping],
   );
   const { live } = useRealtime(onRealtime);
+  useEffect(() => {
+    if (!live) clearTyping();
+  }, [live, clearTyping]);
   usePolling(pollNew, live ? THREAD_FALLBACK_POLL_MS : THREAD_POLL_MS, loaded);
 
   const pollHeader = useCallback(async () => {
@@ -158,6 +170,35 @@ export function useChatThreadPresenter(conversationId: string) {
   usePolling(pollHeader, HEADER_POLL_MS, loaded);
 
   // A block made or lifted changes the header and the composer: refetch it.
+  const typingSentAt = useRef(0);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onTyping = useCallback(
+    (active: boolean) => {
+      if (!live || summary?.peer?.blockedByMe || (!active && !typingSentAt.current)) return;
+      if (typingTimer.current) clearTimeout(typingTimer.current);
+      const now = Date.now();
+      if (!active || now - typingSentAt.current >= 5_000) {
+        typingSentAt.current = active ? now : 0;
+        void chatService.setTyping(conversationId, active).catch(() => undefined);
+      }
+      if (active)
+        typingTimer.current = setTimeout(() => {
+          typingSentAt.current = 0;
+          void chatService.setTyping(conversationId, false).catch(() => undefined);
+        }, 5_000);
+    },
+    [conversationId, live, summary?.peer?.blockedByMe],
+  );
+  useEffect(
+    () => () => {
+      if (typingTimer.current) clearTimeout(typingTimer.current);
+      if (typingSentAt.current)
+        void chatService.setTyping(conversationId, false).catch(() => undefined);
+      typingSentAt.current = 0;
+    },
+    [conversationId],
+  );
+
   const refreshHeader = useCallback(() => void pollHeader(), [pollHeader]);
   const safety = useChatSafety(conversationId, summary?.peer ?? null, refreshHeader);
 
@@ -184,6 +225,13 @@ export function useChatThreadPresenter(conversationId: string) {
           // Retrying can't help until tomorrow: say so instead of offering it.
           setPending((p) => p.filter((x) => x.clientId !== clientId));
           setRefusedIn(conversationId);
+          setSendError(null);
+          return;
+        }
+        if (e instanceof ApiError && isCrossCountryPremium(e.body)) {
+          // Retrying can't help without Silver: offer it instead.
+          setPending((p) => p.filter((x) => x.clientId !== clientId));
+          setNeedsSilverIn(conversationId);
           setSendError(null);
           return;
         }
@@ -272,12 +320,29 @@ export function useChatThreadPresenter(conversationId: string) {
     }
   }, [conversationId, hasMore, loadingMore, messages]);
 
-  const peer = useMemo(() => toThreadPeerVM(summary?.peer ?? null, Routes.member), [summary]);
+  const peer = useMemo(() => {
+    const vm = toThreadPeerVM(
+      summary?.peer ?? null,
+      Routes.member,
+      isOfficialOrganization(summary?.peer?.userId),
+    );
+    const isTyping = typing.has(conversationId) && !summary?.peer?.blockedByMe;
+    return vm
+      ? {
+          ...vm,
+          typing: isTyping,
+          presenceLabel: isTyping ? CHAT_COPY.typing : CHAT_COPY.presence[vm.presence ?? "offline"],
+        }
+      : null;
+  }, [summary, typing, conversationId]);
   const notice = newChatNotice({
     empty,
     allowance: allowance?.for === conversationId ? allowance.value : null,
     refused: refusedIn === conversationId,
   });
+  // Once the other member writes here, replying is free.
+  const needsSilver =
+    needsSilverIn === conversationId && !messages.some((m) => m.senderId !== viewerId);
   const bubbles = useMemo(
     () => [
       ...messages.map((m) => toThreadMessageVM(m, viewerId, revealed)),
@@ -302,9 +367,17 @@ export function useChatThreadPresenter(conversationId: string) {
       loadingMore,
       /** The other member left or was removed: read-only from here. */
       unavailable: loaded && peer === null,
-      /** The daily new-chat allowance, shown while nobody has written yet. */
-      newChat:
-        notice === null
+      /**
+       * The daily new-chat allowance, shown while nobody has written yet; or,
+       * after writing first to someone abroad was refused, the offer of Silver.
+       */
+      newChat: needsSilver
+        ? {
+            text: CHAT_COPY.crossCountry,
+            blocking: true,
+            link: { label: CHAT_COPY.getSilver, href: Routes.subscription },
+          }
+        : notice === null
           ? null
           : {
               text: notice === "blocked" ? CHAT_COPY.newChatLimit : CHAT_COPY.newChatHint,
@@ -328,6 +401,7 @@ export function useChatThreadPresenter(conversationId: string) {
     safety,
     backHref: Routes.messages,
     send,
+    onTyping,
     retry,
     loadMore: () => void loadMore(),
     attachPhoto,

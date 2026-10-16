@@ -27,7 +27,7 @@ export default function HomeScreen() {
           onFinished={splash.onFinished}
         />
       )}
-      <SplashScreen {...vm} />
+      <SplashScreen {...vm} showAgeGate={vm.showAgeGate && !splash.visible} />
     </>
   );
 }

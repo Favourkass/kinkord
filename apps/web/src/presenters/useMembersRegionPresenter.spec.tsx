@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { Routes } from "@/constants/Routes";
 import type { MemberCardPM } from "@/domain/member";
@@ -53,6 +55,14 @@ const member = (n: number, extra: Partial<MemberCardPM> = {}): MemberCardPM => (
 const pageOf = (items: MemberCardPM[], total: number, page: number) =>
   Promise.resolve({ items, total, page, limit: 20 });
 
+// A state's towns come from the generated /locations files, served from disk here.
+const townsFetch = vi.fn(
+  async (url: string) =>
+    new Response(fs.readFileSync(path.resolve(__dirname, "../../public", `.${url}`), "utf8")),
+);
+beforeEach(() => vi.stubGlobal("fetch", townsFetch));
+afterEach(() => vi.unstubAllGlobals());
+
 describe("useMembersRegionPresenter", () => {
   beforeEach(() => {
     replace.mockClear();
@@ -73,7 +83,7 @@ describe("useMembersRegionPresenter", () => {
     expect(result.current.title).toBe("Delta State");
     expect(result.current.subtitle).toBe("Discover like-minded members near you.");
     expect(result.current.selector.value).toBe("All regions");
-    expect(result.current.selector.options.slice(0, 2)).toEqual(["All regions", "Abraka"]);
+    expect(result.current.selector.options[0]).toBe("All regions");
     expect(result.current.selector.searchByRegionLabel).toBe("Search by Region");
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(apiGet).toHaveBeenCalledWith(
@@ -95,6 +105,28 @@ describe("useMembersRegionPresenter", () => {
     expect(result.current.rows[0].openProfileLabel).toBe("Open kinkster1’s profile");
     expect(result.current.hasMore).toBe(true);
     expect(result.current.endText).toBeNull();
+  });
+
+  it("loads the state's towns when the sheet opens, searchable and 50 at a time", async () => {
+    townsFetch.mockClear();
+    const { result } = renderHook(() => useMembersRegionPresenter("ng", "Delta"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(townsFetch).not.toHaveBeenCalled();
+    act(() => result.current.selector.onOpen());
+    expect(result.current.selector.status).toBe("Loading regions…");
+    await waitFor(() => expect(result.current.selector.options).toContain("Abraka"));
+    expect(townsFetch).toHaveBeenCalledWith("/locations/NG/delta.json");
+    expect(result.current.selector.options[0]).toBe("All regions");
+    expect(result.current.selector.options).toHaveLength(51);
+    expect(result.current.selector.status).toBe("Keep typing to narrow it down");
+    act(() => result.current.selector.search.onChange("asaba utchi"));
+    expect(result.current.selector.options).toEqual(["All regions", "Asaba-Utchi"]);
+    expect(result.current.selector.status).toBeNull();
+    act(() => result.current.selector.search.onChange("zzzz"));
+    expect(result.current.selector.options).toEqual(["All regions"]);
+    expect(result.current.selector.status).toBe("No matching regions");
+    act(() => result.current.selector.onClose());
+    expect(result.current.selector.search.value).toBe("");
   });
 
   it("appends the next page on loadMore and stops at the end", async () => {
@@ -143,6 +175,46 @@ describe("useMembersRegionPresenter", () => {
     );
   });
 
+  it("searches by name once typing pauses, says when nobody matches, and clears at once", async () => {
+    const { result } = renderHook(() => useMembersRegionPresenter("ng", "Delta"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.search).toMatchObject({ value: "", label: "Search members" });
+    apiGet.mockImplementation((path: string) =>
+      new URL(`http://x${path}`).searchParams.get("q") === "zed"
+        ? pageOf([], 0, 1)
+        : pageOf([member(1), member(2)], 3, 1),
+    );
+    act(() => result.current.search.onChange("ze"));
+    act(() => result.current.search.onChange("zed"));
+    expect(result.current.search.value).toBe("zed");
+    await waitFor(() =>
+      expect(apiGet).toHaveBeenLastCalledWith(
+        "/members?country=NG&state=Delta&q=zed&page=1&limit=20&sort=recent",
+      ),
+    );
+    // Only the paused-on word was sent, not each keystroke.
+    expect(apiGet.mock.calls.some(([path]) => String(path).includes("q=ze&"))).toBe(false);
+    await waitFor(() => expect(result.current.empty).toBe("No one in Delta State matches “zed”."));
+    expect(result.current.endText).toBeNull();
+    act(() => result.current.search.onChange(""));
+    await waitFor(() => expect(result.current.rows).toHaveLength(2));
+    expect(apiGet).toHaveBeenLastCalledWith(
+      "/members?country=NG&state=Delta&page=1&limit=20&sort=recent",
+    );
+  });
+
+  it("never sends more than the API takes, so a long paste still searches", async () => {
+    const { result } = renderHook(() => useMembersRegionPresenter("ng", "Delta"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.search.maxLength).toBe(50);
+    act(() => result.current.search.onChange("a".repeat(80)));
+    await waitFor(() =>
+      expect(apiGet).toHaveBeenLastCalledWith(
+        `/members?country=NG&state=Delta&q=${"a".repeat(50)}&page=1&limit=20&sort=recent`,
+      ),
+    );
+  });
+
   it("follows optimistically, updates the count, and reverts when the API rejects", async () => {
     const { result } = renderHook(() => useMembersRegionPresenter("ng", "Delta"));
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -171,6 +243,10 @@ describe("useMembersRegionPresenter", () => {
     expect(result.current.selector.options[0]).toBe("All states");
     expect(result.current.selector.options).toContain("Delta");
     expect(result.current.selector.options).toHaveLength(38);
+    expect(result.current.selector.status).toBeNull();
+    act(() => result.current.selector.search.onChange("del"));
+    expect(result.current.selector.options).toEqual(["All states", "Delta"]);
+    act(() => result.current.selector.search.onChange(""));
     expect(result.current.selector.sheetTitle).toBe("Choose a state");
     expect(result.current.selector.searchByRegionLabel).toBe("Search by State");
     await waitFor(() => expect(result.current.loading).toBe(false));

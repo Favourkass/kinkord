@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { type Db } from "../db/db.module";
 import { type StorageService } from "../storage/storage.service";
+import type { SilverChecksService } from "../subscriptions/silver-checks.service";
 import {
   ProfilesService,
   lockMessage,
@@ -83,6 +84,16 @@ describe("updateProfileSchema", () => {
     expect(updateProfileSchema.safeParse({ relationshipStatus: null }).success).toBe(true);
   });
 
+  it("only accepts listed sexualities, and null to clear it", () => {
+    expect(updateProfileSchema.parse({ orientation: "Bisexual" }).orientation).toBe("Bisexual");
+    expect(updateProfileSchema.parse({ orientation: "Straight" }).orientation).toBe("Straight");
+    expect(updateProfileSchema.parse({ orientation: null }).orientation).toBeNull();
+    expect(updateProfileSchema.parse({}).orientation).toBeUndefined();
+    for (const orientation of ["Gay", "Prefer not to say", "bisexual", ""]) {
+      expect(updateProfileSchema.safeParse({ orientation }).success).toBe(false);
+    }
+  });
+
   it("canonicalises gender and only accepts Male/Female (CEO brief)", () => {
     expect(updateProfileSchema.parse({ gender: "female" }).gender).toBe("Female");
     expect(updateProfileSchema.parse({ gender: " MALE " }).gender).toBe("Male");
@@ -90,12 +101,11 @@ describe("updateProfileSchema", () => {
     expect(updateProfileSchema.safeParse({ gender: "Non-binary" }).success).toBe(false);
   });
 
-  it("only accepts listed statuses, kinks, roles (plus legacy roles), looking-for and languages", () => {
+  it("only accepts listed statuses, kinks, roles, looking-for and languages", () => {
     const ok = (body: unknown) => updateProfileSchema.safeParse(body).success;
     expect(ok({ relationshipStatus: "Head of House" })).toBe(false);
     expect(ok({ interests: ["Rope bondage", "Wax play"] })).toBe(true);
     expect(ok({ interests: ["Shibari"] })).toBe(false);
-    // "Rigger" was offered by the old signup wizard; still accepted, no longer offered.
     expect(ok({ roles: ["Domme", "Rigger"] })).toBe(true);
     expect(ok({ roles: ["Overlord"] })).toBe(false);
     expect(ok({ lookingFor: ["Events", "Mentorship / Guidance"] })).toBe(true);
@@ -167,6 +177,9 @@ describe("ProfilesService", () => {
       phoneVerified: false,
       avatarKey: null,
       coverKey: null,
+      signupPhotosSkipped: false,
+      // A new member who has never had a profile photo.
+      photoSkipAvailable: true,
       nationality: null,
       occupation: null,
       limits: null,
@@ -212,8 +225,15 @@ describe("ProfilesService", () => {
       remove: vi.fn(async () => undefined),
       copy: vi.fn(async () => undefined),
     };
+    // A Silver member's check waits for an admin after a name or photo change.
+    const checks = { hold: vi.fn(async () => true) };
     return {
-      service: new ProfilesService(db, storage as unknown as StorageService),
+      service: new ProfilesService(
+        db,
+        storage as unknown as StorageService,
+        checks as unknown as SilverChecksService,
+      ),
+      checks,
       storage,
       db,
       row,
@@ -231,6 +251,61 @@ describe("ProfilesService", () => {
     key: "avatars/u1/old.jpg",
     createdAt: new Date("2026-09-01T00:00:00Z"),
   };
+
+  it("puts a Silver member's check on hold when their name or photo changes", async () => {
+    const renamed = makeService();
+    await renamed.service.updateOwn("u1", { displayName: "Favour K" }, "Favour", now);
+    expect(renamed.checks.hold).toHaveBeenCalledWith("u1", "name");
+
+    const rephotographed = makeService();
+    await rephotographed.service.updateOwn("u1", { avatarKey: "avatars/u1/new.jpg" }, "Favour");
+    expect(rephotographed.checks.hold).toHaveBeenCalledWith("u1", "photo");
+
+    // A bio or cover change doesn't make anyone look like someone else.
+    const other = makeService();
+    await other.service.updateOwn("u1", { bio: "hello", coverKey: "covers/u1/c.jpg" }, "Favour");
+    expect(other.checks.hold).not.toHaveBeenCalled();
+  });
+
+  describe("skipping the sign-up photos", () => {
+    it("is accepted at first sign-up, and the profile says it may be offered", async () => {
+      const { service, setCalls } = makeService();
+      expect((await service.getOwn("u1", "Favour")).canSkipPhotos).toBe(true);
+      await service.updateOwn("u1", { signupPhotosSkipped: true, roles: ["Switch"] }, "Favour");
+      expect(setCalls[0]).toMatchObject({ signupPhotosSkipped: true, roles: ["Switch"] });
+    });
+
+    it("is refused once the member has had a profile photo, even after deleting it", async () => {
+      const { service, setCalls, row } = makeService();
+      row.photoSkipAvailable = false;
+      expect((await service.getOwn("u1", "Favour")).canSkipPhotos).toBe(false);
+      const refused = service.updateOwn("u1", { signupPhotosSkipped: true }, "Favour");
+      expect(await responseOf(refused)).toEqual({
+        signupPhotosSkipped: ["Add a profile photo and a cover picture to continue."],
+      });
+      expect(setCalls).toHaveLength(0);
+    });
+
+    it("closes for good with the first profile photo, but not with a cover", async () => {
+      const cover = makeService();
+      await cover.service.updateOwn("u1", { coverKey: "covers/u1/c.jpg" }, "Favour");
+      expect(cover.setCalls[0]).not.toHaveProperty("photoSkipAvailable");
+
+      const avatar = makeService();
+      await avatar.service.updateOwn("u1", { avatarKey: "avatars/u1/a.jpg" }, "Favour");
+      expect(avatar.setCalls[0]).toMatchObject({
+        avatarKey: "avatars/u1/a.jpg",
+        photoSkipAvailable: false,
+      });
+    });
+
+    it("can't be undone through PATCH /profile", () => {
+      expect(updateProfileSchema.safeParse({ signupPhotosSkipped: false }).success).toBe(false);
+      expect(updateProfileSchema.parse({ signupPhotosSkipped: true }).signupPhotosSkipped).toBe(
+        true,
+      );
+    });
+  });
 
   it("records a new avatar or cover in the media history, but not an unchanged key", async () => {
     const { service, inserted, row } = makeService();
@@ -296,6 +371,57 @@ describe("ProfilesService", () => {
     expect(setCalls[0]).toMatchObject({ bio: "hi" });
   });
 
+  it("keeps Kinkord out of a new display name, but lets the account that has it keep it", async () => {
+    const { service, setCalls, row, checks } = makeService();
+    await expect(
+      responseOf(service.updateOwn("u1", { displayName: "Kin_kord HQ" }, "Favour", now)),
+    ).resolves.toEqual({ displayName: ["That name is reserved."] });
+    expect(setCalls).toHaveLength(0);
+    expect(checks.hold).not.toHaveBeenCalled();
+
+    row.displayName = "Kinkord";
+    await service.updateOwn("u1", { displayName: "Kinkord Official" }, "Favour", now);
+    expect(setCalls[0]).toMatchObject({ displayName: "Kinkord Official" });
+  });
+
+  it("tells members whether they're verified, and lets them hide the badge", async () => {
+    const verifiedFor = (avatarKey: string) => ({
+      status: "verified",
+      verifiedAvatarKey: avatarKey,
+      verifiedDob: "1998-04-02",
+      verifiedGender: "female",
+    });
+    const row = {
+      ...makeService().row,
+      avatarKey: "avatars/u1/a.jpg",
+      dateOfBirth: "1998-04-02",
+      gender: "female",
+      showVerifiedBadge: false,
+    };
+    // ensureRow reads the profile, then the view reads the verification.
+    const { service: verified } = makeService({
+      selects: [[row], [verifiedFor("avatars/u1/a.jpg")]],
+    });
+    expect(await verified.getOwn("u1", "Favour")).toMatchObject({
+      identityVerified: true,
+      showVerifiedBadge: false,
+    });
+
+    const { service: replaced } = makeService({
+      selects: [[row], [verifiedFor("avatars/u1/old.jpg")]],
+    });
+    expect((await replaced.getOwn("u1", "Favour")).identityVerified).toBe(false);
+
+    // Hiding the badge is saved like any profile edit, and the member stays verified.
+    const hiding = makeService({ selects: [[row], [verifiedFor("avatars/u1/a.jpg")]] });
+    Object.assign(hiding.row, row);
+    const input = updateProfileSchema.parse({ showVerifiedBadge: false });
+    const saved = await hiding.service.updateOwn("u1", input, "Favour");
+    expect(hiding.setCalls).toEqual([{ showVerifiedBadge: false }]);
+    expect(saved).toMatchObject({ identityVerified: true, showVerifiedBadge: false });
+    expect(hiding.checks.hold).not.toHaveBeenCalled();
+  });
+
   it("exposes the new fields and lock dates in the own-profile VM", async () => {
     // getOwn reads the clock: pin it, or the 30-day lock below runs out on the
     // real calendar (it did, on 1 Oct 2026).
@@ -328,9 +454,10 @@ describe("ProfilesService", () => {
     });
 
     it("updates user + profile in one transaction and returns the next allowed date", async () => {
-      const { service, setCalls, transaction } = makeService({ selects: [[account]] });
+      const { service, setCalls, transaction, checks } = makeService({ selects: [[account]] });
       const vm = await service.changeUsername("u1", "@Sir.Tega", now);
       expect(transaction).toHaveBeenCalledTimes(1);
+      expect(checks.hold).toHaveBeenCalledWith("u1", "username");
       expect(setCalls).toEqual([
         { username: "sir.tega", displayUsername: "Sir.Tega" },
         { usernameChangedAt: now },
@@ -344,9 +471,10 @@ describe("ProfilesService", () => {
     });
 
     it("is a no-op when the handle is unchanged", async () => {
-      const { service, transaction } = makeService({ selects: [[account]] });
+      const { service, transaction, checks } = makeService({ selects: [[account]] });
       const vm = await service.changeUsername("u1", "Tega", now);
       expect(transaction).not.toHaveBeenCalled();
+      expect(checks.hold).not.toHaveBeenCalled();
       expect(vm.canChangeUsernameAt).toBeNull();
     });
 
@@ -357,6 +485,19 @@ describe("ProfilesService", () => {
         username: ["You can change your username again on 1 Oct 2026."],
       });
       expect(transaction).not.toHaveBeenCalled();
+    });
+
+    it("keeps Kinkord out of a new handle, unless the account's handle already has it", async () => {
+      const refused = makeService({ selects: [[account]] });
+      await expect(
+        responseOf(refused.service.changeUsername("u1", "the.kinkord", now)),
+      ).resolves.toEqual({ username: ["That name is reserved."] });
+      expect(refused.transaction).not.toHaveBeenCalled();
+
+      const official = { username: "kinkord", displayUsername: "Kinkord", name: "Kinkord" };
+      const kept = makeService({ selects: [[official]] });
+      await kept.service.changeUsername("u1", "Kinkord_HQ", now);
+      expect(kept.setCalls[0]).toEqual({ username: "kinkord_hq", displayUsername: "Kinkord_HQ" });
     });
 
     it("turns a unique violation into a 409, wrapped or not", async () => {

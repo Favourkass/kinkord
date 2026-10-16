@@ -9,7 +9,9 @@ const PRIVATE_SECTIONS = [
   "p",
   "profile",
   "settings",
+  "kinkcoins",
   "saved",
+  "search",
   "notifications",
   "moderation",
   "offline",
@@ -19,6 +21,9 @@ const PRIVATE_SECTIONS = [
 ];
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: process.env.KINKORD_ALLOWED_DEV_ORIGINS?.split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
   // Self-contained server bundle for the App Runner image.
   output: "standalone",
   // No sharp in the runtime image: the build stage runs on the builder's

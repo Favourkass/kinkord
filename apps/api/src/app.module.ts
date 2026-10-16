@@ -1,3 +1,4 @@
+import { WalletModule } from "./wallet/wallet.module";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { AuthModule } from "./auth/auth.module";
@@ -17,6 +18,8 @@ import { OtpModule } from "./otp/otp.module";
 import { PostsModule } from "./posts/posts.module";
 import { SafetyModule } from "./safety/safety.module";
 import { StorageModule } from "./storage/storage.module";
+import { SubscriptionsModule } from "./subscriptions/subscriptions.module";
+import { VerificationModule } from "./verification/verification.module";
 
 @Module({
   imports: [
@@ -31,11 +34,14 @@ import { StorageModule } from "./storage/storage.module";
     ProfilesModule,
     CommunityModule,
     MembersModule,
+    VerificationModule,
     OtpModule,
     PostsModule,
     SafetyModule,
     ChatModule,
     PushModule,
+    SubscriptionsModule,
+    WalletModule,
   ],
   controllers: [HealthController],
   providers: [HealthService],

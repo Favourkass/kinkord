@@ -29,6 +29,7 @@ const storage = () => ({ presignDownload: vi.fn(async (k: string) => `https://s3
 /** `byId` applies the feed's visibility rules; null means "not for this viewer". */
 const posts = (author: string | null = "u2", postId = "p1") => ({
   byId: vi.fn(async () => (author ? { postId, author: { userId: author } } : null)),
+  notifyMentions: vi.fn(),
 });
 
 const push = { newComment: vi.fn(), newLike: vi.fn() };
@@ -69,6 +70,18 @@ describe("visibility", () => {
       body: "hi",
     });
     expect(push.newComment).toHaveBeenCalledWith("p1", "u2", "u1");
+  });
+
+  it("tells the members a comment mentions, but not the post's author twice, and links only members", async () => {
+    const p = posts("u2");
+    const db = makeDb([
+      [{ id: "c9", body: "ask @Ada or @ghost", createdAt: new Date("2026-10-01T12:00:00Z") }],
+      [{ username: "me", displayName: "Me", avatarKey: null }],
+      [{ username: "ada" }],
+    ]);
+    const vm = await service(db, p).comment("p1", "u1", "ask @Ada or @ghost");
+    expect(p.notifyMentions).toHaveBeenCalledWith("p1", "u1", "ask @Ada or @ghost", ["u2"]);
+    expect(vm.mentions).toEqual([{ handle: "ada", username: "ada" }]);
   });
 
   it("will not list comments on a post they cannot read", async () => {

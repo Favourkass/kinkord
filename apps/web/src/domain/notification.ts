@@ -1,5 +1,19 @@
 export type NotificationKind =
-  "message" | "follow" | "comment" | "mention" | "like" | "repost" | "report" | "test";
+  | "message"
+  | "follow"
+  | "comment"
+  | "mention"
+  | "like"
+  | "repost"
+  | "report"
+  | "test"
+  | "payment"
+  | "payment_verified"
+  | "payment_rejected"
+  | "verification"
+  | "verification_update"
+  | "verification_underage"
+  | "silver_check";
 
 /**
  * GET /notifications item. Who did it is looked up when the inbox loads, so a
@@ -8,7 +22,15 @@ export type NotificationKind =
 export interface NotificationPM {
   id: string;
   type: NotificationKind;
-  actor: { name: string; username: string | null; avatarUrl: string | null } | null;
+  actor: {
+    /** Who it is; absent from an older API. */
+    userId?: string;
+    name: string;
+    username: string | null;
+    avatarUrl: string | null;
+    /** Shows the Silver check; absent from an older API. */
+    silver?: boolean;
+  } | null;
   url: string;
   /** Messages in a chat since its row was last read; 1 otherwise. */
   count: number;
@@ -27,6 +49,10 @@ export interface NotificationVM {
   body: string;
   category: string;
   actorName: string | null;
+  /** The Silver check beside the actor's name. */
+  actorSilver: boolean;
+  /** The official organization's marks: the Org pill and a square avatar. */
+  actorOrganization: boolean;
   avatarUrl: string | null;
   action: string;
   official: boolean;
@@ -52,6 +78,39 @@ const KINDS: Record<
   like: { category: "Like", icon: "heart", action: () => "liked your post." },
   repost: { category: "Repost", icon: "repost", action: () => "reposted your post." },
   report: { category: "Moderation", icon: "shield", action: () => "New report to review." },
+  payment: { category: "Payments", icon: "shield", action: () => "New payment to verify." },
+  payment_verified: {
+    category: "Silver Premium",
+    icon: "bell",
+    action: () => "Your payment is confirmed. Silver Premium is now active.",
+  },
+  payment_rejected: {
+    category: "Payment",
+    icon: "bell",
+    action: () => "We couldn't confirm your payment. Open it to see why.",
+  },
+  silver_check: {
+    category: "Silver badges",
+    icon: "shield",
+    action: () => "A Silver member changed their name or photo. Review their badge.",
+  },
+  verification: {
+    category: "Moderation",
+    icon: "shield",
+    action: () => "New verification to review.",
+  },
+  // The member's own check finished, or an admin decided, revoked or reopened it.
+  verification_update: {
+    category: "Identity verification",
+    icon: "bell",
+    action: () => "Your identity verification has an update.",
+  },
+  // To the admins; it opens that member's moderation page.
+  verification_underage: {
+    category: "Moderation",
+    icon: "shield",
+    action: () => "A member's ID shows they may be under 18.",
+  },
   test: {
     category: "Notifications enabled",
     icon: "bell",
@@ -61,9 +120,31 @@ const KINDS: Record<
 };
 
 /** Kinkord's own notices, shown with the brand mark rather than a member. */
-const OFFICIAL: ReadonlySet<NotificationKind> = new Set(["report", "test"]);
+const OFFICIAL: ReadonlySet<NotificationKind> = new Set([
+  "report",
+  "test",
+  "payment",
+  "payment_verified",
+  "payment_rejected",
+  "silver_check",
+  "verification",
+  "verification_update",
+  "verification_underage",
+]);
 
-export function toNotificationVM(item: NotificationPM, now = new Date()): NotificationVM {
+/** A kind this version of the app doesn't know yet still shows, as Kinkord's own. */
+const UNKNOWN_KIND = {
+  category: "Kinkord",
+  icon: "bell",
+  action: () => "Something new for you.",
+} as const;
+
+/** `organization` is whether the actor is the official organization; presenters decide it. */
+export function toNotificationVM(
+  item: NotificationPM,
+  now = new Date(),
+  organization = false,
+): NotificationVM {
   const date = new Date(item.createdAt);
   const minutes = Math.max(0, Math.floor((now.getTime() - date.getTime()) / 60_000));
   const time =
@@ -78,8 +159,8 @@ export function toNotificationVM(item: NotificationPM, now = new Date()): Notifi
               month: "short",
               ...(date.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}),
             });
-  const kind = KINDS[item.type];
-  const official = OFFICIAL.has(item.type);
+  const kind = KINDS[item.type] ?? UNKNOWN_KIND;
+  const official = OFFICIAL.has(item.type) || !(item.type in KINDS);
   const actorName = official ? null : (item.actor?.name ?? "A member");
   const action = kind.action(item.count);
   return {
@@ -87,6 +168,8 @@ export function toNotificationVM(item: NotificationPM, now = new Date()): Notifi
     body: actorName ? `${actorName} ${action}` : action,
     category: kind.category,
     actorName,
+    actorSilver: !official && Boolean(item.actor?.silver),
+    actorOrganization: !official && organization,
     avatarUrl: official ? null : (item.actor?.avatarUrl ?? null),
     action,
     official,

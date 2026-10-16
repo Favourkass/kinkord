@@ -1,9 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useId, useRef } from "react";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import MaskIcon from "@/components/app/MaskIcon";
+import SilverCheck from "@/components/app/SilverCheck";
+import OrganizationBadge from "@/components/organization/OrganizationBadge";
 import type { CommentVM } from "@/domain/post";
+import BodyText from "./BodyText";
+import MentionSuggestions, {
+  activeMentionId,
+  composing,
+  type MentionPickerProps,
+} from "./MentionSuggestions";
 
 export interface CommentsPanelProps {
   open: boolean;
@@ -13,7 +22,9 @@ export interface CommentsPanelProps {
   hasMore: boolean;
   onLoadMore: () => void;
   draft: string;
-  onDraftChange: (value: string) => void;
+  /** The text, and where the caret is: "@" right before it suggests members. */
+  onDraftChange: (value: string, caret?: number) => void;
+  mentions: MentionPickerProps;
   maxLength: number;
   canSubmit: boolean;
   sending: boolean;
@@ -30,6 +41,9 @@ export interface CommentsPanelProps {
     loadMore: string;
     loading: string;
     close: string;
+    mentions: string;
+    organization: string;
+    verifiedOrganization: string;
   };
 }
 
@@ -39,6 +53,17 @@ export interface CommentsPanelProps {
  * first thing the author sees.
  */
 export default function CommentsPanel(p: CommentsPanelProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const mentionListId = useId();
+  // After a mention is picked, the caret goes after it.
+  const caretAt = p.mentions.caret?.at;
+  const caretPick = p.mentions.caret?.pick;
+  useEffect(() => {
+    if (caretAt === undefined || !inputRef.current) return;
+    inputRef.current.focus();
+    inputRef.current.setSelectionRange(caretAt, caretAt);
+  }, [caretAt, caretPick]);
+
   if (!p.open) return null;
   return (
     <div
@@ -66,39 +91,63 @@ export default function CommentsPanel(p: CommentsPanelProps) {
             <p className="py-[24px] text-center text-[14px] text-feed-muted">{p.labels.empty}</p>
           )}
           <ul className="flex flex-col gap-[16px]">
-            {p.comments.map((c) => (
-              <li key={c.id} className="flex items-start gap-[10px]">
-                <AvatarCircle src={c.avatarUrl} alt="" size={32} ringClassName="bg-feed-line" />
-                <div className="min-w-0 flex-1">
-                  <p className="flex flex-wrap items-baseline gap-x-[8px]">
-                    {c.authorHref ? (
-                      <Link
-                        href={c.authorHref}
-                        className="text-[13px] font-bold text-feed-text hover:underline"
-                      >
-                        {c.authorName}
-                      </Link>
-                    ) : (
-                      <span className="text-[13px] font-bold text-feed-text">{c.authorName}</span>
-                    )}
-                    <span className="text-[11px] font-light text-feed-muted">{c.time}</span>
-                  </p>
-                  <p className="whitespace-pre-wrap pt-[2px] text-[14px] leading-[20px] text-feed-text">
-                    {c.body}
-                  </p>
-                </div>
-                {c.canDelete && (
-                  <button
-                    type="button"
-                    onClick={() => p.onDelete(c.id)}
-                    aria-label={p.labels.delete}
-                    className="shrink-0 text-feed-muted transition-colors hover:text-[#e5484d]"
-                  >
-                    <MaskIcon src="/app/feed/icon-close.svg" width={14} />
-                  </button>
-                )}
-              </li>
-            ))}
+            {p.comments.map((c) => {
+              const name = (
+                <>
+                  {c.authorName}
+                  {c.authorSilver ? <SilverCheck size={14} /> : null}
+                  {c.authorOrganization ? (
+                    <OrganizationBadge
+                      label={p.labels.organization}
+                      verified
+                      verifiedLabel={p.labels.verifiedOrganization}
+                      markSize={13}
+                    />
+                  ) : null}
+                </>
+              );
+              return (
+                <li key={c.id} className="flex items-start gap-[10px]">
+                  <AvatarCircle
+                    src={c.avatarUrl}
+                    alt=""
+                    size={32}
+                    ringClassName="bg-feed-line"
+                    shape={c.authorOrganization ? "square" : "circle"}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="flex flex-wrap items-baseline gap-x-[8px]">
+                      {c.authorHref ? (
+                        <Link
+                          href={c.authorHref}
+                          className="inline-flex items-center gap-[3px] text-[13px] font-bold text-feed-text hover:underline"
+                        >
+                          {name}
+                        </Link>
+                      ) : (
+                        <span className="inline-flex items-center gap-[3px] text-[13px] font-bold text-feed-text">
+                          {name}
+                        </span>
+                      )}
+                      <span className="text-[11px] font-light text-feed-muted">{c.time}</span>
+                    </p>
+                    <p className="whitespace-pre-wrap pt-[2px] text-[14px] leading-[20px] text-feed-text">
+                      <BodyText parts={c.bodyParts} />
+                    </p>
+                  </div>
+                  {c.canDelete && (
+                    <button
+                      type="button"
+                      onClick={() => p.onDelete(c.id)}
+                      aria-label={p.labels.delete}
+                      className="shrink-0 text-feed-muted transition-colors hover:text-[#e5484d]"
+                    >
+                      <MaskIcon src="/app/feed/icon-close.svg" width={14} />
+                    </button>
+                  )}
+                </li>
+              );
+            })}
           </ul>
           {p.loading && (
             <p className="py-[16px] text-center text-[13px] text-feed-muted">{p.labels.loading}</p>
@@ -114,34 +163,62 @@ export default function CommentsPanel(p: CommentsPanelProps) {
           )}
         </div>
 
-        <footer className="flex items-center gap-[10px] border-t border-feed-line px-[20px] py-[12px]">
-          <AvatarCircle
-            src={p.viewerAvatarUrl}
-            alt=""
-            size={32}
-            ringClassName="bg-kink-gold-bright"
+        <footer className="border-t border-feed-line px-[20px] py-[12px]">
+          {/* Above the box, in the footer's own flow: the sheet grows to fit it, never clips it. */}
+          <MentionSuggestions
+            {...p.mentions}
+            id={mentionListId}
+            label={p.labels.mentions}
+            organizationLabel={p.labels.organization}
+            verifiedOrganizationLabel={p.labels.verifiedOrganization}
+            className="mb-[10px]"
           />
-          <input
-            value={p.draft}
-            maxLength={p.maxLength}
-            onChange={(e) => p.onDraftChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey && p.canSubmit) {
-                e.preventDefault();
-                p.onSubmit();
+          <div className="flex items-center gap-[10px]">
+            <AvatarCircle
+              src={p.viewerAvatarUrl}
+              alt=""
+              size={32}
+              ringClassName="bg-kink-gold-bright"
+            />
+            <input
+              ref={inputRef}
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={p.mentions.open}
+              aria-controls={mentionListId}
+              aria-activedescendant={activeMentionId(mentionListId, p.mentions)}
+              value={p.draft}
+              maxLength={p.maxLength}
+              onChange={(e) =>
+                p.onDraftChange(e.target.value, e.target.selectionStart ?? undefined)
               }
-            }}
-            placeholder={p.labels.placeholder}
-            className="h-[36px] flex-1 rounded-[18px] border border-feed-line bg-feed-field px-[14px] text-[14px] text-feed-text outline-none placeholder:text-feed-muted"
-          />
-          <button
-            type="button"
-            onClick={p.onSubmit}
-            disabled={!p.canSubmit}
-            className="rounded-[8px] bg-kink-gold-bright px-[16px] py-[7px] text-[13px] font-bold text-kink-ink disabled:opacity-40"
-          >
-            {p.labels.submit}
-          </button>
+              onSelect={(e) =>
+                p.onDraftChange(e.currentTarget.value, e.currentTarget.selectionStart ?? undefined)
+              }
+              onKeyDown={(e) => {
+                if (composing(e)) return;
+                // An open list of members takes Enter to pick one, not to send.
+                if (p.mentions.onKey(e.key)) {
+                  e.preventDefault();
+                  return;
+                }
+                if (e.key === "Enter" && !e.shiftKey && p.canSubmit) {
+                  e.preventDefault();
+                  p.onSubmit();
+                }
+              }}
+              placeholder={p.labels.placeholder}
+              className="h-[36px] flex-1 rounded-[18px] border border-feed-line bg-feed-field px-[14px] text-[14px] text-feed-text outline-none placeholder:text-feed-muted"
+            />
+            <button
+              type="button"
+              onClick={p.onSubmit}
+              disabled={!p.canSubmit}
+              className="rounded-[8px] bg-kink-gold-bright px-[16px] py-[7px] text-[13px] font-bold text-kink-ink disabled:opacity-40"
+            >
+              {p.labels.submit}
+            </button>
+          </div>
         </footer>
       </div>
     </div>

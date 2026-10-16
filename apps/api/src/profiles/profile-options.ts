@@ -8,6 +8,13 @@
 export const GENDERS = ["Male", "Female"] as const;
 export type Gender = (typeof GENDERS)[number];
 
+/**
+ * Sexuality is private: only the member sees it (founder, 2026-10-14). The web
+ * sign-up form keeps the same list (constants/onboarding.ts SEXUALITY_FIELD),
+ * since it is shown before the member can call GET /profile/options.
+ */
+export const ORIENTATIONS = ["Straight", "Bisexual"] as const;
+
 export const RELATIONSHIP_STATUSES = [
   "Single",
   "In a Relationship",
@@ -29,20 +36,36 @@ export const RELATIONSHIP_STATUSES = [
 ] as const;
 
 export const KINK_ROLES = [
+  "Acolyte",
+  "Adult Baby",
+  "Adult Baby Diaper Lover (ABDL)",
+  "Adventurer",
+  "Aesthetic Exhibitionist",
+  "Aesthetic Fetishist",
+  "Affection Slut",
+  "Affini",
+  "Aftercare Buddy",
+  "Aftercare Specialist",
   "Ageplayer",
   "Bottom",
   "Brat",
+  "Brat Tamer",
   "Caregiver",
   "Cuckold",
+  "Curious",
   "Dominant",
   "Domme",
   "Exhibitionist",
+  "Handler",
+  "Little",
   "Masochist",
   "Master",
   "Mistress",
   "Owner",
   "Pet",
   "Primal",
+  "Rigger",
+  "Rope Bunny",
   "Sadist",
   "Slave",
   "Submissive",
@@ -50,23 +73,6 @@ export const KINK_ROLES = [
   "Top",
   "Voyeur",
 ] as const;
-
-/**
- * Roles offered by the signup wizard before the 2026-09-12 list. Still accepted on
- * write so a member on a not-yet-refreshed app build can finish signing up; no longer
- * offered anywhere.
- */
-export const LEGACY_KINK_ROLES = [
-  "Handler",
-  "Brat Tamer",
-  "Rigger",
-  "Rope Bunny",
-  "Little",
-  "Curious",
-] as const;
-
-/** What PATCH /profile accepts for `roles`: the offered list plus the legacy names. */
-export const ACCEPTED_KINK_ROLES = [...KINK_ROLES, ...LEGACY_KINK_ROLES] as const;
 
 export const KINKS = [
   "Anal play",
@@ -178,6 +184,7 @@ export const NAME_CHANGE_COOLDOWN_DAYS = 30;
 /** Payload of GET /profile/options. */
 export const PROFILE_OPTIONS = {
   genders: GENDERS,
+  orientations: ORIENTATIONS,
   relationshipStatuses: RELATIONSHIP_STATUSES,
   roles: KINK_ROLES,
   kinks: KINKS,

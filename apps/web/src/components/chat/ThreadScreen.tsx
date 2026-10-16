@@ -4,6 +4,8 @@ import { useEffect, useRef, type CSSProperties } from "react";
 import Link from "next/link";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import MaskIcon from "@/components/app/MaskIcon";
+import SilverCheck from "@/components/app/SilverCheck";
+import OrganizationBadge from "@/components/organization/OrganizationBadge";
 import ConfirmDialog, { type ConfirmDialogProps } from "@/components/feed/ConfirmDialog";
 import MediaLightbox from "@/components/feed/MediaLightbox";
 import type { ThreadMessageVM, ThreadPeerVM } from "@/domain/chat";
@@ -25,17 +27,23 @@ export interface ThreadScreenProps {
   unavailableText: string;
   /**
    * Today's new-chat allowance, while nobody has written yet: a hint above the
-   * composer, or, once it's used, a notice in place of it.
+   * composer, or, once it's used, a notice in place of it. A notice can carry a
+   * link: to Silver, when writing first to someone abroad was refused.
    */
-  newChat: { text: string; blocking: boolean } | null;
+  newChat: { text: string; blocking: boolean; link?: { label: string; href: string } } | null;
   onlineLabel: string;
+  organizationLabel: string;
+  verifiedOrganizationLabel: string;
   backHref: string;
   backLabel: string;
   emptyText: string;
   retryLabel: string;
   onSend: (body: string) => void;
   onRetry: (clientId: string) => void;
-  composer: Pick<MessageComposerProps, "placeholder" | "sendLabel" | "maxLength" | "photo">;
+  composer: Pick<
+    MessageComposerProps,
+    "placeholder" | "sendLabel" | "maxLength" | "photo" | "onTyping"
+  >;
   /** Why photos aren't open yet, after the member tried to add one. */
   photoNotice: string | null;
   photoLabels: MessageBubblePhotoLabels;
@@ -92,19 +100,36 @@ export default function ThreadScreen(p: ThreadScreenProps) {
           alt=""
           size={38}
           ringClassName="bg-app-line"
+          shape={p.peer?.organization ? "square" : "circle"}
         />
         <PresenceDot
           online={Boolean(p.peer?.isOnline)}
-          label={p.onlineLabel}
+          status={p.peer?.presence}
+          label={p.peer?.presenceLabel ?? p.onlineLabel}
           className="absolute -bottom-[1px] -right-[1px]"
         />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[15px] font-bold text-app-text">
-          {p.peer?.displayName ?? (p.loading ? "…" : "Member")}
+        <span className="flex items-center gap-[3px]">
+          <span className="truncate text-[15px] font-bold text-app-text">
+            {p.peer?.displayName ?? (p.loading ? "…" : "Member")}
+          </span>
+          {p.peer?.silver ? <SilverCheck size={15} /> : null}
+          {p.peer?.organization ? (
+            <OrganizationBadge
+              label={p.organizationLabel}
+              verified
+              verifiedLabel={p.verifiedOrganizationLabel}
+              markSize={14}
+            />
+          ) : null}
         </span>
-        {p.peer?.isOnline && (
-          <span className="block text-[12px] text-app-online">{p.onlineLabel}</span>
+        {p.peer && (
+          <span
+            className={`block text-[12px] ${p.peer.typing || p.peer.presence === "online" ? "text-app-online" : p.peer.presence === "away" ? "text-kink-amber" : "text-app-muted"}`}
+          >
+            {p.peer.presenceLabel ?? p.onlineLabel}
+          </span>
         )}
       </span>
     </>
@@ -212,9 +237,17 @@ export default function ThreadScreen(p: ThreadScreenProps) {
             </button>
           </div>
         ) : p.unavailable || p.newChat?.blocking ? (
-          <p className="border-t border-app-line bg-app-surface px-[16px] py-[14px] text-center text-[13px] text-app-muted">
-            {p.unavailable ? p.unavailableText : p.newChat?.text}
-          </p>
+          <div className="border-t border-app-line bg-app-surface px-[16px] py-[14px] text-center text-[13px] text-app-muted">
+            <p>{p.unavailable ? p.unavailableText : p.newChat?.text}</p>
+            {!p.unavailable && p.newChat?.link && (
+              <Link
+                href={p.newChat.link.href}
+                className="mt-[10px] inline-block rounded-full bg-kink-gold-bright px-[14px] py-[7px] text-[13px] font-bold text-kink-ink"
+              >
+                {p.newChat.link.label}
+              </Link>
+            )}
+          </div>
         ) : (
           <>
             {(p.newChat || p.photoNotice) && (

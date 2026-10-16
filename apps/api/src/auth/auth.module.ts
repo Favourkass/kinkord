@@ -2,6 +2,7 @@ import { Global, Module } from "@nestjs/common";
 import { Db, DRIZZLE } from "../db/db.module";
 import { EmailService } from "../email/email.service";
 import { SignupGuardService } from "../moderation/signup-guard.service";
+import { SubscriptionsModule } from "../subscriptions/subscriptions.module";
 import { AUTH, buildAuth } from "./auth.instance";
 import { AuthExtController } from "./auth-ext.controller";
 import { MeController } from "./me.controller";
@@ -10,6 +11,7 @@ import { SignUpService } from "./sign-up.service";
 
 @Global()
 @Module({
+  imports: [SubscriptionsModule],
   controllers: [MeController, AuthExtController],
   providers: [
     {

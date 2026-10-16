@@ -8,8 +8,9 @@ vi.mock("next/navigation", () => ({ useRouter: () => router }));
 
 const me = vi.fn();
 const own = vi.fn();
+const update = vi.fn();
 vi.mock("@/services/profile.service", () => ({
-  profileApi: { me: () => me(), own: () => own() },
+  profileApi: { me: () => me(), own: () => own(), update: (...args: unknown[]) => update(...args) },
 }));
 
 const sendCode = vi.fn();
@@ -39,6 +40,7 @@ vi.mock("@/services/authClient", () => ({
 
 describe("useSecurityPagePresenter", () => {
   beforeEach(() => {
+    update.mockReset().mockResolvedValue({ phone: "+2348031234567", phoneVerified: false });
     me.mockReset().mockResolvedValue({ twoFactorEnabled: true });
     own.mockReset().mockResolvedValue({ phone: "+2349127883266", phoneVerified: false });
     sendCode.mockReset().mockResolvedValue({
@@ -93,14 +95,26 @@ describe("useSecurityPagePresenter", () => {
       expect(result.current.view.phone.sendLabel).toBe("Text me a code");
     });
 
-    it("points people at Edit Profile when there is no number yet", async () => {
+    it("saves a number in Settings and then enables verification", async () => {
+      own.mockResolvedValue({ phone: null, phoneVerified: false });
+      const { result } = renderHook(() => useSecurityPagePresenter());
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      act(() => result.current.view.phone.entry.onChange("0803 123 4567"));
+      act(() => result.current.view.phone.entry.onSave());
+      await waitFor(() => expect(result.current.view.phone.hasNumber).toBe(true));
+      expect(update).toHaveBeenCalledWith({ phone: "+2348031234567" });
+      expect(result.current.view.phone.canSend).toBe(true);
+      expect(sendCode).not.toHaveBeenCalled();
+    });
+
+    it("offers optional phone entry when there is no number yet", async () => {
       own.mockResolvedValue({ phone: null, phoneVerified: false });
       const { result } = renderHook(() => useSecurityPagePresenter());
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       expect(result.current.view.phone.hasNumber).toBe(false);
       expect(result.current.view.phone.canSend).toBe(false);
-      expect(result.current.view.phone.missingNote).toMatch(/Edit Profile/);
+      expect(result.current.view.phone.missingNote).toMatch(/optional/);
     });
 
     it("shows the badge for a number that is already verified", async () => {

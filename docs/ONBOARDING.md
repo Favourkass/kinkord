@@ -31,6 +31,10 @@ cp apps/api/.env.example apps/api/.env
 
 # Web environment
 echo "NEXT_PUBLIC_API_URL=http://localhost:4000" > apps/web/.env.local
+# Leave this blank: no account shows as the official organization. To see the
+# organization's marks, put a real user id from your local database here, then
+# restart the web dev server (the value is read when the app is compiled).
+echo "NEXT_PUBLIC_KINKORD_OFFICIAL_USER_ID=" >> apps/web/.env.local
 
 # Database schema
 pnpm --filter api db:migrate
@@ -43,6 +47,21 @@ pnpm --filter web dev     # Web on :3000
 Open http://localhost:3000/signup and create an account. **All emails land in
 Mailpit at http://localhost:8025** — verification codes, password resets, etc.
 Nothing is sent to real inboxes locally.
+
+## The official Kinkord account
+
+`NEXT_PUBLIC_KINKORD_OFFICIAL_USER_ID` names the account the web shows as the
+official organization (the Org mark, a square avatar, Follow instead of Add
+friend). Like every `NEXT_PUBLIC_*` value it is baked into the web bundle when
+the image is built, not read when the server starts. Production takes it from
+the GitHub repository variable of the same name (Settings → Secrets and
+variables → Actions → Variables). After setting or changing that variable,
+re-run the **Deploy Web** workflow (Actions → Deploy Web → the latest run →
+Re-run all jobs): until a new image is built, the live site keeps the old value.
+
+The API reserves the name itself: no username or display name may contain
+"kinkord" (letters only, any case), unless the account's current one already
+does.
 
 ## What works locally without any cloud credentials
 
@@ -140,6 +159,13 @@ a banner: on Android, use Alerting and enable Pop on screen / Floating
 notifications in the installed app or browser's notification settings. Focus,
 Do Not Disturb and notification cooldown can suppress banners. Inbox storage
 alone does not enable device push: permission and a device subscription are required.
+
+The status-bar icon is Android's to draw, from transparency alone. In a browser
+tab it comes from the notification's `badge` (`icons/badge-96x96.png`); in the
+installed app it comes from the manifest's `monochrome` icons (`icons/badge-*.png`)
+instead, and without them Android shows a blank square. Installed phones pick up
+a change to those icons when Chrome next updates the app, which can take a few
+days; removing Kinkord from the home screen and adding it again applies it at once.
 
 ## Changing the database schema
 

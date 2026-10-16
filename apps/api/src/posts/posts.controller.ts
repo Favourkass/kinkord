@@ -13,6 +13,7 @@ import {
 } from "@nestjs/common";
 import { z } from "zod";
 import { AuthGuard, AuthedRequest } from "../auth/auth.guard";
+import { FEED_TABS } from "./feed-ranking";
 import { createCommentSchema, PostInteractionsService } from "./post-interactions.service";
 import { createPostSchema, PostsService, uploadUrlSchema } from "./posts.service";
 
@@ -23,6 +24,15 @@ const feedQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(30).optional(),
   /** The profile Posts tab: one member's posts, same visibility rules. */
   author: z.string().trim().min(1).max(64).optional(),
+  /** Search: posts whose text contains this, same visibility rules. */
+  q: z
+    .string()
+    .trim()
+    .max(50)
+    .transform((v) => v || undefined)
+    .optional(),
+  /** The home feed's tab. Left out, the feed reads newest first as before the tabs. */
+  tab: z.enum(FEED_TABS).optional(),
 });
 
 const commentsQuerySchema = z.object({
@@ -57,6 +67,8 @@ export class PostsController {
       cursor: parsed.data.cursor,
       limit: parsed.data.limit,
       author: parsed.data.author,
+      q: parsed.data.q,
+      tab: parsed.data.tab,
     });
   }
 
@@ -98,6 +110,11 @@ export class PostsController {
   @Delete(":id/like")
   unlike(@Req() req: AuthedRequest, @Param("id") id: string) {
     return this.interactions.unlike(parseId(id), req.user.id);
+  }
+
+  @HttpPost(":id/share")
+  share(@Req() req: AuthedRequest, @Param("id") id: string) {
+    return this.posts.share(parseId(id), req.user.id);
   }
 
   @HttpPost(":id/repost")

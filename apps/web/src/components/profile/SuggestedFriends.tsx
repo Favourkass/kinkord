@@ -1,13 +1,20 @@
 import MaskIcon from "@/components/app/MaskIcon";
+import SilverCheck from "@/components/app/SilverCheck";
+import OrganizationBadge from "@/components/organization/OrganizationBadge";
 import type { FriendRowVM } from "@/domain/member";
+
+export interface SuggestedFriendRowVM extends FriendRowVM {
+  /** "Add" / "Added", or Follow / Following for the organization. */
+  actionLabel: string;
+}
 
 export interface SuggestedFriendsProps {
   heading: string;
-  rows: FriendRowVM[];
-  addLabel: string;
-  addedLabel: string;
+  rows: SuggestedFriendRowVM[];
   onAdd: (row: FriendRowVM) => void;
   empty: string;
+  organizationLabel: string;
+  verifiedOrganizationLabel: string;
 }
 
 /** Figma desktop profile right column (987:5569): "Suggested Friends" card with Add buttons. */
@@ -22,7 +29,9 @@ export default function SuggestedFriends(p: SuggestedFriendsProps) {
           {p.rows.map((r) => (
             <li key={r.userId} className="flex items-center justify-between py-[8px]">
               <span className="flex items-center gap-[10px]">
-                <span className="block size-[36px] overflow-hidden rounded-[18px] bg-pf-surface-2">
+                <span
+                  className={`block size-[36px] overflow-hidden bg-pf-surface-2 ${r.organization ? "rounded-[8px]" : "rounded-[18px]"}`}
+                >
                   {r.avatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -39,8 +48,17 @@ export default function SuggestedFriends(p: SuggestedFriendsProps) {
                   )}
                 </span>
                 <span className="flex flex-col gap-[2px]">
-                  <span className="text-[13px] font-bold leading-[16px] text-pf-text">
+                  <span className="inline-flex items-center gap-[3px] text-[13px] font-bold leading-[16px] text-pf-text">
                     {r.displayName}
+                    {r.silver ? <SilverCheck size={13} /> : null}
+                    {r.organization ? (
+                      <OrganizationBadge
+                        label={p.organizationLabel}
+                        verified
+                        verifiedLabel={p.verifiedOrganizationLabel}
+                        markSize={13}
+                      />
+                    ) : null}
                   </span>
                   {r.handle && (
                     <span className="text-[11px] leading-[13px] text-pf-muted">{r.handle}</span>
@@ -54,7 +72,7 @@ export default function SuggestedFriends(p: SuggestedFriendsProps) {
                 aria-pressed={r.isFollowing}
                 className="rounded-[6px] bg-[#1f2937] px-[10px] py-[4px] text-[11px] font-bold text-kink-gold-bright disabled:opacity-60"
               >
-                {r.isFollowing ? p.addedLabel : p.addLabel}
+                {r.actionLabel}
               </button>
             </li>
           ))}

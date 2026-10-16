@@ -1,25 +1,43 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { FEED_COPY, FEED_PHOTO_LIMIT, FEED_SUGGESTION_LIMIT } from "@/constants/feed";
 import { Routes } from "@/constants/Routes";
 import {
-  handleOf,
+  COMMENT_BODY_MAX,
+  FEED_TABS,
+  postBodyMax,
   toCommentVM,
+  toFeedSuggestionVM,
   toPostVM,
   type CommentPM,
   type CommentVM,
   type DraftPhotoVM,
+  type FeedEmptyVM,
+  type FeedHint,
+  type FeedSuggestionPM,
   type FeedSuggestionVM,
   type PostMediaVM,
   type FeedPM as FeedPagePM,
+  type FeedTab,
+  type FeedTabVM,
   type PostPM,
   type PostVM,
   type PostVisibility,
+  type SuggestionSegmentVM,
+  type SuggestionShow,
 } from "@/domain/post";
+import type { KinkCurrency } from "@/domain/kinkcoins";
+import type { WalletSummaryPM } from "@/domain/wallet";
+import type { GiftInDoubt } from "@/domain/wallet";
+import { GIFT_COPY, postGiftsService } from "@/services/post-gifts.service";
+import { pendingTransfersService } from "@/services/pendingTransfers.service";
 import { ApiError } from "@/services/apiClient";
+import { isOfficialOrganization } from "@/services/organization-placeholder.service";
+import { useMentionSuggestions, type MentionField } from "./useMentionSuggestions";
 import {
+  appendNewRows,
   applyLike,
   applyRepost,
   applySave,
@@ -27,20 +45,50 @@ import {
   applyToPost,
   canSubmitComment,
   canSubmitPost,
+  feedTabMemory,
   postPermalink,
   postsApi,
   remainingPhotoSlots,
-  toggleFollowOnSuggestion,
   toggleLikeOnPost,
   toggleRepostOnPost,
   toggleSaveOnPost,
   uploadPostPhoto,
+  withAuthorFollow,
   withCommentDelta,
-  type SuggestedPersonPM,
+  withSuggestionFollow,
+  withSuggestionRestored,
 } from "@/services/posts.service";
 
 /** Profile link for an author; null for a member who has no username yet. */
 const memberHref = (username: string | null) => (username ? Routes.member(username) : null);
+
+/** For useSyncExternalStore: nothing but this page changes the remembered tab. */
+const noOutsideChanges = () => () => {};
+/** The server has no session to remember a tab from: the client reads it before the feed loads. */
+const noTabOnTheServer = () => null;
+
+/** What an empty home feed says for each tab, and the way to fill it when there is one. */
+function emptyFeed(tab: FeedTab | null, hint: FeedHint | null): FeedEmptyVM {
+  if (tab === "following") {
+    return hint === "no_follows"
+      ? {
+          title: FEED_COPY.noFollowsTitle,
+          body: FEED_COPY.noFollowsBody,
+          action: { label: FEED_COPY.noFollowsAction, href: Routes.members },
+        }
+      : { title: FEED_COPY.followingEmpty, body: null, action: null };
+  }
+  if (tab === "nearby") {
+    return hint === "no_location"
+      ? {
+          title: FEED_COPY.noLocationTitle,
+          body: FEED_COPY.noLocationBody,
+          action: { label: FEED_COPY.noLocationAction, href: Routes.profileEditLocation },
+        }
+      : { title: FEED_COPY.nearbyEmpty, body: null, action: null };
+  }
+  return { title: FEED_COPY.feedEmptyTitle, body: FEED_COPY.feedEmptyBody, action: null };
+}
 
 interface DraftPhoto extends DraftPhotoVM {
   key: string | null;
@@ -57,6 +105,10 @@ export interface FeedOptions {
   postId?: string | null;
   /** The viewer's saved posts instead of the feed. */
   saved?: boolean;
+  /** Search: the posts whose text contains this. */
+  search?: string | null;
+  /** The composer's limit (Silver writes longer posts), which a picked @mention mustn't pass. */
+  postMaxLength?: number;
   /**
    * False while the author is still being resolved. /profile has to ask the API
    * who you are before it can ask for your posts, and without this the first
@@ -69,7 +121,8 @@ export interface FeedOptions {
 /**
  * The feed: reading it, writing to it, and reacting to it. Serves both the home
  * feed and a profile's Posts tab, so a post behaves the same wherever it is
- * read — one like, one comment sheet, one delete.
+ * read — one like, one comment sheet, one delete. Only the home feed has the
+ * For You | Following | Nearby tabs, remembered for the browser session.
  *
  * Photos upload the moment they are picked rather than on submit, so the Post
  * button is instant on the connection most members are on — by the time the
@@ -79,22 +132,57 @@ export function useFeedPresenter({
   author = null,
   postId = null,
   saved = false,
+  search = null,
+  postMaxLength = postBodyMax(false),
   ready = true,
 }: FeedOptions = {}) {
   const router = useRouter();
 
+  // The home feed's tab: the one picked here, else the one this browser
+  // session last showed. Read on the client only, and the feed waits for it,
+  // so a remembered Following never loads For You first.
+  const home = !author && !postId && !saved && !search;
+  const rememberedTab = useSyncExternalStore(
+    noOutsideChanges,
+    feedTabMemory.read,
+    noTabOnTheServer,
+  );
+  const [pickedTab, setPickedTab] = useState<FeedTab | null>(null);
+  const tab = home ? (pickedTab ?? rememberedTab) : null;
+  const listReady = ready && (!home || tab !== null);
+
   const [posts, setPosts] = useState<PostPM[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
+  /** Why the list may be empty, as its first page said. */
+  const [hint, setHint] = useState<FeedHint | null>(null);
+  const surface = `${postId ?? ""}|${author ?? ""}|${saved}|${search ?? ""}|${tab ?? ""}`;
   /**
-   * Which author the loaded posts belong to. Deriving `loading` from it rather
-   * than flipping a flag means walking from one member's profile to another
-   * shows a load instead of a flash of the previous member's posts — the page
-   * component stays mounted across that navigation.
+   * Each first page starts a round of the list: another list, the same list
+   * switched off and on again (a search cleared and typed again), or one gone
+   * back to. Until the round's first page is in, the list is loading: it can't
+   * page, and a next page asked for in an earlier round is dropped. Deriving
+   * `loading` from the round rather than flipping a flag means walking from
+   * one member's profile to another shows a load instead of a flash of the
+   * previous member's posts — the page component stays mounted across that.
+   * A home feed tab is a list of its own: switching tabs starts a round too.
    */
-  const [loadedFor, setLoadedFor] = useState<string | undefined>(undefined);
-  const surface = `${postId ?? ""}|${author ?? ""}|${saved}`;
-  const loading = !ready || loadedFor !== surface;
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [requested, setRequested] = useState({ surface, ready: listReady, round: 1 });
+  if (requested.surface !== surface || requested.ready !== listReady) {
+    setRequested({ surface, ready: listReady, round: requested.round + 1 });
+  }
+  const round = requested.round;
+  const [loadedRound, setLoadedRound] = useState(0);
+  const loading = !listReady || loadedRound !== round;
+  // The round on screen, for the next pages still out when it changes.
+  const shownRound = useRef(round);
+  useEffect(() => {
+    shownRound.current = round;
+  }, [round]);
+  // The next page loading, for which round: an earlier round's never holds
+  // this one up, and only the request that set it may clear it.
+  const [loadingMoreFor, setLoadingMoreFor] = useState<{ round: number; ask: number } | null>(null);
+  const loadingMore = !loading && loadingMoreFor?.round === round;
+  const asks = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string[]>([]);
 
@@ -111,6 +199,33 @@ export function useFeedPresenter({
   const [commentsCursor, setCommentsCursor] = useState<string | null>(null);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentDraft, setCommentDraft] = useState("");
+
+  // "@" and a few letters in either box suggests members to mention.
+  const {
+    track: trackMention,
+    picker: mentionPicker,
+    close: closeMention,
+  } = useMentionSuggestions(
+    useCallback((field: MentionField, text: string) => {
+      if (field === "post") setDraft(text);
+      else setCommentDraft(text);
+    }, []),
+  );
+  /** A box's text changed, or its caret moved: where it is decides the suggestions. */
+  const typeDraft = useCallback(
+    (value: string, caret?: number) => {
+      setDraft(value);
+      trackMention("post", value, caret ?? value.length);
+    },
+    [trackMention],
+  );
+  const typeCommentDraft = useCallback(
+    (value: string, caret?: number) => {
+      setCommentDraft(value);
+      trackMention("comment", value, caret ?? value.length);
+    },
+    [trackMention],
+  );
   const [commentSending, setCommentSending] = useState(false);
   const [commentsError, setCommentsError] = useState<string | null>(null);
 
@@ -122,21 +237,30 @@ export function useFeedPresenter({
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const [suggestions, setSuggestions] = useState<SuggestedPersonPM[]>([]);
-  const [suggestionsHidden, setSuggestionsHidden] = useState(false);
+  // "Kinksters Near You". The segment asked for (null: the member's default,
+  // which the API knows), then the segment shown and those offered, as the
+  // API last answered.
+  const [suggestions, setSuggestions] = useState<FeedSuggestionPM[]>([]);
+  const [suggestionsAsked, setSuggestionsAsked] = useState<SuggestionShow | null>(null);
+  const [suggestionShow, setSuggestionShow] = useState<SuggestionShow | null>(null);
+  const [suggestionOptions, setSuggestionOptions] = useState<SuggestionShow[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  /** Bumped whenever another segment replaces the list, so a late failure can't reach the new one. */
+  const suggestionsRound = useRef(0);
   const [followBusy, setFollowBusy] = useState<string[]>([]);
 
   /** Object URLs outlive React state, so they are revoked by hand. */
   const previewUrls = useRef<string[]>([]);
 
-  /** Which page of which list to read — the four surfaces differ only here. */
+  /** Which page of which list to read — the surfaces differ only here. */
   const loadPage = useCallback(
     async (cursor: string | null): Promise<FeedPagePM> => {
       if (postId) return { items: [await postsApi.byId(postId)], nextCursor: null };
       if (saved) return postsApi.saved(cursor);
-      return postsApi.feed(cursor, undefined, author);
+      if (tab) return postsApi.feed(cursor, undefined, null, null, tab);
+      return postsApi.feed(cursor, undefined, author, search);
     },
-    [author, postId, saved],
+    [author, postId, saved, search, tab],
   );
 
   const onUnauthorized = useCallback(
@@ -151,7 +275,7 @@ export function useFeedPresenter({
   );
 
   useEffect(() => {
-    if (!ready) return;
+    if (!listReady) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -159,34 +283,45 @@ export function useFeedPresenter({
         if (cancelled) return;
         setPosts(page.items);
         setCursor(page.nextCursor);
+        setHint(page.hint ?? null);
+        setError(null);
       } catch (e) {
         if (cancelled || onUnauthorized(e)) return;
+        // Nothing of the list before belongs under this one's error.
+        setPosts([]);
+        setCursor(null);
+        setHint(null);
         setError(FEED_COPY.feedError);
       } finally {
-        if (!cancelled) setLoadedFor(surface);
+        if (!cancelled) setLoadedRound(round);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [surface, loadPage, ready, onUnauthorized]);
+  }, [round, loadPage, listReady, onUnauthorized]);
 
   useEffect(() => {
     // Only the home feed carries the suggestions strip.
-    if (author || postId || saved || !ready) return;
+    if (author || postId || saved || search || !ready) return;
     let cancelled = false;
     void (async () => {
       try {
-        const page = await postsApi.suggested(FEED_SUGGESTION_LIMIT);
-        if (!cancelled) setSuggestions(page.items);
+        const page = await postsApi.suggested(FEED_SUGGESTION_LIMIT, suggestionsAsked);
+        if (cancelled) return;
+        setSuggestions(page.items);
+        setSuggestionShow(page.show ?? null);
+        setSuggestionOptions(page.options ?? []);
       } catch {
         // The strip is a nicety; a failure just leaves it out.
+      } finally {
+        if (!cancelled) setSuggestionsLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [author, postId, saved, ready]);
+  }, [author, postId, saved, search, ready, suggestionsAsked]);
 
   // Revoke every preview on unmount so a long session doesn't leak blobs.
   useEffect(
@@ -198,18 +333,38 @@ export function useFeedPresenter({
   );
 
   const loadMore = useCallback(async () => {
-    if (!cursor || loadingMore) return;
-    setLoadingMore(true);
+    // Until a new list's first page is in, the cursor is still the old list's.
+    if (!cursor || loadingMore || loading) return;
+    const ask = ++asks.current;
+    setLoadingMoreFor({ round, ask });
     try {
       const page = await loadPage(cursor);
-      setPosts((prev) => [...prev, ...page.items]);
+      if (shownRound.current !== round) return;
+      setPosts((prev) => appendNewRows(prev, page.items));
       setCursor(page.nextCursor);
     } catch (e) {
-      if (!onUnauthorized(e)) setError(FEED_COPY.feedError);
+      if (shownRound.current === round && !onUnauthorized(e)) setError(FEED_COPY.feedError);
     } finally {
-      setLoadingMore(false);
+      setLoadingMoreFor((current) => (current?.ask === ask ? null : current));
     }
-  }, [cursor, loadPage, loadingMore, onUnauthorized]);
+  }, [cursor, loadPage, loading, loadingMore, onUnauthorized, round]);
+
+  /**
+   * Another tab: its list replaces this one, from its first page. A response
+   * still on its way for the tab left is dropped (the round has moved on).
+   */
+  const selectTab = useCallback(
+    (next: FeedTab) => {
+      if (!home || next === tab) return;
+      feedTabMemory.remember(next);
+      setPickedTab(next);
+      setPosts([]);
+      setCursor(null);
+      setHint(null);
+      setMenuFor(null);
+    },
+    [home, tab],
+  );
 
   const openMedia = useCallback((media: PostMediaVM) => setLightbox(media), []);
   const closeMedia = useCallback(() => setLightbox(null), []);
@@ -247,10 +402,11 @@ export function useFeedPresenter({
     setComposerOpen(false);
     setAutoPickPhoto(false);
     setDraft("");
+    closeMention("post");
     setVisibility("public");
     setComposerError(null);
     discardPhotos();
-  }, [discardPhotos]);
+  }, [discardPhotos, closeMention]);
 
   const addPhotos = useCallback(
     (files: File[]) => {
@@ -409,10 +565,14 @@ export function useFeedPresenter({
     try {
       if (typeof navigator !== "undefined" && navigator.share) {
         await navigator.share({ url });
-        return;
+      } else {
+        await navigator.clipboard.writeText(url);
+        setShareNote(FEED_COPY.shareCopied);
       }
-      await navigator.clipboard.writeText(url);
-      setShareNote(FEED_COPY.shareCopied);
+      const result = await postsApi.share(postId);
+      setPosts((prev) =>
+        applyToContent(prev, result.postId, (p) => ({ ...p, shares: result.shares })),
+      );
     } catch {
       // A cancelled share sheet lands here too, which is not worth a message.
     }
@@ -428,6 +588,7 @@ export function useFeedPresenter({
       setComments([]);
       setCommentsCursor(null);
       setCommentDraft("");
+      closeMention("comment");
       setCommentsError(null);
       setCommentsLoading(true);
       try {
@@ -441,7 +602,7 @@ export function useFeedPresenter({
         setCommentsLoading(false);
       }
     },
-    [onUnauthorized],
+    [onUnauthorized, closeMention],
   );
 
   const closeComments = useCallback(() => {
@@ -449,8 +610,9 @@ export function useFeedPresenter({
     setComments([]);
     setCommentsCursor(null);
     setCommentDraft("");
+    closeMention("comment");
     setCommentsError(null);
-  }, []);
+  }, [closeMention]);
 
   const loadMoreComments = useCallback(async () => {
     if (!commentsFor || !commentsCursor || commentsLoading) return;
@@ -476,6 +638,7 @@ export function useFeedPresenter({
       setComments((prev) => [created, ...prev]);
       setPosts((prev) => applyToPost(prev, postId, (p) => withCommentDelta(p, 1)));
       setCommentDraft("");
+      closeMention("comment");
     } catch (e) {
       if (onUnauthorized(e)) return;
       setCommentsError(
@@ -484,7 +647,7 @@ export function useFeedPresenter({
     } finally {
       setCommentSending(false);
     }
-  }, [commentsFor, commentDraft, commentSending, onUnauthorized]);
+  }, [commentsFor, commentDraft, commentSending, onUnauthorized, closeMention]);
 
   const deleteComment = useCallback(
     async (id: string) => {
@@ -531,59 +694,136 @@ export function useFeedPresenter({
     }
   }, [confirmDelete, deleting, commentsFor, closeComments, onUnauthorized]);
 
-  // ---- suggestions ------------------------------------------------------
+  // ---- following --------------------------------------------------------
 
-  const hideSuggestions = useCallback(() => setSuggestionsHidden(true), []);
+  /** A segment of the toggle: its list replaces this one, and is asked for. */
+  const showSuggestions = useCallback(
+    (show: SuggestionShow) => {
+      if (show === suggestionShow) return;
+      suggestionsRound.current += 1;
+      setSuggestionsAsked(show);
+      setSuggestionShow(show);
+      setSuggestions([]);
+      setSuggestionsLoading(true);
+    },
+    [suggestionShow],
+  );
 
+  /**
+   * Remove: the card goes at once, and the member is never suggested again. If
+   * the API refuses, the card comes back where it was — unless another segment
+   * has replaced the list meanwhile.
+   */
+  const removeSuggestion = useCallback(
+    async (userId: string) => {
+      const index = suggestions.findIndex((s) => s.userId === userId);
+      if (index < 0) return;
+      const person = suggestions[index];
+      const round = suggestionsRound.current;
+      setSuggestions((prev) => prev.filter((s) => s.userId !== userId));
+      try {
+        await postsApi.dismissSuggestion(userId);
+      } catch (e) {
+        if (onUnauthorized(e) || suggestionsRound.current !== round) return;
+        setSuggestions((prev) => withSuggestionRestored(prev, person, index));
+      }
+    },
+    [suggestions, onUnauthorized],
+  );
+
+  /**
+   * Optimistic follow, from a suggestion card or the Follow button on the
+   * official organization's posts. The posts carry whether the viewer follows
+   * their author, so nothing is asked for first; the flip reaches the card and
+   * every one of the member's posts at once, and is undone if the API refuses.
+   */
   const toggleFollow = useCallback(
     async (userId: string) => {
       const person = suggestions.find((s) => s.userId === userId);
-      if (!person?.username || followBusy.includes(userId)) return;
-      const handle = person.username;
+      const author = posts.find((p) => p.author.userId === userId)?.author;
+      const handle = person?.username ?? author?.username;
+      if (!handle || followBusy.includes(userId)) return;
+      const was = person?.isFollowing ?? Boolean(author?.isFollowing);
+      const show = (following: boolean) => {
+        setSuggestions((prev) => withSuggestionFollow(prev, userId, following));
+        setPosts((prev) => withAuthorFollow(prev, userId, following));
+      };
       setFollowBusy((prev) => [...prev, userId]);
-      setSuggestions((prev) =>
-        prev.map((s) => (s.userId === userId ? toggleFollowOnSuggestion(s) : s)),
-      );
+      show(!was);
       try {
-        if (person.isFollowing) await postsApi.unfollow(handle);
+        if (was) await postsApi.unfollow(handle);
         else await postsApi.follow(handle);
       } catch (e) {
-        if (!onUnauthorized(e)) {
-          setSuggestions((prev) =>
-            prev.map((s) => (s.userId === userId ? toggleFollowOnSuggestion(s) : s)),
-          );
-        }
+        if (!onUnauthorized(e)) show(was);
       } finally {
         setFollowBusy((prev) => prev.filter((id) => id !== userId));
       }
     },
-    [suggestions, followBusy, onUnauthorized],
+    [suggestions, posts, followBusy, onUnauthorized],
   );
 
   // ---- view models ------------------------------------------------------
 
   const postVMs: PostVM[] = useMemo(
-    () => posts.map((p) => toPostVM(p, expanded.includes(p.id), memberHref)),
-    [posts, expanded],
+    () =>
+      posts.map((p) => ({
+        ...toPostVM(
+          p,
+          expanded.includes(p.id),
+          memberHref,
+          new Date(),
+          isOfficialOrganization(p.author.userId),
+        ),
+        authorFollowBusy: followBusy.includes(p.author.userId),
+      })),
+    [posts, expanded, followBusy],
   );
 
   const commentVMs: CommentVM[] = useMemo(
-    () => comments.map((c) => toCommentVM(c, memberHref)),
+    () =>
+      comments.map((c) =>
+        toCommentVM(c, memberHref, new Date(), isOfficialOrganization(c.author.userId)),
+      ),
     [comments],
   );
 
   const suggestionVMs: FeedSuggestionVM[] = useMemo(
     () =>
-      suggestions.map((s) => ({
-        userId: s.userId,
-        displayName: s.displayName,
-        handle: handleOf(s.username),
-        avatarUrl: s.avatarUrl,
-        isFollowing: s.isFollowing,
-        busy: followBusy.includes(s.userId),
-        href: memberHref(s.username),
-      })),
+      suggestions.map((s) =>
+        toFeedSuggestionVM(
+          s,
+          memberHref,
+          followBusy.includes(s.userId),
+          isOfficialOrganization(s.userId),
+        ),
+      ),
     [suggestions, followBusy],
+  );
+
+  // Until the client has read the remembered tab (the server render), none is
+  // selected: better than showing For You for a frame and then another tab.
+  const tabs: FeedTabVM[] = useMemo(
+    () =>
+      home
+        ? FEED_TABS.map((value) => ({
+            value,
+            label: FEED_COPY.tabs[value],
+            selected: value === tab,
+          }))
+        : [],
+    [home, tab],
+  );
+
+  const empty = useMemo(() => emptyFeed(tab, hint), [tab, hint]);
+
+  const suggestionSegments: SuggestionSegmentVM[] = useMemo(
+    () =>
+      suggestionOptions.map((value) => ({
+        value,
+        label: FEED_COPY.peopleShow[value],
+        selected: value === suggestionShow,
+      })),
+    [suggestionOptions, suggestionShow],
   );
 
   const photoVMs: DraftPhotoVM[] = useMemo(
@@ -597,11 +837,292 @@ export function useFeedPresenter({
     [photos],
   );
 
+  const [giftTarget, setGiftTarget] = useState<{ postId: string; name: string } | null>(null);
+  const [giftCurrency, setGiftCurrency] = useState<KinkCurrency>("coin");
+  const [giftQuantity, setGiftQuantity] = useState("1");
+  const [giftSummary, setGiftSummary] = useState<WalletSummaryPM | null>(null);
+  const [giftLoading, setGiftLoading] = useState(false);
+  const [giftSending, setGiftSending] = useState(false);
+  const [giftError, setGiftError] = useState<string | null>(null);
+  const giftKey = useRef("");
+  const giftBusy = useRef(false);
+  // A gift sent but not answered: its sender (it's only ever sent again as them), and whether
+  // this browser could keep it (storage can be off, or full).
+  type InDoubt = GiftInDoubt & { member: string; persisted: boolean };
+  const uncertainGift = useRef<InDoubt | null>(null);
+  const [giftLocked, setGiftLocked] = useState(false);
+  const giftLoadVersion = useRef(0);
+  /** A gift answered (sent or refused): no longer in doubt, here or kept. */
+  const settleGift = (member: string, key: string) => {
+    if (uncertainGift.current?.key === key) uncertainGift.current = null;
+    pendingTransfersService.settleGift(member, key);
+  };
+  /**
+   * This member's gifts in doubt: those kept in this browser, any tab's (the truth across tabs:
+   * another may have settled this page's one, or kept others), and this page's own when it
+   * couldn't be kept.
+   */
+  const giftsInDoubt = (member: string): InDoubt[] => {
+    const own = uncertainGift.current?.member === member ? uncertainGift.current : null;
+    const stored = pendingTransfersService.gifts(member);
+    // Storage can't be read: no telling what's kept, so this page's own still counts.
+    if (stored === null) return own ? [own] : [];
+    const kept = stored.map((gift) => ({ ...gift, member, persisted: true }));
+    if (own && !own.persisted && !kept.some((g) => g.key === own.key)) kept.push(own);
+    return kept;
+  };
+  /**
+   * Settles an earlier gift in doubt by sending it again exactly as it was, as its sender: the
+   * server returns the gift it made, makes it once, or refuses, even if its post has gone since.
+   * True once it's settled, false while it's still in doubt.
+   */
+  const settleEarlierGift = (gift: InDoubt) =>
+    pendingTransfersService.exclusive(gift.member, async () => {
+      // Another tab may have answered it while this one waited for the lock.
+      if (!giftsInDoubt(gift.member).some((g) => g.key === gift.key)) {
+        if (uncertainGift.current?.key === gift.key) uncertainGift.current = null;
+        return true;
+      }
+      try {
+        await postGiftsService.send(
+          gift.postId,
+          gift.currency,
+          Number(gift.quantity),
+          gift.key,
+          gift.member,
+        );
+        setShareNote(GIFT_COPY.earlierSent);
+      } catch (e) {
+        if (pendingTransfersService.failure(e) !== "refused") return false;
+        // Refused (its post gone before it landed, say): nothing was sent.
+      }
+      settleGift(gift.member, gift.key);
+      return true;
+    });
+  const openGift = async (postId: string, currency: KinkCurrency = "coin") => {
+    if (giftBusy.current) return;
+    const target = posts.find((p) => p.postId === postId);
+    if (!target) return;
+    if (target.mine && !target.repostedBy) {
+      setShareNote(GIFT_COPY.self);
+      return;
+    }
+    const version = ++giftLoadVersion.current;
+    setGiftTarget({ postId, name: target.author.displayName });
+    setGiftCurrency(currency);
+    setGiftQuantity("1");
+    setGiftLocked(false);
+    setGiftSummary(null);
+    setGiftError(null);
+    giftKey.current = crypto.randomUUID();
+    setGiftLoading(true);
+    try {
+      // Whose wallet this is decides everything below: a gift in doubt is only ever sent again
+      // as its sender, never under an account switched to in another tab.
+      const summary = await postGiftsService.balance();
+      if (version !== giftLoadVersion.current) return;
+      setGiftSummary(summary);
+      const member = summary.userId ?? null;
+      let doubts = member ? giftsInDoubt(member) : [];
+      // All but one for this post are settled first, wherever their posts are, so none can be
+      // sent twice or hold this one up; checked again after each (another tab may keep more).
+      const extra = (list: InDoubt[]) =>
+        list.find((g) => g.postId !== postId) ?? list.filter((g) => g.postId === postId)[1];
+      let settledAny = false;
+      for (let rounds = 0; member && extra(doubts) && rounds < 5; rounds++) {
+        const earlier = extra(doubts) as InDoubt;
+        giftBusy.current = true;
+        const settled = await settleEarlierGift(earlier).finally(() => {
+          giftBusy.current = false;
+        });
+        if (version !== giftLoadVersion.current) return;
+        if (!settled) break;
+        settledAny = true;
+        doubts = giftsInDoubt(member);
+      }
+      if (extra(doubts)) {
+        uncertainGift.current = extra(doubts) ?? null;
+        setGiftTarget(null);
+        setShareNote(GIFT_COPY.earlierUnconfirmed);
+        return;
+      }
+      const pending = doubts.find((g) => g.postId === postId) ?? null;
+      // Restored before anything else can fail, so a retry is always exactly this gift.
+      uncertainGift.current = pending;
+      if (pending) {
+        setGiftCurrency(pending.currency);
+        setGiftQuantity(pending.quantity);
+        setGiftLocked(true);
+        giftKey.current = pending.key;
+      }
+      if (settledAny) {
+        // One may have just been sent: read the balance again before offering this one, and
+        // stop if another account is signed in now.
+        const after = await postGiftsService.balance();
+        if (version !== giftLoadVersion.current) return;
+        if (after.userId !== member) {
+          uncertainGift.current = null;
+          setGiftTarget(null);
+          setShareNote(GIFT_COPY.otherAccount);
+          return;
+        }
+        setGiftSummary(after);
+      }
+      if (!summary.settings.enabled) setGiftError(GIFT_COPY.unavailable);
+    } catch (e) {
+      // Without the wallet there's no telling whose it is: nothing is offered to send.
+      if (version === giftLoadVersion.current)
+        setGiftError(e instanceof Error ? e.message : "Could not load your wallet.");
+    } finally {
+      if (version === giftLoadVersion.current) setGiftLoading(false);
+    }
+  };
+  const sendGift = async () => {
+    const quote = postGiftsService.quote(giftSummary, giftCurrency, giftQuantity);
+    const recovered = uncertainGift.current;
+    // A recovered gift goes as its sender (the API refuses it if someone else is signed in now).
+    const member = recovered?.member ?? giftSummary?.userId;
+    // A gift is only sent knowing whose wallet it comes from.
+    if (giftBusy.current || !giftTarget || !member || (!giftLocked && !quote.valid)) return;
+    // A retry is exactly the gift in doubt (its key and amount), never the form's.
+    const attempt: GiftInDoubt = recovered
+      ? {
+          postId: recovered.postId,
+          currency: recovered.currency,
+          quantity: recovered.quantity,
+          key: recovered.key,
+        }
+      : {
+          postId: giftTarget.postId,
+          currency: giftCurrency,
+          quantity: giftQuantity,
+          key: giftKey.current,
+        };
+    giftBusy.current = true;
+    setGiftSending(true);
+    setGiftError(null);
+    try {
+      // One tab at a time sends this member's money requests, deciding from the kept copies
+      // as they are once it holds the lock.
+      const outcome = await pendingTransfersService.exclusive(member, async () => {
+        const doubts = giftsInDoubt(member);
+        if (recovered && !doubts.some((g) => g.key === recovered.key)) {
+          uncertainGift.current = null;
+          return "answered elsewhere" as const;
+        }
+        // Nothing new while another gift is in doubt (another tab's): it would be left behind.
+        if (!recovered && doubts.length > 0) return "another in doubt" as const;
+        // Kept before it's sent: if the page goes before the answer comes, a retry reuses its
+        // key. (Storage can be off or full: then it's this page's own record.)
+        const persisted = pendingTransfersService.keepGift(member, attempt);
+        uncertainGift.current = { ...attempt, member, persisted };
+        try {
+          await postGiftsService.send(
+            attempt.postId,
+            attempt.currency,
+            Number(attempt.quantity),
+            attempt.key,
+            member,
+          );
+        } catch (e) {
+          const failure = pendingTransfersService.failure(e);
+          // Refused: nothing was made. Unread: this send wasn't read, and with the lock held no
+          // other tab has sent it, so a first send is settled too. No answer: kept.
+          if (failure === "refused" || (failure === "unread" && !recovered))
+            settleGift(member, attempt.key);
+          return { failure, message: e instanceof Error ? e.message : "Please try again." };
+        }
+        settleGift(member, attempt.key);
+        return "sent" as const;
+      });
+      if (outcome === "answered elsewhere") {
+        setGiftLocked(false);
+        setGiftTarget(null);
+        setShareNote(GIFT_COPY.answeredElsewhere);
+      } else if (outcome === "another in doubt") {
+        setGiftError(GIFT_COPY.earlierUnconfirmed);
+      } else if (outcome === "sent") {
+        setGiftLocked(false);
+        setShareNote(
+          postGiftsService.sentLabel(attempt.quantity, attempt.currency, giftTarget.name),
+        );
+        setGiftTarget(null);
+        // Read the committed count so a retried, idempotent gift never counts twice.
+        const updated = await postsApi.byId(attempt.postId).catch(() => null);
+        if (updated)
+          setPosts((prev) =>
+            applyToContent(prev, updated.postId, (p) => ({ ...p, gifts: updated.gifts ?? 0 })),
+          );
+      } else if (outcome.failure === "refused" || (outcome.failure === "unread" && !recovered)) {
+        setGiftLocked(false);
+        setGiftError(outcome.message);
+      } else if (outcome.failure === "unread") {
+        // Says nothing about the earlier send: still in doubt, key and all.
+        setGiftLocked(true);
+        setGiftError(outcome.message);
+      } else {
+        setGiftLocked(true);
+        setGiftError(
+          "Delivery could not be confirmed. Retry this same gift to check it safely, or check Transaction History.",
+        );
+      }
+    } finally {
+      giftBusy.current = false;
+      setGiftSending(false);
+    }
+  };
+  const giftQuote = postGiftsService.quote(giftSummary, giftCurrency, giftQuantity);
+  const giftDialog = {
+    open: giftTarget !== null,
+    recipient: giftTarget?.name ?? "",
+    currency: giftCurrency,
+    quantity: giftQuantity,
+    copy: GIFT_COPY,
+    buyHref: Routes.kinkcoinsBuy,
+    availableLabel: postGiftsService.availableLabel(giftQuote.available, giftCurrency),
+    confirmLabel: postGiftsService.confirmLabel(giftQuantity, giftCurrency, giftTarget?.name ?? ""),
+    loading: giftLoading,
+    locked: giftLocked,
+    sending: giftSending,
+    error: giftError,
+    canSend: (giftQuote.valid || giftLocked) && !giftLoading && !giftSending,
+    onCurrency: (v: KinkCurrency) => {
+      if (!giftBusy.current && !giftLocked && v !== giftCurrency) {
+        setGiftCurrency(v);
+        giftKey.current = crypto.randomUUID();
+        setGiftError(null);
+      }
+    },
+    onQuantity: (v: string) => {
+      if (!giftBusy.current && !giftLocked && v !== giftQuantity) {
+        setGiftQuantity(v);
+        giftKey.current = crypto.randomUUID();
+        setGiftError(null);
+      }
+    },
+    onSend: sendGift,
+    onClose: () => {
+      if (!giftBusy.current) {
+        giftLoadVersion.current++;
+        setGiftTarget(null);
+      }
+    },
+  };
+
   return {
+    openGift,
+    giftDialog,
     loading,
     error,
     posts: postVMs,
-    hasMore: Boolean(cursor),
+    /** The home feed's For You | Following | Nearby; none elsewhere. */
+    tabs,
+    selectTab,
+    /** What the feed says when it has nothing to show. */
+    empty,
+    /** "Kinksters Near You" belongs to For You and Nearby, not to Following. */
+    showPeople: tab === "for_you" || tab === "nearby",
+    hasMore: !loading && Boolean(cursor),
     loadingMore,
     loadMore,
     toggleExpanded,
@@ -615,7 +1136,8 @@ export function useFeedPresenter({
     openComposerWithPhoto,
     closeComposer,
     draft,
-    setDraft,
+    setDraft: typeDraft,
+    postMentions: mentionPicker("post", postMaxLength),
     visibility,
     setVisibility,
     photos: photoVMs,
@@ -644,7 +1166,8 @@ export function useFeedPresenter({
     openComments,
     closeComments,
     commentDraft,
-    setCommentDraft,
+    setCommentDraft: typeCommentDraft,
+    commentMentions: mentionPicker("comment", COMMENT_BODY_MAX),
     commentSending,
     canComment: canSubmitComment(commentDraft) && !commentSending,
     submitComment,
@@ -661,9 +1184,11 @@ export function useFeedPresenter({
     confirmDeletePost,
     deleting,
 
-    suggestions: suggestionsHidden ? [] : suggestionVMs,
-    suggestionsHidden,
-    hideSuggestions,
+    suggestions: suggestionVMs,
+    suggestionSegments,
+    suggestionsLoading,
+    showSuggestions,
+    removeSuggestion,
     toggleFollow,
   };
 }

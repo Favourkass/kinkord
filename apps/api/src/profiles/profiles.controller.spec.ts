@@ -31,11 +31,42 @@ describe("ProfilesController", () => {
     );
   });
 
+  it("makes preference options accessible before profile photos are uploaded", () => {
+    expect(
+      Reflect.getMetadata("kinkord:allowDuringSignUp", ProfilesController.prototype.options),
+    ).toBe(true);
+  });
+
+  it("saves explicit photo skipping together with the new roles", async () => {
+    const service = serviceMock();
+    await new ProfilesController(service).update(req, {
+      signupPhotosSkipped: true,
+      roles: ["Acolyte", "Aftercare Specialist", "Adult Baby Diaper Lover (ABDL)"],
+    });
+    expect(service.updateOwn).toHaveBeenCalledWith(
+      "u1",
+      {
+        signupPhotosSkipped: true,
+        roles: ["Acolyte", "Aftercare Specialist", "Adult Baby Diaper Lover (ABDL)"],
+      },
+      "Favour",
+    );
+  });
+
+  it("won't take a request to undo the photo skip", () => {
+    const service = serviceMock();
+    expect(() =>
+      new ProfilesController(service).update(req, { signupPhotosSkipped: false }),
+    ).toThrow(BadRequestException);
+    expect(service.updateOwn).not.toHaveBeenCalled();
+  });
+
   it("serves the option lists the pickers render", () => {
     const options = new ProfilesController(serviceMock()).options();
     expect(options.genders).toEqual(["Male", "Female"]);
+    expect(options.orientations).toEqual(["Straight", "Bisexual"]);
     expect(options.relationshipStatuses).toHaveLength(17);
-    expect(options.roles).toHaveLength(20);
+    expect(options.roles).toHaveLength(36);
     expect(options.kinks).toHaveLength(50);
     expect(options.lookingFor).toHaveLength(10);
     expect(options.nameChangeCooldownDays).toBe(30);

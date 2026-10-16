@@ -35,6 +35,10 @@ export interface ChatPeerPM {
   username: string | null;
   displayName: string;
   avatarUrl: string | null;
+  /** Shows the Silver check; absent from an older API. */
+  silver?: boolean;
+  presence?: "online" | "away" | "offline";
+  typing?: boolean;
   online: boolean;
   /** The viewer blocked them: the thread stays, read-only until they unblock. */
   blockedByMe: boolean;
@@ -66,14 +70,30 @@ export interface PendingMessage {
   status: "sending" | "failed";
 }
 
+export type ChatInboxFilter = "all" | "unread" | "online";
+
+/** How many chats each inbox tab holds, every chat counted. */
+export interface InboxCountsPM {
+  all: number;
+  unread: number;
+  online: number;
+}
+
 export interface ConversationRowVM {
   id: string;
   href: string;
   displayName: string;
+  presenceLabel?: string;
+  presence?: "online" | "away" | "offline";
+  typing?: boolean;
+  silver: boolean;
+  /** The official organization: marked, so nobody can pass for it in a chat. */
+  organization: boolean;
   avatarUrl: string | null;
   preview: string;
   time: string;
   unread: number;
+  sentByMe?: boolean;
   isOnline: boolean;
 }
 
@@ -100,6 +120,11 @@ export interface ThreadMessageVM {
 export interface ThreadPeerVM {
   userId: string;
   displayName: string;
+  presenceLabel?: string;
+  presence?: "online" | "away" | "offline";
+  typing?: boolean;
+  silver: boolean;
+  organization: boolean;
   avatarUrl: string | null;
   isOnline: boolean;
   blockedByMe: boolean;
@@ -118,20 +143,28 @@ export function previewOf(summary: ConversationSummaryPM, viewerId: string | nul
   return viewerId !== null && last.senderId === viewerId ? `You: ${clipped}` : clipped;
 }
 
+/** `organization` is whether the other member is the official organization; presenters decide it. */
 export function toConversationRowVM(
   summary: ConversationSummaryPM,
   viewerId: string | null,
   href: (conversationId: string) => string,
   now = new Date(),
+  organization = false,
 ): ConversationRowVM {
   return {
     id: summary.id,
     href: href(summary.id),
     displayName: summary.peer?.displayName ?? "Member",
+    silver: Boolean(summary.peer?.silver),
+    organization,
+    presence: summary.peer?.presence ?? (summary.peer?.online ? "online" : "offline"),
+    typing: Boolean(summary.peer?.typing),
     avatarUrl: summary.peer?.avatarUrl ?? null,
     preview: previewOf(summary, viewerId),
     time: conversationTime(summary.lastMessage?.createdAt ?? summary.lastMessageAt, now),
     unread: summary.unreadCount,
+    sentByMe:
+      !!summary.lastMessage && viewerId !== null && summary.lastMessage.senderId === viewerId,
     isOnline: summary.peer?.online ?? false,
   };
 }
@@ -140,11 +173,16 @@ export function toConversationRowVM(
 export function toThreadPeerVM(
   peer: ChatPeerPM | null,
   profileHref: (usernameOrId: string) => string,
+  organization = false,
 ): ThreadPeerVM | null {
   if (!peer) return null;
   return {
     userId: peer.userId,
     displayName: peer.displayName,
+    silver: Boolean(peer.silver),
+    organization,
+    presence: peer.presence ?? (peer.online ? "online" : "offline"),
+    typing: Boolean(peer.typing),
     avatarUrl: peer.avatarUrl,
     isOnline: peer.online,
     blockedByMe: peer.blockedByMe,
@@ -223,6 +261,17 @@ export const NEW_CHAT_LIMIT = "NEW_CHAT_LIMIT";
 /** Whether an API error body is that refusal. */
 export function isNewChatLimit(body: unknown): boolean {
   return (body as { code?: unknown } | null)?.code === NEW_CHAT_LIMIT;
+}
+
+/**
+ * The API's code for a chat refused because writing first to a member in
+ * another country is part of Silver Premium. Replies are always free.
+ */
+export const CROSS_COUNTRY_PREMIUM = "CROSS_COUNTRY_PREMIUM";
+
+/** Whether an API error body is that refusal. */
+export function isCrossCountryPremium(body: unknown): boolean {
+  return (body as { code?: unknown } | null)?.code === CROSS_COUNTRY_PREMIUM;
 }
 
 /**

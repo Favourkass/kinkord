@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Coins } from "lucide-react";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import MaskIcon from "@/components/app/MaskIcon";
 import type { AppNavLabels, AppNavLinks } from "@/components/app/nav";
@@ -13,8 +14,14 @@ export interface ProfileTopNavProps {
   notificationsUnread?: boolean;
   notificationsCount?: number;
   messagesCount?: number;
-  links: Pick<AppNavLinks, "home" | "chat" | "notifications" | "settings" | "profile">;
-  labels: Pick<AppNavLabels, "home" | "chat" | "notifications" | "settings" | "profile">;
+  links: Pick<
+    AppNavLinks,
+    "home" | "chat" | "notifications" | "settings" | "profile" | "kinkcoins"
+  >;
+  labels: Pick<
+    AppNavLabels,
+    "home" | "chat" | "notifications" | "settings" | "profile" | "kinkcoins"
+  >;
 }
 
 /** Figma desktop profile TopNav (987:5468): wordmark, 480px search pill, icon circles, "My Account". */
@@ -70,6 +77,11 @@ export default function ProfileTopNav(p: ProfileTopNavProps) {
         <Link href={p.links.home} aria-label={p.labels.home} className="text-kink-amber">
           <MaskIcon name="home-solid" width={24} />
         </Link>
+        {p.links.kinkcoins && p.labels.kinkcoins && (
+          <Link href={p.links.kinkcoins} aria-label={p.labels.kinkcoins} className={circle}>
+            <Coins size={20} />
+          </Link>
+        )}
         <Link href={p.links.settings} aria-label={p.labels.settings} className="text-pf-icon">
           <MaskIcon name="settings" width={21} />
         </Link>

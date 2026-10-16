@@ -65,6 +65,30 @@ describe("useHomePresenter", () => {
     expect(result.current.handle).toBe("@tegamaxwell");
     expect(result.current.avatarUrl).toBe("https://s3/avatar.jpg");
     expect(result.current.membersCount).toBe("128");
+    expect(result.current.silver).toBe(false);
+  });
+
+  it("knows a Silver member, for the limits the app shows", async () => {
+    apiGet.mockImplementation((path: unknown) =>
+      path === "/me" ? Promise.resolve({ ...me, plan: "silver" }) : routeGet(path),
+    );
+    const { result } = renderHook(() => useHomePresenter());
+    await waitFor(() => expect(result.current.silver).toBe(true));
+  });
+
+  it("knows when you've hidden your verified badge, for your own profile", async () => {
+    const { result } = renderHook(() => useHomePresenter());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    // Absent from the payload: shown, as by default.
+    expect(result.current.showVerifiedBadge).toBe(true);
+
+    apiGet.mockImplementation((path: unknown) =>
+      path === "/profile"
+        ? Promise.resolve({ ...profile, showVerifiedBadge: false })
+        : routeGet(path),
+    );
+    const hidden = renderHook(() => useHomePresenter());
+    await waitFor(() => expect(hidden.result.current.showVerifiedBadge).toBe(false));
   });
 
   it("redirects to login when the session is gone", async () => {

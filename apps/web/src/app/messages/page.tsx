@@ -3,7 +3,7 @@
 import AppShell from "@/components/app/AppShell";
 import ChatListScreen from "@/components/chat/ChatListScreen";
 import PushPrompt from "@/components/chat/PushPrompt";
-import { CHAT_COPY } from "@/constants/chat";
+import { CHAT_COPY, INBOX_SEARCH_MAX } from "@/constants/chat";
 import { getAppShellNav } from "@/presenters/getAppShellNav";
 import { useChatListPresenter } from "@/presenters/useChatListPresenter";
 import { usePushPresenter } from "@/presenters/usePushPresenter";
@@ -16,6 +16,7 @@ export default function MessagesPage() {
   return (
     <AppShell
       brand="KINKORD"
+      mobileHeader={<></>}
       tagline="THE WORLD'S KINK COMMUNITY"
       greeting={shell.greeting}
       name={shell.name}
@@ -42,9 +43,23 @@ export default function MessagesPage() {
         heading={CHAT_COPY.heading}
         banner={push.prompt && <PushPrompt {...push.prompt} />}
         loadingText={CHAT_COPY.loading}
-        emptyTitle={CHAT_COPY.emptyTitle}
-        emptyBody={CHAT_COPY.emptyBody}
+        emptyTitle={list.emptyTitle}
+        emptyBody={list.emptyBody}
         onlineLabel={CHAT_COPY.online}
+        organizationLabel={CHAT_COPY.organization}
+        verifiedOrganizationLabel={CHAT_COPY.verifiedOrganization}
+        query={list.query}
+        onQuery={list.setQuery}
+        searchMaxLength={INBOX_SEARCH_MAX}
+        filters={list.filters}
+        onFilter={list.setFilter}
+        menuOpen={list.menuOpen}
+        onToggleMenu={list.toggleMenu}
+        onCloseMenu={list.closeMenu}
+        onNavigation={list.openNavigation}
+        newChatHref={list.newChatHref}
+        settingsHref={list.settingsHref}
+        copy={CHAT_COPY.inbox}
       />
     </AppShell>
   );

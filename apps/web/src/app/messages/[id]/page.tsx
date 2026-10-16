@@ -19,6 +19,7 @@ export default function ThreadPage({ params }: { params: Promise<{ id: string }>
     safety,
     backHref,
     send,
+    onTyping,
     retry,
     loadMore,
     attachPhoto,
@@ -61,6 +62,8 @@ export default function ThreadPage({ params }: { params: Promise<{ id: string }>
         unavailableText={CHAT_COPY.unavailable}
         newChat={thread.newChat}
         onlineLabel={CHAT_COPY.online}
+        organizationLabel={CHAT_COPY.organization}
+        verifiedOrganizationLabel={CHAT_COPY.verifiedOrganization}
         backHref={backHref}
         backLabel={CHAT_COPY.back}
         emptyText={CHAT_COPY.threadEmpty}
@@ -68,6 +71,7 @@ export default function ThreadPage({ params }: { params: Promise<{ id: string }>
         onSend={send}
         onRetry={retry}
         composer={{
+          onTyping,
           placeholder: CHAT_COPY.placeholder,
           sendLabel: CHAT_COPY.send,
           maxLength: MESSAGE_BODY_MAX,

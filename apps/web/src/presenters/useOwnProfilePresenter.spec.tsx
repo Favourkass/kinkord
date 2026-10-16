@@ -74,6 +74,25 @@ describe("useOwnProfilePresenter", () => {
     expect(result.current.editHref).toBe("/profile/edit");
   });
 
+  it("notes on your own verified badge that you've hidden it from others", async () => {
+    apiGet.mockResolvedValue({
+      ...profile,
+      verification: { email: true, phone: false, identity: true },
+    });
+    const { result, rerender } = renderHook(
+      ({ shown }: { shown: boolean }) => useOwnProfilePresenter(null, shown),
+      { initialProps: { shown: false } },
+    );
+    await waitFor(() => expect(result.current.vm).not.toBeNull());
+    expect(result.current.vm?.verification).toMatchObject({
+      level: "identity",
+      hiddenFromOthers: true,
+    });
+    expect(result.current.heroLabels.identityHidden).toBe("Hidden from others");
+    rerender({ shown: true });
+    expect(result.current.vm?.verification.hiddenFromOthers).toBeUndefined();
+  });
+
   it("reports an account without a handle instead of spinning forever", async () => {
     me.mockResolvedValue({ username: null });
     const { result } = renderHook(() => useOwnProfilePresenter(null));

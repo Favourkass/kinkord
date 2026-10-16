@@ -120,6 +120,104 @@
       "when": 1791038823839,
       "tag": "0016_notification_inbox",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1791308671393,
+      "tag": "0017_subscriptions",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791360571068,
+      "tag": "0018_silver_check",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791376973039,
+      "tag": "0019_windy_brother_voodoo",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1791463533441,
+      "tag": "0020_post_gifts",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791533943234,
+      "tag": "0021_post_share_count",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1791621612605,
+      "tag": "0022_wallet_earned_post_shares",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1791623598188,
+      "tag": "0023_wallet_operation_bank",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791705280160,
+      "tag": "0024_wallet_usd_prices",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791885803027,
+      "tag": "0025_many_donald_blake",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1791888151301,
+      "tag": "0026_complete_sheva_callister",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1791962780335,
+      "tag": "0027_numerous_donald_blake",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1791965877793,
+      "tag": "0028_white_kulan_gath",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1791973200966,
+      "tag": "0029_medical_mindworm",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1791976539750,
+      "tag": "0030_cute_pyro",
+      "breakpoints": true
     }
   ]
 }

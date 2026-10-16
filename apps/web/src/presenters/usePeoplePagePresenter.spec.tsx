@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { usePeoplePagePresenter } from "./usePeoplePagePresenter";
 
@@ -74,6 +74,8 @@ const person = (n: number) => ({
   isFollowing: false,
 });
 
+afterEach(() => vi.unstubAllEnvs());
+
 describe("usePeoplePagePresenter", () => {
   beforeEach(() => {
     replace.mockClear();
@@ -124,6 +126,42 @@ describe("usePeoplePagePresenter", () => {
     expect(push).toHaveBeenCalledWith("/u/nene");
   });
 
+  it("waits for the profile before asking for a list, since whose page it is decides which", async () => {
+    let answer!: (pm: unknown) => void;
+    apiGet.mockImplementation((path: string) =>
+      path.includes("/friends")
+        ? Promise.resolve({ items: [person(1)], total: 1, page: 1, limit: 30 })
+        : new Promise((resolve) => (answer = resolve)),
+    );
+    const { result } = renderHook(() => usePeoplePagePresenter("nene", "followers"));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(apiGet).not.toHaveBeenCalledWith(expect.stringContaining("/friends"));
+
+    await act(async () => answer(profile));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(apiGet).toHaveBeenCalledWith("/profiles/nene/friends?tab=followers&page=1&limit=30");
+  });
+
+  it("lands a link to the organization's friends on its followers, and fixes the address", async () => {
+    vi.stubEnv("NEXT_PUBLIC_KINKORD_OFFICIAL_USER_ID", "u2");
+    const { result } = renderHook(() => usePeoplePagePresenter("nene", "all"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(apiGet).not.toHaveBeenCalledWith(expect.stringContaining("tab=all"));
+    expect(apiGet).toHaveBeenCalledWith("/profiles/nene/friends?tab=followers&page=1&limit=30");
+    expect(replace).toHaveBeenCalledWith("/u/nene/people?tab=followers");
+    expect(result.current.people.subTabs.map((t) => [t.key, t.active])).toEqual([
+      ["followers", true],
+      ["following", false],
+    ]);
+  });
+
+  it("leaves a member's address alone when the tab is one they have", async () => {
+    const { result } = renderHook(() => usePeoplePagePresenter("nene", "all"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(replace).not.toHaveBeenCalled();
+  });
+
   it("falls back to Friends for an unknown tab and surfaces a missing member", async () => {
     const junk = renderHook(() => usePeoplePagePresenter("nene", "enemies"));
     expect(junk.result.current.people.subTabs[0].active).toBe(true);
@@ -131,6 +169,24 @@ describe("usePeoplePagePresenter", () => {
     apiGet.mockRejectedValue(new ApiError(404, {}));
     const missing = renderHook(() => usePeoplePagePresenter("ghost", null));
     await waitFor(() => expect(missing.result.current.error).toMatch(/couldn’t find/));
+  });
+
+  it("names a Kenyan member's county as it is, with no Nigerian 'State'", async () => {
+    apiGet.mockImplementation((path: string) =>
+      Promise.resolve(
+        path.includes("/friends")
+          ? {
+              items: [{ ...person(1), city: "Westlands", state: "Nairobi", country: "KE" }],
+              total: 1,
+              page: 1,
+              limit: 30,
+            }
+          : profile,
+      ),
+    );
+    const { result } = renderHook(() => usePeoplePagePresenter("nene", "followers"));
+    await waitFor(() => expect(result.current.people.rows).toHaveLength(1));
+    expect(result.current.people.rows[0].location).toBe("Westlands, Nairobi");
   });
 });
 

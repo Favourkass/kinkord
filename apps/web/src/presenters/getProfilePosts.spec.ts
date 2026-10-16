@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { toPostVM, type PostPM } from "@/domain/post";
 import { getProfilePosts } from "./getProfilePosts";
 import type { useFeedPresenter } from "./useFeedPresenter";
 
@@ -69,6 +70,61 @@ describe("getProfilePosts", () => {
     expect(props.postOverlays.comments.open).toBe(true);
     // The reply box shows the reader's own avatar, not the post author's.
     expect(props.postOverlays.comments.viewerAvatarUrl).toBe("https://s3/me.jpg");
+  });
+
+  it("makes the header's Follow the one on its own posts, so the two always agree", () => {
+    const post = (id: string, userId: string): PostPM => ({
+      id,
+      postId: id,
+      body: "hi",
+      visibility: "public",
+      createdAt: "2026-09-18T11:00:00.000Z",
+      author: {
+        userId,
+        username: userId,
+        displayName: userId,
+        avatarUrl: null,
+        isFollowing: false,
+      },
+      media: [],
+      likes: 0,
+      comments: 0,
+      reposts: 0,
+      likedByMe: false,
+      repostedByMe: false,
+      savedByMe: false,
+      repostedBy: null,
+      mine: false,
+    });
+    const posts = [toPostVM(post("p1", "org"), false, () => null, new Date(), true)];
+    posts.push(toPostVM(post("p2", "kay"), false, () => null, new Date(), false));
+    const toggleFollow = vi.fn();
+    const onToggle = vi.fn();
+    const props = getProfilePosts(feed({ posts, toggleFollow }), null, {
+      userId: "org",
+      isFollowing: true,
+      busy: true,
+      onToggle,
+    });
+
+    expect(props.posts.posts[0]).toMatchObject({ authorIsFollowing: true, authorFollowBusy: true });
+    expect(props.posts.posts[1]).toMatchObject({
+      authorIsFollowing: false,
+      authorFollowBusy: false,
+    });
+    props.posts.onTogglePostAuthorFollow("org");
+    expect(onToggle).toHaveBeenCalledOnce();
+    expect(toggleFollow).not.toHaveBeenCalled();
+    // Anyone else's Follow still goes to the feed.
+    props.posts.onTogglePostAuthorFollow("kay");
+    expect(toggleFollow).toHaveBeenCalledWith("kay");
+  });
+
+  it("leaves the feed's own Follow in charge when no header shares one", () => {
+    const toggleFollow = vi.fn();
+    const props = getProfilePosts(feed({ toggleFollow }), null);
+    props.posts.onTogglePostAuthorFollow("org");
+    expect(toggleFollow).toHaveBeenCalledWith("org");
   });
 
   it("puts the delete confirm in front of a post the member chose to remove", () => {

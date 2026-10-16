@@ -1,11 +1,12 @@
 import type { MetadataRoute } from "next";
+import { SEO_COPY, SITE_NAME } from "@/constants/seo";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Kinkord — Where Kinksters Connect",
-    short_name: "Kinkord",
-    description:
-      "Where kinksters connect, explore their interests, build meaningful relationships, and find a community where they truly belong.",
+    // The installed app's name, not the search title.
+    name: SITE_NAME,
+    short_name: SITE_NAME,
+    description: SEO_COPY.site.description,
     start_url: "/",
     id: "/",
     display: "standalone",
@@ -36,6 +37,21 @@ export default function manifest(): MetadataRoute.Manifest {
         src: "/icons/icon.svg",
         sizes: "512x512",
         type: "image/svg+xml",
+      },
+      // The status-bar icon of the installed app. Android draws it from the
+      // transparency alone, and an installed app ignores a notification's own
+      // badge for this, so without these it shows a blank square.
+      {
+        src: "/icons/badge-96x96.png",
+        sizes: "96x96",
+        type: "image/png",
+        purpose: "monochrome",
+      },
+      {
+        src: "/icons/badge-192x192.png",
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "monochrome",
       },
     ],
   };

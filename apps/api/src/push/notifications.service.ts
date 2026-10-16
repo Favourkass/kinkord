@@ -21,6 +21,7 @@ import { notBanned } from "../moderation/admins";
 import { RealtimeService } from "../realtime/realtime.service";
 import { blockedBy } from "../safety/blocks";
 import { StorageService } from "../storage/storage.service";
+import { silverCheck } from "../subscriptions/plans";
 
 /** Something that happened, as the code that saw it describes it. */
 export interface InboxEvent {
@@ -36,7 +37,15 @@ export interface InboxEvent {
 export interface InboxItem {
   id: string;
   type: NotificationType;
-  actor: { name: string; username: string | null; avatarUrl: string | null } | null;
+  actor: {
+    /** Who it is, for the app's own marks (the official organization's, say). */
+    userId: string;
+    name: string;
+    username: string | null;
+    avatarUrl: string | null;
+    /** Shows the Silver check beside their name. */
+    silver: boolean;
+  } | null;
   url: string;
   /** Messages in a chat since its row was last read; 1 otherwise. */
   count: number;
@@ -57,6 +66,7 @@ interface InboxRow {
   actorName: string | null;
   actorDisplayName: string | null;
   actorAvatarKey: string | null;
+  actorSilver: boolean | null;
 }
 
 export interface InboxQuery {
@@ -87,6 +97,8 @@ const REPEATS: Partial<
   repost: { key: (e) => `repost:${e.actorId}:${e.subjectId}`, on: "skip" },
   message: { key: (e) => `message:${e.subjectId}`, on: "bump" },
   test: { key: () => "test", on: "bump" },
+  // One row for a member's verification: each update moves it back to the top.
+  verification_update: { key: () => "verification_update", on: "bump" },
 };
 
 /** Words a search can use to find a kind of notification, besides names. */
@@ -98,7 +110,14 @@ const SEARCH_WORDS: Record<NotificationType, readonly string[]> = {
   like: ["like", "liked", "likes"],
   repost: ["repost", "reposted", "reposts"],
   report: ["report", "reports", "moderation"],
+  verification: ["verification", "verify", "moderation"],
+  verification_update: ["verification", "verify", "identity"],
+  verification_underage: ["verification", "moderation", "age"],
   test: ["notifications", "enabled"],
+  payment: ["payment", "payments", "verify"],
+  payment_verified: ["payment", "silver", "premium", "subscription"],
+  payment_rejected: ["payment", "silver", "premium", "subscription"],
+  silver_check: ["silver", "check", "review"],
 };
 
 const cursorSchema = z.object({ at: z.string().datetime(), id: z.string().uuid() });
@@ -116,6 +135,18 @@ export function notificationUrl(
       return actorUsername ? `/u/${encodeURIComponent(actorUsername)}` : "/notifications";
     case "report":
       return "/moderation/reports";
+    case "payment":
+    case "silver_check":
+      return "/moderation/payments";
+    case "payment_verified":
+    case "payment_rejected":
+      return "/subscription";
+    case "verification":
+      return "/moderation/verification";
+    case "verification_update":
+      return "/settings/verification";
+    case "verification_underage":
+      return subjectId ? `/moderation/members/${subjectId}` : "/moderation/members";
     case "test":
       return "/settings";
     default:
@@ -339,6 +370,7 @@ export class NotificationsService {
         actorName: user.name,
         actorDisplayName: profile.displayName,
         actorAvatarKey: profile.avatarKey,
+        actorSilver: silverCheck(notification.actorId),
       })
       .from(notification)
       .leftJoin(user, eq(user.id, notification.actorId))
@@ -409,11 +441,13 @@ export class NotificationsService {
       type: row.type,
       actor: row.actorId
         ? {
+            userId: row.actorId,
             name: row.actorDisplayName ?? row.actorUsername ?? row.actorName ?? "Someone",
             username: row.actorUsername ?? null,
             avatarUrl: row.actorAvatarKey
               ? await this.storage.presignDownload(row.actorAvatarKey, "sm")
               : null,
+            silver: Boolean(row.actorSilver),
           }
         : null,
       url: notificationUrl(row.type, row.subjectId, row.actorUsername ?? null),

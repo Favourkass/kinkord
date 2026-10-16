@@ -33,6 +33,25 @@ export const photoUploadSchema = z.object({
   contentLength: z.number().int().positive().optional(),
 });
 
+export const typingSchema = z.object({ typing: z.boolean() });
+
+/** The inbox's tabs. */
+export const INBOX_FILTERS = ["all", "unread", "online"] as const;
+export type InboxFilter = (typeof INBOX_FILTERS)[number];
+
+/** The inbox search (a name, a username, or words from a message) and tab. */
+export const inboxQuerySchema = z.object({
+  q: z.string().trim().max(100).optional(),
+  filter: z.enum(INBOX_FILTERS).optional(),
+});
+
+/** How many chats each inbox tab holds. */
+export interface InboxCountsDto {
+  all: number;
+  unread: number;
+  online: number;
+}
+
 export const markReadSchema = z.object({
   messageId: z.string().uuid(),
 });
@@ -73,7 +92,10 @@ export interface ChatPeerDto {
   username: string | null;
   displayName: string;
   avatarUrl: string | null;
+  /** Shows the Silver check beside their name. */
+  silver: boolean;
   online: boolean;
+  presence: "online" | "away" | "offline";
   /** The viewer blocked them: the thread stays, read-only until they unblock. */
   blockedByMe: boolean;
 }

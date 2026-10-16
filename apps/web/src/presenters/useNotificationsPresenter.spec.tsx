@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { useNotificationsPresenter } from "./useNotificationsPresenter";
+import { Routes } from "@/constants/Routes";
 import type { NotificationPM } from "@/domain/notification";
 const { counts, list, read, readAll, push, replace, remove } = vi.hoisted(() => ({
   counts: vi.fn(),
@@ -49,7 +50,10 @@ const page = (over: Record<string, unknown> = {}) => ({
   q: undefined,
   ...over,
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllEnvs();
+});
 beforeEach(() => {
   counts.mockReset().mockResolvedValue({ all: 9, comment: 2, mention: 3 });
   list.mockReset().mockResolvedValue({ items: [item], nextCursor: null });
@@ -72,6 +76,20 @@ describe("useNotificationsPresenter", () => {
     rerender({ ready: true });
     await waitFor(() => expect(result.current.items).toHaveLength(1));
   });
+  it("marks a notification from the official organization, by its configured id", async () => {
+    vi.stubEnv("NEXT_PUBLIC_KINKORD_OFFICIAL_USER_ID", "org");
+    list.mockResolvedValue({
+      items: [
+        { ...item, id: "n2", type: "follow", actor: { ...item.actor!, userId: "org" } },
+        item,
+      ],
+      nextCursor: null,
+    });
+    const { result } = renderHook(() => useNotificationsPresenter(true));
+    await waitFor(() => expect(result.current.items).toHaveLength(2));
+    const marked = Object.fromEntries(result.current.items.map((n) => [n.id, n.actorOrganization]));
+    expect(marked).toEqual({ n1: false, n2: true });
+  });
   it("marks a clicked notification read before navigating", async () => {
     let resolve!: (value: NotificationPM) => void;
     read.mockImplementationOnce(
@@ -91,6 +109,37 @@ describe("useNotificationsPresenter", () => {
     await act(async () => resolve({ ...item, readAt: item.createdAt }));
     expect(push).toHaveBeenCalledWith("/messages/c1");
     expect(result.current.items[0].unread).toBe(false);
+  });
+  it("opens verification updates on the member's settings and underage flags on the member", async () => {
+    const update: NotificationPM = {
+      ...item,
+      id: "n2",
+      type: "verification_update",
+      actor: null,
+      url: "/settings/verification",
+    };
+    const underage: NotificationPM = {
+      ...item,
+      id: "n3",
+      type: "verification_underage",
+      actor: null,
+      url: "/moderation/members/u2",
+    };
+    list.mockResolvedValue({ items: [update, underage], nextCursor: null });
+    read.mockImplementation(async (id: string) => ({
+      ...(id === "n2" ? update : underage),
+      readAt: item.createdAt,
+    }));
+    const { result } = renderHook(() => useNotificationsPresenter(true));
+    await waitFor(() => expect(result.current.items).toHaveLength(2));
+    expect(result.current.items.map((row) => row.body).sort()).toEqual([
+      "A member's ID shows they may be under 18.",
+      "Your identity verification has an update.",
+    ]);
+    await act(async () => result.current.openNotification("n2"));
+    expect(push).toHaveBeenLastCalledWith(Routes.settingsVerification);
+    await act(async () => result.current.openNotification("n3"));
+    expect(push).toHaveBeenLastCalledWith(Routes.moderationMember("u2"));
   });
   it("retains unread state and does not navigate when marking fails", async () => {
     read.mockRejectedValueOnce(new Error("offline"));

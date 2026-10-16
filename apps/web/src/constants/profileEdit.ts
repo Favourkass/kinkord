@@ -15,6 +15,7 @@ export const ROW_ICONS: Record<EditRowKey, string> = {
   displayName: "/app/profile/edit/row-display-name.svg",
   bio: "/app/profile/edit/row-bio.svg",
   gender: "/app/profile/edit/row-gender.svg",
+  orientation: "/app/profile/edit/row-gender.svg",
   dateOfBirth: "/app/profile/edit/row-dob.svg",
   nationality: "/app/profile/edit/row-nationality.svg",
   relationshipStatus: "/app/profile/edit/row-relationship.svg",
@@ -29,6 +30,7 @@ export const ROW_ICONS: Record<EditRowKey, string> = {
   languages: "/app/profile/edit/row-languages.svg",
   socialLinks: "/app/profile/edit/row-social-links.svg",
   profileVisibility: "/app/profile/edit/row-visibility.svg",
+  verifiedBadge: "/app/profile/icon-verified.svg",
 };
 
 export const PROFILE_EDIT_COPY = {
@@ -107,6 +109,10 @@ export const PROFILE_EDIT_COPY = {
     },
     bio: { title: "Bio", help: "Up to 500 characters." },
     gender: { title: "Gender", help: null },
+    orientation: {
+      title: "Sexuality",
+      help: 'Only you can see this. Choose "Prefer not to say" to clear it.',
+    },
     dateOfBirth: { title: "Date of Birth", help: "You must be 18 or older." },
     nationality: { title: "Nationality", help: null },
     relationshipStatus: { title: "Relationship Status", help: null },
@@ -121,7 +127,15 @@ export const PROFILE_EDIT_COPY = {
     languages: { title: "Language Spoken", help: "Pick up to 10." },
     socialLinks: { title: "Social Media Links", help: "Public links shown on your profile." },
     profileVisibility: { title: "Profile Visibility", help: null },
+    verifiedBadge: {
+      title: "Verified Badge",
+      help: "Members who can see your profile see only the badge, not your ID or selfie.",
+    },
   } satisfies Record<EditRowKey, { title: string; help: string | null }>,
+  verifiedBadge: {
+    show: { label: "Shown", help: "Members see that your identity is verified." },
+    hide: { label: "Hidden", help: "Only you see your badge." },
+  },
   visibility: {
     public: { label: "Public", help: "Every member can see your full profile." },
     friends: {
@@ -141,6 +155,8 @@ export const PROFILE_EDIT_COPY = {
     displayName: "Your display name",
   },
   empty: "Not set",
+  /** The choice that clears an optional pick, like sexuality. */
+  preferNotToSay: "Prefer not to say",
   notLinked: "Not linked",
   save: "Save",
   cancel: "Cancel",
@@ -191,11 +207,14 @@ export const SECURITY_COPY = {
   },
   phone: {
     heading: "Phone verification",
+    inputLabel: "Phone number (optional)",
+    placeholder: "0803 123 4567",
+    save: "Save phone number",
     verified: "VERIFIED",
     unverified: "NOT VERIFIED",
     description: "Verifying your number earns the Basic verified badge.",
     verifiedNote: "Your number is verified. Changing it means verifying again.",
-    missing: "Add a phone number in Edit Profile, then come back to verify it.",
+    missing: "Phone is optional. Add your number here if you want to verify it.",
     send: "Text me a code",
     resend: "Send a new code",
     codeLabel: "Enter the 6-digit code",

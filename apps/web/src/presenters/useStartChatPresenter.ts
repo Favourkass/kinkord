@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { CHAT_COPY } from "@/constants/chat";
 import { Routes } from "@/constants/Routes";
+import { isCrossCountryPremium } from "@/domain/chat";
+import { ApiError } from "@/services/apiClient";
 import { chatService } from "@/services/chat.service";
 
 /**
@@ -12,6 +15,7 @@ import { chatService } from "@/services/chat.service";
 export function useStartChatPresenter(userId: string) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [needsSilver, setNeedsSilver] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -20,7 +24,9 @@ export function useStartChatPresenter(userId: string) {
         if (live) router.replace(Routes.messageThread(conversationId));
       },
       (e: unknown) => {
-        if (live) setError(e instanceof Error ? e.message : "Couldn't open the conversation.");
+        if (!live) return;
+        if (e instanceof ApiError && isCrossCountryPremium(e.body)) setNeedsSilver(true);
+        else setError(e instanceof Error ? e.message : "Couldn't open the conversation.");
       },
     );
     return () => {
@@ -28,5 +34,12 @@ export function useStartChatPresenter(userId: string) {
     };
   }, [userId, router]);
 
-  return { error, backHref: Routes.messages };
+  return {
+    error,
+    /** Writing first to someone in another country is part of Silver: offer it. */
+    premium: needsSilver
+      ? { text: CHAT_COPY.crossCountry, linkLabel: CHAT_COPY.getSilver, href: Routes.subscription }
+      : null,
+    backHref: Routes.messages,
+  };
 }

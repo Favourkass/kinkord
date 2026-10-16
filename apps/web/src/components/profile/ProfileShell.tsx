@@ -13,6 +13,8 @@ export interface ProfileShellProps {
   sideCard: ReactNode;
   /** Desktop right column. */
   aside: ReactNode;
+  /** False drops the right column altogether, so the middle one takes its 300px. */
+  showAside?: boolean;
   viewerAvatarUrl: string | null;
   notificationsUnread?: boolean;
   notificationsCount?: number;
@@ -38,6 +40,7 @@ export default function ProfileShell({
   hero,
   sideCard,
   aside,
+  showAside = true,
   viewerAvatarUrl,
   notificationsCount,
   messagesCount,
@@ -61,7 +64,9 @@ export default function ProfileShell({
           <div className="lg:hidden">{hero}</div>
           {children}
         </div>
-        <div className="hidden w-[300px] shrink-0 flex-col gap-[24px] lg:flex">{aside}</div>
+        {showAside ? (
+          <div className="hidden w-[300px] shrink-0 flex-col gap-[24px] lg:flex">{aside}</div>
+        ) : null}
       </main>
 
       <div className="lg:hidden">

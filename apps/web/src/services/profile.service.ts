@@ -1,5 +1,6 @@
 import { ALL_COUNTRY_CODES } from "@/constants/countries";
-import { LAUNCH_COUNTRIES } from "@/constants/onboarding";
+import { DEFAULT_SIGNUP_COUNTRY, LAUNCH_COUNTRIES } from "@/constants/onboarding";
+import { PROFILE_EDIT_COPY } from "@/constants/profileEdit";
 import type {
   DraftIssue,
   EditorDraft,
@@ -18,7 +19,7 @@ import type {
 import { IMAGE_VARIANTS, buildUploadSet, type ImageVariant } from "@/util/image";
 import { capitalize, countryName, displayState, shortDate } from "@/util/format";
 import { api, uploadToPresignedUrl } from "./apiClient";
-import { regionsForState, statesForCountry } from "./members.service";
+import { regionsForState, statesForCountry } from "./location.service";
 
 /** Presigned PUT slots returned by POST /profile/upload-url — one per stored size. */
 export interface UploadSlots {
@@ -32,9 +33,11 @@ export type ImageKind = "avatar" | "cover";
 
 /** PATCH /profile body — only the fields Edit Profile writes. */
 export interface ProfilePatch {
+  phone?: string | null;
   displayName?: string;
   bio?: string | null;
   gender?: string | null;
+  orientation?: string | null;
   dateOfBirth?: string;
   nationality?: string | null;
   relationshipStatus?: string | null;
@@ -50,6 +53,7 @@ export interface ProfilePatch {
   languages?: string[];
   socialLinks?: SocialLinks;
   profileVisibility?: ProfileVisibility;
+  showVerifiedBadge?: boolean;
   avatarKey?: string;
   coverKey?: string;
 }
@@ -91,13 +95,14 @@ export const SECTION_ROWS: Record<EditSectionKey, EditRowKey[]> = {
     "displayName",
     "bio",
     "gender",
+    "orientation",
     "dateOfBirth",
     "nationality",
     "relationshipStatus",
   ],
   kinks: ["roles", "kinks", "lookingFor", "limits"],
   location: ["country", "state", "city", "occupation", "languages"],
-  privacy: ["socialLinks", "profileVisibility"],
+  privacy: ["socialLinks", "profileVisibility", "verifiedBadge"],
 };
 
 /** Same rule as the API / Better Auth username plugin. */
@@ -129,8 +134,8 @@ export function locationLine(
   state: string | null,
   country: string | null,
 ): string | null {
-  const parts = [city, displayState(state), countryName(country)].filter((p): p is string =>
-    Boolean(p),
+  const parts = [city, displayState(state, country), countryName(country)].filter(
+    (p): p is string => Boolean(p),
   );
   return parts.length ? parts.join(", ") : null;
 }
@@ -139,7 +144,18 @@ export interface EditRowsContext {
   profile: OwnProfilePM;
   me: MePM;
   options: ProfileOptionsPM;
+  /** The towns in the member's state, once loaded (loadCityOptions). */
+  cityOptions?: readonly string[];
   now?: Date;
+}
+
+const profileCountry = (profile: OwnProfilePM) => profile.country ?? DEFAULT_SIGNUP_COUNTRY;
+
+/** The City editor's towns: the member's state's list, fetched the first time. */
+export function loadCityOptions(profile: OwnProfilePM): Promise<string[]> {
+  return profile.state
+    ? regionsForState(profileCountry(profile), profile.state)
+    : Promise.resolve([]);
 }
 
 /** Display value + editor for one row. */
@@ -168,7 +184,7 @@ export function buildEditRow(key: EditRowKey, ctx: EditRowsContext): EditRowPM {
   });
   const multi = (value: string[], opts: readonly string[], max: number, searchable = false) =>
     ({ kind: "multi", value, options: plain(opts), max, searchable }) satisfies EditorSpec;
-  const country = profile.country ?? LAUNCH_COUNTRIES[0].code;
+  const country = profileCountry(profile);
 
   switch (key) {
     case "username": {
@@ -196,6 +212,16 @@ export function buildEditRow(key: EditRowKey, ctx: EditRowsContext): EditRowPM {
         key,
         value: capitalize(profile.gender) || null,
         editor: single(capitalize(profile.gender) || null, plain(options.genders)),
+      };
+    case "orientation":
+      // Private: this row is only ever built for the member's own profile.
+      return {
+        key,
+        value: profile.orientation,
+        editor: single(profile.orientation, [
+          { value: "", label: PROFILE_EDIT_COPY.preferNotToSay },
+          ...plain(options.orientations),
+        ]),
       };
     case "dateOfBirth":
       return {
@@ -251,18 +277,21 @@ export function buildEditRow(key: EditRowKey, ctx: EditRowsContext): EditRowPM {
     case "state":
       return {
         key,
-        value: displayState(profile.state) || null,
+        value: displayState(profile.state, profile.country) || null,
         editor: single(profile.state, plain(statesForCountry(country)), true),
       };
     case "city":
       return {
         key,
         value: profile.city,
-        editor: single(
-          profile.city,
-          profile.state ? plain(regionsForState(country, profile.state)) : [],
-          true,
-        ),
+        // Members can name a town the list lacks.
+        editor: {
+          kind: "single",
+          value: profile.city,
+          options: profile.state ? plain(ctx.cityOptions ?? []) : [],
+          searchable: true,
+          custom: true,
+        },
       };
     case "occupation":
       return { key, value: profile.occupation, editor: text(profile.occupation, 0, 80) };
@@ -290,11 +319,17 @@ export function buildEditRow(key: EditRowKey, ctx: EditRowsContext): EditRowPM {
         value: profile.profileVisibility,
         editor: single(profile.profileVisibility, plain(options.visibilities)),
       };
+    case "verifiedBadge": {
+      const value = profile.showVerifiedBadge ? "show" : "hide";
+      return { key, value, editor: single(value, plain(["show", "hide"])) };
+    }
   }
 }
 
 export function buildEditRows(section: EditSectionKey, ctx: EditRowsContext): EditRowPM[] {
-  return SECTION_ROWS[section].map((key) => buildEditRow(key, ctx));
+  return SECTION_ROWS[section]
+    .filter((key) => key !== "verifiedBadge" || ctx.profile.identityVerified)
+    .map((key) => buildEditRow(key, ctx));
 }
 
 export function initialDraft(editor: EditorSpec): EditorDraft {
@@ -365,6 +400,8 @@ export function patchFor(key: EditRowKey, draft: EditorDraft, profile: OwnProfil
       return { occupation: t || null };
     case "gender":
       return { gender: t || null };
+    case "orientation":
+      return { orientation: t || null };
     case "dateOfBirth":
       return { dateOfBirth: t };
     case "nationality":
@@ -398,6 +435,8 @@ export function patchFor(key: EditRowKey, draft: EditorDraft, profile: OwnProfil
     }
     case "profileVisibility":
       return { profileVisibility: (t || "public") as ProfileVisibility };
+    case "verifiedBadge":
+      return { showVerifiedBadge: t !== "hide" };
   }
 }
 

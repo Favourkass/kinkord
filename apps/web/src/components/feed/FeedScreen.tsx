@@ -1,16 +1,24 @@
-import type { PostMediaVM, PostVM } from "@/domain/post";
+import Link from "next/link";
+import type { FeedEmptyVM, PostMediaVM, PostVM } from "@/domain/post";
 import CommentsPanel, { type CommentsPanelProps } from "./CommentsPanel";
 import ComposerBar, { type ComposerBarProps } from "./ComposerBar";
 import ComposerDialog, { type ComposerDialogProps } from "./ComposerDialog";
 import ConfirmDialog, { type ConfirmDialogProps } from "./ConfirmDialog";
 import FeedShell, { type FeedShellProps } from "./FeedShell";
+import FeedTabs, { feedTabId, type FeedTabsProps } from "./FeedTabs";
 import MediaLightbox, { type MediaLightboxProps } from "./MediaLightbox";
-import PeopleYouMayKnow, { type PeopleYouMayKnowProps } from "./PeopleYouMayKnow";
+import KinkstersNearYou, { type KinkstersNearYouProps } from "./KinkstersNearYou";
 import PostCard, { type PostCardProps } from "./PostCard";
+import GiftDialog, { type GiftDialogProps } from "./GiftDialog";
 import Toast, { type ToastProps } from "./Toast";
+
+/** The list of posts the tabs control. */
+const PANEL_ID = "feed-panel";
 
 export interface FeedScreenProps {
   shell: Omit<FeedShellProps, "aside" | "children">;
+  /** For You | Following | Nearby at the top of the feed. */
+  tabs: Omit<FeedTabsProps, "panelId">;
   loading: boolean;
   error: string | null;
   posts: PostVM[];
@@ -26,20 +34,24 @@ export interface FeedScreenProps {
   onComment: (postId: string) => void;
   onSave: (postId: string) => void;
   onShare: (postId: string) => void;
+  onGift: (postId: string, currency?: "coin" | "star" | "crown") => void;
   onOpenMedia: (media: PostMediaVM) => void;
+  onTogglePostAuthorFollow: (userId: string) => void;
   hasMore: boolean;
   loadingMore: boolean;
   onLoadMore: () => void;
   composerBar: ComposerBarProps;
   composerDialog: ComposerDialogProps;
   commentsPanel: CommentsPanelProps;
-  people: PeopleYouMayKnowProps;
+  /** "Kinksters Near You"; null on a tab that doesn't carry it. */
+  people: KinkstersNearYouProps | null;
+  /** What the feed says when the tab has no posts. */
+  empty: FeedEmptyVM;
   lightbox: MediaLightboxProps;
   confirm: ConfirmDialogProps;
   toast: ToastProps;
+  giftDialog: GiftDialogProps;
   copy: {
-    emptyTitle: string;
-    emptyBody: string;
     loading: string;
     loadMore: string;
     asideHeading: string;
@@ -48,13 +60,16 @@ export interface FeedScreenProps {
 }
 
 /**
- * The home feed (Figma "Hompage Light" 344:138 / dark 837:295).
+ * The home feed (Figma "Hompage Light" 344:138 / dark 837:295), under its
+ * For You | Following | Nearby tabs.
  *
  * On a phone the suggestions strip sits between the first and second post, as
  * drawn. On desktop it moves to the right rail and the same cards stack there,
  * so nothing in the design is lost and nothing is invented for the wide layout.
+ * A tab without the strip (Following) shows it in neither place.
  */
 export default function FeedScreen(p: FeedScreenProps) {
+  const selected = p.tabs.tabs.find((t) => t.selected);
   const card = (post: PostVM) => (
     <PostCard
       key={post.id}
@@ -70,7 +85,9 @@ export default function FeedScreen(p: FeedScreenProps) {
       onComment={() => p.onComment(post.postId)}
       onSave={() => p.onSave(post.postId)}
       onShare={() => p.onShare(post.postId)}
+      onGift={(currency) => p.onGift(post.postId, currency)}
       onOpenMedia={p.onOpenMedia}
+      onToggleAuthorFollow={p.onTogglePostAuthorFollow}
     />
   );
 
@@ -80,7 +97,7 @@ export default function FeedScreen(p: FeedScreenProps) {
         {...p.shell}
         aside={
           <>
-            <PeopleYouMayKnow {...p.people} layout="column" />
+            {p.people && <KinkstersNearYou {...p.people} layout="column" />}
             <section className="rounded-[16px] border border-feed-line bg-feed-card p-[16px]">
               <p className="text-[14px] font-bold tracking-[1.4px] text-kink-gold-bright">
                 {p.copy.asideHeading}
@@ -90,46 +107,65 @@ export default function FeedScreen(p: FeedScreenProps) {
           </>
         }
       >
+        <FeedTabs {...p.tabs} panelId={PANEL_ID} />
         <ComposerBar {...p.composerBar} />
 
-        {p.error && (
-          <p className="px-[25px] py-[40px] text-center text-[15px] font-semibold text-feed-muted">
-            {p.error}
-          </p>
-        )}
+        <div
+          id={PANEL_ID}
+          role="tabpanel"
+          aria-labelledby={selected ? feedTabId(selected.value) : undefined}
+        >
+          {p.error && (
+            <p className="px-[25px] py-[40px] text-center text-[15px] font-semibold text-feed-muted">
+              {p.error}
+            </p>
+          )}
 
-        {p.loading && !p.error && (
-          <p className="px-[25px] py-[40px] text-center text-[14px] text-feed-muted">
-            {p.copy.loading}
-          </p>
-        )}
+          {p.loading && !p.error && (
+            <p className="px-[25px] py-[40px] text-center text-[14px] text-feed-muted">
+              {p.copy.loading}
+            </p>
+          )}
 
-        {!p.loading && !p.error && p.posts.length === 0 && (
-          <div className="px-[25px] py-[48px] text-center">
-            <p className="text-[16px] font-bold text-feed-text">{p.copy.emptyTitle}</p>
-            <p className="pt-[6px] text-[14px] text-feed-muted">{p.copy.emptyBody}</p>
-          </div>
-        )}
+          {!p.loading && !p.error && p.posts.length === 0 && (
+            <div className="px-[25px] py-[48px] text-center">
+              <p className="text-[16px] font-bold text-feed-text">{p.empty.title}</p>
+              {p.empty.body && (
+                <p className="pt-[6px] text-[14px] text-feed-muted">{p.empty.body}</p>
+              )}
+              {p.empty.action && (
+                <Link
+                  href={p.empty.action.href}
+                  className="mt-[16px] inline-flex h-[36px] items-center rounded-full bg-kink-gold-bright px-[18px] text-[14px] font-semibold text-kink-ink"
+                >
+                  {p.empty.action.label}
+                </Link>
+              )}
+            </div>
+          )}
 
-        {p.posts.slice(0, 1).map(card)}
-        {/* The design puts the suggestions between the first and second post. */}
-        <div className="lg:hidden">
-          <PeopleYouMayKnow {...p.people} />
+          {p.posts.slice(0, 1).map(card)}
+          {/* The design puts the suggestions between the first and second post. */}
+          {p.people && (
+            <div className="lg:hidden">
+              <KinkstersNearYou {...p.people} />
+            </div>
+          )}
+          {p.posts.slice(1).map(card)}
+
+          {p.hasMore && (
+            <div className="px-[25px] py-[20px] text-center">
+              <button
+                type="button"
+                onClick={p.onLoadMore}
+                disabled={p.loadingMore}
+                className="rounded-[8px] border border-feed-line px-[20px] py-[8px] text-[14px] font-medium text-feed-text disabled:opacity-50"
+              >
+                {p.loadingMore ? p.copy.loading : p.copy.loadMore}
+              </button>
+            </div>
+          )}
         </div>
-        {p.posts.slice(1).map(card)}
-
-        {p.hasMore && (
-          <div className="px-[25px] py-[20px] text-center">
-            <button
-              type="button"
-              onClick={p.onLoadMore}
-              disabled={p.loadingMore}
-              className="rounded-[8px] border border-feed-line px-[20px] py-[8px] text-[14px] font-medium text-feed-text disabled:opacity-50"
-            >
-              {p.loadingMore ? p.copy.loading : p.copy.loadMore}
-            </button>
-          </div>
-        )}
       </FeedShell>
 
       <ComposerDialog {...p.composerDialog} />
@@ -137,6 +173,7 @@ export default function FeedScreen(p: FeedScreenProps) {
       <MediaLightbox {...p.lightbox} />
       <ConfirmDialog {...p.confirm} />
       <Toast {...p.toast} />
+      <GiftDialog {...p.giftDialog} />
     </>
   );
 }

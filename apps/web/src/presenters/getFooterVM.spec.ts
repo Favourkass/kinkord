@@ -27,7 +27,7 @@ describe("getFooterVM", () => {
   });
 
   it("combines company name and address into one line", () => {
-    expect(vm.addressLine).toContain("Temaxiro Limited");
+    expect(vm.addressLine).toContain("Kinkord Limited");
     expect(vm.addressLine).toContain("Sapele");
   });
 

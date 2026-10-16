@@ -18,9 +18,7 @@ import {
   isCountryAvailable,
   membersApi,
   nextSort,
-  regionsForState,
   searchCountries,
-  statesForCountry,
   toggleFollowOnCard,
   toggleFollowOnFriend,
   toggleFollowOnProfile,
@@ -30,6 +28,13 @@ beforeEach(() => {
   apiGet.mockReset().mockResolvedValue({});
   apiPost.mockReset().mockResolvedValue({});
   apiDel.mockReset().mockResolvedValue({});
+});
+
+describe("membersApi.search", () => {
+  it("searches everyone by name or @username, page by page", async () => {
+    await membersApi.search("@ada o", 2, 20);
+    expect(apiGet).toHaveBeenCalledWith("/members/search?q=%40ada+o&page=2&limit=20");
+  });
 });
 
 describe("membersApi", () => {
@@ -92,6 +97,13 @@ describe("searchCountries", () => {
         membersCount: 12_400,
         available: true,
       },
+      {
+        code: "KE",
+        name: "Kenya",
+        flag: "/app/members/flag-ke.svg",
+        membersCount: expect.anything(),
+        available: true,
+      },
     ]);
   });
 
@@ -118,15 +130,8 @@ describe("searchCountries", () => {
   });
 });
 
-describe("states + regions", () => {
-  it("knows Nigeria's configured states and regions, and nothing for other countries", () => {
-    expect(statesForCountry("ng")).toContain("Delta");
-    expect(statesForCountry("ng").length).toBe(37);
-    expect(statesForCountry("gh")).toEqual([]);
-    expect(regionsForState("NG", "Delta")[0]).toBe("Abraka");
-    expect(regionsForState("NG", "Delta")).toContain("My region is not listed");
-    expect(regionsForState("NG", "Nowhere")).toEqual([]);
-    expect(regionsForState("GH", "Delta")).toEqual([]);
+describe("directory countries", () => {
+  it("serves launched countries only", () => {
     expect(isCountryAvailable("ng")).toBe(true);
     expect(isCountryAvailable("GH")).toBe(false);
   });

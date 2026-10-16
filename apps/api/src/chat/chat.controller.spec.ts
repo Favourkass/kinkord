@@ -15,6 +15,9 @@ function make() {
     startDm: vi.fn(async () => "c1"),
     history: vi.fn(async () => []),
     sendMessage: vi.fn(async () => ({ id: "m1" })),
+    setTyping: vi.fn(async () => undefined),
+    listConversations: vi.fn(async () => []),
+    inboxCounts: vi.fn(async () => ({ all: 3, unread: 1, online: 2 })),
     markRead: vi.fn(async () => undefined),
     allowance: vi.fn(async () => ({ newChatsPerDay: 1, usedToday: 0, resetsAt: "x" })),
     presignPhotoUpload: vi.fn(async () => ({ key: "chat/c1/u1/a.jpg" })),
@@ -118,4 +121,33 @@ it("returns the signed-in member's unread message count", async () => {
   const { controller, chat } = make();
   await expect(controller.unreadCount(req)).resolves.toEqual({ count: 4 });
   expect(chat.unreadCount).toHaveBeenCalledWith("u1");
+});
+
+it("validates typing state and uses the authenticated identity", async () => {
+  const { controller, chat } = make();
+  await controller.typing(req, "c1", { typing: true });
+  expect(chat.setTyping).toHaveBeenCalledWith("u1", "c1", true);
+  await expect(controller.typing(req, "c1", { typing: "yes" })).rejects.toBeInstanceOf(
+    BadRequestException,
+  );
+});
+
+it("searches the inbox with a trimmed query and a tab, and refuses bad ones", async () => {
+  const { controller, chat } = make();
+  await controller.list(req, { q: "  ada ", filter: "unread" });
+  expect(chat.listConversations).toHaveBeenLastCalledWith("u1", "ada", "unread");
+  await controller.list(req, {});
+  expect(chat.listConversations).toHaveBeenLastCalledWith("u1", undefined, undefined);
+  expect(() => controller.list(req, { q: "x".repeat(101) })).toThrow(BadRequestException);
+  expect(() => controller.list(req, { filter: "groups" })).toThrow(BadRequestException);
+});
+
+it("counts each tab for the search in force", async () => {
+  const { controller, chat } = make();
+  await expect(controller.counts(req, { q: " ada " })).resolves.toEqual({
+    all: 3,
+    unread: 1,
+    online: 2,
+  });
+  expect(chat.inboxCounts).toHaveBeenCalledWith("u1", "ada");
 });

@@ -39,6 +39,7 @@ export class ProfilesController {
 
   /** Option lists for Edit Profile pickers — the API owns them, the web only renders them. */
   @Get("options")
+  @AllowDuringSignUp()
   @Header("Cache-Control", "private, max-age=3600")
   options() {
     return PROFILE_OPTIONS;

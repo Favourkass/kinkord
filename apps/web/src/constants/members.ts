@@ -40,6 +40,10 @@ export const MEMBERS_COPY = {
     allStates: "All states",
     searchByState: "Search by State",
     sheetTitleStates: "Choose a state",
+    searchRegions: "Search regions / cities / towns",
+    searchStates: "Search states",
+    loadingRegions: "Loading regions…",
+    noRegionMatch: "No matching regions",
     closeSheet: "Close",
     found: "Members Found",
     sort: "Sort",
@@ -53,12 +57,15 @@ export const MEMBERS_COPY = {
     loadingMore: "Loading more members…",
     end: "You’ve met everyone here — for now.",
     empty: (place: string) => `No members in ${place} yet. Be the first.`,
+    searchPlaceholder: "Search by name or @username",
+    searchLabel: "Search members",
+    noMatch: (query: string, place: string) => `No one in ${place} matches “${query}”.`,
     openProfile: (name: string) => `Open ${name}’s profile`,
     unknownState: "We don’t know that state yet.",
   },
   profile: {
     brand: "KINKORD",
-    actions: { search: "Search members", more: "More options", share: "Share profile" },
+    actions: { search: "Search", more: "More options", share: "Share profile" },
     tabs: { posts: "Posts", about: "About", media: "Media", people: "People" },
     follow: "Follow",
     following: "Following",
@@ -70,9 +77,12 @@ export const MEMBERS_COPY = {
     online: "Online",
     lastSeen: (ago: string) => `Last seen ${ago}`,
     stats: { friends: "Friends", followers: "Followers", following: "Following" },
+    organization: "Official",
+    verifiedOrganization: "Official Kinkord account",
     /** About tab cards (Figma 1256:800 + Profile Sections Design). */
     about: {
       aboutMe: "About Me",
+      aboutUs: "About Us",
       personal: "Personal Information",
       age: "Age",
       dateOfBirth: "Date of Birth",
@@ -92,7 +102,14 @@ export const MEMBERS_COPY = {
       noSocial: "No links added yet.",
       platforms: { facebook: "Facebook", x: "X (Twitter)" },
       verification: "Verification Status",
-      verified: { basic: "Basic Verified", none: "Not verified yet" },
+      verified: {
+        identity: "Identity verified",
+        basic: "Basic Verified",
+        none: "Not verified yet",
+      },
+      identityDetail: "ID and selfie checked by Kinkord",
+      /** Beside your own badge when you've hidden it from everyone else. */
+      identityHidden: "Hidden from others",
       verifiedDetail: (email: boolean, phone: boolean) =>
         email && phone
           ? "Email & Phone Verified"
@@ -158,9 +175,17 @@ export const MEMBERS_COPY = {
     },
     notFound: "We couldn’t find that member.",
     yourself: "This is you",
+    /** What the Silver check says when tapped, X-style. */
+    silver: {
+      title: "Silver Premium",
+      body: "This member has the badge because they're subscribed to Silver Premium.",
+      since: (when: string) => `Silver since ${when}`,
+      get: "Get Silver",
+      manage: "Your Silver",
+    },
     /** Desktop-only chrome (Figma desktop-profile-* frames). */
     desktop: {
-      searchPlaceholder: "Search friends, kinks, groups...",
+      searchPlaceholder: "Search people and posts",
       account: "My Account",
       tagsHeading: "Profile Bio & Tags",
       friendsList: "Friends List",
@@ -172,12 +197,15 @@ export const MEMBERS_COPY = {
   },
   nav: {
     home: "Home",
+    search: "Search",
     members: "Members",
     chat: "Chat",
     notifications: "Notifications",
     profile: "Profile",
     settings: "Settings and Privacy",
     saved: "Saved",
+    kinkcoins: "KinkCoins & Payment",
+    subscription: "Silver Premium",
     logout: "Log Out",
   },
   notifications: {
@@ -191,6 +219,7 @@ export const MEMBERS_COPY = {
 /** Countries the directory serves today; every other country is "Coming Soon". */
 export const AVAILABLE_COUNTRIES = [
   { code: "NG", name: "Nigeria", flag: "/app/members/flag-ng.svg" },
+  { code: "KE", name: "Kenya", flag: "/app/members/flag-ke.svg" },
 ] as const;
 
 /** Page size for the infinite-scrolling members list. */

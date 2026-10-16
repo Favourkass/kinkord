@@ -2,7 +2,27 @@ import { index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "dri
 import { user } from "./auth";
 
 export type NotificationType =
-  "message" | "follow" | "comment" | "mention" | "like" | "repost" | "report" | "test";
+  | "message"
+  | "follow"
+  | "comment"
+  | "mention"
+  | "like"
+  | "repost"
+  | "report"
+  | "test"
+  // A member's payment proof, for the admins to check.
+  | "payment"
+  // The member's own payment: confirmed, or not.
+  | "payment_verified"
+  | "payment_rejected"
+  // A Silver member changed their name or photo, for the admins to look at.
+  | "silver_check"
+  // An identity verification Didit couldn't settle, for the admins to review.
+  | "verification"
+  // The member's own identity verification moved on: finished, decided, revoked or reopened.
+  | "verification_update"
+  // A member's ID says they may be under 18, for the admins to look at.
+  | "verification_underage";
 
 /**
  * Member inbox, independent of whether any device has enabled browser push.

@@ -6,21 +6,27 @@ describe("getAppShellNav", () => {
     const nav = getAppShellNav();
     expect(nav.links).toEqual({
       home: "/home",
+      search: "/search",
       members: "/members",
       chat: "/messages",
       notifications: "/notifications",
       profile: "/profile",
       settings: "/settings",
       saved: "/saved",
+      kinkcoins: "/kinkcoins",
+      subscription: "/subscription",
     });
     expect(nav.labels).toEqual({
       home: "Home",
+      search: "Search",
       members: "Members",
       chat: "Chat",
       notifications: "Notifications",
       profile: "Profile",
       settings: "Settings and Privacy",
       saved: "Saved",
+      kinkcoins: "KinkCoins & Payment",
+      subscription: "Silver Premium",
       logout: "Log Out",
     });
   });

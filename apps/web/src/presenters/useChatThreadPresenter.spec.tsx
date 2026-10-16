@@ -43,6 +43,7 @@ const svc = {
   conversation: vi.fn(),
   history: vi.fn(),
   send: vi.fn(),
+  setTyping: vi.fn(async () => ({ ok: true })),
   markRead: vi.fn(),
   allowance: vi.fn(),
   uploadPhoto: vi.fn(),
@@ -111,7 +112,10 @@ describe("useChatThreadPresenter", () => {
     URL.createObjectURL = vi.fn(() => "blob:local-photo");
     URL.revokeObjectURL = vi.fn();
   });
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllEnvs();
+  });
 
   it("loads the thread and tells the viewer's bubbles apart", async () => {
     const { result } = await ready();
@@ -123,6 +127,13 @@ describe("useChatThreadPresenter", () => {
       ["m2", true],
     ]);
     expect(result.current.thread.hasMore).toBe(false);
+    expect(result.current.thread.peer?.organization).toBe(false);
+  });
+
+  it("marks the official organization in the header, by its configured id", async () => {
+    vi.stubEnv("NEXT_PUBLIC_KINKORD_OFFICIAL_USER_ID", "u2");
+    const { result } = await ready();
+    expect(result.current.thread.peer?.organization).toBe(true);
   });
 
   it("polls for what's newer than the last message and marks it read", async () => {
@@ -262,6 +273,43 @@ describe("useChatThreadPresenter", () => {
       await waitFor(() => expect(result.current.thread.newChat?.blocking).toBe(true));
       expect(result.current.thread.messages).toEqual([]);
       expect(result.current.thread.sendError).toBeNull();
+    });
+  });
+
+  describe("chats across countries", () => {
+    const abroad = () =>
+      new ApiError(403, {
+        code: "CROSS_COUNTRY_PREMIUM",
+        message: "Messaging members in another country is part of Silver Premium.",
+      });
+
+    it("offers Silver in place of the composer when writing first is refused, not a retry", async () => {
+      svc.history.mockResolvedValue([]);
+      svc.send.mockRejectedValueOnce(abroad());
+      const { result } = await ready();
+      act(() => result.current.send("hi"));
+      await waitFor(() =>
+        expect(result.current.thread.newChat).toEqual({
+          text: CHAT_COPY.crossCountry,
+          blocking: true,
+          link: { label: "Get Silver Premium", href: "/subscription" },
+        }),
+      );
+      expect(result.current.thread.messages).toEqual([]);
+      expect(result.current.thread.sendError).toBeNull();
+    });
+
+    it("gives the composer back once the other member writes: replies are free", async () => {
+      // Only the viewer has written here so far.
+      svc.history.mockResolvedValue([msg("m1", "u1", 1)]);
+      svc.send.mockRejectedValueOnce(abroad());
+      const { result } = await ready();
+      act(() => result.current.send("hello again"));
+      await waitFor(() => expect(result.current.thread.newChat?.link?.href).toBe("/subscription"));
+
+      svc.history.mockResolvedValueOnce([msg("m2", "u2", 2)]);
+      await act(async () => polls.get(THREAD_POLL_MS)?.tick());
+      expect(result.current.thread.newChat).toBeNull();
     });
   });
 
@@ -440,5 +488,54 @@ describe("useChatThreadPresenter", () => {
     await waitFor(() => expect(result.current.safety.blocked).not.toBeNull());
     expect(safety.block).toHaveBeenCalledWith("u2");
     expect(result.current.thread.peer?.blockedByMe).toBe(true);
+  });
+  it("throttles typing heartbeats and clears them after idle", async () => {
+    live.up = true;
+    const { result } = renderHook(() => useChatThreadPresenter("c1"));
+    await waitFor(() => expect(result.current.thread.loading).toBe(false));
+    vi.useFakeTimers();
+    try {
+      svc.setTyping.mockClear();
+      act(() => {
+        result.current.onTyping(true);
+        result.current.onTyping(true);
+      });
+      expect(svc.setTyping).toHaveBeenCalledTimes(1);
+      expect(svc.setTyping).toHaveBeenCalledWith("c1", true);
+      act(() => vi.advanceTimersByTime(5000));
+      expect(svc.setTyping).toHaveBeenLastCalledWith("c1", false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("renders live typing without fetching the header and expires it locally", async () => {
+    live.up = true;
+    const { result } = renderHook(() => useChatThreadPresenter("c1"));
+    await waitFor(() => expect(result.current.thread.loading).toBe(false));
+    svc.conversation.mockClear();
+    vi.useFakeTimers();
+    try {
+      act(() =>
+        live.hear?.({
+          type: "typing",
+          conversationId: "c1",
+          typing: true,
+        }),
+      );
+      expect(result.current.thread.peer?.typing).toBe(true);
+      expect(svc.conversation).not.toHaveBeenCalled();
+      act(() => vi.advanceTimersByTime(8000));
+      expect(result.current.thread.peer?.typing).toBe(false);
+      expect(svc.conversation).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("does not send typing requests without a live connection", async () => {
+    const { result } = renderHook(() => useChatThreadPresenter("c1"));
+    await waitFor(() => expect(result.current.thread.loading).toBe(false));
+    svc.setTyping.mockClear();
+    act(() => result.current.onTyping(true));
+    expect(svc.setTyping).not.toHaveBeenCalled();
   });
 });

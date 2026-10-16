@@ -1,6 +1,8 @@
-import { ForbiddenException } from "@nestjs/common";
+import { ConflictException, ForbiddenException, NotFoundException } from "@nestjs/common";
+import { PgDialect } from "drizzle-orm/pg-core";
+import type { BronzeService } from "../verification/bronze.service";
 import { describe, expect, it, vi } from "vitest";
-import { memberBan, moderationLog, session, signupBlock, user } from "../db/schema";
+import { memberBan, moderationLog, session, signupBlock, staff, user } from "../db/schema";
 import type { PostsService } from "../posts/posts.service";
 import type { StorageService } from "../storage/storage.service";
 import { containsPattern, ModerationService, normalizeRuleValue } from "./moderation.service";
@@ -47,12 +49,14 @@ function make(answers: unknown[]) {
   const posts = {
     removeAsModerator: vi.fn(async (id: string) => ({ deleted: id, authorId: "u9" })),
   };
+  const verification = { forgetMember: vi.fn(async () => undefined) };
   const service = new ModerationService(
     q.db,
     storage as unknown as StorageService,
     posts as unknown as PostsService,
+    verification as unknown as BronzeService,
   );
-  return { ...q, service, storage, posts };
+  return { ...q, service, storage, posts, verification };
 }
 
 const member = {
@@ -60,7 +64,6 @@ const member = {
   email: "C.Tolulope05@gmail.com",
   emailVerified: true,
   username: "downtoearth",
-  phone: "+2349054291043",
 };
 
 describe("ModerationService guard rails", () => {
@@ -83,7 +86,7 @@ describe("ModerationService.block", () => {
       [member], // the target
       [], // no staff row
       [{ ip: "102.89.84.23" }, { ip: null }], // where they signed in from
-      [{ phone: "+2349054291043" }, { phone: "08000000000" }], // phones they verified
+      [{ phone: "+2349054291043", verified: true }], // their profile's phone
       undefined, // ban row
       undefined, // sessions deleted
       undefined, // rules
@@ -105,7 +108,6 @@ describe("ModerationService.block", () => {
     expect(rules.map((r) => `${r.kind}:${r.value}:${r.action}`)).toEqual([
       "email:ctolulope05@gmail.com:block",
       "phone:+2349054291043:block",
-      "phone:+2348000000000:block",
       "ip:102.89.84.23:flag",
     ]);
     expect(rules.every((r) => r.subjectUserId === "u9" && r.reason === "harassment")).toBe(true);
@@ -115,6 +117,25 @@ describe("ModerationService.block", () => {
       action: "block",
       subjectUserId: "u9",
     });
+  });
+
+  it("never bans a phone the member didn't verify: it may be someone else's", async () => {
+    const { service, after } = make([
+      [member],
+      [],
+      [{ ip: "102.89.84.23" }],
+      [{ phone: "+2348035550142", verified: false }], // typed in, never proved
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    ]);
+    await service.block("admin1", "u9", {});
+    const rules = after("insert", signupBlock, "values") as Array<Record<string, string>>;
+    expect(rules.map((r) => `${r.kind}:${r.value}`)).toEqual([
+      "email:ctolulope05@gmail.com",
+      "ip:102.89.84.23",
+    ]);
   });
 
   it("leaves the posts alone unless asked", async () => {
@@ -147,12 +168,12 @@ describe("ModerationService.unblock", () => {
 
 describe("ModerationService.deleteMember", () => {
   it("clears their files, blocks them from returning, then deletes the account", async () => {
-    const target = { ...member, email: "x@y.com", emailVerified: false, phone: null };
-    const { service, storage, indexOf, after } = make([
+    const target = { ...member, email: "x@y.com", emailVerified: false };
+    const { service, storage, indexOf, after, verification } = make([
       [target],
       [],
       [], // no IPs
-      [], // no verified phones
+      [], // no phone on their profile
       undefined, // rules
       [{ key: "posts/u9/a.jpg", posterKey: null }],
       [{ key: "avatars/u9/b.png" }],
@@ -179,12 +200,22 @@ describe("ModerationService.deleteMember", () => {
         "posts/u9/a_sm.jpg",
       ].sort(),
     );
+    // What Didit holds is durably queued while the account still exists to find it by.
+    // A ban also holds their identity, so it can't verify a new account unseen.
+    expect(verification.forgetMember).toHaveBeenCalledWith("u9", { hold: true });
     // The rules are written while the account still exists to read them from.
     expect(indexOf("insert", signupBlock)).toBeLessThan(indexOf("delete", user));
     expect(after("insert", moderationLog, "values")).toMatchObject({
       action: "delete+block",
       detail: "@downtoearth x@y.com",
     });
+  });
+
+  it("keeps the account when durable provider-erasure queuing fails", async () => {
+    const { service, verification, indexOf } = make([[member], []]);
+    verification.forgetMember.mockRejectedValueOnce(new Error("database unavailable"));
+    await expect(service.deleteMember("admin1", "u9", {})).rejects.toThrow("database unavailable");
+    expect(indexOf("delete", user)).toBe(-1);
   });
 });
 
@@ -264,6 +295,134 @@ describe("ModerationService.isAdmin", () => {
     await expect(
       service.isAdmin({ id: "u1", email: "maxihandsome@gmail.com", emailVerified: true }),
     ).resolves.toBe(true);
+  });
+});
+
+/** A row of the admin list query, for someone who isn't a founder. */
+const teammate = {
+  id: "u7",
+  name: "Jane Doe",
+  username: "ladyjane",
+  email: "jane@example.com",
+  emailVerified: true,
+  displayName: "Lady Jane",
+  avatarKey: "avatars/u7/a.png",
+  since: null as Date | null,
+};
+
+describe("ModerationService.team", () => {
+  it("lists the founders first, then the admins they made", async () => {
+    const founder = {
+      ...teammate,
+      id: "u1",
+      name: "Favour",
+      username: "favour",
+      email: "maxihandsome@gmail.com",
+      displayName: null,
+      avatarKey: null,
+    };
+    const since = new Date("2026-10-10T09:00:00Z");
+    const { service } = make([[{ ...teammate, since }, founder]]);
+    await expect(service.team()).resolves.toEqual([
+      {
+        id: "u1",
+        name: "Favour",
+        displayName: null,
+        username: "favour",
+        avatarUrl: null,
+        founder: true,
+        since: null,
+      },
+      {
+        id: "u7",
+        name: "Jane Doe",
+        displayName: "Lady Jane",
+        username: "ladyjane",
+        avatarUrl: "https://media/avatars/u7/a.png?sm",
+        founder: false,
+        since: "2026-10-10T09:00:00.000Z",
+      },
+    ]);
+  });
+});
+
+describe("ModerationService.addAdmin", () => {
+  const since = new Date("2026-10-10T09:00:00Z");
+
+  it("finds the member by username however it was typed, and logs who made them an admin", async () => {
+    const { service, calls, after } = make([[teammate], [], [{ since }], undefined]);
+    const added = await service.addAdmin("u1", " @LadyJane ");
+    const lookup = calls.find((c) => c.op === "where")?.args[0];
+    expect(new PgDialect().sqlToQuery(lookup as never).params).toEqual(["ladyjane"]);
+    expect(after("insert", staff, "values")).toEqual({ userId: "u7" });
+    expect(after("insert", moderationLog, "values")).toMatchObject({
+      actorId: "u1",
+      action: "add-admin",
+      subjectUserId: "u7",
+      detail: "@ladyjane",
+    });
+    expect(added).toMatchObject({ id: "u7", founder: false, since: "2026-10-10T09:00:00.000Z" });
+  });
+
+  it("says when no member has that username", async () => {
+    const { service, indexOf } = make([[]]);
+    await expect(service.addAdmin("u1", "ladyjayne")).rejects.toThrow(
+      new NotFoundException("No member has the username @ladyjayne."),
+    );
+    expect(indexOf("insert", staff)).toBe(-1);
+  });
+
+  it("won't make a blocked member an admin", async () => {
+    const { service, indexOf } = make([[teammate], [{ userId: "u7" }]]);
+    await expect(service.addAdmin("u1", "ladyjane")).rejects.toBeInstanceOf(ConflictException);
+    expect(indexOf("insert", staff)).toBe(-1);
+  });
+
+  it("changes nothing for someone who's already an admin", async () => {
+    const { service, indexOf } = make([[{ ...teammate, since }], []]);
+    await expect(service.addAdmin("u1", "ladyjane")).resolves.toMatchObject({
+      id: "u7",
+      since: "2026-10-10T09:00:00.000Z",
+    });
+    expect(indexOf("insert", staff)).toBe(-1);
+    expect(indexOf("insert", moderationLog)).toBe(-1);
+  });
+
+  it("writes no row for a founder, who is an admin by their email", async () => {
+    const founder = { ...teammate, id: "u1", email: "maxihandsome@gmail.com" };
+    const { service, indexOf } = make([[founder], []]);
+    await expect(service.addAdmin("u2", "ladyjane")).resolves.toMatchObject({
+      founder: true,
+      since: null,
+    });
+    expect(indexOf("insert", staff)).toBe(-1);
+  });
+});
+
+describe("ModerationService.removeAdmin", () => {
+  it("deletes their admin row and logs who removed them", async () => {
+    const { service, indexOf, after } = make([[teammate], [{ userId: "u7" }], undefined]);
+    await expect(service.removeAdmin("u1", "u7")).resolves.toEqual({ removed: "u7" });
+    expect(indexOf("delete", staff)).toBeGreaterThan(-1);
+    expect(after("insert", moderationLog, "values")).toMatchObject({
+      actorId: "u1",
+      action: "remove-admin",
+      subjectUserId: "u7",
+      detail: "@ladyjane",
+    });
+  });
+
+  it("can't remove a founder", async () => {
+    const founder = { ...teammate, email: "nnabuekassidy@gmail.com" };
+    const { service, indexOf } = make([[founder]]);
+    await expect(service.removeAdmin("u1", "u7")).rejects.toBeInstanceOf(ForbiddenException);
+    expect(indexOf("delete", staff)).toBe(-1);
+  });
+
+  it("says when the member isn't an admin, and logs nothing", async () => {
+    const { service, indexOf } = make([[teammate], []]);
+    await expect(service.removeAdmin("u1", "u7")).rejects.toBeInstanceOf(NotFoundException);
+    expect(indexOf("insert", moderationLog)).toBe(-1);
   });
 });
 

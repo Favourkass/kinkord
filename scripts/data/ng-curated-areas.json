@@ -1,9 +1,5 @@
-/** Nigerian LGAs / popular areas per state, provided by the product team.
- *  Every list ends with the catch-all option so nobody is blocked. */
-export const REGION_NOT_LISTED = "My region is not listed";
-
-export const NG_LGAS: Record<string, readonly string[]> = {
-  Abia: [
+{
+  "Abia": [
     "Aba",
     "Alayi",
     "Ariaria",
@@ -23,10 +19,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Umuahia",
     "Umunneochi",
     "Ututu",
-    "Uzuakoli",
-    "My region is not listed",
+    "Uzuakoli"
   ],
-  Adamawa: [
+  "Adamawa": [
     "Demsa",
     "Fufore",
     "Ganye",
@@ -46,8 +41,7 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Shelleng",
     "Song",
     "Toungo",
-    "Yola",
-    "My region is not listed",
+    "Yola"
   ],
   "Akwa Ibom": [
     "Abak",
@@ -69,10 +63,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Oron",
     "Oruk Anam",
     "Ukaana",
-    "Uyo",
-    "My region is not listed",
+    "Uyo"
   ],
-  Anambra: [
+  "Anambra": [
     "Abagana",
     "Adazi",
     "Aguata",
@@ -92,10 +85,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Ozubulu",
     "Oyi",
     "Umunze",
-    "Umuchu",
-    "My region is not listed",
+    "Umuchu"
   ],
-  Bauchi: [
+  "Bauchi": [
     "Alkaleri",
     "Azare",
     "Bauchi",
@@ -115,10 +107,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Tafawa Balewa",
     "Toro",
     "Warji",
-    "Zaki",
-    "My region is not listed",
+    "Zaki"
   ],
-  Bayelsa: [
+  "Bayelsa": [
     "Agge",
     "Amassama",
     "Brass",
@@ -138,10 +129,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Sagbama Town",
     "Sampou",
     "Twon-Brass",
-    "Yenagoa",
-    "My region is not listed",
+    "Yenagoa"
   ],
-  Benue: [
+  "Benue": [
     "Adikpo",
     "Adoka",
     "Aliade",
@@ -161,10 +151,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Ugbokolo",
     "Vandeikya",
     "Wannune",
-    "Zaki-Biam",
-    "My region is not listed",
+    "Zaki-Biam"
   ],
-  Borno: [
+  "Borno": [
     "Askira",
     "Bama",
     "Banki",
@@ -183,8 +172,7 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Magumeri",
     "Marte",
     "Monguno",
-    "Ngala",
-    "My region is not listed",
+    "Ngala"
   ],
   "Cross River": [
     "Abi",
@@ -206,10 +194,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Okpoma",
     "Sankwala",
     "Ugep",
-    "Yakurr",
-    "My region is not listed",
+    "Yakurr"
   ],
-  Delta: [
+  "Delta": [
     "Abraka",
     "Agbarho",
     "Agbor",
@@ -229,10 +216,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Ughelli",
     "Uvwie",
     "Warri",
-    "Isoko",
-    "My region is not listed",
+    "Isoko"
   ],
-  Ebonyi: [
+  "Ebonyi": [
     "Abakaliki",
     "Afikpo",
     "Akaeze",
@@ -252,10 +238,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Ohaukwu",
     "Okposhi",
     "Onueke",
-    "Uburu",
-    "My region is not listed",
+    "Uburu"
   ],
-  Edo: [
+  "Edo": [
     "Abudu",
     "Afuze",
     "Agenebode",
@@ -275,10 +260,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Siluko",
     "Ubiaja",
     "Udo",
-    "Uromi",
-    "My region is not listed",
+    "Uromi"
   ],
-  Ekiti: [
+  "Ekiti": [
     "Ado-Ekiti",
     "Aramoko",
     "Ayede",
@@ -298,10 +282,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Omuo",
     "Otun",
     "Oye",
-    "Ila-Orangun",
-    "My region is not listed",
+    "Ila-Orangun"
   ],
-  Enugu: [
+  "Enugu": [
     "9th Mile",
     "Abakpa",
     "Achi",
@@ -321,10 +304,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Oji River",
     "Ozalla",
     "Udi",
-    "Nike",
-    "My region is not listed",
+    "Nike"
   ],
-  Gombe: [
+  "Gombe": [
     "Akko",
     "Bajoga",
     "Balanga",
@@ -344,10 +326,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Pindiga",
     "Talasse",
     "Ture",
-    "Yamaltu",
-    "My region is not listed",
+    "Yamaltu"
   ],
-  Imo: [
+  "Imo": [
     "Egbema",
     "Ehime Mbano",
     "Ezinihitte",
@@ -367,10 +348,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Orlu",
     "Oru",
     "Owerri",
-    "Umuaka",
-    "My region is not listed",
+    "Umuaka"
   ],
-  Jigawa: [
+  "Jigawa": [
     "Auyo",
     "Babura",
     "Birnin Kudu",
@@ -390,10 +370,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Sule Tankarkar",
     "Taura",
     "Wudil",
-    "Yankwashi",
-    "My region is not listed",
+    "Yankwashi"
   ],
-  Kaduna: [
+  "Kaduna": [
     "Birnin Gwari",
     "Giwa",
     "Ikara",
@@ -411,10 +390,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Saminaka",
     "Soba",
     "Zangon Kataf",
-    "Zaria",
-    "My region is not listed",
+    "Zaria"
   ],
-  Kano: [
+  "Kano": [
     "Bichi",
     "Dambatta",
     "Dawakin Tofa",
@@ -434,10 +412,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Takai",
     "Tofa",
     "Ungogo",
-    "Wudil",
-    "My region is not listed",
+    "Wudil"
   ],
-  Katsina: [
+  "Katsina": [
     "Bakori",
     "Batsari",
     "Charanchi",
@@ -457,10 +434,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Musawa",
     "Rimi",
     "Safana",
-    "Zango",
-    "My region is not listed",
+    "Zango"
   ],
-  Kebbi: [
+  "Kebbi": [
     "Aleiro",
     "Argungu",
     "Augie",
@@ -480,10 +456,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Suru",
     "Wasagu",
     "Yauri",
-    "Zuru",
-    "My region is not listed",
+    "Zuru"
   ],
-  Kogi: [
+  "Kogi": [
     "Adavi",
     "Ajaokuta",
     "Anyigba",
@@ -503,10 +478,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Ofu",
     "Okene",
     "Olamaboro",
-    "Yagba",
-    "My region is not listed",
+    "Yagba"
   ],
-  Kwara: [
+  "Kwara": [
     "Ajase-Ipo",
     "Arandun",
     "Bacita",
@@ -526,10 +500,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Owu-Isin",
     "Patigi",
     "Share",
-    "Shonga",
-    "My region is not listed",
+    "Shonga"
   ],
-  Lagos: [
+  "Lagos": [
     "Agege",
     "Ajah",
     "Alaba",
@@ -579,10 +552,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Magodo",
     "Mile 2",
     "Obalende",
-    "Oniru",
-    "My region is not listed",
+    "Oniru"
   ],
-  Nasarawa: [
+  "Nasarawa": [
     "Akwanga",
     "Assakio",
     "Awe",
@@ -602,10 +574,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Shabu",
     "Toto",
     "Uke",
-    "Wamba",
-    "My region is not listed",
+    "Wamba"
   ],
-  Niger: [
+  "Niger": [
     "Agaie",
     "Bida",
     "Edati",
@@ -625,10 +596,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Rijau",
     "Shiroro",
     "Suleja",
-    "Wushishi",
-    "My region is not listed",
+    "Wushishi"
   ],
-  Ogun: [
+  "Ogun": [
     "Abeokuta",
     "Abeokuta North",
     "Abeokuta South",
@@ -648,10 +618,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Ota",
     "Owode",
     "Remo",
-    "Sagamu",
-    "My region is not listed",
+    "Sagamu"
   ],
-  Ondo: [
+  "Ondo": [
     "Ajagba",
     "Akoko",
     "Akure",
@@ -671,10 +640,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Ondo",
     "Ore",
     "Owo",
-    "Supare",
-    "My region is not listed",
+    "Supare"
   ],
-  Osun: [
+  "Osun": [
     "Ede",
     "Ejigbo",
     "Esa-Oke",
@@ -693,10 +661,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Modakeke",
     "Ode-Omu",
     "Okuku",
-    "Osogbo",
-    "My region is not listed",
+    "Osogbo"
   ],
-  Oyo: [
+  "Oyo": [
     "Egbeda",
     "Eruwa",
     "Fiditi",
@@ -716,10 +683,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Oluyole",
     "Oyo",
     "Saki",
-    "Shaki",
-    "My region is not listed",
+    "Shaki"
   ],
-  Plateau: [
+  "Plateau": [
     "Barkin Ladi",
     "Bassa",
     "Bokkos",
@@ -738,10 +704,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Shendam",
     "Vom",
     "Wase",
-    "Wukari",
-    "My region is not listed",
+    "Wukari"
   ],
-  Rivers: [
+  "Rivers": [
     "Abonnema",
     "Abua",
     "Ahoada",
@@ -761,10 +726,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Opobo",
     "Port Harcourt",
     "Tai",
-    "Oyigbo",
-    "My region is not listed",
+    "Oyigbo"
   ],
-  Sokoto: [
+  "Sokoto": [
     "Binji",
     "Bodinga",
     "Dange",
@@ -784,10 +748,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Tureta",
     "Wamakko",
     "Wurno",
-    "Yabo",
-    "My region is not listed",
+    "Yabo"
   ],
-  Taraba: [
+  "Taraba": [
     "Ardo-Kola",
     "Baissa",
     "Bali",
@@ -807,10 +770,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Takum",
     "Wukari",
     "Yorro",
-    "Zing",
-    "My region is not listed",
+    "Zing"
   ],
-  Yobe: [
+  "Yobe": [
     "Bade",
     "Bursari",
     "Damaturu",
@@ -829,10 +791,9 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Potiskum",
     "Tarmuwa",
     "Yunusari",
-    "Yusufari",
-    "My region is not listed",
+    "Yusufari"
   ],
-  Zamfara: [
+  "Zamfara": [
     "Anka",
     "Bakura",
     "Birnin Magaji",
@@ -852,8 +813,7 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Shinkafi",
     "Talata Mafara",
     "Tsafe",
-    "Zurmi",
-    "My region is not listed",
+    "Zurmi"
   ],
   "FCT Abuja": [
     "Abuja",
@@ -875,7 +835,6 @@ export const NG_LGAS: Record<string, readonly string[]> = {
     "Mpape",
     "Nyanya",
     "Wuse",
-    "Gwagwalada",
-    "My region is not listed",
-  ],
-};
+    "Gwagwalada"
+  ]
+}
