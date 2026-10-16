@@ -253,7 +253,14 @@ export function mergeMessages(
  * The super admins have no limit.
  */
 export type ChatAllowancePM =
-  { newChatsPerDay: null } | { newChatsPerDay: number; usedToday: number; resetsAt: string };
+  | { newChatsPerDay: null }
+  | {
+      newChatsPerDay: number;
+      usedToday: number;
+      resetsAt: string;
+      /** On Silver, so there's no bigger allowance to offer. Absent from an older API. */
+      silver?: boolean;
+    };
 
 /** The API's code for a first message refused because today's new chat is used. */
 export const NEW_CHAT_LIMIT = "NEW_CHAT_LIMIT";

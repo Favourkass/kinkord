@@ -7,7 +7,7 @@ import { SILVER_NEW_CHATS_PER_DAY } from "../subscriptions/plans";
  * already have messages don't count. This is the free allowance; Silver
  * raises it to SILVER_NEW_CHATS_PER_DAY.
  */
-export const FREE_NEW_CHATS_PER_DAY = 1;
+export const FREE_NEW_CHATS_PER_DAY = 3;
 
 /** The error code the web app reads to explain the limit. */
 export const NEW_CHAT_LIMIT = "NEW_CHAT_LIMIT";

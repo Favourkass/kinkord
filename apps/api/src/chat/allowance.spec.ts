@@ -27,7 +27,7 @@ describe("newChatsPerDay", () => {
     expect(newChatsPerDay({ email: "ada@example.com", emailVerified: true })).toBe(
       FREE_NEW_CHATS_PER_DAY,
     );
-    expect(FREE_NEW_CHATS_PER_DAY).toBe(1);
+    expect(FREE_NEW_CHATS_PER_DAY).toBe(3);
   });
 
   it("raises the allowance for Silver", () => {
@@ -47,6 +47,8 @@ describe("newChatsPerDay", () => {
   });
 
   it("limits an admin address nobody has verified", () => {
-    expect(newChatsPerDay({ email: "maxihandsome@gmail.com", emailVerified: false })).toBe(1);
+    expect(newChatsPerDay({ email: "maxihandsome@gmail.com", emailVerified: false })).toBe(
+      FREE_NEW_CHATS_PER_DAY,
+    );
   });
 });

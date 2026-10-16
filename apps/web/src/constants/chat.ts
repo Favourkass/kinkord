@@ -37,9 +37,14 @@ export const CHAT_COPY = {
   send: "Send",
   opening: "Opening conversation…",
   loadError: "Couldn't load this. Check your connection and try again.",
-  newChatHint: "You can start one new chat a day. Sending a message here uses today's.",
-  newChatLimit:
-    "You've already started a new chat today. You can message someone new after midnight. Replies in your existing chats aren't limited.",
+  newChatHint: (perDay: number) =>
+    `You can start ${perDay} new chats a day. Sending a message here uses one of today's.`,
+  /** At the free allowance: the way to more is Silver. */
+  newChatLimit: (perDay: number | null) =>
+    `You've used today's ${perDay === null ? "" : `${perDay} `}new chats on Kinkord Basic. Upgrade to Silver Premium to message more people today, or start a new chat after midnight. Replies in your existing chats aren't limited.`,
+  /** At Silver's allowance: nothing bigger to offer, just the reset. */
+  newChatLimitSilver: (perDay: number | null) =>
+    `You've used today's ${perDay === null ? "" : `${perDay} `}new chats. You can message someone new after midnight. Replies in your existing chats aren't limited.`,
   /** A free member writing first to someone in another country. */
   crossCountry:
     "Messaging members in another country is part of Silver Premium. You can always reply if they message you first.",
