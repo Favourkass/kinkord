@@ -12,7 +12,8 @@ export type AppNav =
   | "settings"
   | "saved"
   | "edit-profile"
-  | "kinkcoins";
+  | "kinkcoins"
+  | "none";
 
 export interface AppNavLinks {
   home: string;
@@ -39,4 +40,51 @@ export interface AppNavLabels {
   kinkcoins?: string;
   subscription: string;
   logout: string;
+}
+
+export type DrawerIcon =
+  | "members"
+  | "saved"
+  | "kinkopedia"
+  | "verification"
+  | "coins"
+  | "subscription"
+  | "marketplace"
+  | "account"
+  | "data"
+  | "privacy"
+  | "security"
+  | "content"
+  | "safety"
+  | "support"
+  | "about";
+
+export interface DrawerNavItem {
+  key: string;
+  label: string;
+  href: string;
+  icon: DrawerIcon;
+  count?: "members";
+  /** Marked as the current page when the shell's active nav matches. */
+  nav?: AppNav;
+  /** Not built yet: the link opens a "coming soon" screen. */
+  soon?: boolean;
+  /** Listed only while identity verification is open to the member. */
+  verification?: boolean;
+}
+
+export interface DrawerNavGroup {
+  label: string;
+  items: DrawerNavItem[];
+}
+
+/** The phone drawer's account menu, display-ready from the presenter. */
+export interface DrawerNavigation {
+  menuLabel: string;
+  primary: DrawerNavItem[];
+  settingsLabel: string;
+  settingsGroups: DrawerNavGroup[];
+  soonLabel: string;
+  viewProfileLabel: string;
+  verifiedLabel: string;
 }

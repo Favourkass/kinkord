@@ -40,6 +40,12 @@ export const Routes = {
   /** Password + 2FA moved here from /profile (CEO, 2026-09-12: "we still need to keep the change password and co"). */
   settingsSecurity: "/settings/security",
   settingsVerification: "/settings/verification",
+  // Account-menu entries still being built: each opens a "coming soon" screen.
+  kinkopediaInApp: "/coming-soon/kinkopedia",
+  marketplace: "/coming-soon/marketplace",
+  settingsData: "/coming-soon/your-data",
+  settingsContent: "/coming-soon/content-experience",
+  settingsCommunitySafety: "/coming-soon/community-safety",
   // Edit Profile hub (Figma 1542:30) and its five sections.
   profileEdit: "/profile/edit",
   profileEditPhotos: "/profile/edit/photos",

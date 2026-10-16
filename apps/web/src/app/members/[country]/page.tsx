@@ -33,6 +33,8 @@ export default function MembersCountryPage() {
       onLogout={shell.logout}
       links={nav.links}
       labels={nav.labels}
+      drawerNavigation={nav.drawer}
+      verificationEntry={shell.verificationEntry}
       mobileTone="members"
       desktopGreeting={false}
     >

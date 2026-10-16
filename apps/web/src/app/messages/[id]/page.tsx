@@ -51,6 +51,8 @@ export default function ThreadPage({ params }: { params: Promise<{ id: string }>
       onLogout={shell.logout}
       links={nav.links}
       labels={nav.labels}
+      drawerNavigation={nav.drawer}
+      verificationEntry={shell.verificationEntry}
     >
       <ThreadScreen
         peer={thread.peer}

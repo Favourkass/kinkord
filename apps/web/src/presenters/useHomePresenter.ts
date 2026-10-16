@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { showsVerificationEntry } from "@/domain/bronzeVerification";
 import { authClient } from "@/services/authClient";
+import { bronzeVerificationApi } from "@/services/bronzeVerification.service";
 import { api, ApiError } from "@/services/apiClient";
 import { pushService } from "@/services/push.service";
 import { Routes } from "@/constants/Routes";
@@ -76,6 +78,19 @@ export function useHomePresenter() {
     };
   }, [router]);
 
+  // The drawer lists Verification only while it's open to the member, as Settings
+  // does. It's asked the first time the drawer opens, so other pages don't pay for it.
+  const [verificationEntry, setVerificationEntry] = useState(false);
+  const askedVerification = useRef(false);
+  useEffect(() => {
+    if (!drawerOpen || askedVerification.current) return;
+    askedVerification.current = true;
+    bronzeVerificationApi.status().then(
+      (status) => setVerificationEntry(showsVerificationEntry(status)),
+      () => undefined,
+    );
+  }, [drawerOpen]);
+
   const openDrawer = useCallback(() => setDrawerOpen(true), []);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
 
@@ -91,6 +106,7 @@ export function useHomePresenter() {
     loading,
     error,
     drawerOpen,
+    verificationEntry,
     openDrawer,
     closeDrawer,
     logout,
