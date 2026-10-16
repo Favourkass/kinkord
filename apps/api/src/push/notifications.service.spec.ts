@@ -109,18 +109,40 @@ describe("NotificationsService.record", () => {
     expect(t.realtime.notify).not.toHaveBeenCalled();
   });
 
-  it("tells nobody twice when a like, repost or follow is undone and done again", async () => {
-    const t = make([[], []]); // not blocked; the insert hits the existing row
-    await expect(
-      t.service.record("kemi", { type: "like", actorId: "ada", subjectId: "p1" }),
-    ).resolves.toBeNull();
-    expect(t.arg("insert", "values")).toMatchObject({ dedupeKey: "like:ada:p1" });
-    expect(t.has("insert", "onConflictDoNothing")).toBe(true);
-    expect(t.realtime.notify).not.toHaveBeenCalled();
+  it.each(["like", "repost"] as const)(
+    "tells nobody twice when a %s is undone and done again",
+    async (type) => {
+      const t = make([[], []]); // not blocked; the insert hits the existing row
+      await expect(
+        t.service.record("kemi", { type, actorId: "ada", subjectId: "p1" }),
+      ).resolves.toBeNull();
+      expect(t.arg("insert", "values")).toMatchObject({ dedupeKey: `${type}:ada:p1` });
+      expect(t.has("insert", "onConflictDoNothing")).toBe(true);
+      expect(t.realtime.notify).not.toHaveBeenCalled();
+    },
+  );
 
-    const follow = make([[], [{ id: ID }]]);
-    await follow.service.record("kemi", { type: "follow", actorId: "ada" });
-    expect(follow.arg("insert", "values")).toMatchObject({ dedupeKey: "follow:ada" });
+  it("tells a member about a re-follow, but once a day at most", async () => {
+    const secondId = "00000000-0000-4000-8000-000000000002";
+    const day = (at: Date) => Math.floor(at.getTime() / 86_400_000);
+    const morning = new Date("2026-10-16T09:00:00Z");
+    const evening = new Date("2026-10-16T21:00:00Z");
+    const tomorrow = new Date("2026-10-17T09:00:00Z");
+    // Block check, insert, retention sweep; block check, insert that hits the
+    // day's row; block check, the next day's insert.
+    const t = make([[], [{ id: ID }], [], [], [], [], [{ id: secondId }]]);
+    const follow = (at: Date) => t.service.record("kemi", { type: "follow", actorId: "ada", at });
+    await expect(follow(morning)).resolves.toBe(ID);
+    // Unfollowed and followed again the same day: nobody is told twice.
+    await expect(follow(evening)).resolves.toBeNull();
+    await expect(follow(tomorrow)).resolves.toBe(secondId);
+    expect(t.arg("insert", "values", 0)).toMatchObject({ dedupeKey: `follow:ada:${day(morning)}` });
+    expect(t.arg("insert", "values", 1)).toMatchObject({ dedupeKey: `follow:ada:${day(morning)}` });
+    expect(t.arg("insert", "values", 2)).toMatchObject({
+      dedupeKey: `follow:ada:${day(tomorrow)}`,
+    });
+    expect(t.has("insert", "onConflictDoNothing", 1)).toBe(true);
+    expect(t.realtime.notify).toHaveBeenCalledTimes(2);
   });
 
   it("keeps one row per chat: another message moves it back to the top as unread", async () => {
