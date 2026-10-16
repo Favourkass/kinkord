@@ -1,0 +1,82 @@
+@property --signup-light-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.wordmarkImage {
+  mix-blend-mode: screen;
+  filter: drop-shadow(0 0 4px #ffb91e50);
+  animation:
+    brandReveal 1.4s ease-out both,
+    wordmarkLight 5s ease-in-out infinite;
+}
+
+@keyframes wordmarkLight {
+  0%,
+  100% {
+    filter: brightness(1) drop-shadow(0 0 3px #ffb91e40);
+  }
+  50% {
+    filter: brightness(1.2) drop-shadow(0 0 7px #ffcd4570);
+  }
+}
+
+@keyframes brandReveal {
+  0%,
+  25% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.signup {
+  position: relative;
+  box-shadow: 0 0 10px #ffd02a40;
+}
+
+.signup::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 3px;
+  pointer-events: none;
+  background: repeating-conic-gradient(
+    from var(--signup-light-angle),
+    transparent 0deg 62deg,
+    #ffd02a 70deg,
+    #fffbea 76deg,
+    #ffe36b 80deg,
+    transparent 86deg 90deg
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: signupLights 6s linear infinite;
+}
+
+@keyframes signupLights {
+  to {
+    --signup-light-angle: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wordmarkImage,
+  .signup::after {
+    animation: none;
+  }
+}
+
+.emoji {
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-variant-emoji: emoji;
+}

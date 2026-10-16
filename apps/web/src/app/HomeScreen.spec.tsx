@@ -1,16 +1,23 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { communityStatsService } from "@/services/communityStats.service";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import AgeGateModal from "@/components/ui/AgeGateModal";
 import { useLandingPresenter } from "@/presenters/useLandingPresenter";
 import { ageGateService } from "@/services/ageGate.service";
 import { pwaService } from "@/services/pwa.service";
 
 describe("landing age confirmation", () => {
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
   beforeEach(() => {
     ageGateService.reset();
     localStorage.clear();
     vi.restoreAllMocks();
+    vi.spyOn(communityStatsService, "read").mockResolvedValue(null);
+    vi.spyOn(document, "hidden", "get").mockReturnValue(false);
     // Reset shared singleton state between tests.
     pwaService.setDeferredPrompt(null);
     pwaService.closeInstallGuide();

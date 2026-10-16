@@ -6,6 +6,11 @@ import { CommunityService } from "./community.service";
 export class CommunityController {
   constructor(private readonly community: CommunityService) {}
 
+  @Get("public-stats")
+  publicStats() {
+    return this.community.publicStats();
+  }
+
   @Get("stats")
   @UseGuards(AuthGuard)
   stats() {
