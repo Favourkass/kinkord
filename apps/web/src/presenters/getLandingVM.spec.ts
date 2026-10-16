@@ -6,7 +6,7 @@ describe("getLandingVM", () => {
   const vm = getLandingVM();
 
   it("brands the splash with the Kinkord name and tagline", () => {
-    expect(vm.brand).toBe("KINKORD");
+    expect(vm.brand).toBe("Kinkord");
     expect(vm.tagline).toContain("Where kinksters connect");
     expect(vm.copyright).toBe("© 2026 Kinkord Limited. A Temaxiro Company");
   });
@@ -28,7 +28,7 @@ describe("getLandingVM", () => {
   it("serves the redesign assets from public/brand", () => {
     expect(vm.logo.src).toBe("/brand/logo-badge.png");
     expect(vm.hero.src).toBe("/brand/hero-trio.jpg");
-    expect(vm.mobileHero).toMatchObject({ src: "/brand/header.jpeg", width: 720, height: 1080 });
+    expect(vm.mobileHero).toMatchObject({ src: "/brand/topa.jpeg", width: 720, height: 1080 });
     expect(vm.logo.alt).not.toHaveLength(0);
     expect(vm.hero.alt).not.toHaveLength(0);
   });
@@ -49,7 +49,7 @@ describe("getLandingVM", () => {
       "Safety & Reporting",
       "Copyright Policy",
       "Invest in Kinkord",
-      "Chat with us on WhatsApp",
+      "Kinkord on WhatsApp",
     ]);
     expect(vm.allRightsReserved).toBe("All rights reserved.");
   });

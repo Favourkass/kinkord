@@ -1,8 +1,13 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { getLandingVM, LandingVM } from "./getLandingVM";
 import { usePwaPresenter } from "./usePwaPresenter";
+import { communityStatsToVM, type CommunityStatsPM } from "@/domain/communityStats";
+import {
+  communityStatsService,
+  COMMUNITY_STATS_REFRESH_MS,
+} from "@/services/communityStats.service";
 import { ageGateService } from "@/services/ageGate.service";
 
 export type ClientLandingVM = LandingVM & {
@@ -20,6 +25,31 @@ const getAgeGateServerSnapshot = () => false;
 export function useLandingPresenter(): ClientLandingVM {
   const baseVM = useMemo(() => getLandingVM(), []);
   const pwa = usePwaPresenter();
+  const [stats, setStats] = useState<CommunityStatsPM | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let pending = false;
+    const refresh = async () => {
+      if (pending || document.hidden || controller.signal.aborted) return;
+      pending = true;
+      try {
+        const next = await communityStatsService.read(controller.signal);
+        if (!controller.signal.aborted && next) setStats(next);
+      } finally {
+        pending = false;
+      }
+    };
+    void refresh();
+    const interval = setInterval(() => void refresh(), COMMUNITY_STATS_REFRESH_MS);
+    const onVisible = () => void refresh();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      controller.abort();
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
   const [dismissed, setDismissed] = useState(false);
 
   // Client-only age confirmation. useSyncExternalStore keeps this SSR-safe
@@ -39,6 +69,10 @@ export function useLandingPresenter(): ClientLandingVM {
 
   return {
     ...baseVM,
+    membership: {
+      ...baseVM.membership,
+      count: stats ? communityStatsToVM(stats).count : baseVM.membership.count,
+    },
     isInstalled: pwa.isInstalled,
     showAgeGate: !dismissed && !hasConfirmedAge,
     onConfirmAge: () => {
