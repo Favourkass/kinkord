@@ -122,18 +122,26 @@ describe("NotificationsService.record", () => {
     },
   );
 
-  it("records a fresh follow after an unfollow instead of suppressing it behind an old row", async () => {
+  it("tells a member about a re-follow, but once a day at most", async () => {
     const secondId = "00000000-0000-4000-8000-000000000002";
-    // Block check, first insert, retention sweep, block check, second insert.
-    const t = make([[], [{ id: ID }], [], [], [{ id: secondId }]]);
-    const event = { type: "follow" as const, actorId: "ada" };
-    await expect(t.service.record("kemi", event)).resolves.toBe(ID);
-    await expect(t.service.record("kemi", event)).resolves.toBe(secondId);
-    for (const nth of [0, 1]) {
-      expect(t.arg("insert", "values", nth)).toMatchObject({ type: "follow", dedupeKey: null });
-      expect(t.has("insert", "onConflictDoNothing", nth)).toBe(false);
-      expect(t.has("insert", "onConflictDoUpdate", nth)).toBe(false);
-    }
+    const day = (at: Date) => Math.floor(at.getTime() / 86_400_000);
+    const morning = new Date("2026-10-16T09:00:00Z");
+    const evening = new Date("2026-10-16T21:00:00Z");
+    const tomorrow = new Date("2026-10-17T09:00:00Z");
+    // Block check, insert, retention sweep; block check, insert that hits the
+    // day's row; block check, the next day's insert.
+    const t = make([[], [{ id: ID }], [], [], [], [], [{ id: secondId }]]);
+    const follow = (at: Date) => t.service.record("kemi", { type: "follow", actorId: "ada", at });
+    await expect(follow(morning)).resolves.toBe(ID);
+    // Unfollowed and followed again the same day: nobody is told twice.
+    await expect(follow(evening)).resolves.toBeNull();
+    await expect(follow(tomorrow)).resolves.toBe(secondId);
+    expect(t.arg("insert", "values", 0)).toMatchObject({ dedupeKey: `follow:ada:${day(morning)}` });
+    expect(t.arg("insert", "values", 1)).toMatchObject({ dedupeKey: `follow:ada:${day(morning)}` });
+    expect(t.arg("insert", "values", 2)).toMatchObject({
+      dedupeKey: `follow:ada:${day(tomorrow)}`,
+    });
+    expect(t.has("insert", "onConflictDoNothing", 1)).toBe(true);
     expect(t.realtime.notify).toHaveBeenCalledTimes(2);
   });
 
