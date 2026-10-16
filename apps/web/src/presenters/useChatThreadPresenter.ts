@@ -21,6 +21,7 @@ import type { RealtimeEventPM } from "@/domain/realtime";
 import { ApiError } from "@/services/apiClient";
 import { chatService } from "@/services/chat.service";
 import { isOfficialOrganization } from "@/services/organization-placeholder.service";
+import { chatRulesStore } from "@/util/chatRules";
 import { useHomePresenter } from "./useHomePresenter";
 import { useChatSafety } from "./useChatSafety";
 import { usePolling } from "./usePolling";
@@ -40,6 +41,28 @@ const clientIdOf = (): string =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+/**
+ * The line under a thread nobody has written in yet: today's allowance, or at
+ * the limit, how to get more. Silver is offered only to members who aren't on it.
+ */
+export function newChatNoticeVM(
+  notice: "hint" | "blocked",
+  allowance: ChatAllowancePM | null,
+): { text: string; blocking: boolean; link?: { label: string; href: string } } {
+  const perDay = allowance?.newChatsPerDay ?? null;
+  if (notice === "hint") {
+    return { text: CHAT_COPY.newChatHint(perDay ?? 0), blocking: false };
+  }
+  const silver = allowance !== null && "silver" in allowance && allowance.silver === true;
+  return silver
+    ? { text: CHAT_COPY.newChatLimitSilver(perDay), blocking: true }
+    : {
+        text: CHAT_COPY.newChatLimit(perDay),
+        blocking: true,
+        link: { label: CHAT_COPY.getSilver, href: Routes.subscription },
+      };
+}
 
 function messageOf(e: unknown, fallback: string): string {
   return e instanceof Error ? e.message : fallback;
@@ -122,6 +145,15 @@ export function useChatThreadPresenter(conversationId: string) {
   const loaded = loadedFor === conversationId && !error;
   // Nobody has written here yet: a first message would start a new chat.
   const empty = loaded && messages.length === 0 && pending.length === 0;
+
+  // Someone the member hasn't written to yet: remind them of the rule against
+  // asking for (or sending) money, once for this chat.
+  const writtenHere = pending.length > 0 || messages.some((m) => m.senderId === viewerId);
+  useEffect(() => {
+    if (!loaded || viewerId === null || writtenHere) return;
+    chatRulesStore.openNewChat(conversationId);
+    return () => chatRulesStore.closeNewChat(conversationId);
+  }, [conversationId, loaded, viewerId, writtenHere]);
 
   useEffect(() => {
     if (!empty) return;
@@ -379,10 +411,7 @@ export function useChatThreadPresenter(conversationId: string) {
           }
         : notice === null
           ? null
-          : {
-              text: notice === "blocked" ? CHAT_COPY.newChatLimit : CHAT_COPY.newChatHint,
-              blocking: notice === "blocked",
-            },
+          : newChatNoticeVM(notice, allowance?.for === conversationId ? allowance.value : null),
       /** Why photos aren't open yet, once the member has tried to add one. */
       photoNotice:
         photoLockedTapped && !canSendPhotos && peer ? photosLockedText(peer.displayName) : null,

@@ -328,8 +328,7 @@ export class ChatService {
         throw new HttpException(
           {
             code: NEW_CHAT_LIMIT,
-            message:
-              "You've already started a new chat today. You can message someone new after midnight.",
+            message: "You've used today's new chats. You can message someone new after midnight.",
             resetsAt: day.end.toISOString(),
           },
           HttpStatus.TOO_MANY_REQUESTS,
@@ -393,12 +392,13 @@ export class ChatService {
   /** Today's new-chat allowance, so the app can say so before anyone types. */
   async allowance(who: Member): Promise<ChatAllowanceDto> {
     if (newChatsPerDay(who) === null) return { newChatsPerDay: null };
-    const limit = await this.newChatLimit(who);
+    const silver = await hasSilver(this.db, who.id);
     const day = chatDay(new Date());
     return {
-      newChatsPerDay: limit,
+      newChatsPerDay: newChatsPerDay(who, silver) ?? Number.POSITIVE_INFINITY,
       usedToday: await this.chatsStartedSince(this.db, who.id, day.start),
       resetsAt: day.end.toISOString(),
+      silver,
     };
   }
 

@@ -9,10 +9,13 @@ import {
   THREAD_POLL_MS,
   useChatThreadPresenter,
 } from "./useChatThreadPresenter";
+import { chatRulesStore } from "@/util/chatRules";
 
 vi.mock("./useHomePresenter", () => ({ useHomePresenter: () => ({}) }));
 
 // usePolling is driven by hand here, so each test decides when a poll happens.
+/** Kinkord Basic: three new chats a day. */
+const DEFAULT_PER_DAY = 3;
 const polls = new Map<number, { tick: () => Promise<void> | void; enabled: boolean }>();
 vi.mock("./usePolling", () => ({
   usePolling: (tick: () => Promise<void> | void, ms: number, enabled: boolean) =>
@@ -104,9 +107,10 @@ describe("useChatThreadPresenter", () => {
     svc.history.mockResolvedValue([msg("m1", "u2", 1), msg("m2", "u1", 2)]);
     svc.markRead.mockResolvedValue({ ok: true });
     svc.allowance.mockResolvedValue({
-      newChatsPerDay: 1,
+      newChatsPerDay: DEFAULT_PER_DAY,
       usedToday: 0,
       resetsAt: "2026-09-30T23:00:00.000Z",
+      silver: false,
     });
     // jsdom has no object URLs; a picked photo's local preview is stood in for.
     URL.createObjectURL = vi.fn(() => "blob:local-photo");
@@ -212,29 +216,66 @@ describe("useChatThreadPresenter", () => {
     expect(polls.get(THREAD_POLL_MS)?.enabled).toBe(false);
   });
 
+  describe("the reminder for someone new", () => {
+    afterEach(() => chatRulesStore.reset());
+
+    it("flags a chat the viewer hasn't written in", async () => {
+      svc.history.mockResolvedValue([msg("m1", "u2", 1)]);
+      const { unmount } = await ready();
+      await waitFor(() => expect(chatRulesStore.pendingNewChat()).toBe("c1"));
+      unmount();
+      expect(chatRulesStore.pendingNewChat()).toBeNull();
+    });
+
+    it("leaves a chat they've written in alone", async () => {
+      await ready();
+      expect(chatRulesStore.pendingNewChat()).toBeNull();
+    });
+  });
+
   describe("the daily new-chat allowance", () => {
     it("hints that a first message here uses today's new chat", async () => {
       svc.history.mockResolvedValue([]);
       const { result } = await ready();
       await waitFor(() =>
         expect(result.current.thread.newChat).toEqual({
-          text: CHAT_COPY.newChatHint,
+          text: CHAT_COPY.newChatHint(DEFAULT_PER_DAY),
           blocking: false,
         }),
       );
     });
 
-    it("replaces the composer with a notice once today's new chat is used", async () => {
+    it("replaces the composer with the offer of Silver once today's new chats are used", async () => {
       svc.history.mockResolvedValue([]);
       svc.allowance.mockResolvedValue({
-        newChatsPerDay: 1,
-        usedToday: 1,
+        newChatsPerDay: 3,
+        usedToday: 3,
         resetsAt: "2026-09-30T23:00:00.000Z",
+        silver: false,
       });
       const { result } = await ready();
       await waitFor(() =>
         expect(result.current.thread.newChat).toEqual({
-          text: CHAT_COPY.newChatLimit,
+          text: CHAT_COPY.newChatLimit(3),
+          blocking: true,
+          link: { label: CHAT_COPY.getSilver, href: "/subscription" },
+        }),
+      );
+      expect(result.current.thread.newChat?.text).toContain("Upgrade to Silver Premium");
+    });
+
+    it("offers a Silver member nothing more, only when it resets", async () => {
+      svc.history.mockResolvedValue([]);
+      svc.allowance.mockResolvedValue({
+        newChatsPerDay: 10,
+        usedToday: 10,
+        resetsAt: "2026-09-30T23:00:00.000Z",
+        silver: true,
+      });
+      const { result } = await ready();
+      await waitFor(() =>
+        expect(result.current.thread.newChat).toEqual({
+          text: CHAT_COPY.newChatLimitSilver(10),
           blocking: true,
         }),
       );
