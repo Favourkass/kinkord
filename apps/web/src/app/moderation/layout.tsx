@@ -28,6 +28,8 @@ export default function ModerationLayout({ children }: { children: ReactNode }) 
       onLogout={vm.logout}
       links={nav.links}
       labels={nav.labels}
+      drawerNavigation={nav.drawer}
+      verificationEntry={vm.verificationEntry}
     >
       {children}
     </AppShell>

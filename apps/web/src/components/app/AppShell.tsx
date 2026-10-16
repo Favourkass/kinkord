@@ -3,7 +3,7 @@ import AppMobileHeader from "./AppMobileHeader";
 import AvatarCircle from "./AvatarCircle";
 import DesktopSidebar from "./DesktopSidebar";
 import MobileTabBar from "./MobileTabBar";
-import type { AppNav, AppNavLabels, AppNavLinks, AppTab } from "./nav";
+import type { AppNav, AppNavLabels, AppNavLinks, AppTab, DrawerNavigation } from "./nav";
 import SidebarDrawer from "./SidebarDrawer";
 
 export type { AppNav, AppNavLabels, AppNavLinks, AppTab } from "./nav";
@@ -28,6 +28,10 @@ export interface AppShellProps {
   onLogout: () => void;
   links: AppNavLinks;
   labels: AppNavLabels;
+  /** The phone drawer's account menu. */
+  drawerNavigation: DrawerNavigation;
+  /** Whether the drawer lists Verification: only while it's open to the member. */
+  verificationEntry?: boolean;
   /** Page background; the members directory screens use the Figma `mem-page` tone. */
   mobileTone?: "surface" | "members";
   /** Desktop greeting strip (avatar + "Hi …"); the directory screens don't have one in the PC frames. */
@@ -56,6 +60,8 @@ export default function AppShell({
   onLogout,
   links,
   labels,
+  drawerNavigation,
+  verificationEntry,
   mobileTone = "surface",
   desktopGreeting = true,
   mobileHeader,
@@ -93,8 +99,11 @@ export default function AppShell({
           name={name}
           avatarUrl={avatarUrl}
           membersCount={membersCount}
+          verificationEntry={verificationEntry}
+          active={activeNav}
           links={links}
           labels={labels}
+          navigation={drawerNavigation}
           onLogout={onLogout}
         />
       </div>

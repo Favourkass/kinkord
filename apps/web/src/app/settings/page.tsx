@@ -65,6 +65,8 @@ export default function SettingsPage() {
       onLogout={vm.logout}
       links={nav.links}
       labels={nav.labels}
+      drawerNavigation={nav.drawer}
+      verificationEntry={vm.verificationEntry}
     >
       <div className="mx-auto w-full max-w-[440px] px-[29px]">
         <h1 className="text-[24px] font-medium text-app-value">Settings</h1>

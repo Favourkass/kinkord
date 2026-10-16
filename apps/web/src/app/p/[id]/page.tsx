@@ -32,6 +32,8 @@ export default function PostPage() {
         onLogout: home.logout,
         links: nav.links,
         labels: nav.labels,
+        drawerNavigation: nav.drawer,
+        verificationEntry: home.verificationEntry,
       }}
       heading={FEED_COPY.postHeading}
       {...getPostList(feed, home.avatarUrl)}

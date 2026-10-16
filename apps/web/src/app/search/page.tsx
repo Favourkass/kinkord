@@ -40,6 +40,8 @@ function Search() {
         onLogout: home.logout,
         links: nav.links,
         labels: nav.labels,
+        drawerNavigation: nav.drawer,
+        verificationEntry: home.verificationEntry,
       }}
       query={s.query}
       onQuery={s.setQuery}
