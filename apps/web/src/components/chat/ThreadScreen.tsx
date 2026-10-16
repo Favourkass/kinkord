@@ -28,7 +28,8 @@ export interface ThreadScreenProps {
   /**
    * Today's new-chat allowance, while nobody has written yet: a hint above the
    * composer, or, once it's used, a notice in place of it. A notice can carry a
-   * link: to Silver, when writing first to someone abroad was refused.
+   * link: to Silver, when writing first to someone abroad was refused, or a
+   * Basic member has used today's new chats.
    */
   newChat: { text: string; blocking: boolean; link?: { label: string; href: string } } | null;
   onlineLabel: string;

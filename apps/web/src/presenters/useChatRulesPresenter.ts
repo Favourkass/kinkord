@@ -18,13 +18,17 @@ export function useChatRulesPresenter() {
   const [neverShow, setNeverShow] = useState(false);
 
   useEffect(() => {
-    // One-time read of browser storage, which is unavailable during SSR. The
-    // first paint must be server-consistent (no gate), so the check cannot run
-    // during render. This is a single flip on mount, not a cascading update —
-    // `useSyncExternalStore` would be the "correct" primitive but the store has
-    // no other subscribers and would need a listener map just for this.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (!chatRulesStore.isAcknowledged()) setVisible(true);
+    // Browser storage is unavailable during SSR, so the first paint has no gate
+    // and the check runs after mount. It shows on a tab's first visit to
+    // Messages, and again for each chat with someone the member hasn't written
+    // to yet, unless they ticked "Never show this again".
+    const check = () =>
+      setVisible(
+        !chatRulesStore.isOffForever() &&
+          (!chatRulesStore.isAcknowledged() || chatRulesStore.pendingNewChat() !== null),
+      );
+    check();
+    return chatRulesStore.subscribe(check);
   }, []);
 
   const acknowledge = useCallback(() => {

@@ -121,4 +121,11 @@ export interface ConversationThreadDto extends ConversationSummaryDto {
  * The super admins have no limit.
  */
 export type ChatAllowanceDto =
-  { newChatsPerDay: null } | { newChatsPerDay: number; usedToday: number; resetsAt: string };
+  | { newChatsPerDay: null }
+  | {
+      newChatsPerDay: number;
+      usedToday: number;
+      resetsAt: string;
+      /** On Silver, so there's no bigger allowance to offer. */
+      silver: boolean;
+    };

@@ -23,4 +23,24 @@ describe("useChatRulesPresenter", () => {
     expect(result.current.visible).toBe(false);
     expect(chatRulesStore.isAcknowledged()).toBe(true);
   });
+
+  it("reminds again when the member opens a chat with someone new, once", () => {
+    chatRulesStore.acknowledge(false);
+    const { result } = renderHook(() => useChatRulesPresenter());
+    expect(result.current.visible).toBe(false);
+    act(() => chatRulesStore.openNewChat("c1"));
+    expect(result.current.visible).toBe(true);
+    act(() => result.current.acknowledge());
+    expect(result.current.visible).toBe(false);
+    act(() => chatRulesStore.closeNewChat("c1"));
+    act(() => chatRulesStore.openNewChat("c1"));
+    expect(result.current.visible).toBe(false);
+  });
+
+  it("never shows after 'never show again', even for someone new", () => {
+    chatRulesStore.acknowledge(true);
+    const { result } = renderHook(() => useChatRulesPresenter());
+    act(() => chatRulesStore.openNewChat("c1"));
+    expect(result.current.visible).toBe(false);
+  });
 });

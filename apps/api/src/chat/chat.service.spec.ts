@@ -305,7 +305,7 @@ describe("ChatService.sendMessage", () => {
       expect(left()).toBe(0);
     });
 
-    it("refuses a second new chat the same day, saying when it resets", async () => {
+    it("refuses a fourth new chat the same day, saying when it resets", async () => {
       const { service, after } = make([
         [{ userId: "u1" }],
         [{ userId: "u2" }],
@@ -314,7 +314,7 @@ describe("ChatService.sendMessage", () => {
         [], // an empty thread: this would be a new chat
         [], // on Basic
         undefined, // lock
-        [{ n: 1 }], // today's chat is already used
+        [{ n: 3 }], // today's three are already used
       ]);
       const err = await service
         .sendMessage(member("u1"), "c1", { body: "hi" })
@@ -557,9 +557,10 @@ describe("ChatService.allowance", () => {
     vi.setSystemTime(new Date("2026-09-30T10:00:00Z"));
     const { service } = make([[], [{ n: 1 }]]);
     await expect(service.allowance(member("u1"))).resolves.toEqual({
-      newChatsPerDay: 1,
+      newChatsPerDay: 3,
       usedToday: 1,
       resetsAt: "2026-09-30T23:00:00.000Z",
+      silver: false,
     });
   });
 
@@ -568,6 +569,7 @@ describe("ChatService.allowance", () => {
     await expect(service.allowance(member("u1"))).resolves.toMatchObject({
       newChatsPerDay: SILVER_NEW_CHATS_PER_DAY,
       usedToday: 2,
+      silver: true,
     });
   });
 
