@@ -83,18 +83,24 @@ export const RETENTION_DAYS = 90;
 const SWEEP_EVERY_MS = 6 * 60 * 60_000;
 const PAGE_SIZE = 20;
 
+/** The UTC day an event falls on, as a whole number. */
+const dayOf = (e: InboxEvent) => Math.floor((e.at ?? new Date()).getTime() / 86_400_000);
+
 /**
  * How a type repeats. "skip": the same person doing the same thing to the same
- * post again (unlike then like, unfollow then follow) tells nobody twice, until
- * the old row has been read and swept. "bump": another message in a chat, or a
- * new push test, moves the existing row back to the top as unread.
+ * post again (unlike then like) tells nobody twice, until the old row has been
+ * read and swept. A follow is the same within a day: someone who follows again
+ * the next day is news, but unfollowing and following again can't flood a
+ * member with pushes, so it tells them once a day at most. "bump": another
+ * message in a chat, or a new push test, moves the existing row back to the top
+ * as unread.
  */
 const REPEATS: Partial<
   Record<NotificationType, { key: (e: InboxEvent) => string; on: "skip" | "bump" }>
 > = {
   like: { key: (e) => `like:${e.actorId}:${e.subjectId}`, on: "skip" },
   repost: { key: (e) => `repost:${e.actorId}:${e.subjectId}`, on: "skip" },
-  follow: { key: (e) => `follow:${e.actorId}`, on: "skip" },
+  follow: { key: (e) => `follow:${e.actorId}:${dayOf(e)}`, on: "skip" },
   message: { key: (e) => `message:${e.subjectId}`, on: "bump" },
   test: { key: () => "test", on: "bump" },
   // One row for a member's verification: each update moves it back to the top.

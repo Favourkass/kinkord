@@ -27,6 +27,32 @@ function worker(windows: unknown[] = []) {
 }
 
 describe("notification service worker", () => {
+  it.each(["message", "follow", "comment", "mention", "like", "repost", "report", "test"])(
+    "shows a %s push when the PWA is closed and there are no open windows",
+    async (type) => {
+      const w = worker([]);
+      await w.dispatch("push", {
+        data: {
+          json: () => ({
+            title: "Kinkord",
+            body: `New ${type}`,
+            url: "/notifications",
+            notificationId: type,
+          }),
+        },
+      });
+      expect(w.showNotification).toHaveBeenCalledWith(
+        "Kinkord",
+        expect.objectContaining({
+          body: `New ${type}`,
+          silent: false,
+          renotify: true,
+          tag: `notification-${type}`,
+        }),
+      );
+    },
+  );
+
   it("retains the inbox id and refreshes open tabs when a push arrives", async () => {
     const client = {
       visibilityState: "hidden",
