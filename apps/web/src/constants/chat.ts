@@ -38,17 +38,21 @@ export const CHAT_COPY = {
   opening: "Opening conversation…",
   loadError: "Couldn't load this. Check your connection and try again.",
   newChatHint: (perDay: number) =>
-    `You can start ${perDay} new chats a day. Sending a message here uses one of today's.`,
+    `You can start ${perDay} new ${perDay === 1 ? "chat" : "chats"} a day. Sending a message here uses one of today's.`,
   /** At the free allowance: the way to more is Silver. */
   newChatLimit: (perDay: number | null) =>
-    `You've used today's ${perDay === null ? "" : `${perDay} `}new chats on Kinkord Basic. Upgrade to Silver Premium to message more people today, or start a new chat after midnight. Replies in your existing chats aren't limited.`,
+    `🔒 Messaging Is a Premium Feature\n\nUpgrade to Kinkord Premium to unlock messaging and start connecting with kinksters worldwide.\n\nEnjoy more ways to connect, chat, and build meaningful relationships.\n\n${
+      perDay === 0
+        ? "You can always reply when someone messages you first."
+        : `You've used today's ${perDay === null ? "" : `${perDay} `}new ${perDay === 1 ? "chat" : "chats"}. You can start another after midnight. Replies in your existing chats aren't limited.`
+    }`,
   /** At Silver's allowance: nothing bigger to offer, just the reset. */
   newChatLimitSilver: (perDay: number | null) =>
     `You've used today's ${perDay === null ? "" : `${perDay} `}new chats. You can message someone new after midnight. Replies in your existing chats aren't limited.`,
   /** A free member writing first to someone in another country. */
   crossCountry:
-    "Messaging members in another country is part of Silver Premium. You can always reply if they message you first.",
-  getSilver: "Get Silver Premium",
+    "🔒 Messaging Is a Premium Feature\n\nUpgrade to Kinkord Premium to unlock messaging and start connecting with kinksters worldwide.\n\nEnjoy more ways to connect, chat, and build meaningful relationships.\n\nStarting a chat with someone in another country requires Premium. You can always reply if they message you first.",
+  getSilver: "Upgrade to Premium",
   photoAdd: "Add a photo",
   photoRemove: "Remove photo",
   photoUploading: "Uploading…",
