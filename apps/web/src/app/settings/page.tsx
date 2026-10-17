@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import AppShell from "@/components/app/AppShell";
 import { ChevronRightIcon } from "@/components/app/icons";
@@ -13,7 +12,6 @@ import { useHomePresenter } from "@/presenters/useHomePresenter";
 import { usePushPresenter } from "@/presenters/usePushPresenter";
 import { usePwaPresenter } from "@/presenters/usePwaPresenter";
 import { useVerificationAvailabilityPresenter } from "@/presenters/useVerificationAvailabilityPresenter";
-import { getTheme, setTheme, type Theme } from "@/util/theme";
 
 export default function SettingsPage() {
   const vm = useHomePresenter();
@@ -22,30 +20,6 @@ export default function SettingsPage() {
   const admin = useAdminAccessPresenter();
   const nav = getAppShellNav();
   const verification = useVerificationAvailabilityPresenter();
-  const [theme, setThemeState] = useState<Theme>(() =>
-    typeof document === "undefined" ? "light" : getTheme(),
-  );
-
-  const choose = (next: Theme) => {
-    setTheme(next);
-    setThemeState(next);
-  };
-
-  const chip = (value: Theme, label: string) => (
-    <button
-      type="button"
-      suppressHydrationWarning
-      onClick={() => choose(value)}
-      className={`h-[41px] flex-1 rounded-[10px] border text-[15px] font-bold ${
-        theme === value
-          ? "border-kink-amber bg-kink-amber text-black"
-          : "border-app-input-border bg-app-input text-app-value"
-      }`}
-    >
-      {label}
-    </button>
-  );
-
   return (
     <AppShell
       brand="KINKORD"
@@ -70,11 +44,6 @@ export default function SettingsPage() {
     >
       <div className="mx-auto w-full max-w-[440px] px-[29px]">
         <h1 className="text-[24px] font-medium text-app-value">Settings</h1>
-        <p className="pt-[24px] pb-[8px] text-[14px] font-bold text-app-text">Appearance</p>
-        <div className="flex gap-[12px]">
-          {chip("light", "Light")}
-          {chip("dark", "Dark")}
-        </div>
         <p className="pt-[28px] pb-[8px] text-[14px] font-bold text-app-text">Application</p>
         <button
           type="button"

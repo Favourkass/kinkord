@@ -19,8 +19,8 @@ beforeEach(() => {
 });
 
 describe("theme util", () => {
-  it("defaults to light when no theme attribute is set", () => {
-    expect(getTheme()).toBe("light");
+  it("defaults to dark when no theme attribute is set", () => {
+    expect(getTheme()).toBe("dark");
   });
 
   it("persists and applies the chosen theme", () => {
@@ -30,14 +30,14 @@ describe("theme util", () => {
     expect(getTheme()).toBe("dark");
   });
 
-  it("toggles between light and dark", () => {
+  it("cannot switch back to light", () => {
     setTheme("light");
     expect(toggleTheme()).toBe("dark");
-    expect(toggleTheme()).toBe("light");
+    expect(toggleTheme()).toBe("dark");
   });
 
-  it("honors a stored theme when the init script runs", () => {
-    store.set(THEME_STORAGE_KEY, "dark");
+  it("overrides an old light theme when the init script runs", () => {
+    store.set(THEME_STORAGE_KEY, "light");
     eval(themeInitScript);
     expect(document.documentElement.dataset.theme).toBe("dark");
   });
