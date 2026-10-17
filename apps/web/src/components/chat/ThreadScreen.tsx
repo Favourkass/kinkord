@@ -241,7 +241,9 @@ export default function ThreadScreen(p: ThreadScreenProps) {
           </div>
         ) : p.unavailable || p.newChat?.blocking ? (
           <div className="border-t border-app-line bg-app-surface px-[16px] py-[14px] text-center text-[13px] text-app-muted">
-            <p>{p.unavailable ? p.unavailableText : p.newChat?.text}</p>
+            <p className="whitespace-pre-line">
+              {p.unavailable ? p.unavailableText : p.newChat?.text}
+            </p>
             {!p.unavailable && p.newChat?.link && (
               <Link
                 href={p.newChat.link.href}

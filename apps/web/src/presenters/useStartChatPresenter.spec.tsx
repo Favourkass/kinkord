@@ -49,7 +49,7 @@ describe("useStartChatPresenter", () => {
     await waitFor(() =>
       expect(result.current.premium).toEqual({
         text: CHAT_COPY.crossCountry,
-        linkLabel: "Get Silver Premium",
+        linkLabel: "Upgrade to Premium",
         href: "/subscription",
       }),
     );

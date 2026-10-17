@@ -34,20 +34,27 @@ const whereSql = (calls: Array<{ op: string; args: unknown[] }>, n: number) =>
  * replies in the order the code asks. `transaction(fn)` runs `fn` on the same
  * stand-in, so what happens inside it is recorded too.
  */
-function queuedDb(answers: unknown[]) {
+function queuedDb(answers: unknown[], country = "NG") {
   const queue = [...answers];
   const calls: Array<{ op: string; args: unknown[] }> = [];
-  const chain = (): unknown =>
+  const chain = (results = queue): unknown =>
     new Proxy(() => undefined, {
       get(_target, prop) {
         if (prop === "then") {
-          const value = queue.shift();
+          const value = results.shift();
           return (resolve: (v: unknown) => void) => resolve(value);
         }
         if (prop === "transaction") return (fn: (tx: unknown) => unknown) => fn(root);
         return (...args: unknown[]) => {
           calls.push({ op: String(prop), args });
-          return chain();
+          if (
+            prop === "select" &&
+            args[0] &&
+            Object.keys(args[0] as object).length === 1 &&
+            "country" in (args[0] as object)
+          )
+            return chain([[{ country }]]);
+          return chain(results);
         };
       },
     });
@@ -60,8 +67,8 @@ function queuedDb(answers: unknown[]) {
   return { db: root as never, calls, after, left: () => queue.length };
 }
 
-function make(answers: unknown[]) {
-  const q = queuedDb(answers);
+function make(answers: unknown[], country = "NG") {
+  const q = queuedDb(answers, country);
   const storage = {
     presignDownload: vi.fn(
       async (key: string, variant?: string) => `https://media/${key}?${variant}`,
@@ -305,7 +312,7 @@ describe("ChatService.sendMessage", () => {
       expect(left()).toBe(0);
     });
 
-    it("refuses a fourth new chat the same day, saying when it resets", async () => {
+    it("refuses a second Nigerian new chat the same day, saying when it resets", async () => {
       const { service, after } = make([
         [{ userId: "u1" }],
         [{ userId: "u2" }],
@@ -314,7 +321,7 @@ describe("ChatService.sendMessage", () => {
         [], // an empty thread: this would be a new chat
         [], // on Basic
         undefined, // lock
-        [{ n: 3 }], // today's three are already used
+        [{ n: 1 }], // Nigeria's one new chat is already used
       ]);
       const err = await service
         .sendMessage(member("u1"), "c1", { body: "hi" })
@@ -326,6 +333,32 @@ describe("ChatService.sendMessage", () => {
         resetsAt: expect.stringMatching(/T23:00:00\.000Z$/),
       });
       expect(after("insert", message, "values")).toBeUndefined();
+    });
+
+    it.each([
+      ["NG", 1, true],
+      ["KE", 2, false],
+      ["KE", 3, true],
+    ] as const)("enforces %s allowance at %s used chats", async (country, used, blocked) => {
+      const saved = row("m1", { senderId: "u1", body: "hi" });
+      const { service } = make([
+        [{ userId: "u1" }],
+        [{ userId: "u2" }],
+        [{ n: 0 }],
+        countries(country, country),
+        [],
+        [],
+        undefined,
+        [{ n: used }],
+        [saved],
+        undefined,
+      ]);
+      const result = service.sendMessage(member("u1"), "c1", { body: "hi" });
+      if (blocked)
+        await expect(result).rejects.toMatchObject({
+          response: expect.objectContaining({ code: NEW_CHAT_LIMIT }),
+        });
+      else await expect(result).resolves.toMatchObject({ id: "m1" });
     });
 
     it("lets a Silver member start more new chats a day", async () => {
@@ -557,9 +590,18 @@ describe("ChatService.allowance", () => {
     vi.setSystemTime(new Date("2026-09-30T10:00:00Z"));
     const { service } = make([[], [{ n: 1 }]]);
     await expect(service.allowance(member("u1"))).resolves.toEqual({
-      newChatsPerDay: 3,
+      newChatsPerDay: 1,
       usedToday: 1,
       resetsAt: "2026-09-30T23:00:00.000Z",
+      silver: false,
+    });
+  });
+
+  it("reports three free new chats for Kenya", async () => {
+    const { service } = make([[], [{ n: 2 }]], "KE");
+    await expect(service.allowance(member("u1"))).resolves.toMatchObject({
+      newChatsPerDay: 3,
+      usedToday: 2,
       silver: false,
     });
   });
