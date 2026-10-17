@@ -447,4 +447,42 @@ describe("useMemberProfilePresenter", () => {
     expect(result.current.vm?.isFollowing).toBe(false);
     expect(apiPost).not.toHaveBeenCalledWith("/follows/nene", {});
   });
+
+  it("shows Friends, and asks before removing a friend", async () => {
+    apiGet.mockImplementation(routeGet({ ...profile, friendship: "friends" }));
+    const { result } = renderHook(() => useMemberProfilePresenter("nene"));
+    await waitFor(() => expect(result.current.friendAction?.label).toBe("Friends"));
+    expect(result.current.friendAction?.friends).toBe(true);
+
+    act(() => result.current.friendAction?.onPrimary());
+    expect(result.current.unfriendConfirm.open).toBe(true);
+    expect(result.current.unfriendConfirm.message).toContain(profile.displayName);
+    expect(apiDel).not.toHaveBeenCalled();
+    act(() => result.current.unfriendConfirm.onCancel());
+    expect(result.current.unfriendConfirm.open).toBe(false);
+    expect(apiDel).not.toHaveBeenCalled();
+
+    act(() => result.current.friendAction?.onPrimary());
+    apiGet.mockImplementation(routeGet({ ...profile, friendship: "none" }));
+    act(() => result.current.unfriendConfirm.onConfirm());
+    await waitFor(() => expect(result.current.friendAction?.label).toBe("Add Friend"));
+    expect(apiDel).toHaveBeenCalledWith("/friendships/nene");
+    expect(result.current.unfriendConfirm.open).toBe(false);
+  });
+
+  it("leaves a suggested friend alone when their button only says Friends", async () => {
+    apiGet.mockImplementation((path: string) =>
+      path.includes("tab=suggested")
+        ? Promise.resolve({
+            ...suggestionsPage,
+            items: suggestionsPage.items.map((item) => ({ ...item, friendship: "friends" })),
+          })
+        : routeGet()(path),
+    );
+    const { result } = renderHook(() => useMemberProfilePresenter("nene"));
+    await waitFor(() => expect(result.current.suggested.rows[0]?.actionLabel).toBe("Friends"));
+    act(() => result.current.suggested.onAdd(result.current.suggested.rows[0]));
+    expect(apiDel).not.toHaveBeenCalled();
+    expect(apiPost).not.toHaveBeenCalled();
+  });
 });
