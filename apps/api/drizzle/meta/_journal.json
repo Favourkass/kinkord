@@ -225,6 +225,13 @@
       "when": 1792181569581,
       "tag": "0031_friend_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1792224370001,
+      "tag": "0032_team_member_badge",
+      "breakpoints": true
     }
   ]
 }

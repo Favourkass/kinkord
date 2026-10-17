@@ -17,6 +17,7 @@ const pm = (over: Partial<MemberCardPM> = {}): MemberCardPM => ({
   postsCount: 3,
   followersCount: 12,
   isFollowing: false,
+  teamMember: false,
   silver: true,
   ...over,
 });
@@ -30,6 +31,7 @@ describe("toSearchPersonVM", () => {
       handle: "@ada",
       details: "25F · Ikeja, Lagos State",
       avatarUrl: "https://media/a.jpg",
+      teamMember: false,
       silver: true,
       organization: false,
       isFollowing: false,

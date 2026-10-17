@@ -82,6 +82,13 @@ export class ModerationController {
     return this.moderation.member(id);
   }
 
+  @Post("members/:id/team-badge")
+  @UseGuards(AdminGuard)
+  teamBadge(@Req() req: AuthedRequest, @Param("id") id: string, @Body() body: unknown) {
+    const input = parse(z.object({ enabled: z.boolean() }).strict(), body);
+    return this.moderation.setTeamBadge(req.user.id, id, input.enabled);
+  }
+
   @Post("members/:id/block")
   @UseGuards(AdminGuard)
   async block(@Req() req: AuthedRequest, @Param("id") id: string, @Body() body: unknown) {

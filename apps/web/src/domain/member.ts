@@ -35,6 +35,7 @@ export interface MemberCardPM {
   followersCount: number;
   isFollowing: boolean;
   /** Shows the Silver check; absent from an older API. */
+  teamMember?: boolean;
   silver?: boolean;
 }
 
@@ -54,6 +55,7 @@ export interface MemberCardVM {
   posts: string;
   followers: string;
   isFollowing: boolean;
+  teamMember?: boolean;
   silver: boolean;
   /** Temporary organization presentation for the configured official account. */
   organization: boolean;
@@ -109,6 +111,7 @@ export function toMemberCardVM(pm: MemberCardPM, organization = false): MemberCa
     posts: compactNumber(pm.postsCount),
     followers: compactNumber(pm.followersCount),
     isFollowing: pm.isFollowing,
+    teamMember: Boolean(pm.teamMember),
     silver: Boolean(pm.silver),
     organization,
   };
@@ -153,6 +156,7 @@ export interface PublicProfilePM {
   /** `identity`: a verified ID and selfie, sent only when the member shows it to this viewer. */
   verification: { email: boolean; phone: boolean; identity?: boolean };
   /** The Silver check, with when their Silver began; absent from an older API. */
+  teamMember?: boolean;
   silver?: { since: string } | null;
 }
 
@@ -260,6 +264,7 @@ export interface PublicProfileVM {
     hiddenFromOthers?: boolean;
   };
   /** The Silver check beside their name; `since` is "October 2026". */
+  teamMember?: boolean;
   silver: { since: string | null } | null;
   restricted: boolean;
   /** Account type is presentation-only until the full organization domain ships. */
@@ -426,6 +431,7 @@ export function toPublicProfileVM(
       email: Boolean(pm.verification?.email),
       phone: Boolean(pm.verification?.phone),
     },
+    teamMember: Boolean(pm.teamMember),
     silver: pm.silver ? { since: monthYear(pm.silver.since) } : null,
     restricted: Boolean(pm.restricted),
     accountType: organization ? "organization" : "person",
@@ -489,6 +495,7 @@ export interface FriendRowVM {
   location: string | null;
   isFollowing: boolean;
   busy: boolean;
+  teamMember?: boolean;
   silver: boolean;
   organization: boolean;
 }

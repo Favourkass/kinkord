@@ -1,3 +1,4 @@
+import TeamBadge from "@/components/app/TeamBadge";
 import {
   AtSign,
   Bell,
@@ -263,6 +264,7 @@ export default function NotificationInbox(p: NotificationInboxProps) {
                       {item.actorName && (
                         <>
                           <strong className="font-extrabold">{item.actorName}</strong>
+                          {item.actorTeamMember ? <TeamBadge size={16} /> : null}
                           {item.actorSilver ? (
                             <SilverCheck size={14} className="ml-[3px] align-[-2px]" />
                           ) : null}

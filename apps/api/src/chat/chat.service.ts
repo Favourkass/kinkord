@@ -1,3 +1,4 @@
+import { teamBadge } from "../members/team-badge";
 import { randomUUID } from "node:crypto";
 import {
   BadRequestException,
@@ -765,6 +766,7 @@ export class ChatService {
         lastSeenAt: profile.lastSeenAt,
         blockedByMe: blockedBy(userId, conversationParticipant.userId),
         silver: silverCheck(conversationParticipant.userId),
+        teamMember: teamBadge(conversationParticipant.userId),
       })
       .from(conversationParticipant)
       .innerJoin(user, eq(user.id, conversationParticipant.userId))
@@ -820,6 +822,7 @@ export class ChatService {
                   ? await this.storage.presignDownload(p.avatarKey, "sm")
                   : null,
                 silver: Boolean(p.silver),
+                teamMember: Boolean(p.teamMember),
                 online: PresenceService.isOnline(p.lastSeenAt),
                 presence: PresenceService.status(p.lastSeenAt),
                 blockedByMe: Boolean(p.blockedByMe),

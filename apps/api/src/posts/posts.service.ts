@@ -1,3 +1,4 @@
+import { teamBadge } from "../members/team-badge";
 import {
   BadRequestException,
   ForbiddenException,
@@ -134,6 +135,7 @@ export interface PostAuthorVM {
   avatarUrl: string | null;
   /** Shows the Silver check beside their name. */
   silver: boolean;
+  teamMember?: boolean;
   subscribed: boolean;
   /** Whether the viewer follows them, so a post can offer Follow without a profile request. */
   isFollowing: boolean;
@@ -639,6 +641,7 @@ export class PostsService {
         username: user.username,
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
+        teamMember: teamBadge(post.authorId),
         silver: silverCheck(post.authorId),
         subscribed: sql<boolean>`exists (select 1 from ${memberSubscription} where ${memberSubscription.userId} = ${post.authorId} and ${memberSubscription.currentPeriodEnd} > now())`,
         // The visibility rule's own join, so it costs nothing extra.
@@ -682,6 +685,7 @@ export class PostsService {
         username: user.username,
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
+        teamMember: teamBadge(post.authorId),
         silver: silverCheck(post.authorId),
         subscribed: sql<boolean>`exists (select 1 from ${memberSubscription} where ${memberSubscription.userId} = ${post.authorId} and ${memberSubscription.currentPeriodEnd} > now())`,
         // A repost's card shows the original's author, so it's their follow that counts.
@@ -810,6 +814,7 @@ export class PostsService {
           displayName: content.displayName ?? content.username ?? "Member",
           avatarUrl: await avatar(content.avatarKey),
           silver: Boolean(content.silver),
+          teamMember: Boolean(content.teamMember),
           subscribed: Boolean(content.subscribed),
           isFollowing: Boolean(content.viewerFollowsAuthor),
         },
