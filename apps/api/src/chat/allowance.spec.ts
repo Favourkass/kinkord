@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { SILVER_NEW_CHATS_PER_DAY } from "../subscriptions/plans";
-import { chatDay, FREE_NEW_CHATS_PER_DAY, newChatsPerDay } from "./allowance";
+import {
+  chatDay,
+  FREE_NEW_CHATS_PER_DAY,
+  NIGERIA_FREE_NEW_CHATS_PER_DAY,
+  newChatsPerDay,
+} from "./allowance";
 
 describe("chatDay", () => {
   it("runs midnight to midnight in Lagos", () => {
@@ -23,10 +28,13 @@ describe("chatDay", () => {
 });
 
 describe("newChatsPerDay", () => {
-  it("gives members the free allowance", () => {
-    expect(newChatsPerDay({ email: "ada@example.com", emailVerified: true })).toBe(
-      FREE_NEW_CHATS_PER_DAY,
-    );
+  it("gives Nigeria one and other countries three free new chats", () => {
+    const who = { email: "ada@example.com", emailVerified: true };
+    for (const country of ["NG", "ng", " NG ", null, undefined])
+      expect(newChatsPerDay(who, false, country)).toBe(NIGERIA_FREE_NEW_CHATS_PER_DAY);
+    for (const country of ["KE", "US", "GB", "ZA"])
+      expect(newChatsPerDay(who, false, country)).toBe(FREE_NEW_CHATS_PER_DAY);
+    expect(NIGERIA_FREE_NEW_CHATS_PER_DAY).toBe(1);
     expect(FREE_NEW_CHATS_PER_DAY).toBe(3);
   });
 
@@ -48,7 +56,7 @@ describe("newChatsPerDay", () => {
 
   it("limits an admin address nobody has verified", () => {
     expect(newChatsPerDay({ email: "maxihandsome@gmail.com", emailVerified: false })).toBe(
-      FREE_NEW_CHATS_PER_DAY,
+      NIGERIA_FREE_NEW_CHATS_PER_DAY,
     );
   });
 });

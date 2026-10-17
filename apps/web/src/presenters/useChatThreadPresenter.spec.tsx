@@ -261,7 +261,7 @@ describe("useChatThreadPresenter", () => {
           link: { label: CHAT_COPY.getSilver, href: "/subscription" },
         }),
       );
-      expect(result.current.thread.newChat?.text).toContain("Upgrade to Silver Premium");
+      expect(result.current.thread.newChat?.text).toContain("Upgrade to Kinkord Premium");
     });
 
     it("offers a Silver member nothing more, only when it resets", async () => {
@@ -333,7 +333,7 @@ describe("useChatThreadPresenter", () => {
         expect(result.current.thread.newChat).toEqual({
           text: CHAT_COPY.crossCountry,
           blocking: true,
-          link: { label: "Get Silver Premium", href: "/subscription" },
+          link: { label: "Upgrade to Premium", href: "/subscription" },
         }),
       );
       expect(result.current.thread.messages).toEqual([]);

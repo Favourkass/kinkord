@@ -254,16 +254,17 @@ export class ChatService {
     who: Member,
     otherId: string,
     conversationId: string | null,
-  ): Promise<void> {
-    if (isSuperAdmin(who)) return;
+  ): Promise<string | null> {
+    if (isSuperAdmin(who)) return null;
     const rows = await this.db
       .select({ userId: profile.userId, country: profile.country })
       .from(profile)
       .where(inArray(profile.userId, [who.id, otherId]));
     const countryOf = (id: string) => rows.find((r) => r.userId === id)?.country;
-    if (!differentCountries(countryOf(who.id), countryOf(otherId))) return;
-    if (conversationId && (await this.peerHasWritten(conversationId, who.id))) return;
-    if (await hasSilver(this.db, who.id)) return;
+    const senderCountry = countryOf(who.id) ?? null;
+    if (!differentCountries(senderCountry, countryOf(otherId))) return senderCountry;
+    if (conversationId && (await this.peerHasWritten(conversationId, who.id))) return senderCountry;
+    if (await hasSilver(this.db, who.id)) return senderCountry;
     throw new ForbiddenException({ code: CROSS_COUNTRY_PREMIUM, message: CROSS_COUNTRY_MESSAGE });
   }
 
@@ -297,11 +298,16 @@ export class ChatService {
     }
     // Writing first to someone abroad takes Silver. Checked before the
     // allowance, so a message refused here never uses it up.
-    await this.assertCanReach(sender, peerId, conversationId);
+    const senderCountry = await this.assertCanReach(sender, peerId, conversationId);
 
     const startsChat = newChatsPerDay(sender) !== null && !(await this.hasMessages(conversationId));
     const saved = startsChat
-      ? await this.startChat(senderId, conversationId, input, await this.newChatLimit(sender))
+      ? await this.startChat(
+          senderId,
+          conversationId,
+          input,
+          await this.newChatLimit(sender, senderCountry),
+        )
       : await this.insertMessage(this.db, senderId, conversationId, input);
     // Both members' open apps hear of it at once, the sender's other tabs too.
     void this.realtime.notify([peerId, senderId], { type: "message", conversationId });
@@ -393,9 +399,10 @@ export class ChatService {
   async allowance(who: Member): Promise<ChatAllowanceDto> {
     if (newChatsPerDay(who) === null) return { newChatsPerDay: null };
     const silver = await hasSilver(this.db, who.id);
+    const country = silver ? null : await this.countryForAllowance(who.id);
     const day = chatDay(new Date());
     return {
-      newChatsPerDay: newChatsPerDay(who, silver) ?? Number.POSITIVE_INFINITY,
+      newChatsPerDay: newChatsPerDay(who, silver, country) ?? Number.POSITIVE_INFINITY,
       usedToday: await this.chatsStartedSince(this.db, who.id, day.start),
       resetsAt: day.end.toISOString(),
       silver,
@@ -403,8 +410,19 @@ export class ChatService {
   }
 
   /** New chats a member with an allowance may start today: Silver raises it. */
-  private async newChatLimit(who: Member): Promise<number> {
-    return newChatsPerDay(who, await hasSilver(this.db, who.id)) ?? Number.POSITIVE_INFINITY;
+  private async newChatLimit(who: Member, country: string | null): Promise<number> {
+    return (
+      newChatsPerDay(who, await hasSilver(this.db, who.id), country) ?? Number.POSITIVE_INFINITY
+    );
+  }
+
+  private async countryForAllowance(userId: string): Promise<string | null> {
+    const [row] = await this.db
+      .select({ country: profile.country })
+      .from(profile)
+      .where(eq(profile.userId, userId))
+      .limit(1);
+    return row?.country ?? null;
   }
 
   /**
