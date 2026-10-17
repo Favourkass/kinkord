@@ -1,29 +1,19 @@
-export type Theme = "light" | "dark";
-
+/** Kinkord has one permanent black theme. Old saved Light choices are ignored. */
+export type Theme = "dark";
 export const THEME_STORAGE_KEY = "kinkord-theme";
-
-/**
- * Runs inline in <head> before paint so the first frame already has the right
- * theme. Falls back to the OS preference, then light.
- */
-export const themeInitScript = `(function(){try{var t=localStorage.getItem("${THEME_STORAGE_KEY}");if(t!=="light"&&t!=="dark"){t=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";}document.documentElement.dataset.theme=t;}catch(e){document.documentElement.dataset.theme="light";}})();`;
-
+export const themeInitScript = `(function(){document.documentElement.dataset.theme="dark";document.documentElement.style.colorScheme="dark";try{localStorage.setItem("${THEME_STORAGE_KEY}","dark");}catch(e){}})();`;
 export function getTheme(): Theme {
-  if (typeof document === "undefined") return "light";
-  return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+  return "dark";
 }
-
-export function setTheme(theme: Theme): void {
-  document.documentElement.dataset.theme = theme;
+export function setTheme(_theme: string): void {
+  void _theme; // Compatibility for callers with a saved legacy choice.
+  document.documentElement.dataset.theme = "dark";
+  document.documentElement.style.colorScheme = "dark";
   try {
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
-  } catch {
-    // storage may be unavailable (private mode); the attribute still applies
-  }
+    window.localStorage.setItem(THEME_STORAGE_KEY, "dark");
+  } catch {}
 }
-
 export function toggleTheme(): Theme {
-  const next: Theme = getTheme() === "dark" ? "light" : "dark";
-  setTheme(next);
-  return next;
+  setTheme("dark");
+  return "dark";
 }
