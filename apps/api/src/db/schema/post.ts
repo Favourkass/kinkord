@@ -46,6 +46,8 @@ export const post = pgTable(
     }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    /** Admin archive is reversible and retains media, comments and reactions. */
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
   },
   (t) => [
     // The feed and a profile's Posts tab both read newest-first by author.

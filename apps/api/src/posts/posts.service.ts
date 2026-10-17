@@ -394,7 +394,13 @@ export class PostsService {
     await this.db
       .update(post)
       .set({ deletedAt: new Date() })
-      .where(and(eq(post.repostOfId, target), eq(post.authorId, userId), isNull(post.deletedAt)));
+      .where(
+        and(
+          eq(post.repostOfId, target),
+          eq(post.authorId, userId),
+          and(isNull(post.deletedAt), isNull(post.archivedAt)),
+        ),
+      );
     return this.repostState(target, userId);
   }
 
@@ -453,11 +459,19 @@ export class PostsService {
     const [total] = await this.db
       .select({ n: count() })
       .from(post)
-      .where(and(eq(post.repostOfId, postId), isNull(post.deletedAt)));
+      .where(
+        and(eq(post.repostOfId, postId), and(isNull(post.deletedAt), isNull(post.archivedAt))),
+      );
     const [mine] = await this.db
       .select({ id: post.id })
       .from(post)
-      .where(and(eq(post.repostOfId, postId), eq(post.authorId, userId), isNull(post.deletedAt)));
+      .where(
+        and(
+          eq(post.repostOfId, postId),
+          eq(post.authorId, userId),
+          and(isNull(post.deletedAt), isNull(post.archivedAt)),
+        ),
+      );
     return { postId, reposts: Number(total?.n ?? 0), repostedByMe: Boolean(mine) };
   }
 
@@ -528,7 +542,7 @@ export class PostsService {
       )
       .where(
         and(
-          isNull(post.deletedAt),
+          and(isNull(post.deletedAt), isNull(post.archivedAt)),
           inArray(post.authorId, authorIds),
           visibleTo(viewerId, viewerFollows, authorFollows),
         ),
@@ -553,7 +567,7 @@ export class PostsService {
     const viewerFollows = alias(follow, "viewer_follows_author");
     const authorFollows = alias(follow, "author_follows_viewer");
     const where = and(
-      isNull(post.deletedAt),
+      and(isNull(post.deletedAt), isNull(post.archivedAt)),
       eq(post.authorId, authorId),
       inArray(postMedia.kind, kinds),
       visibleTo(viewerId, viewerFollows, authorFollows),
@@ -598,7 +612,10 @@ export class PostsService {
         .values({ postId: visible.postId, userId: viewerId })
         .onConflictDoNothing()
         .returning({ postId: postShare.postId });
-      const live = and(eq(post.id, visible.postId), isNull(post.deletedAt));
+      const live = and(
+        eq(post.id, visible.postId),
+        and(isNull(post.deletedAt), isNull(post.archivedAt)),
+      );
       const [row] = first
         ? await tx
             .update(post)
@@ -659,7 +676,11 @@ export class PostsService {
         and(eq(authorFollows.followerId, post.authorId), eq(authorFollows.followingId, viewerId)),
       )
       .where(
-        and(isNull(post.deletedAt), visibleTo(viewerId, viewerFollows, authorFollows), ...extra),
+        and(
+          and(isNull(post.deletedAt), isNull(post.archivedAt)),
+          visibleTo(viewerId, viewerFollows, authorFollows),
+          ...extra,
+        ),
       )
       .orderBy(desc(post.createdAt))
       .limit(limit);
@@ -698,7 +719,13 @@ export class PostsService {
         viewerFollows,
         and(eq(viewerFollows.followerId, viewerId), eq(viewerFollows.followingId, post.authorId)),
       )
-      .where(and(inArray(post.id, ids), isNull(post.deletedAt), eq(post.visibility, "public")));
+      .where(
+        and(
+          inArray(post.id, ids),
+          and(isNull(post.deletedAt), isNull(post.archivedAt)),
+          eq(post.visibility, "public"),
+        ),
+      );
     return new Map(rows.map((r) => [r.id, r]));
   }
 
@@ -747,7 +774,9 @@ export class PostsService {
       this.db
         .select({ postId: post.repostOfId, n: count() })
         .from(post)
-        .where(and(inArray(post.repostOfId, ids), isNull(post.deletedAt)))
+        .where(
+          and(inArray(post.repostOfId, ids), and(isNull(post.deletedAt), isNull(post.archivedAt))),
+        )
         .groupBy(post.repostOfId),
       this.db
         .select({ postId: postLike.postId })
@@ -757,7 +786,11 @@ export class PostsService {
         .select({ postId: post.repostOfId })
         .from(post)
         .where(
-          and(inArray(post.repostOfId, ids), eq(post.authorId, viewerId), isNull(post.deletedAt)),
+          and(
+            inArray(post.repostOfId, ids),
+            eq(post.authorId, viewerId),
+            and(isNull(post.deletedAt), isNull(post.archivedAt)),
+          ),
         ),
       this.db
         .select({ postId: postSave.postId })
