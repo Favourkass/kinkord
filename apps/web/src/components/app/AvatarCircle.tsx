@@ -8,6 +8,7 @@ export interface AvatarCircleProps {
   /** Tailwind class for the ring color, e.g. "bg-[#464242]" or "bg-kink-gold-bright". */
   ringClassName?: string;
   shape?: "circle" | "square";
+  silver?: boolean;
 }
 
 /** Circular avatar on a slightly larger colored ring, with an icon fallback. */
@@ -16,13 +17,17 @@ export default function AvatarCircle({
   alt,
   size,
   ringClassName,
+  silver = false,
   shape = "circle",
 }: AvatarCircleProps) {
-  const ring = size + 2;
+  const ring = size + (silver ? 6 : 2);
   const rounding = shape === "square" ? "rounded-[8px]" : "rounded-full";
   return (
     <span
-      className={`grid place-items-center ${rounding} ${ringClassName ?? "bg-[#464242]"}`}
+      role={silver ? "img" : undefined}
+      aria-label={silver ? "Silver Premium" : undefined}
+      title={silver ? "Silver Premium member" : undefined}
+      className={`grid place-items-center ${rounding} ${silver ? "bg-gradient-to-br from-[#f5f5f5] via-[#a6a6a6] to-[#e0e0e0]" : (ringClassName ?? "bg-[#464242]")}`}
       style={{ width: ring, height: ring }}
     >
       {src ? (
@@ -32,7 +37,7 @@ export default function AvatarCircle({
           alt={alt}
           width={size}
           height={size}
-          className={`${rounding} object-cover`}
+          className={`${rounding} bg-app-input object-cover`}
           style={{ width: size, height: size }}
         />
       ) : (

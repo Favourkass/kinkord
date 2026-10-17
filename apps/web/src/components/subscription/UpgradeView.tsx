@@ -32,7 +32,7 @@ export interface UpgradeViewProps {
   };
   /** "See all 15 Silver benefits"; null until the full list exists. */
   seeAll: string | null;
-  /** check: where the Silver check stands, under a running plan. */
+  /** check: where the Silver ring stands, under a running plan. */
   planCard: {
     title: string;
     body: string;
@@ -207,7 +207,7 @@ function DesktopComingSoonCard({
   );
 }
 
-/** Under the running plan: the Silver check showing, or what it waits for. */
+/** Under the running plan: the Silver ring showing, or what it waits for. */
 function CheckNote({ check }: { check: { shown: boolean; text: string } | null }) {
   if (!check) return null;
   return (

@@ -16,9 +16,9 @@ export const SUBSCRIPTION_COPY = {
         body: (until: string) => `Active until ${until}.`,
         /** The founders' Silver, which never runs out. */
         forGood: "Yours for good, as part of the Kinkord team.",
-        /** Where the member's Silver check stands, under the plan. */
+        /** Where the member's Silver ring stands, under the plan. */
         check: {
-          shown: "Your Silver badge shows on your profile.",
+          shown: "Your Silver ring shows on your profile.",
           held: {
             name: "Your badge is hidden while we look at your new name.",
             username: "Your badge is hidden while we look at your new username.",

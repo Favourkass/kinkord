@@ -116,7 +116,7 @@ export default function ExpandableAvatar({
               fetchPriority={fetchPriority}
               decoding="async"
               draggable={false}
-              className={`size-full object-cover ${rounding}`}
+              className={`size-full bg-black object-cover ${rounding}`}
             />
           </motion.button>
         ) : null}

@@ -2,7 +2,6 @@ import TeamBadge from "@/components/app/TeamBadge";
 import Link from "next/link";
 import { Mars, Target, UserRound, Venus, X } from "lucide-react";
 import MaskIcon from "@/components/app/MaskIcon";
-import SilverCheck from "@/components/app/SilverCheck";
 import OrganizationBadge from "@/components/organization/OrganizationBadge";
 import type { FeedSuggestionVM, SuggestionSegmentVM, SuggestionShow } from "@/domain/post";
 
@@ -130,7 +129,7 @@ export default function KinkstersNearYou({
                 <p className="flex min-w-0 items-center gap-[4px] text-[15px] font-bold text-feed-text">
                   <span className="truncate">{person.displayName}</span>
                   {person.teamMember ? <TeamBadge size={18} /> : null}
-                  {person.silver ? <SilverCheck size={15} /> : null}
+
                   {person.organization ? (
                     <OrganizationBadge
                       label={labels.organization}
@@ -208,7 +207,7 @@ function PersonPhoto({
 }) {
   const photo = (
     <span
-      className={`relative block w-full overflow-hidden bg-feed-media ${column ? "aspect-[4/3]" : "aspect-[4/5]"}`}
+      className={`${person.silver ? "ring-[3px] ring-inset ring-[#c6c6c6] border-[3px] border-[#c6c6c6]" : ""} relative block w-full overflow-hidden bg-feed-media ${column ? "aspect-[4/3]" : "aspect-[4/5]"}`}
     >
       {person.avatarUrl && (
         // eslint-disable-next-line @next/next/no-img-element -- presigned S3 URL, not optimizable

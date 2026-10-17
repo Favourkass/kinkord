@@ -1,7 +1,6 @@
 import TeamBadge from "@/components/app/TeamBadge";
 import Link from "next/link";
 import MaskIcon from "@/components/app/MaskIcon";
-import SilverCheck from "@/components/app/SilverCheck";
 import OrganizationBadge from "@/components/organization/OrganizationBadge";
 import type { FriendRowVM } from "@/domain/member";
 
@@ -67,7 +66,7 @@ export default function PeopleTab(p: PeopleTabProps) {
           <li key={r.userId} className="flex items-center justify-between gap-[8px] py-[12px]">
             <Link href={r.href} className="flex min-w-0 items-center gap-[12px]">
               <span
-                className={`block size-[48px] shrink-0 overflow-hidden bg-pf-surface-2 ${r.organization ? "rounded-[10px]" : "rounded-[24px]"}`}
+                className={`block size-[48px] shrink-0 overflow-hidden bg-pf-surface-2 ${r.silver ? "ring-[3px] ring-inset ring-[#c6c6c6] border-[3px] border-[#c6c6c6]" : ""} ${r.organization ? "rounded-[10px]" : "rounded-[24px]"}`}
               >
                 {r.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element -- presigned S3 URL
@@ -88,7 +87,7 @@ export default function PeopleTab(p: PeopleTabProps) {
                 <span className="flex min-w-0 items-center gap-[3px] text-[13px] font-bold leading-[16px] text-pf-text">
                   <span className="truncate">{r.displayName}</span>
                   {r.teamMember ? <TeamBadge size={18} /> : null}
-                  {r.silver ? <SilverCheck size={13} /> : null}
+
                   {r.organization ? (
                     <OrganizationBadge
                       label={p.labels.organization}
