@@ -1,3 +1,4 @@
+import { acceptedFriendship } from "../members/friendship-policy";
 /**
  * The home feed's tabs, read from the database (docs/MATCHING.md, "Feed").
  *
@@ -266,6 +267,7 @@ async function authorsOf(
       profileVisibility: profile.profileVisibility,
       viewerFollows: followedAsOf(viewerId, profile.userId, asOf),
       followsViewer: followedAsOf(profile.userId, viewerId, asOf),
+      isFriend: acceptedFriendship(viewerId, profile.userId),
     })
     .from(profile)
     .where(inArray(profile.userId, ids));
@@ -279,6 +281,7 @@ async function authorsOf(
         lookingFor: r.lookingFor ?? [],
         viewerFollows: Boolean(r.viewerFollows),
         followsViewer: Boolean(r.followsViewer),
+        isFriend: Boolean(r.isFriend),
       },
     ]),
   );

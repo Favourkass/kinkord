@@ -1,0 +1,20 @@
+export const FRIENDSHIP_COPY = {
+  add: "Add Friend",
+  requested: "Request sent",
+  accept: "Accept request",
+  decline: "Decline",
+  remove: "Remove friend",
+  friends: "Friends",
+  keep: "Keep friend",
+  removeConfirm: (name: string) =>
+    `Remove ${name} from your friends? To be friends again, one of you will need to send a new request.`,
+  cancel: "Cancel request",
+  title: "Friend requests",
+  incoming: "Received",
+  outgoing: "Sent",
+  loading: "Loading friend requests…",
+  error: "Could not update friend requests. Please try again.",
+  empty: "No pending friend requests.",
+  more: "Load more",
+  intro: "Friends are added only after a request is accepted. Following stays separate.",
+} as const;

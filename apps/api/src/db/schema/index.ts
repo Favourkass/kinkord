@@ -16,3 +16,5 @@ export * from "./safety";
 export * from "./notification";
 export * from "./subscription";
 export * from "./wallet";
+
+export * from "./friendship";

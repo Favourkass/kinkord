@@ -114,6 +114,8 @@ export interface FeedAuthor extends KinkProfile, Place {
   viewerFollows: boolean;
   /** ...and they follow the viewer. */
   followsViewer: boolean;
+  /** Explicit friendship, independent of either follow direction. */
+  isFriend?: boolean;
 }
 
 /** One row a tab may show: a post, or somebody's repost of one. */
@@ -171,7 +173,7 @@ export function reactedTo(interactions: readonly Interaction[]): Set<string> {
 
 /** An author's kinks and looking-for may count: their profile is public, or the two are friends. */
 export function kinksReadable(author: FeedAuthor): boolean {
-  return author.profileVisibility === "public" || (author.viewerFollows && author.followsViewer);
+  return author.profileVisibility === "public" || author.isFriend === true;
 }
 
 /** What the ranking may read of an author. Roles are on every card, so they always count. */

@@ -1,3 +1,4 @@
+import type { FriendshipActionProps } from "./FriendshipAction";
 import type { AppNavLabels, AppNavLinks, AppTab } from "@/components/app/nav";
 import GiftDialog, { type GiftDialogProps } from "@/components/feed/GiftDialog";
 import CommentsPanel, { type CommentsPanelProps } from "@/components/feed/CommentsPanel";
@@ -32,6 +33,11 @@ export interface ProfileScreenProps {
   setTab: (key: string) => void;
   toggleFollow: () => void;
   followBusy: boolean;
+  friendAction?: FriendshipActionProps;
+  /** "Remove friend?" — asked before a friendship ends. */
+  unfriendConfirm?: ConfirmDialogProps;
+  friendRequestsHref?: string;
+  friendRequestsLabel?: string;
   messageHref: string;
   editHref: string;
   coinBalance?: CoinBalanceVM;
@@ -80,6 +86,9 @@ export default function ProfileScreen(p: ProfileScreenProps) {
     silverHref: p.silverHref,
     onToggleFollow: p.toggleFollow,
     followBusy: p.followBusy,
+    friendAction: p.friendAction,
+    friendRequestsHref: p.friendRequestsHref,
+    friendRequestsLabel: p.friendRequestsLabel,
   };
   return (
     <>
@@ -123,6 +132,7 @@ export default function ProfileScreen(p: ProfileScreenProps) {
       <CommentsPanel {...p.postOverlays.comments} />
       <GiftDialog {...p.postOverlays.gift} />
       <ConfirmDialog {...p.postOverlays.confirm} />
+      {p.unfriendConfirm ? <ConfirmDialog {...p.unfriendConfirm} /> : null}
       <MediaLightbox {...p.postOverlays.lightbox} />
       <Toast {...p.postOverlays.toast} />
     </>

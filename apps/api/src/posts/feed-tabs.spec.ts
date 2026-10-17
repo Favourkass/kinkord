@@ -199,8 +199,8 @@ describe("For You's pages", () => {
       const { sql, params } = render(q.where!);
       expect(sql).toContain('"post"."deleted_at" is null');
       expect(sql).toContain('"post"."visibility" = $');
-      expect(sql).toContain('"viewer_follows_author"."follower_id" is not null');
-      expect(sql).toContain('"author_follows_viewer"."follower_id" is not null');
+      expect(sql).toContain('from "friendship"');
+      expect(sql).toContain('"friendship"."status" = \'accepted\'');
       expect(sql).toContain('not exists (select 1 from "member_ban"');
       expect(sql).toContain('"post"."author_id" <> $');
       expect(sql).toContain(

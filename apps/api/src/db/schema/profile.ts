@@ -60,7 +60,7 @@ export const profile = pgTable("profile", {
   /** Hard limits — the one free-text field of "Kinks & interests"; everything else is picked from lists. */
   limits: text("limits"),
   socialLinks: jsonb("social_links").$type<SocialLinks>().notNull().default({}),
-  /** "public" (every member) or "friends" (mutual follows only). */
+  /** "public" (every member) or "friends" (accepted friends only). */
   profileVisibility: text("profile_visibility").notNull().default("public"),
   /** Whether other members see the Verified badge; verifying doesn't have to be public. */
   showVerifiedBadge: boolean("show_verified_badge").notNull().default(true),

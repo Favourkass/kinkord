@@ -1,3 +1,5 @@
+import { FriendshipsController } from "./friendships.controller";
+import { FriendshipsService } from "./friendships.service";
 import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
 import { PostsModule } from "../posts/posts.module";
@@ -12,7 +14,12 @@ import { PublicProfilesController } from "./public-profiles.controller";
 /** Members directory, public profiles and the follow graph. */
 @Module({
   imports: [AuthModule, StorageModule, PostsModule, PushModule],
-  controllers: [MembersController, FollowsController, PublicProfilesController],
-  providers: [MembersService, FollowsService],
+  controllers: [
+    FriendshipsController,
+    MembersController,
+    FollowsController,
+    PublicProfilesController,
+  ],
+  providers: [MembersService, FollowsService, FriendshipsService],
 })
 export class MembersModule {}
