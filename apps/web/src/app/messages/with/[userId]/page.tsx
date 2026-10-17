@@ -41,7 +41,7 @@ export default function StartChatPage({ params }: { params: Promise<{ userId: st
       <div className="px-[20px] py-[48px] text-center">
         {start.premium ? (
           <>
-            <p className="text-[14px] text-app-text">{start.premium.text}</p>
+            <p className="whitespace-pre-line text-[14px] text-app-text">{start.premium.text}</p>
             <Link
               href={start.premium.href}
               className="mt-[16px] inline-block rounded-full bg-kink-gold-bright px-[18px] py-[9px] text-[14px] font-bold text-kink-ink"

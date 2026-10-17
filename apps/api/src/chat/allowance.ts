@@ -8,6 +8,11 @@ import { SILVER_NEW_CHATS_PER_DAY } from "../subscriptions/plans";
  * raises it to SILVER_NEW_CHATS_PER_DAY.
  */
 export const FREE_NEW_CHATS_PER_DAY = 3;
+/**
+ * Free members in Nigeria can't start new chats: messaging someone new there
+ * is part of Silver. Replying when someone writes first stays free.
+ */
+export const NIGERIA_FREE_NEW_CHATS_PER_DAY = 0;
 
 /** The error code the web app reads to explain the limit. */
 export const NEW_CHAT_LIMIT = "NEW_CHAT_LIMIT";
@@ -27,7 +32,11 @@ export function chatDay(now: Date): { start: Date; end: Date } {
 export function newChatsPerDay(
   who: { email: string; emailVerified: boolean },
   silver = false,
+  country?: string | null,
 ): number | null {
   if (isSuperAdmin(who)) return null;
-  return silver ? SILVER_NEW_CHATS_PER_DAY : FREE_NEW_CHATS_PER_DAY;
+  if (silver) return SILVER_NEW_CHATS_PER_DAY;
+  // Accounts predating country selection are Nigerian, as in cross-country reach.
+  const code = country?.trim().toUpperCase() || "NG";
+  return code === "NG" ? NIGERIA_FREE_NEW_CHATS_PER_DAY : FREE_NEW_CHATS_PER_DAY;
 }
