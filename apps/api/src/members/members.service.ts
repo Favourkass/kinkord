@@ -1,3 +1,4 @@
+import { friendshipStateSql } from "./friendship-policy";
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import {
   and,
@@ -323,6 +324,7 @@ export class MembersService {
         silverSince(this.db, u.id),
       ]);
     const counts = { ...followCounts, mutualFriends };
+    const friendship = isSelf ? "none" : await this.follows.friendshipState(viewerId, u.id);
     // Friends-only profile seen by a non-friend: what the directory card already shows
     // stays (so they can still follow back), the About details are withheld.
     const restricted = friendsOnly && !isFriend;
@@ -357,6 +359,7 @@ export class MembersService {
       lastSeenAt: p.lastSeenAt ? p.lastSeenAt.toISOString() : null,
       isOnline: PresenceService.isOnline(p.lastSeenAt),
       counts,
+      friendship,
       isFollowing,
       isSelf,
       restricted,
@@ -412,6 +415,7 @@ export class MembersService {
         city: profile.city,
         state: profile.state,
         country: profile.country,
+        friendship: friendshipStateSql(viewerId, profile.userId),
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
         silver: silverCheck(profile.userId),
       })
@@ -659,7 +663,7 @@ export class MembersService {
     return { items, total, page, limit, restricted: false };
   }
 
-  /** A member's friends ("all" = their mutual follows; "mutual" = friends in common with the viewer). */
+  /** A member's friends ("all" = their accepted friends; "mutual" = friends in common with the viewer). */
   async friends(
     username: string,
     viewerId: string,
@@ -692,6 +696,7 @@ export class MembersService {
         state: r.state,
         country: r.country,
         isFollowing: r.isFollowing,
+        friendship: r.friendship ?? "none",
         silver: r.silver,
       })),
     );

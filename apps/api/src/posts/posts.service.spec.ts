@@ -537,14 +537,14 @@ describe("the feed's visibility rules", () => {
     return new PgDialect().sqlToQuery(wheres[0]);
   };
 
-  it("shows public posts, the viewer's own, and friends-only posts only between mutual follows", async () => {
+  it("shows public posts, the viewer's own, and private posts only between accepted friends", async () => {
     const { sql, params } = await feedSql();
 
     expect(sql).toContain('"post"."deleted_at" is null');
     expect(sql).toContain('"post"."visibility" = $1 or "post"."author_id" = $2');
-    // Both directions of the follow must be present — one alone is not friendship.
-    expect(sql).toContain('"viewer_follows_author"."follower_id" is not null');
-    expect(sql).toContain('"author_follows_viewer"."follower_id" is not null');
+    // Private posts require an accepted friendship, not mutual follows.
+    expect(sql).toContain('from "friendship"');
+    expect(sql).toContain("'accepted'");
     expect(params.slice(0, 3)).toEqual(["public", "viewer-1", "friends"]);
   });
 
@@ -563,21 +563,21 @@ describe("the feed's visibility rules", () => {
     await svc.feed("viewer-1", { author: "tega" });
     const { sql, params } = new PgDialect().sqlToQuery(wheres[0]);
 
-    expect(sql).toContain('"post"."author_id" = $4');
-    expect(params[3]).toBe("u2");
+    expect(sql).toContain('"post"."author_id" = $6');
+    expect(params[5]).toBe("u2");
   });
 
   it("pages by timestamp so a post arriving mid-scroll cannot shift the page", async () => {
     const { sql, params } = await feedSql({ cursor: "2026-09-18T09:00:00.000Z" });
-    expect(sql).toContain('"post"."created_at" < $4');
-    expect(params[3]).toBe("2026-09-18T09:00:00.000Z");
+    expect(sql).toContain('"post"."created_at" < $6');
+    expect(params[5]).toBe("2026-09-18T09:00:00.000Z");
   });
 
   it("searches post text within the same visibility rules, wildcards taken literally", async () => {
     const { sql, params } = await feedSql({ q: "50%_off" });
     expect(sql).toContain('"post"."visibility" = $1 or "post"."author_id" = $2');
-    expect(sql).toContain('"post"."body" ilike $4');
-    expect(params[3]).toBe("%50\\%\\_off%");
+    expect(sql).toContain('"post"."body" ilike $6');
+    expect(params[5]).toBe("%50\\%\\_off%");
   });
 
   it("leaves the cursor out of the query on the first page", async () => {
@@ -621,12 +621,12 @@ describe("the home feed's tabs", () => {
     const { sql, params } = new PgDialect().sqlToQuery(wheres[0]);
     // The one visibility rule, then the cursor, then who the viewer follows.
     expect(sql).toContain('"post"."visibility" = $1 or "post"."author_id" = $2');
-    expect(sql).toContain('"post"."created_at" < $4');
+    expect(sql).toContain('"post"."created_at" < $6');
     expect(sql).toContain(
-      '"post"."author_id" = $5 or exists (select 1 from "follow" where "follow"."follower_id" = $6 and "follow"."following_id" = "post"."author_id")',
+      '"post"."author_id" = $7 or exists (select 1 from "follow" where "follow"."follower_id" = $8 and "follow"."following_id" = "post"."author_id")',
     );
     expect(sql).toContain('"member_block"');
-    expect(params.slice(3, 6)).toEqual(["2026-09-18T09:00:00.000Z", "viewer-1", "viewer-1"]);
+    expect(params.slice(5, 8)).toEqual(["2026-09-18T09:00:00.000Z", "viewer-1", "viewer-1"]);
     expect(rankedTabPage).not.toHaveBeenCalled();
   });
 
@@ -671,8 +671,8 @@ describe("the home feed's tabs", () => {
     expect(page.nextCursor).toBe("next");
     const { sql, params } = new PgDialect().sqlToQuery(wheres[0]);
     expect(sql).toContain('"post"."visibility" = $1 or "post"."author_id" = $2');
-    expect(sql).toContain('"post"."id" in ($4, $5, $6)');
-    expect(params.slice(3)).toEqual(["p2", "gone", "p1"]);
+    expect(sql).toContain('"post"."id" in ($6, $7, $8)');
+    expect(params.slice(5)).toEqual(["p2", "gone", "p1"]);
   });
 
   it("Nearby says when the viewer has no location, reading no posts", async () => {
@@ -729,9 +729,9 @@ describe("post counts and post media carry the same rule", () => {
 
     expect(q.sql).toContain('"post"."deleted_at" is null');
     expect(q.sql).toContain('"post"."author_id" in ($1, $2)');
-    expect(q.sql).toContain('"viewer_follows_author"."follower_id" is not null');
-    expect(q.sql).toContain('"author_follows_viewer"."follower_id" is not null');
-    expect(q.params).toEqual(["u2", "u3", "public", "viewer-1", "friends"]);
+    expect(q.sql).toContain('from "friendship"');
+    expect(q.sql).toContain("'accepted'");
+    expect(q.params).toEqual(["u2", "u3", "public", "viewer-1", "friends", "viewer-1", "viewer-1"]);
   });
 
   it("does not query at all for an empty set of members", async () => {
@@ -747,7 +747,7 @@ describe("post counts and post media carry the same rule", () => {
 
     expect(q.sql).toContain('"post"."author_id" = $1');
     expect(q.sql).toContain('"post_media"."kind" in ($2)');
-    expect(q.sql).toContain('"viewer_follows_author"."follower_id" is not null');
+    expect(q.sql).toContain('from "friendship"');
     expect(q.params.slice(0, 2)).toEqual(["u2", "image"]);
   });
 

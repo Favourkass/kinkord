@@ -304,6 +304,8 @@ describe("NotificationsService reading", () => {
 describe("notification links and search words", () => {
   it("links each kind of notification to the right screen", () => {
     expect(notificationUrl("message", "c1", null)).toBe("/messages/c1");
+    expect(notificationUrl("friend_request", "request-1", "ada")).toBe("/friends/requests");
+    expect(notificationUrl("friend_accepted", "request-1", "ada")).toBe("/u/ada");
     expect(notificationUrl("follow", null, "ada x")).toBe("/u/ada%20x");
     expect(notificationUrl("follow", null, null)).toBe("/notifications");
     expect(notificationUrl("like", "p1", "ada")).toBe("/p/p1");

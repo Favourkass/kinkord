@@ -1,3 +1,4 @@
+import FriendshipAction, { type FriendshipActionProps } from "./FriendshipAction";
 import Link from "next/link";
 import CoinBalance from "@/components/kinkcoins/CoinBalance";
 import type { CoinBalanceVM } from "@/domain/kinkcoins";
@@ -39,6 +40,9 @@ export interface ProfileHeroProps {
   silverHref: string;
   onToggleFollow: () => void;
   followBusy: boolean;
+  friendAction?: FriendshipActionProps;
+  friendRequestsHref?: string;
+  friendRequestsLabel?: string;
 }
 
 /**
@@ -57,6 +61,9 @@ export default function ProfileHero({
   silverHref,
   onToggleFollow,
   followBusy,
+  friendAction,
+  friendRequestsHref,
+  friendRequestsLabel,
 }: ProfileHeroProps) {
   const organization = vm.accountType === "organization";
   return (
@@ -181,6 +188,14 @@ export default function ProfileHero({
           <p className="text-[14px] font-semibold leading-[17px] text-pf-muted">{vm.tagLine}</p>
         )}
         {vm.isSelf && <p className="text-[12px] text-pf-muted">{labels.yourself}</p>}
+        {vm.isSelf && friendRequestsHref && (
+          <Link
+            href={friendRequestsHref}
+            className="py-2 text-sm font-semibold text-kink-gold-bright underline"
+          >
+            {friendRequestsLabel}
+          </Link>
+        )}
       </div>
 
       <div className="flex gap-[12px] px-[16px] pb-[20px]">
@@ -214,6 +229,7 @@ export default function ProfileHero({
               <MaskIcon name={vm.isFollowing ? "user-check" : "person-add"} width={16} />
               {vm.isFollowing ? labels.following : labels.follow}
             </button>
+            {friendAction && <FriendshipAction {...friendAction} />}
             <Link
               href={messageHref}
               className="flex h-[36px] flex-1 items-center justify-center gap-[8px] rounded-[12px] bg-pf-btn-dark text-[11px] font-bold text-white"

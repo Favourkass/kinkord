@@ -1,3 +1,4 @@
+import type { FriendshipState } from "./friendship";
 /**
  * Members directory + public member profile. PMs mirror the API payloads
  * (the source of truth we fetch/persist); `toVM` shapes them for display.
@@ -138,6 +139,7 @@ export interface PublicProfilePM {
   isOnline: boolean;
   counts: { friends: number; followers: number; following: number; mutualFriends: number };
   isFollowing: boolean;
+  friendship?: FriendshipState;
   isSelf: boolean;
   /** About cards (Edit Profile fields, 2026-09-12). */
   nationality: string | null;
@@ -232,6 +234,7 @@ export interface PublicProfileVM {
   /** "25 May 2025" — the exact join date (CEO, 2026-09-12). */
   memberSince: string | null;
   isFollowing: boolean;
+  friendship?: FriendshipState;
   isSelf: boolean;
   /** About → Personal Information rows (Figma 1256:800), display-ready. */
   personal: {
@@ -396,6 +399,7 @@ export function toPublicProfileVM(
     joined: monthYear(pm.joinedAt),
     memberSince: shortDate(pm.joinedAt),
     isFollowing: pm.isFollowing,
+    friendship: pm.friendship ?? "none",
     isSelf: pm.isSelf,
     personal: {
       age: pm.age === null ? null : String(pm.age),

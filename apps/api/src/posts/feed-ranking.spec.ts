@@ -158,14 +158,15 @@ describe("privacy: an author's kinks and looking-for", () => {
     expect(kinksReadable(author("a"))).toBe(true);
   });
 
-  it("are read from a friends-only profile only when the two follow each other", () => {
+  it("are read from a friends-only profile only for accepted friends", () => {
     const friendsOnly = { profileVisibility: "friends", kinks: ["Latex"], lookingFor: ["Events"] };
     expect(kinksReadable(author("a", friendsOnly))).toBe(false);
     expect(kinksReadable(author("a", { ...friendsOnly, viewerFollows: true }))).toBe(false);
     expect(kinksReadable(author("a", { ...friendsOnly, followsViewer: true }))).toBe(false);
     expect(
       kinksReadable(author("a", { ...friendsOnly, viewerFollows: true, followsViewer: true })),
-    ).toBe(true);
+    ).toBe(false);
+    expect(kinksReadable(author("a", { ...friendsOnly, isFriend: true }))).toBe(true);
     // Roles are on every card, so they always count.
     expect(readableKinks(author("a", { ...friendsOnly, roles: ["Brat"] }))).toEqual({
       roles: ["Brat"],
