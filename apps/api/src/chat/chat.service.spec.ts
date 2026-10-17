@@ -120,6 +120,7 @@ const countries = (u1: string | null, u2: string | null) => [
 ];
 /** Same country: nothing more is asked. */
 const nigerians = countries("NG", "NG");
+const kenyans = countries("KE", "KE");
 /** Silver running, as hasSilver reads it. */
 const onSilver = [{ end: new Date(Date.now() + 86_400_000) }];
 
@@ -286,13 +287,36 @@ describe("ChatService.sendMessage", () => {
   });
 
   describe("the daily new-chat allowance", () => {
-    it("lets a member start today's new chat", async () => {
+    it("refuses a Nigerian on Basic their first message, pointing to Premium", async () => {
+      const { service, after } = make([
+        [{ userId: "u1" }],
+        [{ userId: "u2" }],
+        [{ n: 0 }],
+        nigerians,
+        [], // nobody has written in this thread yet
+        [], // on Basic: no Silver
+        undefined, // the member's new-chat lock
+        [{ n: 0 }], // nothing started today, and still none allowed
+      ]);
+      const err = await service
+        .sendMessage(member("u1"), "c1", { body: "hi" })
+        .catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(HttpException);
+      expect((err as HttpException).getStatus()).toBe(429);
+      expect((err as HttpException).getResponse()).toMatchObject({
+        code: NEW_CHAT_LIMIT,
+        message: expect.stringContaining("Premium"),
+      });
+      expect(after("insert", message, "values")).toBeUndefined();
+    });
+
+    it("lets a member elsewhere start today's new chat", async () => {
       const saved = row("m1", { senderId: "u1", body: "hi" });
       const { service, after, calls, left } = make([
         [{ userId: "u1" }],
         [{ userId: "u2" }],
         [{ n: 0 }],
-        nigerians,
+        kenyans,
         [], // nobody has written in this thread yet
         [], // on Basic: no Silver
         undefined, // the member's new-chat lock
@@ -312,16 +336,16 @@ describe("ChatService.sendMessage", () => {
       expect(left()).toBe(0);
     });
 
-    it("refuses a second Nigerian new chat the same day, saying when it resets", async () => {
+    it("refuses a fourth new chat elsewhere the same day, saying when it resets", async () => {
       const { service, after } = make([
         [{ userId: "u1" }],
         [{ userId: "u2" }],
         [{ n: 0 }],
-        nigerians,
+        kenyans,
         [], // an empty thread: this would be a new chat
         [], // on Basic
         undefined, // lock
-        [{ n: 1 }], // Nigeria's one new chat is already used
+        [{ n: 3 }], // today's three are already used
       ]);
       const err = await service
         .sendMessage(member("u1"), "c1", { body: "hi" })
@@ -551,7 +575,7 @@ describe("chats across countries need Silver to start", () => {
       const saved = row("m1", { senderId: "u1", body: "hi" });
       const { service, calls, left } = make([
         ...upToCheck,
-        nigerians,
+        kenyans,
         [], // an empty thread: the free allowance applies as before
         [], // on Basic
         undefined, // lock
@@ -590,7 +614,7 @@ describe("ChatService.allowance", () => {
     vi.setSystemTime(new Date("2026-09-30T10:00:00Z"));
     const { service } = make([[], [{ n: 1 }]]);
     await expect(service.allowance(member("u1"))).resolves.toEqual({
-      newChatsPerDay: 1,
+      newChatsPerDay: 0,
       usedToday: 1,
       resetsAt: "2026-09-30T23:00:00.000Z",
       silver: false,

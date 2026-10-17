@@ -334,7 +334,10 @@ export class ChatService {
         throw new HttpException(
           {
             code: NEW_CHAT_LIMIT,
-            message: "You've used today's new chats. You can message someone new after midnight.",
+            message:
+              limit === 0
+                ? "Starting new chats is part of Premium. You can always reply when someone messages you first."
+                : "You've used today's new chats. You can message someone new after midnight.",
             resetsAt: day.end.toISOString(),
           },
           HttpStatus.TOO_MANY_REQUESTS,
