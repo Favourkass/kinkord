@@ -2,7 +2,7 @@ import { ConflictException, ForbiddenException, NotFoundException } from "@nestj
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { BronzeService } from "../verification/bronze.service";
 import { describe, expect, it, vi } from "vitest";
-import { memberBan, moderationLog, session, signupBlock, staff, user } from "../db/schema";
+import { memberBan, moderationLog, profile, session, signupBlock, staff, user } from "../db/schema";
 import type { PostsService } from "../posts/posts.service";
 import type { StorageService } from "../storage/storage.service";
 import { containsPattern, ModerationService, normalizeRuleValue } from "./moderation.service";
@@ -435,5 +435,53 @@ describe("helpers", () => {
     expect(normalizeRuleValue("phone", "0905 429 1043")).toBe("+2349054291043");
     expect(normalizeRuleValue("ip", "::ffff:102.93.7.171")).toBe("102.93.7.171");
     expect(normalizeRuleValue("name", "  Durowara ")).toBe("durowara");
+  });
+});
+
+describe("ModerationService team badge", () => {
+  for (const enabled of [true, false])
+    it(`sets badge to ${enabled} and audits without changing permissions or subscriptions`, async () => {
+      const set = vi.fn().mockReturnThis();
+      const where = vi.fn().mockReturnThis();
+      const returning = vi.fn().mockResolvedValue([{ teamMember: enabled }]);
+      const values = vi.fn().mockResolvedValue(undefined);
+      const tx = {
+        update: vi.fn(() => ({ set, where, returning })),
+        insert: vi.fn(() => ({ values })),
+      };
+      const transaction = vi.fn((fn) => fn(tx));
+      const service = new ModerationService(
+        { transaction } as never,
+        {} as never,
+        {} as never,
+        {} as never,
+      );
+      await expect(service.setTeamBadge("admin", "person", enabled)).resolves.toEqual({
+        teamMember: enabled,
+      });
+      expect(tx.update).toHaveBeenCalledExactlyOnceWith(profile);
+      expect(set).toHaveBeenCalledWith({ teamMember: enabled });
+      expect(tx.insert).toHaveBeenCalledExactlyOnceWith(moderationLog);
+      expect(values).toHaveBeenCalledWith({
+        actorId: "admin",
+        subjectUserId: "person",
+        action: enabled ? "assign-team-badge" : "remove-team-badge",
+      });
+    });
+  it("refuses a missing profile without writing an audit success", async () => {
+    const q = {
+      set: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue([]),
+    };
+    const tx = { update: vi.fn(() => q), insert: vi.fn() };
+    const service = new ModerationService(
+      { transaction: (fn: (value: typeof tx) => unknown) => fn(tx) } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+    await expect(service.setTeamBadge("admin", "absent", true)).rejects.toThrow(NotFoundException);
+    expect(tx.insert).not.toHaveBeenCalled();
   });
 });

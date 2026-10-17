@@ -33,6 +33,7 @@ export interface FriendPM {
   country?: string | null;
   isFollowing: boolean;
   /** Shows the Silver check; absent from an older API. */
+  teamMember?: boolean;
   silver?: boolean;
 }
 

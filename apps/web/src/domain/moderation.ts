@@ -21,6 +21,7 @@ export interface AdminMemberPM {
   posts: number;
   banned: boolean;
   admin: boolean;
+  teamMember?: boolean;
 }
 
 export interface AdminPostPM {
@@ -106,6 +107,7 @@ export interface AdminMemberDetailVM {
   banNote: string | null;
   /** Admins can't be blocked or deleted from here; the API refuses too. */
   protectedAccount: boolean;
+  teamMember?: boolean;
   postCount: number;
   posts: AdminPostVM[];
   rules: BlockRuleVM[];
@@ -219,6 +221,7 @@ export function toAdminMemberDetailVM(
     banned: pm.banned,
     banNote,
     protectedAccount: pm.admin,
+    teamMember: Boolean(pm.teamMember),
     postCount: pm.posts,
     posts: pm.recentPosts.map((p) => toAdminPostVM(p, now)),
     rules: pm.rules.map((r) => toBlockRuleVM(r, now)),

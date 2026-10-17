@@ -1,4 +1,5 @@
 "use client";
+import TeamBadge from "@/components/app/TeamBadge";
 
 import { useEffect, useRef, type CSSProperties } from "react";
 import Link from "next/link";
@@ -115,6 +116,7 @@ export default function ThreadScreen(p: ThreadScreenProps) {
           <span className="truncate text-[15px] font-bold text-app-text">
             {p.peer?.displayName ?? (p.loading ? "…" : "Member")}
           </span>
+          {p.peer?.teamMember ? <TeamBadge size={16} /> : null}
           {p.peer?.silver ? <SilverCheck size={15} /> : null}
           {p.peer?.organization ? (
             <OrganizationBadge

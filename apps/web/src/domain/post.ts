@@ -15,6 +15,7 @@ export interface PostAuthorPM {
   displayName: string;
   avatarUrl: string | null;
   /** Shows the Silver check beside their name; absent from an older API. */
+  teamMember?: boolean;
   silver?: boolean;
   subscribed?: boolean;
   /** Whether the viewer follows them; absent from an older API. */
@@ -170,6 +171,7 @@ export interface PostVM {
   authorUserId: string;
   authorName: string;
   /** The Silver check beside the author's name. */
+  authorTeamMember?: boolean;
   authorSilver: boolean;
   authorSubscribed: boolean;
   /** The official organization's posts carry its marks. */
@@ -228,6 +230,7 @@ export interface FeedSuggestionPM {
   avatarUrl: string | null;
   isFollowing: boolean;
   /** Shows the Silver check; absent from an older API, like everything below. */
+  teamMember?: boolean;
   silver?: boolean;
   age?: number | null;
   gender?: string | null;
@@ -256,6 +259,7 @@ export const SUGGESTION_LIST_MAX = 3;
 export interface FeedSuggestionVM {
   userId: string;
   displayName: string;
+  teamMember?: boolean;
   silver: boolean;
   organization: boolean;
   avatarUrl: string | null;
@@ -282,6 +286,7 @@ export interface SuggestionSegmentVM {
 export interface CommentVM {
   id: string;
   authorName: string;
+  authorTeamMember?: boolean;
   authorSilver: boolean;
   authorOrganization: boolean;
   handle: string | null;
@@ -350,6 +355,7 @@ export function toPostVM(
     isRepost: pm.id !== pm.postId,
     authorUserId: pm.author.userId,
     authorName: pm.author.displayName,
+    authorTeamMember: Boolean(pm.author.teamMember),
     authorSilver: Boolean(pm.author.silver),
     authorSubscribed: Boolean(pm.author.subscribed),
     authorOrganization: organization,
@@ -394,6 +400,7 @@ export function toCommentVM(
   return {
     id: pm.id,
     authorName: pm.author.displayName,
+    authorTeamMember: Boolean(pm.author.teamMember),
     authorSilver: Boolean(pm.author.silver),
     authorOrganization: organization,
     handle: handleOf(pm.author.username),
@@ -427,6 +434,7 @@ export function toFeedSuggestionVM(
   return {
     userId: pm.userId,
     displayName: pm.displayName,
+    teamMember: Boolean(pm.teamMember),
     silver: Boolean(pm.silver),
     organization,
     avatarUrl: pm.avatarUrl,

@@ -1,3 +1,4 @@
+import TeamBadge from "@/components/app/TeamBadge";
 import MaskIcon from "@/components/app/MaskIcon";
 import SilverCheck from "@/components/app/SilverCheck";
 import OrganizationBadge from "@/components/organization/OrganizationBadge";
@@ -50,6 +51,7 @@ export default function SuggestedFriends(p: SuggestedFriendsProps) {
                 <span className="flex flex-col gap-[2px]">
                   <span className="inline-flex items-center gap-[3px] text-[13px] font-bold leading-[16px] text-pf-text">
                     {r.displayName}
+                    {r.teamMember ? <TeamBadge size={18} /> : null}
                     {r.silver ? <SilverCheck size={13} /> : null}
                     {r.organization ? (
                       <OrganizationBadge

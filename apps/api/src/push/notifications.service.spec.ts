@@ -188,6 +188,7 @@ describe("NotificationsService.list", () => {
         name: "Ada",
         username: "ada_x",
         avatarUrl: "https://media.test/avatars/ada/a.jpg",
+        teamMember: false,
         silver: false,
       },
       url: "/u/ada_x",

@@ -42,6 +42,7 @@ export interface MemberDetailViewProps {
   onDeletePost: (postId: string) => void;
   /** Their Silver check, when they have Silver. */
   silverCheck?: ReactNode;
+  teamBadge?: ReactNode;
   onRevokeVerification: () => void;
   onReopenVerification: () => void;
 }
@@ -65,6 +66,7 @@ export default function MemberDetailView({
   onDeleteAccount,
   onDeletePost,
   silverCheck,
+  teamBadge,
   onRevokeVerification,
   onReopenVerification,
 }: MemberDetailViewProps) {
@@ -112,6 +114,7 @@ export default function MemberDetailView({
             ))}
           </dl>
 
+          {teamBadge}
           {verification || verificationError ? (
             <section className="mt-[12px] rounded-[16px] border border-app-card-border bg-app-card p-[14px]">
               <h2 className="text-[12px] font-bold uppercase tracking-wide text-app-muted">

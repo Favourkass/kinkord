@@ -392,6 +392,7 @@ export function useMemberProfilePresenter(
       isFollowing: f.isFollowing,
       busy: rowBusy.has(f.userId),
       silver: Boolean(f.silver),
+      teamMember: Boolean(f.teamMember),
       organization: rowOrganization,
     };
   };

@@ -1,3 +1,4 @@
+import TeamBadge from "@/components/app/TeamBadge";
 import Link from "next/link";
 import MaskIcon from "@/components/app/MaskIcon";
 import SilverCheck from "@/components/app/SilverCheck";
@@ -86,6 +87,7 @@ export default function PeopleTab(p: PeopleTabProps) {
               <span className="flex min-w-0 flex-col gap-[2px]">
                 <span className="flex min-w-0 items-center gap-[3px] text-[13px] font-bold leading-[16px] text-pf-text">
                   <span className="truncate">{r.displayName}</span>
+                  {r.teamMember ? <TeamBadge size={18} /> : null}
                   {r.silver ? <SilverCheck size={13} /> : null}
                   {r.organization ? (
                     <OrganizationBadge

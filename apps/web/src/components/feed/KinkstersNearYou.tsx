@@ -1,3 +1,4 @@
+import TeamBadge from "@/components/app/TeamBadge";
 import Link from "next/link";
 import { Mars, Target, UserRound, Venus, X } from "lucide-react";
 import MaskIcon from "@/components/app/MaskIcon";
@@ -128,6 +129,7 @@ export default function KinkstersNearYou({
               <div className="flex flex-1 flex-col gap-[6px] px-[10px] pb-[12px] pt-[10px] text-[12px]">
                 <p className="flex min-w-0 items-center gap-[4px] text-[15px] font-bold text-feed-text">
                   <span className="truncate">{person.displayName}</span>
+                  {person.teamMember ? <TeamBadge size={18} /> : null}
                   {person.silver ? <SilverCheck size={15} /> : null}
                   {person.organization ? (
                     <OrganizationBadge

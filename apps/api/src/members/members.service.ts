@@ -240,6 +240,7 @@ export class MembersService {
         isOnline,
         followers,
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
+        teamMember: profile.teamMember,
         silver: silverCheck(profile.userId),
       })
       .from(profile)
@@ -286,6 +287,7 @@ export class MembersService {
         followersCount: Number(r.followers ?? 0),
         isFollowing: Boolean(r.isFollowing),
         silver: Boolean(r.silver),
+        teamMember: Boolean(r.teamMember),
       })),
     );
 
@@ -376,6 +378,7 @@ export class MembersService {
       },
       // The Silver check, X-style: shown with the month their Silver began.
       silver: silver ? { since: silver.toISOString() } : null,
+      teamMember: Boolean(p.teamMember),
     };
   }
 
@@ -417,6 +420,7 @@ export class MembersService {
         country: profile.country,
         friendship: friendshipStateSql(viewerId, profile.userId),
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
+        teamMember: profile.teamMember,
         silver: silverCheck(profile.userId),
       })
       .from(profile)
@@ -435,6 +439,7 @@ export class MembersService {
         ...r,
         isFollowing: Boolean(r.isFollowing),
         silver: Boolean(r.silver),
+        teamMember: Boolean(r.teamMember),
       })),
       total: Number(totalRow?.total ?? 0),
     };
@@ -501,6 +506,7 @@ export class MembersService {
         visibility: profile.profileVisibility,
         lastSeenAt: profile.lastSeenAt,
         createdAt: user.createdAt,
+        teamMember: profile.teamMember,
         silver: silverCheck(profile.userId),
       })
       .from(profile)
@@ -548,6 +554,7 @@ export class MembersService {
         lookingFor: r.lookingFor.slice(0, CARD_LIST_MAX),
         online: PresenceService.isOnline(r.lastSeenAt, now),
         silver: Boolean(r.silver),
+        teamMember: Boolean(r.teamMember),
         // Members the viewer follows are never in the pool.
         isFollowing: false,
       })),
@@ -698,6 +705,7 @@ export class MembersService {
         isFollowing: r.isFollowing,
         friendship: r.friendship ?? "none",
         silver: r.silver,
+        teamMember: r.teamMember,
       })),
     );
     return { items, total: result.total, page, limit };

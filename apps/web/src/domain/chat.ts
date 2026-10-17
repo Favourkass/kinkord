@@ -36,6 +36,7 @@ export interface ChatPeerPM {
   displayName: string;
   avatarUrl: string | null;
   /** Shows the Silver check; absent from an older API. */
+  teamMember?: boolean;
   silver?: boolean;
   presence?: "online" | "away" | "offline";
   typing?: boolean;
@@ -86,6 +87,7 @@ export interface ConversationRowVM {
   presenceLabel?: string;
   presence?: "online" | "away" | "offline";
   typing?: boolean;
+  teamMember?: boolean;
   silver: boolean;
   /** The official organization: marked, so nobody can pass for it in a chat. */
   organization: boolean;
@@ -123,6 +125,7 @@ export interface ThreadPeerVM {
   presenceLabel?: string;
   presence?: "online" | "away" | "offline";
   typing?: boolean;
+  teamMember?: boolean;
   silver: boolean;
   organization: boolean;
   avatarUrl: string | null;
@@ -155,6 +158,7 @@ export function toConversationRowVM(
     id: summary.id,
     href: href(summary.id),
     displayName: summary.peer?.displayName ?? "Member",
+    teamMember: Boolean(summary.peer?.teamMember),
     silver: Boolean(summary.peer?.silver),
     organization,
     presence: summary.peer?.presence ?? (summary.peer?.online ? "online" : "offline"),
@@ -179,6 +183,7 @@ export function toThreadPeerVM(
   return {
     userId: peer.userId,
     displayName: peer.displayName,
+    teamMember: Boolean(peer.teamMember),
     silver: Boolean(peer.silver),
     organization,
     presence: peer.presence ?? (peer.online ? "online" : "offline"),
@@ -259,6 +264,7 @@ export type ChatAllowancePM =
       usedToday: number;
       resetsAt: string;
       /** On Silver, so there's no bigger allowance to offer. Absent from an older API. */
+      teamMember?: boolean;
       silver?: boolean;
     };
 
