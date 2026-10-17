@@ -286,13 +286,13 @@ describe("ChatService.sendMessage", () => {
   });
 
   describe("the daily new-chat allowance", () => {
-    it("lets a member start today's new chat", async () => {
+    it("lets a Kenyan member start today's new chat", async () => {
       const saved = row("m1", { senderId: "u1", body: "hi" });
       const { service, after, calls, left } = make([
         [{ userId: "u1" }],
         [{ userId: "u2" }],
         [{ n: 0 }],
-        nigerians,
+        countries("KE", "KE"),
         [], // nobody has written in this thread yet
         [], // on Basic: no Silver
         undefined, // the member's new-chat lock
@@ -312,7 +312,7 @@ describe("ChatService.sendMessage", () => {
       expect(left()).toBe(0);
     });
 
-    it("refuses a second Nigerian new chat the same day, saying when it resets", async () => {
+    it("refuses the first Nigerian new chat without a subscription", async () => {
       const { service, after } = make([
         [{ userId: "u1" }],
         [{ userId: "u2" }],
@@ -321,7 +321,7 @@ describe("ChatService.sendMessage", () => {
         [], // an empty thread: this would be a new chat
         [], // on Basic
         undefined, // lock
-        [{ n: 1 }], // Nigeria's one new chat is already used
+        [{ n: 0 }], // no chats used: Nigeria still requires a subscription
       ]);
       const err = await service
         .sendMessage(member("u1"), "c1", { body: "hi" })
@@ -336,6 +336,7 @@ describe("ChatService.sendMessage", () => {
     });
 
     it.each([
+      ["NG", 0, true],
       ["NG", 1, true],
       ["KE", 2, false],
       ["KE", 3, true],
@@ -551,8 +552,8 @@ describe("chats across countries need Silver to start", () => {
       const saved = row("m1", { senderId: "u1", body: "hi" });
       const { service, calls, left } = make([
         ...upToCheck,
-        nigerians,
-        [], // an empty thread: the free allowance applies as before
+        countries("KE", "KE"),
+        [], // an empty thread: Kenya has a free allowance
         [], // on Basic
         undefined, // lock
         [{ n: 0 }],
@@ -590,7 +591,7 @@ describe("ChatService.allowance", () => {
     vi.setSystemTime(new Date("2026-09-30T10:00:00Z"));
     const { service } = make([[], [{ n: 1 }]]);
     await expect(service.allowance(member("u1"))).resolves.toEqual({
-      newChatsPerDay: 1,
+      newChatsPerDay: 0,
       usedToday: 1,
       resetsAt: "2026-09-30T23:00:00.000Z",
       silver: false,

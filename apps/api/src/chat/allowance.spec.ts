@@ -28,13 +28,13 @@ describe("chatDay", () => {
 });
 
 describe("newChatsPerDay", () => {
-  it("gives Nigeria one and other countries three free new chats", () => {
+  it("requires a subscription in Nigeria and gives other countries three free new chats", () => {
     const who = { email: "ada@example.com", emailVerified: true };
     for (const country of ["NG", "ng", " NG ", null, undefined])
       expect(newChatsPerDay(who, false, country)).toBe(NIGERIA_FREE_NEW_CHATS_PER_DAY);
     for (const country of ["KE", "US", "GB", "ZA"])
       expect(newChatsPerDay(who, false, country)).toBe(FREE_NEW_CHATS_PER_DAY);
-    expect(NIGERIA_FREE_NEW_CHATS_PER_DAY).toBe(1);
+    expect(NIGERIA_FREE_NEW_CHATS_PER_DAY).toBe(0);
     expect(FREE_NEW_CHATS_PER_DAY).toBe(3);
   });
 

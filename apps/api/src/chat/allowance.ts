@@ -8,7 +8,7 @@ import { SILVER_NEW_CHATS_PER_DAY } from "../subscriptions/plans";
  * raises it to SILVER_NEW_CHATS_PER_DAY.
  */
 export const FREE_NEW_CHATS_PER_DAY = 3;
-export const NIGERIA_FREE_NEW_CHATS_PER_DAY = 1;
+export const NIGERIA_FREE_NEW_CHATS_PER_DAY = 0;
 
 /** The error code the web app reads to explain the limit. */
 export const NEW_CHAT_LIMIT = "NEW_CHAT_LIMIT";

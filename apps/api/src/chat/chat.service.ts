@@ -335,7 +335,10 @@ export class ChatService {
         throw new HttpException(
           {
             code: NEW_CHAT_LIMIT,
-            message: "You've used today's new chats. You can message someone new after midnight.",
+            message:
+              limit === 0
+                ? "Starting a new chat requires a Premium subscription."
+                : "You've used today's new chats. You can message someone new after midnight.",
             resetsAt: day.end.toISOString(),
           },
           HttpStatus.TOO_MANY_REQUESTS,
