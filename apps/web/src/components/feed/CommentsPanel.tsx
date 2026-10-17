@@ -1,4 +1,5 @@
 "use client";
+import TeamBadge from "@/components/app/TeamBadge";
 
 import Link from "next/link";
 import { useEffect, useId, useRef } from "react";
@@ -95,6 +96,7 @@ export default function CommentsPanel(p: CommentsPanelProps) {
               const name = (
                 <>
                   {c.authorName}
+                  {c.authorTeamMember ? <TeamBadge size={18} /> : null}
                   {c.authorSilver ? <SilverCheck size={14} /> : null}
                   {c.authorOrganization ? (
                     <OrganizationBadge

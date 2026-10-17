@@ -11,6 +11,7 @@ const router = { push: vi.fn(), replace: vi.fn() };
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 
 const svc = {
+  setTeamBadge: vi.fn(),
   access: vi.fn(),
   member: vi.fn(),
   block: vi.fn(),
@@ -81,6 +82,21 @@ async function ready() {
 }
 
 describe("useAdminMemberPresenter", () => {
+  it("assigns the team badge only after confirmation and refreshes its state", async () => {
+    const hook = await ready();
+    act(() => hook.result.current.onToggleTeamBadge());
+    expect(svc.setTeamBadge).not.toHaveBeenCalled();
+    expect(hook.result.current.dialog?.title).toContain("Assign Kinkord Team");
+    svc.member.mockResolvedValue({ ...detail, teamMember: true });
+    await act(async () => hook.result.current.dialog?.confirm());
+    await waitFor(() => expect(hook.result.current.vm?.teamMember).toBe(true));
+    expect(svc.setTeamBadge).toHaveBeenCalledWith("u9", true);
+    act(() => hook.result.current.onToggleTeamBadge());
+    expect(hook.result.current.dialog?.title).toContain("Remove Kinkord Team");
+    await act(async () => hook.result.current.dialog?.confirm());
+    expect(svc.setTeamBadge).toHaveBeenCalledWith("u9", false);
+  });
+
   beforeEach(() => {
     Object.values(svc).forEach((f) => f.mockReset());
     router.replace.mockReset();

@@ -267,7 +267,25 @@ export const MODERATION_COPY = {
       reopenVerification: "Allow verifying again",
     },
   },
+  teamBadge: {
+    title: "Kinkord Team badge",
+    body: "Identifies an official Kinkord team member. Assigned manually by an admin; separate from identity verification and Silver. Grants no admin permissions.",
+    assigned: "Kinkord Team member",
+    unassigned: "No team badge",
+    assign: "Assign team badge",
+    remove: "Remove team badge",
+  },
   dialogs: {
+    assignTeamBadge: {
+      title: "Assign Kinkord Team badge?",
+      body: "This badge tells members this person is part of the Kinkord team. It grants no admin access or paid benefits.",
+      confirm: "Assign badge",
+    },
+    removeTeamBadge: {
+      title: "Remove Kinkord Team badge?",
+      body: "The team badge disappears from this person's profile and posts. Their admin access, follows and membership remain unchanged.",
+      confirm: "Remove badge",
+    },
     cancel: "Cancel",
     reasonLabel: "Reason (kept in the moderation log)",
     twoFactorCodeLabel: "Current six-digit authenticator code",

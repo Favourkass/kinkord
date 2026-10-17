@@ -1,3 +1,4 @@
+import TeamBadge from "@/components/app/TeamBadge";
 import Link from "next/link";
 import MaskIcon from "@/components/app/MaskIcon";
 import SilverCheck from "@/components/app/SilverCheck";
@@ -56,6 +57,7 @@ export default function MemberCard({ vm, href, labels, onToggleFollow, busy }: M
           className="flex min-w-0 items-center gap-[4px] text-[13px] font-semibold leading-[16px] text-mem-list-text after:absolute after:inset-0 after:content-[''] lg:gap-[6px] lg:text-[20px] lg:leading-[24px]"
         >
           <span className="truncate">{vm.title}</span>
+          {vm.teamMember ? <TeamBadge size={18} /> : null}
           {vm.silver ? <SilverCheck size={13} className="lg:!size-[18px]" /> : null}
           {vm.organization ? (
             <OrganizationBadge

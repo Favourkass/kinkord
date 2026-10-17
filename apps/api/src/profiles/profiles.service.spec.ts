@@ -652,3 +652,8 @@ describe("ProfilesService", () => {
     ).rejects.toThrow(/contentType/);
   });
 });
+
+it("does not allow members to assign their own team badge through profile edits", () => {
+  expect(updateProfileSchema.safeParse({ teamMember: true, bio: "Hello" }).success).toBe(false);
+  expect(updateProfileSchema.safeParse({ teamMember: false }).success).toBe(false);
+});

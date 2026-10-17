@@ -21,6 +21,9 @@ const member = (id: string) => `/admin/members/${encodeURIComponent(id)}`;
 const verificationOf = (id: string) => `/admin/verification/members/${encodeURIComponent(id)}`;
 
 export const moderationService = {
+  setTeamBadge: (id: string, enabled: boolean) =>
+    api.post<{ teamMember: boolean }>(`${member(id)}/team-badge`, { enabled }),
+
   access: () => api.get<{ isAdmin: boolean }>("/admin/access"),
 
   search: (query: string) =>

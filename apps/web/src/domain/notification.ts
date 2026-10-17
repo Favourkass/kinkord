@@ -31,6 +31,7 @@ export interface NotificationPM {
     username: string | null;
     avatarUrl: string | null;
     /** Shows the Silver check; absent from an older API. */
+    teamMember?: boolean;
     silver?: boolean;
   } | null;
   url: string;
@@ -52,6 +53,7 @@ export interface NotificationVM {
   category: string;
   actorName: string | null;
   /** The Silver check beside the actor's name. */
+  actorTeamMember?: boolean;
   actorSilver: boolean;
   /** The official organization's marks: the Org pill and a square avatar. */
   actorOrganization: boolean;
@@ -180,6 +182,7 @@ export function toNotificationVM(
     body: actorName ? `${actorName} ${action}` : action,
     category: kind.category,
     actorName,
+    actorTeamMember: Boolean(item.actor?.teamMember),
     actorSilver: !official && Boolean(item.actor?.silver),
     actorOrganization: !official && organization,
     avatarUrl: official ? null : (item.actor?.avatarUrl ?? null),

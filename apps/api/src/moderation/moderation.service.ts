@@ -43,6 +43,7 @@ export interface AdminMemberSummary {
   posts: number;
   banned: boolean;
   admin: boolean;
+  teamMember: boolean;
 }
 
 export interface AdminPostSummary {
@@ -139,6 +140,7 @@ export class ModerationService {
         emailVerified: user.emailVerified,
         createdAt: user.createdAt,
         displayName: profile.displayName,
+        teamMember: profile.teamMember,
         phone: profile.phone,
         avatarKey: profile.avatarKey,
         lastSeenAt: profile.lastSeenAt,
@@ -166,6 +168,7 @@ export class ModerationService {
       posts: Number(r.posts),
       banned: Boolean(r.banned),
       admin: Boolean(r.staff) || isSuperAdmin(r),
+      teamMember: Boolean(r.teamMember),
     };
   }
 
@@ -182,6 +185,7 @@ export class ModerationService {
         email: user.email,
         emailVerified: user.emailVerified,
         displayName: profile.displayName,
+        teamMember: profile.teamMember,
         avatarKey: profile.avatarKey,
         since: staff.createdAt,
       })
@@ -253,6 +257,24 @@ export class ModerationService {
     if (!removed) throw new NotFoundException("That member isn't an admin.");
     await this.log(actorId, "remove-admin", id, null, row?.username ? `@${row.username}` : null);
     return { removed: id };
+  }
+
+  /** A public identity badge only. Never adds/removes staff or verification. */
+  async setTeamBadge(actorId: string, id: string, enabled: boolean) {
+    return this.db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(profile)
+        .set({ teamMember: enabled })
+        .where(eq(profile.userId, id))
+        .returning({ teamMember: profile.teamMember });
+      if (!row) throw new NotFoundException("Member profile not found.");
+      await tx.insert(moderationLog).values({
+        actorId,
+        subjectUserId: id,
+        action: enabled ? "assign-team-badge" : "remove-team-badge",
+      });
+      return { teamMember: row.teamMember };
+    });
   }
 
   /** Newest members first; with a query, anyone whose name, handle, email or phone contains it. */

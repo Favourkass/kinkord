@@ -296,6 +296,7 @@ describe("toFeedSuggestionVM (Kinksters Near You)", () => {
     displayName: "Lily Rose",
     avatarUrl: "https://s3.test/lily.jpg",
     isFollowing: false,
+    teamMember: false,
     silver: true,
     age: 26,
     gender: "female",
@@ -312,6 +313,7 @@ describe("toFeedSuggestionVM (Kinksters Near You)", () => {
     expect(toFeedSuggestionVM(person(), href)).toEqual({
       userId: "u3",
       displayName: "Lily Rose",
+      teamMember: false,
       silver: true,
       organization: false,
       avatarUrl: "https://s3.test/lily.jpg",
@@ -369,6 +371,7 @@ describe("toFeedSuggestionVM (Kinksters Near You)", () => {
     );
     expect(vm).toMatchObject({
       online: false,
+      teamMember: false,
       silver: false,
       details: null,
       roles: null,
@@ -389,5 +392,15 @@ describe("toFeedSuggestionVM (Kinksters Near You)", () => {
       lookingFor: null,
       href: "/u/lily",
     });
+  });
+});
+
+it("keeps team identity independent of Silver", () => {
+  expect(
+    toPostVM(post({ author: { ...author, teamMember: true, silver: false } }), false, href, NOW),
+  ).toMatchObject({ authorTeamMember: true, authorSilver: false });
+  expect(toPostVM(post({ author: { ...author, silver: true } }), false, href, NOW)).toMatchObject({
+    authorTeamMember: false,
+    authorSilver: true,
   });
 });

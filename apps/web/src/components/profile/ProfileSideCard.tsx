@@ -1,3 +1,4 @@
+import TeamBadge from "@/components/app/TeamBadge";
 import FriendshipAction, { type FriendshipActionProps } from "./FriendshipAction";
 import Link from "next/link";
 import CoinBalance from "@/components/kinkcoins/CoinBalance";
@@ -112,6 +113,7 @@ export default function ProfileSideCard({
           <p className="flex items-baseline gap-[6px]">
             <span className="inline-flex items-center gap-[4px] text-[22px] font-bold leading-[27px] text-pf-text">
               {vm.displayName}
+              {vm.teamMember ? <TeamBadge size={18} /> : null}
               {vm.silver ? (
                 <SilverBadge since={vm.silver.since} labels={labels.silver} href={silverHref} />
               ) : null}

@@ -1,3 +1,4 @@
+import TeamBadge from "@/components/app/TeamBadge";
 import Link from "next/link";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import MaskIcon from "@/components/app/MaskIcon";
@@ -63,6 +64,7 @@ export default function PostCard({
   const name = (
     <span className="inline-flex items-center gap-[3px] text-[14px] font-bold leading-[17px] text-feed-text">
       {post.authorName}
+      {post.authorTeamMember ? <TeamBadge size={18} /> : null}
       {post.authorSilver ? <SilverCheck size={15} /> : null}
       {post.authorOrganization ? (
         <OrganizationBadge

@@ -83,3 +83,10 @@ describe("moderationService", () => {
     ]);
   });
 });
+
+it("assigns and removes only the team identity badge", async () => {
+  await moderationService.setTeamBadge("u/9", true);
+  await moderationService.setTeamBadge("u/9", false);
+  expect(post).toHaveBeenCalledWith("/admin/members/u%2F9/team-badge", { enabled: true });
+  expect(post).toHaveBeenCalledWith("/admin/members/u%2F9/team-badge", { enabled: false });
+});
