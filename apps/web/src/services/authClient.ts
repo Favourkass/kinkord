@@ -8,7 +8,10 @@ const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
  * production: kinkord.com -> api.kinkord.com).
  */
 export const authClient = createAuthClient({
-  baseURL: `${apiBase}/api/auth`,
+  // A relative API prefix keeps cookies on the page origin in local previews.
+  ...(apiBase.startsWith("/")
+    ? { basePath: `${apiBase}/api/auth` }
+    : { baseURL: `${apiBase}/api/auth` }),
   plugins: [usernameClient(), twoFactorClient()],
   fetchOptions: { credentials: "include" },
 });

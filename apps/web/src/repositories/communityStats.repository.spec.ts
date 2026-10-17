@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { communityStatsRepository } from "./communityStats.repository";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
 describe("communityStatsRepository", () => {
   it("reads only the aggregate count without sending credentials", async () => {
     const fetcher = vi
@@ -32,4 +35,17 @@ describe("communityStatsRepository", () => {
     await expect(communityStatsRepository.read()).resolves.toBeNull();
     await expect(communityStatsRepository.read()).resolves.toBeNull();
   });
+});
+
+it("uses the server's dev proxy when the browser API prefix is relative", async () => {
+  vi.stubEnv("NODE_ENV", "development");
+  vi.stubEnv("NEXT_PUBLIC_API_URL", "/backend");
+  vi.stubEnv("KINKORD_DEV_API_PROXY", "http://127.0.0.1:4383");
+  const fetcher = vi.fn().mockResolvedValue(Response.json({ members: 20 }));
+  vi.stubGlobal("fetch", fetcher);
+  await expect(communityStatsRepository.readPlatform()).resolves.toEqual({ members: 20 });
+  expect(fetcher).toHaveBeenCalledWith(
+    "http://127.0.0.1:4383/community/public-stats",
+    expect.objectContaining({ credentials: "omit" }),
+  );
 });
