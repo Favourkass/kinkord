@@ -1,7 +1,6 @@
 import TeamBadge from "@/components/app/TeamBadge";
 import Link from "next/link";
 import AvatarCircle from "@/components/app/AvatarCircle";
-import SilverCheck from "@/components/app/SilverCheck";
 import OrganizationBadge from "@/components/organization/OrganizationBadge";
 import type { SearchPersonVM } from "@/domain/search";
 
@@ -39,6 +38,7 @@ function PersonSummary({
   return (
     <>
       <AvatarCircle
+        silver={Boolean(r.silver)}
         src={r.avatarUrl}
         alt={r.name}
         size={48}
@@ -48,7 +48,7 @@ function PersonSummary({
         <span className="flex min-w-0 items-center gap-[4px] text-[15px] font-bold text-feed-text">
           <span className="truncate">{r.name}</span>
           {r.teamMember ? <TeamBadge size={18} /> : null}
-          {r.silver ? <SilverCheck size={15} /> : null}
+
           {r.organization ? (
             <OrganizationBadge
               label={organizationLabel}

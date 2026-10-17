@@ -101,7 +101,7 @@ describe("checkNote", () => {
   it("says the badge shows, or what it waits for", () => {
     expect(checkNote({ ...check, shown: true })).toEqual({
       shown: true,
-      text: "Your Silver badge shows on your profile.",
+      text: "Your Silver ring shows on your profile.",
     });
     expect(checkNote({ ...check, reason: "held", heldFor: "username" })).toEqual({
       shown: false,

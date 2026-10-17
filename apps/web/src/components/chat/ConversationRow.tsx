@@ -2,7 +2,6 @@ import TeamBadge from "@/components/app/TeamBadge";
 import Link from "next/link";
 import { Check } from "lucide-react";
 import AvatarCircle from "@/components/app/AvatarCircle";
-import SilverCheck from "@/components/app/SilverCheck";
 import OrganizationBadge from "@/components/organization/OrganizationBadge";
 import type { ConversationRowVM } from "@/domain/chat";
 import PresenceDot from "./PresenceDot";
@@ -33,6 +32,7 @@ export default function ConversationRow({
       >
         <span className="relative shrink-0">
           <AvatarCircle
+            silver={Boolean(row.silver)}
             src={row.avatarUrl}
             alt=""
             size={48}
@@ -53,7 +53,7 @@ export default function ConversationRow({
                 {row.displayName}
               </span>
               {row.teamMember ? <TeamBadge size={16} /> : null}
-              {row.silver ? <SilverCheck size={15} /> : null}
+
               {row.organization ? (
                 <OrganizationBadge
                   label={organizationLabel}

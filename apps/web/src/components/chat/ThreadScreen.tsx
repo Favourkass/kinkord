@@ -5,7 +5,6 @@ import { useEffect, useRef, type CSSProperties } from "react";
 import Link from "next/link";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import MaskIcon from "@/components/app/MaskIcon";
-import SilverCheck from "@/components/app/SilverCheck";
 import OrganizationBadge from "@/components/organization/OrganizationBadge";
 import ConfirmDialog, { type ConfirmDialogProps } from "@/components/feed/ConfirmDialog";
 import MediaLightbox from "@/components/feed/MediaLightbox";
@@ -98,6 +97,7 @@ export default function ThreadScreen(p: ThreadScreenProps) {
     <>
       <span className="relative shrink-0">
         <AvatarCircle
+          silver={Boolean(p.peer?.silver)}
           src={p.peer?.avatarUrl ?? null}
           alt=""
           size={38}
@@ -117,7 +117,7 @@ export default function ThreadScreen(p: ThreadScreenProps) {
             {p.peer?.displayName ?? (p.loading ? "…" : "Member")}
           </span>
           {p.peer?.teamMember ? <TeamBadge size={16} /> : null}
-          {p.peer?.silver ? <SilverCheck size={15} /> : null}
+
           {p.peer?.organization ? (
             <OrganizationBadge
               label={p.organizationLabel}
