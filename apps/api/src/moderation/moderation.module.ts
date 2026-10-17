@@ -1,3 +1,5 @@
+import { AdminPostsService } from "./admin-posts.service";
+import { AdminPostsController } from "./admin-posts.controller";
 import { Global, Module } from "@nestjs/common";
 import { PostsModule } from "../posts/posts.module";
 import { SafetyModule } from "../safety/safety.module";
@@ -11,8 +13,8 @@ import { SignupGuardService } from "./signup-guard.service";
 @Global()
 @Module({
   imports: [PostsModule, SafetyModule, VerificationModule],
-  controllers: [ModerationController],
-  providers: [SignupGuardService, ModerationService, AdminGuard],
+  controllers: [ModerationController, AdminPostsController],
+  providers: [SignupGuardService, ModerationService, AdminGuard, AdminPostsService],
   exports: [SignupGuardService],
 })
 export class ModerationModule {}

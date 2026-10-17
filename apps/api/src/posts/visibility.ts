@@ -1,4 +1,4 @@
-import { and, eq, or } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { follow, post } from "../db/schema";
 import { acceptedFriendship } from "../members/friendship-policy";
@@ -20,6 +20,7 @@ export function visibleTo(
   _authorFollows: FollowAlias,
 ) {
   return and(
+    isNull(post.archivedAt),
     notBanned(post.authorId),
     or(
       eq(post.visibility, "public"),
