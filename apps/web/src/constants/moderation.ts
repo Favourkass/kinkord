@@ -69,9 +69,9 @@ export const MODERATION_COPY = {
     usd: "$",
     invalid: "Check the account number (10 digits) and the prices.",
   },
-  /** Silver checks hidden after a member changed their name, username or photo, X-style. */
+  /** Silver rings hidden after a member changed their name, username or photo, X-style. */
   silverChecks: {
-    title: "Silver badges to review",
+    title: "Silver rings to review",
     hint: "These Silver members changed how they appear. Their badge stays hidden until you approve it.",
     loading: "Loading badges…",
     empty: "No badges waiting.",
@@ -85,9 +85,9 @@ export const MODERATION_COPY = {
     approving: "Approving…",
     approved: (name: string) => `Approved. ${name}'s badge shows again.`,
   },
-  /** One member's Silver check, on their page. */
+  /** One member's Silver ring, on their page. */
   memberCheck: {
-    title: "Silver badge",
+    title: "Silver ring",
     until: (date: string) => `Silver until ${date}`,
     shown: "Showing on their profile and posts.",
     held: {
@@ -102,7 +102,7 @@ export const MODERATION_COPY = {
     approved: "Approved. Their badge shows again.",
     removed: "Removed. Their badge stays hidden until an admin approves it.",
     removeDialog: {
-      title: "Remove this member's Silver badge?",
+      title: "Remove this member's Silver ring?",
       body: "Their badge hides until an admin approves it again. They keep Silver and everything it unlocks.",
       reasonLabel: "Reason (for the log)",
       confirm: "Remove badge",
