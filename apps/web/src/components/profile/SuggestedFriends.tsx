@@ -1,6 +1,5 @@
 import TeamBadge from "@/components/app/TeamBadge";
 import MaskIcon from "@/components/app/MaskIcon";
-import SilverCheck from "@/components/app/SilverCheck";
 import OrganizationBadge from "@/components/organization/OrganizationBadge";
 import type { FriendRowVM } from "@/domain/member";
 
@@ -31,7 +30,7 @@ export default function SuggestedFriends(p: SuggestedFriendsProps) {
             <li key={r.userId} className="flex items-center justify-between py-[8px]">
               <span className="flex items-center gap-[10px]">
                 <span
-                  className={`block size-[36px] overflow-hidden bg-pf-surface-2 ${r.organization ? "rounded-[8px]" : "rounded-[18px]"}`}
+                  className={`block size-[36px] overflow-hidden bg-pf-surface-2 ${r.silver ? "ring-[3px] ring-inset ring-[#c6c6c6] border-[3px] border-[#c6c6c6]" : ""} ${r.organization ? "rounded-[8px]" : "rounded-[18px]"}`}
                 >
                   {r.avatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -52,7 +51,7 @@ export default function SuggestedFriends(p: SuggestedFriendsProps) {
                   <span className="inline-flex items-center gap-[3px] text-[13px] font-bold leading-[16px] text-pf-text">
                     {r.displayName}
                     {r.teamMember ? <TeamBadge size={18} /> : null}
-                    {r.silver ? <SilverCheck size={13} /> : null}
+
                     {r.organization ? (
                       <OrganizationBadge
                         label={p.organizationLabel}

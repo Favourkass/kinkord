@@ -1,7 +1,6 @@
 import TeamBadge from "@/components/app/TeamBadge";
 import Link from "next/link";
 import MaskIcon from "@/components/app/MaskIcon";
-import SilverCheck from "@/components/app/SilverCheck";
 import OrganizationBadge from "@/components/organization/OrganizationBadge";
 import type { MemberCardVM } from "@/domain/member";
 
@@ -32,7 +31,7 @@ export default function MemberCard({ vm, href, labels, onToggleFollow, busy }: M
   return (
     <article className="relative flex h-[75px] items-start rounded-[9px] border border-mem-list-border bg-mem-list-card pl-[12px] pr-[9px] pt-[7px] lg:h-[118px] lg:pl-[10px] lg:pr-[56px] lg:pt-[6px]">
       <span
-        className={`relative block h-[61px] shrink-0 overflow-hidden rounded-[9px] border border-[#35332e] bg-[#1c1b18] lg:h-[106px] ${vm.organization ? "w-[61px] lg:w-[106px]" : "w-[81px] lg:w-[139px]"}`}
+        className={`${vm.silver ? "ring-[3px] ring-inset ring-[#c6c6c6] border-[3px] border-[#c6c6c6]" : ""} relative block h-[61px] shrink-0 overflow-hidden rounded-[9px] border border-[#35332e] bg-[#1c1b18] lg:h-[106px] ${vm.organization ? "w-[61px] lg:w-[106px]" : "w-[81px] lg:w-[139px]"}`}
       >
         {vm.avatarUrl ? (
           // Presigned S3 URL — next/image would need a remote pattern per bucket.
@@ -58,7 +57,7 @@ export default function MemberCard({ vm, href, labels, onToggleFollow, busy }: M
         >
           <span className="truncate">{vm.title}</span>
           {vm.teamMember ? <TeamBadge size={18} /> : null}
-          {vm.silver ? <SilverCheck size={13} className="lg:!size-[18px]" /> : null}
+
           {vm.organization ? (
             <OrganizationBadge
               label={labels.organization}

@@ -175,7 +175,7 @@ export const MEMBERS_COPY = {
     },
     notFound: "We couldn’t find that member.",
     yourself: "This is you",
-    /** What the Silver check says when tapped, X-style. */
+    /** What the Silver ring says when tapped, X-style. */
     silver: {
       title: "Silver Premium",
       body: "This member has the badge because they're subscribed to Silver Premium.",

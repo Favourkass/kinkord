@@ -7,7 +7,7 @@ import MaskIcon from "@/components/app/MaskIcon";
 import VerifiedMark from "@/components/brand/VerifiedMark";
 import type { PublicProfileVM } from "@/domain/member";
 import ExpandableAvatar from "./ExpandableAvatar";
-import SilverBadge, { type SilverBadgeLabels } from "./SilverBadge";
+import type { SilverBadgeLabels } from "./SilverBadge";
 import OrganizationBadge from "@/components/organization/OrganizationBadge";
 
 export interface ProfileHeroLabels {
@@ -59,7 +59,6 @@ export default function ProfileHero({
   labels,
   messageHref,
   editHref,
-  silverHref,
   onToggleFollow,
   followBusy,
   friendAction,
@@ -83,10 +82,13 @@ export default function ProfileHero({
             />
           )}
         </div>
-        <div className="absolute left-[20px] top-[114px] size-[110px]">
+        <div
+          className={`absolute left-[20px] top-[114px] size-[110px] ${vm.silver ? "rounded-full" : ""}`}
+          title={vm.silver ? "Silver Premium member" : undefined}
+        >
           <span
             aria-hidden
-            className={`absolute inset-0 ${organization ? "rounded-[20px]" : "rounded-full"} bg-pf-surface`}
+            className={`absolute inset-0 ${organization ? "rounded-[20px]" : "rounded-full"} ${vm.silver ? "bg-gradient-to-br from-[#f5f5f5] via-[#a6a6a6] to-[#e0e0e0]" : "bg-pf-surface"}`}
           />
           {vm.avatarUrl ? (
             <ExpandableAvatar
@@ -94,13 +96,13 @@ export default function ProfileHero({
               alt={vm.displayName}
               fetchPriority="high"
               closeLabel="Close"
-              wrapperClassName="absolute left-[5px] top-[8px] size-[100px]"
+              wrapperClassName="absolute left-[5px] top-[5px] size-[100px]"
               className="size-[100px]"
               shape={organization ? "square" : "circle"}
             />
           ) : (
             <span
-              className={`absolute left-[5px] top-[8px] grid size-[100px] place-items-center ${organization ? "rounded-[18px]" : "rounded-full"} bg-pf-surface-2 text-pf-muted`}
+              className={`absolute left-[5px] top-[5px] grid size-[100px] place-items-center ${organization ? "rounded-[18px]" : "rounded-full"} bg-pf-surface-2 text-pf-muted`}
             >
               <MaskIcon name="people" width={40} />
             </span>
@@ -118,9 +120,7 @@ export default function ProfileHero({
           <span className="inline-flex items-center gap-[4px] text-[22px] font-bold leading-[27px] text-pf-text">
             {vm.displayName}
             {vm.teamMember ? <TeamBadge size={18} /> : null}
-            {vm.silver ? (
-              <SilverBadge since={vm.silver.since} labels={labels.silver} href={silverHref} />
-            ) : null}
+
             {organization ? (
               <OrganizationBadge
                 label={labels.organization}
