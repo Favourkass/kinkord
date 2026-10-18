@@ -44,6 +44,7 @@ export default function ModerationMemberPage() {
           p.vm ? (
             <MemberTeamBadge
               assigned={Boolean(p.vm.teamMember)}
+              canChange={p.canChangeTeamBadge}
               onToggle={p.onToggleTeamBadge}
               labels={p.teamBadgeLabels}
             />
