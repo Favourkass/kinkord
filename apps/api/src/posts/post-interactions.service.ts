@@ -1,3 +1,4 @@
+import { teamBadge } from "../members/team-badge";
 import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, count, desc, eq, isNull, lt } from "drizzle-orm";
 import { z } from "zod";
@@ -39,6 +40,7 @@ export interface CommentVM {
     avatarUrl: string | null;
     /** Shows the Silver check beside their name. */
     silver: boolean;
+    teamMember?: boolean;
   };
   /** Each @handle in the body that names a member, and whom: the ones the app links. */
   mentions: Mention[];
@@ -126,6 +128,7 @@ export class PostInteractionsService {
         username: user.username,
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
+        teamMember: teamBadge(postComment.authorId),
         silver: silverCheck(postComment.authorId),
       })
       .from(postComment)
@@ -161,6 +164,7 @@ export class PostInteractionsService {
           displayName: r.displayName ?? r.username ?? "Member",
           avatarUrl: r.avatarKey ? await this.storage.presignDownload(r.avatarKey, "sm") : null,
           silver: Boolean(r.silver),
+          teamMember: Boolean(r.teamMember),
         },
         canDelete: r.authorId === viewerId || authorId === viewerId,
       })),
@@ -187,6 +191,7 @@ export class PostInteractionsService {
         username: user.username,
         displayName: profile.displayName,
         avatarKey: profile.avatarKey,
+        teamMember: teamBadge(user.id),
         silver: silverCheck(user.id),
       })
       .from(user)
@@ -204,6 +209,7 @@ export class PostInteractionsService {
         displayName: me?.displayName ?? me?.username ?? "Member",
         avatarUrl: me?.avatarKey ? await this.storage.presignDownload(me.avatarKey, "sm") : null,
         silver: Boolean(me?.silver),
+        teamMember: Boolean(me?.teamMember),
       },
       canDelete: true,
     };

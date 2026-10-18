@@ -16,6 +16,8 @@ export const profile = pgTable("profile", {
     .primaryKey()
     .references(() => user.id, { onDelete: "cascade" }),
   displayName: text("display_name").notNull(),
+  /** Public team identity, assigned only by an admin; grants no permissions. */
+  teamMember: boolean("team_member").notNull().default(false),
   bio: text("bio"),
   pronouns: text("pronouns"),
   /** ISO 3166-1 alpha-2, from the country-selection onboarding step. */

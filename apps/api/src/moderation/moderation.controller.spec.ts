@@ -14,6 +14,7 @@ const teammate = {
 
 function make() {
   const service = {
+    setTeamBadge: vi.fn(async () => ({ teamMember: true })),
     isAdmin: vi.fn(async () => true),
     block: vi.fn(async () => ({ blocked: "u9", postsRemoved: 0 })),
     deleteMember: vi.fn(async () => ({ deleted: "u9" })),
@@ -59,7 +60,11 @@ describe("ModerationController", () => {
 
   it("tells the app whether the signed-in member is an admin", async () => {
     const { controller } = make();
-    await expect(controller.access(req)).resolves.toEqual({ isAdmin: true });
+    await expect(controller.access(req)).resolves.toEqual({ isAdmin: true, isFounder: true });
+    await expect(controller.access(teammate)).resolves.toEqual({
+      isAdmin: true,
+      isFounder: false,
+    });
   });
 
   it("passes a valid block through with the acting admin", async () => {
@@ -124,5 +129,33 @@ describe("ModerationController", () => {
     expect(service.removeAdmin).not.toHaveBeenCalled();
     await controller.removeAdmin(req, "u7");
     expect(service.removeAdmin).toHaveBeenCalledWith("u1", "u7");
+  });
+});
+
+describe("team badge admin boundary", () => {
+  it("uses the acting admin and accepts only an explicit boolean", async () => {
+    const { controller, service } = make();
+    await controller.teamBadge(req, "u9", { enabled: true });
+    expect(service.setTeamBadge).toHaveBeenCalledWith("u1", "u9", true);
+    for (const body of [{ enabled: "true" }, {}, { enabled: true, role: "admin" }])
+      expect(() => controller.teamBadge(req, "u9", body)).toThrow(BadRequestException);
+  });
+  it("lets only the founders give or remove it, not a staff admin", () => {
+    const { controller, service } = make();
+    for (const enabled of [true, false])
+      expect(() => controller.teamBadge(teammate, "u9", { enabled })).toThrow(ForbiddenException);
+    expect(() => controller.teamBadge(teammate, "u7", { enabled: true })).toThrow(
+      ForbiddenException,
+    );
+    expect(service.setTeamBadge).not.toHaveBeenCalled();
+  });
+  it("requires both authentication and admin authorization", async () => {
+    const { GUARDS_METADATA } = await import("@nestjs/common/constants");
+    const { AdminGuard } = await import("./admin.guard");
+    const { AuthGuard } = await import("../auth/auth.guard");
+    expect(Reflect.getMetadata(GUARDS_METADATA, ModerationController)).toContain(AuthGuard);
+    expect(
+      Reflect.getMetadata(GUARDS_METADATA, ModerationController.prototype.teamBadge),
+    ).toContain(AdminGuard);
   });
 });

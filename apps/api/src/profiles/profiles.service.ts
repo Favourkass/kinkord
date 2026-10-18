@@ -67,6 +67,8 @@ export const socialLinksSchema = z
  * are free text.
  */
 export const updateProfileSchema = z.object({
+  /** Team identity can only be assigned at the admin boundary. */
+  teamMember: z.never().optional(),
   /** Only ever set, never cleared, and only while ProfilesService allows it. */
   signupPhotosSkipped: z.literal(true).optional(),
   displayName: z.string().trim().min(3).max(30).optional(),

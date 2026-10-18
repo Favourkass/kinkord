@@ -30,6 +30,12 @@ const nextConfig: NextConfig = {
   // No sharp in the runtime image: the build stage runs on the builder's
   // native arch, so native binaries would not match the amd64 runtime.
   images: { unoptimized: true },
+  async rewrites() {
+    // Opt-in local preview proxy; production continues to use its configured API.
+    const target =
+      process.env.NODE_ENV === "development" ? process.env.KINKORD_DEV_API_PROXY : undefined;
+    return target ? [{ source: "/backend/:path*", destination: `${target}/:path*` }] : [];
+  },
   async headers() {
     return [
       {

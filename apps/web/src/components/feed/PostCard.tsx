@@ -1,7 +1,7 @@
+import TeamBadge from "@/components/app/TeamBadge";
 import Link from "next/link";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import MaskIcon from "@/components/app/MaskIcon";
-import SilverCheck from "@/components/app/SilverCheck";
 import OrganizationBadge from "@/components/organization/OrganizationBadge";
 import type { PostMediaVM, PostVM } from "@/domain/post";
 import PostActions, { type PostActionLabels } from "./PostActions";
@@ -63,7 +63,8 @@ export default function PostCard({
   const name = (
     <span className="inline-flex items-center gap-[3px] text-[14px] font-bold leading-[17px] text-feed-text">
       {post.authorName}
-      {post.authorSilver ? <SilverCheck size={15} /> : null}
+      {post.authorTeamMember ? <TeamBadge size={18} /> : null}
+
       {post.authorOrganization ? (
         <OrganizationBadge
           label={labels.organization}
@@ -83,6 +84,7 @@ export default function PostCard({
       )}
       <header className="flex items-start gap-[12px]">
         <AvatarCircle
+          silver={Boolean(post.authorSilver)}
           src={post.avatarUrl}
           alt=""
           size={35}

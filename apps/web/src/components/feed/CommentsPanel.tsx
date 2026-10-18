@@ -1,10 +1,10 @@
 "use client";
+import TeamBadge from "@/components/app/TeamBadge";
 
 import Link from "next/link";
 import { useEffect, useId, useRef } from "react";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import MaskIcon from "@/components/app/MaskIcon";
-import SilverCheck from "@/components/app/SilverCheck";
 import OrganizationBadge from "@/components/organization/OrganizationBadge";
 import type { CommentVM } from "@/domain/post";
 import BodyText from "./BodyText";
@@ -95,7 +95,8 @@ export default function CommentsPanel(p: CommentsPanelProps) {
               const name = (
                 <>
                   {c.authorName}
-                  {c.authorSilver ? <SilverCheck size={14} /> : null}
+                  {c.authorTeamMember ? <TeamBadge size={18} /> : null}
+
                   {c.authorOrganization ? (
                     <OrganizationBadge
                       label={p.labels.organization}
@@ -109,6 +110,7 @@ export default function CommentsPanel(p: CommentsPanelProps) {
               return (
                 <li key={c.id} className="flex items-start gap-[10px]">
                   <AvatarCircle
+                    silver={Boolean(c.authorSilver)}
                     src={c.avatarUrl}
                     alt=""
                     size={32}

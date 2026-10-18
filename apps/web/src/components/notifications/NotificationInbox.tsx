@@ -1,3 +1,4 @@
+import TeamBadge from "@/components/app/TeamBadge";
 import {
   AtSign,
   Bell,
@@ -13,7 +14,6 @@ import {
 import type { LucideProps } from "lucide-react";
 import type { NotificationVM } from "@/domain/notification";
 import AvatarCircle from "../app/AvatarCircle";
-import SilverCheck from "../app/SilverCheck";
 import OrganizationBadge from "../organization/OrganizationBadge";
 
 const ICONS = {
@@ -226,6 +226,7 @@ export default function NotificationInbox(p: NotificationInboxProps) {
                       </span>
                     ) : (
                       <AvatarCircle
+                        silver={Boolean(item.actorSilver)}
                         src={item.avatarUrl}
                         alt=""
                         size={48}
@@ -263,9 +264,7 @@ export default function NotificationInbox(p: NotificationInboxProps) {
                       {item.actorName && (
                         <>
                           <strong className="font-extrabold">{item.actorName}</strong>
-                          {item.actorSilver ? (
-                            <SilverCheck size={14} className="ml-[3px] align-[-2px]" />
-                          ) : null}
+                          {item.actorTeamMember ? <TeamBadge size={16} /> : null}
                           {item.actorOrganization ? (
                             <span className="ml-[4px] inline-flex align-[-2px]">
                               <OrganizationBadge

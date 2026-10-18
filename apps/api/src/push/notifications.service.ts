@@ -1,3 +1,4 @@
+import { teamBadge } from "../members/team-badge";
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import {
   and,
@@ -45,6 +46,7 @@ export interface InboxItem {
     avatarUrl: string | null;
     /** Shows the Silver check beside their name. */
     silver: boolean;
+    teamMember?: boolean;
   } | null;
   url: string;
   /** Messages in a chat since its row was last read; 1 otherwise. */
@@ -67,6 +69,7 @@ interface InboxRow {
   actorDisplayName: string | null;
   actorAvatarKey: string | null;
   actorSilver: boolean | null;
+  actorTeamMember?: boolean;
 }
 
 export interface InboxQuery {
@@ -384,6 +387,7 @@ export class NotificationsService {
         actorDisplayName: profile.displayName,
         actorAvatarKey: profile.avatarKey,
         actorSilver: silverCheck(notification.actorId),
+        actorTeamMember: teamBadge(notification.actorId),
       })
       .from(notification)
       .leftJoin(user, eq(user.id, notification.actorId))
@@ -461,6 +465,7 @@ export class NotificationsService {
               ? await this.storage.presignDownload(row.actorAvatarKey, "sm")
               : null,
             silver: Boolean(row.actorSilver),
+            teamMember: Boolean(row.actorTeamMember),
           }
         : null,
       url: notificationUrl(row.type, row.subjectId, row.actorUsername ?? null),

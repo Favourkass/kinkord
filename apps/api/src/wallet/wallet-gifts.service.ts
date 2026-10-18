@@ -119,7 +119,7 @@ export class WalletGiftsService {
       const [target] = await tx
         .select()
         .from(post)
-        .where(and(eq(post.id, input.postId), isNull(post.deletedAt)))
+        .where(and(eq(post.id, input.postId), and(isNull(post.deletedAt), isNull(post.archivedAt))))
         .for("share");
       if (!target || target.authorId !== recipientId || target.repostOfId)
         throw new NotFoundException("Choose the original post to send a gift.");

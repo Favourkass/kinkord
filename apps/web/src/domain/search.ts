@@ -31,6 +31,7 @@ export interface SearchPersonVM {
   /** "25F · Ikeja, Lagos State", or null when neither is known. */
   details: string | null;
   avatarUrl: string | null;
+  teamMember?: boolean;
   silver: boolean;
   organization: boolean;
   isFollowing: boolean;
@@ -54,6 +55,7 @@ export function toSearchPersonVM(
           .filter(Boolean)
           .join(" · ") || null,
     avatarUrl: pm.avatarUrl,
+    teamMember: Boolean(pm.teamMember),
     silver: Boolean(pm.silver),
     organization,
     isFollowing: pm.isFollowing,

@@ -31,6 +31,7 @@ export interface FriendRow {
   isFollowing: boolean;
   /** Shows the Silver check beside their name. */
   silver: boolean;
+  teamMember?: boolean;
 }
 
 export interface FriendsPage {
@@ -151,6 +152,7 @@ export class FollowsService {
         city: profile.city,
         state: profile.state,
         country: profile.country,
+        teamMember: profile.teamMember,
         silver: silverCheck(user.id),
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
       })
@@ -175,6 +177,7 @@ export class FollowsService {
         ...r,
         isFollowing: Boolean(r.isFollowing),
         silver: Boolean(r.silver),
+        teamMember: Boolean(r.teamMember),
       })),
       total: await this.friendsCount(userId),
     };
@@ -199,6 +202,7 @@ export class FollowsService {
         city: profile.city,
         state: profile.state,
         country: profile.country,
+        teamMember: profile.teamMember,
         silver: silverCheck(user.id),
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
       })
@@ -219,6 +223,7 @@ export class FollowsService {
         ...r,
         isFollowing: Boolean(r.isFollowing),
         silver: Boolean(r.silver),
+        teamMember: Boolean(r.teamMember),
       })),
       total,
     };
@@ -244,6 +249,7 @@ export class FollowsService {
         city: profile.city,
         state: profile.state,
         country: profile.country,
+        teamMember: profile.teamMember,
         silver: silverCheck(user.id),
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
       })
@@ -265,6 +271,7 @@ export class FollowsService {
         ...r,
         isFollowing: Boolean(r.isFollowing),
         silver: Boolean(r.silver),
+        teamMember: Boolean(r.teamMember),
       })),
       total,
     };
@@ -290,6 +297,7 @@ export class FollowsService {
         city: profile.city,
         state: profile.state,
         country: profile.country,
+        teamMember: profile.teamMember,
         silver: silverCheck(user.id),
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
       })
@@ -315,6 +323,7 @@ export class FollowsService {
         ...r,
         isFollowing: Boolean(r.isFollowing),
         silver: Boolean(r.silver),
+        teamMember: Boolean(r.teamMember),
       })),
       total: await this.mutualFriendsCount(userId, viewerId),
     };

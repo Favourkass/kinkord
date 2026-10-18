@@ -330,6 +330,7 @@ describe("MembersService", () => {
             createdAt: new Date("2023-03-10T09:00:00Z"),
           },
           p: {
+            teamMember: true,
             displayName: "Naughty Neze",
             avatarKey: null,
             coverKey: "covers/u2/c.jpg",
@@ -352,6 +353,7 @@ describe("MembersService", () => {
       ]),
     );
     const vm = await service.publicProfile("@Nene", "me");
+    expect(vm.teamMember).toBe(true);
     expect(vm).not.toHaveProperty("coinBalance");
     expect(vm.isOnline).toBe(false);
     expect(vm.lastSeenAt).toBeNull();
@@ -649,6 +651,7 @@ describe("MembersService people tabs + media (profile rebuild, 2026-09-12)", () 
       city: null,
       state: null,
       isFollowing: false,
+      teamMember: false,
       silver: false,
     });
     const { params } = renderWhere(wheres[0]);
@@ -890,6 +893,7 @@ describe("MembersService.suggestedForFeed (matching v1)", () => {
     lookingFor: [],
     lastSeenAt: null,
     createdAt: new Date("2026-01-01T00:00:00Z"),
+    teamMember: false,
     silver: false,
     ...over,
   });
@@ -941,6 +945,7 @@ describe("MembersService.suggestedForFeed (matching v1)", () => {
           interests: ["Bondage"],
           lookingFor: ["Friendship", "Events", "Vanilla dating", "Sexual Partner"],
           lastSeenAt: aMinuteAgo,
+          teamMember: false,
           silver: true,
         }),
         row({
@@ -971,6 +976,7 @@ describe("MembersService.suggestedForFeed (matching v1)", () => {
       roles: ["Submissive", "Brat", "Pet"],
       lookingFor: ["Friendship", "Events", "Vanilla dating"],
       online: true,
+      teamMember: false,
       silver: true,
       isFollowing: false,
     });

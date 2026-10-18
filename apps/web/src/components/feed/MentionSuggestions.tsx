@@ -1,8 +1,8 @@
 "use client";
+import TeamBadge from "@/components/app/TeamBadge";
 
 import { useEffect, useRef, type KeyboardEvent } from "react";
 import AvatarCircle from "@/components/app/AvatarCircle";
-import SilverCheck from "@/components/app/SilverCheck";
 import OrganizationBadge from "@/components/organization/OrganizationBadge";
 
 export interface MentionSuggestionsProps {
@@ -14,6 +14,7 @@ export interface MentionSuggestionsProps {
     username: string;
     name: string;
     avatarUrl: string | null;
+    teamMember?: boolean;
     silver: boolean;
     organization: boolean;
   }>;
@@ -90,6 +91,7 @@ export default function MentionSuggestions(p: MentionSuggestionsProps) {
           }`}
         >
           <AvatarCircle
+            silver={Boolean(s.silver)}
             src={s.avatarUrl}
             alt=""
             size={28}
@@ -98,7 +100,8 @@ export default function MentionSuggestions(p: MentionSuggestionsProps) {
           <span className="min-w-0">
             <span className="flex min-w-0 items-center gap-[4px] text-[14px] font-bold text-feed-text">
               <span className="truncate">{s.name}</span>
-              {s.silver ? <SilverCheck size={13} /> : null}
+              {s.teamMember ? <TeamBadge size={18} /> : null}
+
               {s.organization ? (
                 <OrganizationBadge
                   label={p.organizationLabel}

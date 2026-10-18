@@ -41,10 +41,10 @@ const newAdminSchema = z.object({
     .pipe(z.string().min(1, "Enter their username.").max(64)),
 });
 
-/** Who gets the admin tools is the founders' decision alone. */
-function foundersOnly(req: AuthedRequest) {
+/** Who gets the admin tools, or the Kinkord Team badge, is the founders' decision alone. */
+function foundersOnly(req: AuthedRequest, message = "Only the founders can add or remove admins.") {
   if (!isSuperAdmin(req.user)) {
-    throw new ForbiddenException("Only the founders can add or remove admins.");
+    throw new ForbiddenException(message);
   }
 }
 
@@ -67,7 +67,7 @@ export class ModerationController {
   /** Lets the app decide whether to show the admin entry point. Any member may ask. */
   @Get("access")
   async access(@Req() req: AuthedRequest) {
-    return { isAdmin: await this.moderation.isAdmin(req.user) };
+    return { isAdmin: await this.moderation.isAdmin(req.user), isFounder: isSuperAdmin(req.user) };
   }
 
   @Get("members")
@@ -80,6 +80,15 @@ export class ModerationController {
   @UseGuards(AdminGuard)
   member(@Param("id") id: string) {
     return this.moderation.member(id);
+  }
+
+  /** The badge tells members someone speaks for Kinkord, so only the founders give or remove it. */
+  @Post("members/:id/team-badge")
+  @UseGuards(AdminGuard)
+  teamBadge(@Req() req: AuthedRequest, @Param("id") id: string, @Body() body: unknown) {
+    foundersOnly(req, "Only the founders can give or remove the Kinkord Team badge.");
+    const input = parse(z.object({ enabled: z.boolean() }).strict(), body);
+    return this.moderation.setTeamBadge(req.user.id, id, input.enabled);
   }
 
   @Post("members/:id/block")

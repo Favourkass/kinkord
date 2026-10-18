@@ -20,6 +20,8 @@ import { moderationService } from "@/services/moderation.service";
 import { useAdminAccessPresenter } from "./useAdminAccessPresenter";
 
 export type AdminDialogKind =
+  | "assignTeamBadge"
+  | "removeTeamBadge"
   | "block"
   | "unblock"
   | "deletePosts"
@@ -152,7 +154,14 @@ export function useAdminMemberPresenter(id: string) {
     setTwoFactorOff(false);
     const why = reason.trim() || null;
     try {
-      if (dialog === "block") {
+      if (dialog === "assignTeamBadge" || dialog === "removeTeamBadge") {
+        await moderationService.setTeamBadge(id, dialog === "assignTeamBadge");
+        setNotice(
+          dialog === "assignTeamBadge"
+            ? "Kinkord Team badge assigned."
+            : "Kinkord Team badge removed.",
+        );
+      } else if (dialog === "block") {
         const r = await moderationService.block(id, { reason: why, deletePosts: checked });
         setNotice(copy.notices.blocked(r.postsRemoved));
       } else if (dialog === "unblock") {
@@ -234,7 +243,8 @@ export function useAdminMemberPresenter(id: string) {
       body: text.body,
       confirmLabel: text.confirm,
       cancelLabel: copy.dialogs.cancel,
-      destructive: dialog !== "unblock" && dialog !== "reopenVerification",
+      destructive:
+        dialog !== "unblock" && dialog !== "reopenVerification" && dialog !== "assignTeamBadge",
       reason: reasonField,
       code,
       checkbox,
@@ -291,6 +301,12 @@ export function useAdminMemberPresenter(id: string) {
       actions: copy.member.actions,
     },
     backHref: Routes.moderation,
+    teamBadgeLabels: copy.teamBadge,
+    /** Only the founders give or remove the Kinkord Team badge; other admins just see it. */
+    canChangeTeamBadge: access.isFounder,
+    onToggleTeamBadge: () => {
+      if (access.isFounder) open(member?.teamMember ? "removeTeamBadge" : "assignTeamBadge");
+    },
     onBlock: () => open("block"),
     onUnblock: () => open("unblock"),
     onDeletePosts: () => open("deletePosts"),

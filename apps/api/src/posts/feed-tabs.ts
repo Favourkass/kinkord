@@ -70,6 +70,7 @@ const original = alias(post, ORIGINAL);
 function originalReadable(viewerId: string) {
   return and(
     isNull(original.deletedAt),
+    isNull(original.archivedAt),
     eq(original.visibility, "public"),
     notBanned(original.authorId),
     noBlockEitherWay(original.authorId, viewerId),
@@ -183,7 +184,7 @@ function postRows(
     )
     .where(
       and(
-        isNull(post.deletedAt),
+        and(isNull(post.deletedAt), isNull(post.archivedAt)),
         visibleTo(viewerId, viewerFollows, authorFollows),
         lte(post.createdAt, asOf),
         ne(post.authorId, viewerId),
@@ -310,7 +311,13 @@ async function engagementOf(db: Db, ids: string[], asOf: Date): Promise<Map<stri
     db
       .select({ postId: post.repostOfId, n: count() })
       .from(post)
-      .where(and(inArray(post.repostOfId, ids), isNull(post.deletedAt), lte(post.createdAt, asOf)))
+      .where(
+        and(
+          inArray(post.repostOfId, ids),
+          and(isNull(post.deletedAt), isNull(post.archivedAt)),
+          lte(post.createdAt, asOf),
+        ),
+      )
       .groupBy(post.repostOfId),
     db
       .select({ postId: postShare.postId, n: count() })
@@ -377,7 +384,12 @@ function interactionsOf(db: Db, viewerId: string, asOf: Date): Promise<Interacti
     .from(post)
     .innerJoin(target, eq(target.id, post.repostOfId))
     .where(
-      and(eq(post.authorId, viewerId), isNull(post.deletedAt), within(post.createdAt), notOwn),
+      and(
+        eq(post.authorId, viewerId),
+        and(isNull(post.deletedAt), isNull(post.archivedAt)),
+        within(post.createdAt),
+        notOwn,
+      ),
     );
   return likes.unionAll(saves).unionAll(shares).unionAll(comments).unionAll(reposts);
 }

@@ -45,6 +45,7 @@ describe("toMemberCardVM", () => {
       posts: "24",
       followers: "1.2K",
       isFollowing: false,
+      teamMember: false,
       silver: false,
       organization: false,
     });

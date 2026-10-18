@@ -19,7 +19,7 @@ export const communityStatsRepository = {
   read: (signal?: AbortSignal) => readCount("/api/community/stats", signal),
   readPlatform: () =>
     readCount(
-      `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"}/community/public-stats`,
+      `${(process.env.NODE_ENV === "development" && process.env.KINKORD_DEV_API_PROXY) || process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/community/public-stats`,
       AbortSignal.timeout(5_000),
     ),
 };
