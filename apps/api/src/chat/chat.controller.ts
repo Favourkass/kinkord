@@ -45,6 +45,11 @@ export class ChatController {
     private readonly realtime: RealtimeService,
   ) {}
 
+  @Post("inbox-seen")
+  seeInbox(@Req() req: AuthedRequest) {
+    return this.chat.seeInbox(req.user.id);
+  }
+
   @Get("unread-count")
   unreadCount(@Req() req: AuthedRequest) {
     return this.chat.unreadCount(req.user.id);

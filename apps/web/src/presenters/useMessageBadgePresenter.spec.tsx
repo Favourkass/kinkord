@@ -97,3 +97,11 @@ it("ignores a stale fetch after a newer push refresh", async () => {
   await act(async () => resolve({ count: 20 }));
   expect(result.current).toBe(7);
 });
+
+it("synchronizes an inbox seen on another device", async () => {
+  unread.mockResolvedValueOnce({ count: 6 }).mockResolvedValueOnce({ count: 0 });
+  const { result } = renderHook(() => useMessageBadgePresenter(true));
+  await waitFor(() => expect(result.current).toBe(6));
+  act(() => live.hear?.({ type: "inbox_seen" }));
+  await waitFor(() => expect(result.current).toBe(0));
+});

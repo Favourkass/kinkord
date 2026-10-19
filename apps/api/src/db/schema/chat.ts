@@ -83,3 +83,11 @@ export const message = pgTable(
     index("message_sender_idx").on(t.senderId, t.createdAt),
   ],
 );
+
+/** Inbox attention is independent from conversation read receipts. */
+export const chatInboxSeen = pgTable("chat_inbox_seen", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  seenAt: timestamp("seen_at", { withTimezone: true }).notNull(),
+});

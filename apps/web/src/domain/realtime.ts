@@ -18,7 +18,8 @@ export type RealtimeConnectionPM =
 export type RealtimeEventPM =
   | { type: "message"; conversationId: string }
   | { type: "typing"; conversationId: string; typing: boolean }
-  | { type: "notification" };
+  | { type: "notification" }
+  | { type: "inbox_seen" };
 
 /** Base64url without padding, as AppSync's handshake header wants it. */
 function base64Url(text: string): string {
@@ -52,6 +53,8 @@ export function eventsFromFrame(frame: unknown): RealtimeEventPM[] {
       typeof e.typing === "boolean"
     ) {
       out.push({ type: "typing", conversationId: e.conversationId, typing: e.typing });
+    } else if (e?.type === "inbox_seen") {
+      out.push({ type: "inbox_seen" });
     } else if (e?.type === "notification") {
       out.push({ type: "notification" });
     }

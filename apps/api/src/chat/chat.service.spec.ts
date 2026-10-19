@@ -655,7 +655,7 @@ describe("ChatService.markRead", () => {
   });
 
   it("moves the read pointer to the message, and clears the chat's inbox row up to it", async () => {
-    const { service, after, push } = make([
+    const { service, after, push, realtime } = make([
       [{ userId: "u1" }],
       [{ id: "m2", createdAt: at }],
       undefined,
@@ -665,6 +665,7 @@ describe("ChatService.markRead", () => {
       lastReadMessageId: "m2",
     });
     expect(push.chatRead).toHaveBeenCalledWith("u1", "c1", at);
+    expect(realtime.notify).toHaveBeenCalledWith(["u1"], { type: "message", conversationId: "c1" });
   });
 });
 
@@ -1077,14 +1078,23 @@ describe("chat unread badge", () => {
     const { service, calls } = make([[{ total: 17 }]]);
     await expect(service.unreadCount("u1")).resolves.toEqual({ count: 17 });
     expect(calls.some((c) => c.op === "limit")).toBe(false);
-    const query = whereSql(calls, 0);
-    expect(query).toContain('"message"."deleted_at" is null');
-    expect(query).toContain('"message"."sender_id" <>');
-    expect(query).toContain('"conversation_participant"."last_read_at"');
-    const join = new PgDialect().sqlToQuery(
-      calls.find((c) => c.op === "innerJoin")!.args[1] as SQL,
-    );
-    expect(join.params).toContain("u1");
+    const selection = calls.find((c) => c.op === "select")!.args[0] as { total: SQL };
+    const query = new PgDialect().sqlToQuery(selection.total);
+    expect(query.sql).toContain('"message"."deleted_at" is null');
+    expect(query.sql).toContain('"message"."sender_id" <>');
+    expect(query.sql).toContain('"conversation_participant"."last_read_at"');
+    expect(query.sql).toContain('"chat_inbox_seen"."seen_at"');
+    expect(query.params).toContain("u1");
+  });
+  it("persists inbox attention without updating conversation reads and syncs other devices", async () => {
+    const { service, calls, realtime } = make([[]]);
+    await expect(service.seeInbox("u1")).resolves.toEqual({ ok: true });
+    expect(calls.some((c) => c.op === "update")).toBe(false);
+    const upsert = calls.find((c) => c.op === "onConflictDoUpdate")!.args[0] as {
+      set: { seenAt: SQL };
+    };
+    expect(new PgDialect().sqlToQuery(upsert.set.seenAt).sql).toContain("greatest");
+    expect(realtime.notify).toHaveBeenCalledWith(["u1"], { type: "inbox_seen" });
   });
   it("returns zero when no messages are unread", async () => {
     await expect(make([[{ total: 0 }]]).service.unreadCount("u1")).resolves.toEqual({ count: 0 });

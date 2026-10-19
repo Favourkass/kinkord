@@ -239,6 +239,13 @@
       "when": 1792225978037,
       "tag": "0033_post_archiving",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1792415639544,
+      "tag": "0034_inbox_seen",
+      "breakpoints": true
     }
   ]
 }
