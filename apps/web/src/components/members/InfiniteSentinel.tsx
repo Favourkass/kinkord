@@ -24,16 +24,23 @@ export default function InfiniteSentinel({
 
   useEffect(() => {
     const node = ref.current;
-    if (!enabled || !node || typeof IntersectionObserver === "undefined") return;
+    if (!enabled || loading || !node || typeof IntersectionObserver === "undefined") return;
+    let requested = false;
     const io = new IntersectionObserver(
       (entries) => {
-        if (entries.some((e) => e.isIntersecting)) onVisible();
+        if (!requested && entries.some((e) => e.isIntersecting)) {
+          requested = true;
+          onVisible();
+        }
       },
       { rootMargin: "320px 0px" },
     );
     io.observe(node);
-    return () => io.disconnect();
-  }, [enabled, onVisible]);
+    return () => {
+      requested = true;
+      io.disconnect();
+    };
+  }, [enabled, loading, onVisible]);
 
   return (
     <div ref={ref} className="py-[18px] text-center text-[13px] text-app-muted" aria-live="polite">
