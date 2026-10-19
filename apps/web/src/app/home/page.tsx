@@ -71,6 +71,7 @@ export default function HomePage() {
         authorName: home.name,
         avatarUrl: home.avatarUrl,
         draft: feed.draft,
+        editor: feed.editor,
         onDraftChange: feed.setDraft,
         mentions: feed.postMentions,
         maxLength: postBodyMax(home.silver),

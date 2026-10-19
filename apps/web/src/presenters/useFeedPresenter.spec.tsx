@@ -1912,3 +1912,21 @@ describe("the home feed's tabs", () => {
     });
   });
 });
+
+it("keeps editor formatting and emoji in the persisted post body with a styled preview", async () => {
+  const { result } = await loaded();
+  act(() => result.current.openComposer());
+  act(() => result.current.setDraft("Hello\nworld"));
+  act(() => result.current.editor.onFormat("bold", { start: 0, end: 5 }));
+  expect(result.current.draft).toBe("**Hello**\nworld");
+  expect(result.current.editor.selection).toMatchObject({ start: 2, end: 7 });
+  act(() =>
+    result.current.editor.onInsert("🔥", {
+      start: result.current.draft.length,
+      end: result.current.draft.length,
+    }),
+  );
+  expect(result.current.editor.previewParts[0]).toEqual({ text: "Hello", marks: { bold: true } });
+  await act(async () => result.current.submitPost());
+  expect(create).toHaveBeenCalledWith(expect.objectContaining({ body: "**Hello**\nworld🔥" }));
+});
