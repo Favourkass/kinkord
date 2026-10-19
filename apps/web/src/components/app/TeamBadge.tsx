@@ -20,7 +20,7 @@ export default function TeamBadge({ size = 20, className = "" }: TeamBadgeProps)
         width={size}
         height={size}
         className="object-contain"
-        style={{ width: size * 0.9, height: size * 0.9 }}
+        style={{ width: size * 0.8, height: size * 0.8 }}
       />
     </span>
   );
