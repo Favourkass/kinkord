@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
-import { Bold, Italic, Underline, Smile, Eye, Pencil, X, ImagePlus } from "lucide-react";
+import { Bold, Italic, Underline, Smile, X, ImagePlus } from "lucide-react";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import type { DraftPhotoVM } from "@/domain/post";
 import type { BodyPart } from "@/domain/mentions";
 import type { PostTextFormat, DraftSelection } from "@/domain/text-format";
 import { useVisibleViewport } from "@/components/chat/useVisibleViewport";
-import BodyText from "./BodyText";
 import MentionSuggestions, {
   activeMentionId,
   composing,
@@ -82,9 +81,7 @@ function OpenComposerDialog(p: ComposerDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const selection = useRef<DraftSelection>({ start: p.draft.length, end: p.draft.length });
   const [emojiOpen, setEmojiOpen] = useState(false);
-  const [preview, setPreview] = useState(false);
   const mentionListId = useId();
-  const hintId = useId();
   const emojiId = useId();
   const viewport = useVisibleViewport();
 
@@ -99,13 +96,6 @@ function OpenComposerDialog(p: ComposerDialogProps) {
       if (focused instanceof HTMLElement) focused.focus();
     };
   }, [p.autoPickPhoto]);
-
-  useEffect(() => {
-    if (!preview && !p.autoPickPhoto) {
-      textRef.current?.focus({ preventScroll: true });
-      textRef.current?.setSelectionRange(selection.current.start, selection.current.end);
-    }
-  }, [preview, p.autoPickPhoto]);
 
   const requested = p.editor.selection;
   useLayoutEffect(() => {
@@ -128,7 +118,7 @@ function OpenComposerDialog(p: ComposerDialogProps) {
     if (!box) return;
     box.style.height = "auto";
     box.style.height = `${Math.max(140, (viewport?.height ?? 750) - 350, box.scrollHeight)}px`;
-  }, [p.draft, viewport?.height, preview]);
+  }, [p.draft, viewport?.height]);
   const range = () => {
     const box = textRef.current;
     if (box) selection.current = { start: box.selectionStart, end: box.selectionEnd };
@@ -205,59 +195,47 @@ function OpenComposerDialog(p: ComposerDialogProps) {
             </div>
           </div>
           <div className="relative">
-            {preview ? (
-              <section
-                aria-label={p.editor.labels.previewTitle}
-                className="min-h-[200px] whitespace-pre-wrap break-words py-2 text-[22px] leading-relaxed text-white"
-              >
-                <BodyText parts={p.editor.previewParts} />
-              </section>
-            ) : (
-              <textarea
-                ref={textRef}
-                aria-label={p.editor.labels.text}
-                aria-describedby={hintId}
-                aria-autocomplete="list"
-                aria-controls={mentionListId}
-                aria-activedescendant={activeMentionId(mentionListId, p.mentions)}
-                value={p.draft}
-                maxLength={p.maxLength}
-                readOnly={p.posting}
-                onChange={(e) => {
-                  range();
-                  p.onDraftChange(e.target.value, e.target.selectionStart);
-                }}
-                onSelect={(e) => {
-                  range();
-                  p.onDraftChange(e.currentTarget.value, e.currentTarget.selectionStart);
-                }}
-                onKeyDown={(e) => {
-                  if (composing(e) || p.posting) return;
-                  const key = e.key.toLowerCase();
-                  if ((e.ctrlKey || e.metaKey) && ["b", "i", "u"].includes(key)) {
-                    e.preventDefault();
-                    format(key === "b" ? "bold" : key === "i" ? "italic" : "underline");
-                    return;
-                  }
-                  // Enter always belongs to this multiline editor; Tab/click can pick a mention.
-                  if (e.key !== "Enter" && p.mentions.open && p.mentions.onKey(e.key))
-                    e.preventDefault();
-                }}
-                placeholder={p.labels.placeholder}
-                rows={8}
-                className="block w-full resize-none border-0 bg-black py-2 text-[22px] leading-relaxed text-white caret-[#ffba1f] outline-none placeholder:text-[#a3a3a3] sm:text-[24px]"
-              />
-            )}
-            {!preview && (
-              <MentionSuggestions
-                {...p.mentions}
-                id={mentionListId}
-                label={p.labels.mentions}
-                organizationLabel={p.labels.organization}
-                verifiedOrganizationLabel={p.labels.verifiedOrganization}
-                className="mt-2"
-              />
-            )}
+            <textarea
+              ref={textRef}
+              aria-label={p.editor.labels.text}
+              aria-autocomplete="list"
+              aria-controls={mentionListId}
+              aria-activedescendant={activeMentionId(mentionListId, p.mentions)}
+              value={p.draft}
+              maxLength={p.maxLength}
+              readOnly={p.posting}
+              onChange={(e) => {
+                range();
+                p.onDraftChange(e.target.value, e.target.selectionStart);
+              }}
+              onSelect={(e) => {
+                range();
+                p.onDraftChange(e.currentTarget.value, e.currentTarget.selectionStart);
+              }}
+              onKeyDown={(e) => {
+                if (composing(e) || p.posting) return;
+                const key = e.key.toLowerCase();
+                if ((e.ctrlKey || e.metaKey) && ["b", "i", "u"].includes(key)) {
+                  e.preventDefault();
+                  format(key === "b" ? "bold" : key === "i" ? "italic" : "underline");
+                  return;
+                }
+                // Enter always belongs to this multiline editor; Tab/click can pick a mention.
+                if (e.key !== "Enter" && p.mentions.open && p.mentions.onKey(e.key))
+                  e.preventDefault();
+              }}
+              placeholder={p.labels.placeholder}
+              rows={8}
+              className="block w-full resize-none border-0 bg-black py-2 text-[22px] leading-relaxed text-white caret-[#ffba1f] outline-none placeholder:text-[#a3a3a3] sm:text-[24px]"
+            />
+            <MentionSuggestions
+              {...p.mentions}
+              id={mentionListId}
+              label={p.labels.mentions}
+              organizationLabel={p.labels.organization}
+              verifiedOrganizationLabel={p.labels.verifiedOrganization}
+              className="mt-2"
+            />
           </div>
           {p.photos.length > 0 && (
             <ul className="mt-3 grid grid-cols-2 gap-2">
@@ -294,9 +272,6 @@ function OpenComposerDialog(p: ComposerDialogProps) {
               ))}
             </ul>
           )}
-          <p id={hintId} className="mt-4 text-xs leading-5 text-[#a3a3a3]">
-            {p.editor.labels.hint}
-          </p>
           {p.error && (
             <p role="alert" className="pt-3 text-sm text-red-300">
               {p.error}
@@ -365,18 +340,6 @@ function OpenComposerDialog(p: ComposerDialogProps) {
               className="grid size-10 place-items-center rounded-lg border border-white/20 text-kink-gold-bright"
             >
               <Smile size={21} />
-            </button>
-            <button
-              type="button"
-              aria-label={preview ? p.editor.labels.edit : p.editor.labels.preview}
-              aria-pressed={preview}
-              onClick={() => {
-                range();
-                setPreview((v) => !v);
-              }}
-              className="ml-auto grid size-10 place-items-center rounded-lg border border-white/20 text-kink-gold-bright"
-            >
-              {preview ? <Pencil size={20} /> : <Eye size={20} />}
             </button>
           </div>
           <div className="flex items-center gap-3 border-t border-white/10 pt-2">
