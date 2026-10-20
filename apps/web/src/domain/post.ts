@@ -3,6 +3,7 @@
  * card — relative time, compact counts, and the "… more" clamp the design puts
  * on a long body.
  */
+import { formattedBodyParts } from "./text-format";
 import { compactNumber, shortTimeAgo } from "@/util/format";
 import { ageTagOf, fullLocationOf } from "./member";
 import { bodyParts, clipParts, type BodyPart, type MentionPM } from "./mentions";
@@ -347,7 +348,7 @@ export function toPostVM(
   const body = pm.body && shown !== null ? clampBody(pm.body) : pm.body;
   // Mentions are read on the whole text, then cut: a handle the clamp cuts
   // short reads as text until "more", never as whoever its first letters name.
-  const parts = pm.body ? bodyParts(pm.body, pm.mentions, (u) => hrefFor(u) ?? "") : [];
+  const parts = pm.body ? formattedBodyParts(pm.body, pm.mentions, (u) => hrefFor(u) ?? "") : [];
   return {
     id: pm.id,
     postId: pm.postId,

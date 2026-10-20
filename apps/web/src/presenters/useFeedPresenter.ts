@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { FEED_COPY, FEED_PHOTO_LIMIT, FEED_SUGGESTION_LIMIT } from "@/constants/feed";
+import { FEED_EDITOR, FEED_COPY, FEED_PHOTO_LIMIT, FEED_SUGGESTION_LIMIT } from "@/constants/feed";
 import { Routes } from "@/constants/Routes";
 import {
   COMMENT_BODY_MAX,
@@ -28,6 +28,13 @@ import {
   type SuggestionSegmentVM,
   type SuggestionShow,
 } from "@/domain/post";
+import {
+  formattedBodyParts,
+  type PostTextFormat,
+  type DraftEdit,
+  type DraftSelection,
+} from "@/domain/text-format";
+import { formatPostDraft, insertPostText } from "@/services/post-editor.service";
 import type { KinkCurrency } from "@/domain/kinkcoins";
 import type { WalletSummaryPM } from "@/domain/wallet";
 import type { GiftInDoubt } from "@/domain/wallet";
@@ -219,6 +226,38 @@ export function useFeedPresenter({
     },
     [trackMention],
   );
+  const [draftSelection, setDraftSelection] = useState<
+    (DraftSelection & { revision: number }) | null
+  >(null);
+  const applyDraftEdit = useCallback(
+    (edit: DraftEdit | null) => {
+      if (!edit) {
+        setComposerError(FEED_EDITOR.labels.limit);
+        return;
+      }
+      setComposerError(null);
+      typeDraft(edit.text, edit.selection.end);
+      setDraftSelection((previous) => ({
+        ...edit.selection,
+        revision: (previous?.revision ?? 0) + 1,
+      }));
+    },
+    [typeDraft],
+  );
+  const formatDraft = useCallback(
+    (format: PostTextFormat, selection: DraftSelection) => {
+      applyDraftEdit(formatPostDraft(draft, selection, format, postMaxLength));
+    },
+    [applyDraftEdit, draft, postMaxLength],
+  );
+  const insertDraft = useCallback(
+    (value: string, selection: DraftSelection) => {
+      applyDraftEdit(insertPostText(draft, selection, value, postMaxLength));
+    },
+    [applyDraftEdit, draft, postMaxLength],
+  );
+  const draftPreviewParts = useMemo(() => formattedBodyParts(draft, [], () => ""), [draft]);
+
   const typeCommentDraft = useCallback(
     (value: string, caret?: number) => {
       setCommentDraft(value);
@@ -1137,6 +1176,13 @@ export function useFeedPresenter({
     closeComposer,
     draft,
     setDraft: typeDraft,
+    editor: {
+      ...FEED_EDITOR,
+      selection: draftSelection,
+      previewParts: draftPreviewParts,
+      onFormat: formatDraft,
+      onInsert: insertDraft,
+    },
     postMentions: mentionPicker("post", postMaxLength),
     visibility,
     setVisibility,
