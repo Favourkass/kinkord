@@ -245,6 +245,12 @@ export function validateNewRule(draft: NewBlockRulePM): string | null {
   return null;
 }
 
+/**
+ * An admin's Silver: a founder's comes with their account, `given` is the
+ * founders' gift to an admin, `paid` they bought themselves.
+ */
+export type AdminSilver = "founder" | "given" | "paid";
+
 /** Someone with the admin tools. */
 export interface AdminTeamMemberPM {
   id: string;
@@ -256,6 +262,10 @@ export interface AdminTeamMemberPM {
   founder: boolean;
   /** When they were made an admin; null for a founder. */
   since: string | null;
+  /** Null on Basic. */
+  silver: AdminSilver | null;
+  /** When paid Silver runs out; null for any other kind. */
+  silverUntil: string | null;
 }
 
 export interface AdminTeamPM {
@@ -272,6 +282,10 @@ export interface AdminTeamRowVM {
   note: string;
   href: string;
   removable: boolean;
+  /** Their Silver, in words; empty on Basic, and for a founder, whose Silver goes without saying. */
+  silver: string;
+  /** What a founder can do about their Silver here; null for anyone else, or for a founder's row. */
+  silverAction: "give" | "remove" | null;
 }
 
 export function toAdminTeamRowVM(
@@ -279,10 +293,16 @@ export function toAdminTeamRowVM(
   opts: {
     canManage: boolean;
     href: (id: string) => string;
-    labels: { founder: string; since: (date: string) => string };
+    labels: {
+      founder: string;
+      since: (date: string) => string;
+      silverGiven: string;
+      silverPaid: (date: string) => string;
+    };
   },
 ): AdminTeamRowVM {
   const since = shortDate(pm.since);
+  const paidUntil = pm.silver === "paid" ? shortDate(pm.silverUntil) : null;
   return {
     id: pm.id,
     title: pm.displayName?.trim() || pm.name,
@@ -291,6 +311,13 @@ export function toAdminTeamRowVM(
     note: pm.founder ? opts.labels.founder : since ? opts.labels.since(since) : "",
     href: opts.href(pm.id),
     removable: opts.canManage && !pm.founder,
+    silver:
+      pm.silver === "given"
+        ? opts.labels.silverGiven
+        : paidUntil
+          ? opts.labels.silverPaid(paidUntil)
+          : "",
+    silverAction: !opts.canManage || pm.founder ? null : pm.silver === "given" ? "remove" : "give",
   };
 }
 

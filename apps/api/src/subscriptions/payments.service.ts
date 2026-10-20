@@ -14,6 +14,7 @@ import { containsPattern } from "../push/notifications.service";
 import { PushService } from "../push/push.service";
 import { StorageService } from "../storage/storage.service";
 import type { AdminPaymentDto, PaymentSettingsDto, PaymentSettingsInput } from "./dto";
+import { silverGiven } from "./given-silver";
 import { addPeriod } from "./plans";
 import { expireAbandoned, readSettings, toPaymentDto } from "./subscriptions.service";
 
@@ -116,31 +117,47 @@ export class PaymentsService {
         .limit(1);
       if (!member) throw new NotFoundException("This member's account no longer exists.");
       const [current] = await tx
-        .select({ end: memberSubscription.currentPeriodEnd })
+        .select({
+          end: memberSubscription.currentPeriodEnd,
+          grantedBy: memberSubscription.grantedBy,
+          paidUntil: memberSubscription.paidUntil,
+        })
         .from(memberSubscription)
         .where(eq(memberSubscription.userId, row.userId))
         .for("update")
         .limit(1);
       const now = new Date();
       const running = Boolean(current && current.end > now);
-      const from = running && current ? current.end : now;
-      const until = addPeriod(from, row.period);
-      // Verifying is an admin looking at the member as they are now, so a check
-      // held after a name or photo change shows again. A lapsed run starts over.
-      await tx
-        .insert(memberSubscription)
-        .values({ userId: row.userId, plan: row.plan, currentPeriodEnd: until, startedAt: now })
-        .onConflictDoUpdate({
-          target: memberSubscription.userId,
-          set: {
-            plan: row.plan,
-            currentPeriodEnd: until,
-            checkHeldAt: null,
-            checkHoldReason: null,
-            updatedAt: now,
-            ...(running ? {} : { startedAt: now }),
-          },
-        });
+      let until: Date;
+      if (current && running && silverGiven(current)) {
+        // Silver the founders gave runs on. The payment adds to the member's
+        // own time, set aside for them if the gift is ever taken back.
+        const paid = current.paidUntil && current.paidUntil > now ? current.paidUntil : now;
+        await tx
+          .update(memberSubscription)
+          .set({ paidUntil: addPeriod(paid, row.period), updatedAt: now })
+          .where(eq(memberSubscription.userId, row.userId));
+        until = current.end;
+      } else {
+        const from = running && current ? current.end : now;
+        until = addPeriod(from, row.period);
+        // Verifying is an admin looking at the member as they are now, so a check
+        // held after a name or photo change shows again. A lapsed run starts over.
+        await tx
+          .insert(memberSubscription)
+          .values({ userId: row.userId, plan: row.plan, currentPeriodEnd: until, startedAt: now })
+          .onConflictDoUpdate({
+            target: memberSubscription.userId,
+            set: {
+              plan: row.plan,
+              currentPeriodEnd: until,
+              checkHeldAt: null,
+              checkHoldReason: null,
+              updatedAt: now,
+              ...(running ? {} : { startedAt: now }),
+            },
+          });
+      }
       await tx.insert(moderationLog).values({
         actorId,
         action: "payment_verified",

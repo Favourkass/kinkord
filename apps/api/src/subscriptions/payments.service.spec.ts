@@ -212,6 +212,28 @@ describe("PaymentsService.verify", () => {
     expect(upsert.set).toMatchObject({ checkHeldAt: null });
   });
 
+  it("adds a payment made while Silver is given to the admin's own time, kept for them", async () => {
+    const forGood = new Date("2099-12-31T12:00:00Z");
+    const paidUntil = new Date("2026-10-20T08:00:00Z");
+    const { service, calls, after, left } = make([
+      [payment()],
+      [{ id: "u1" }],
+      [{ end: forGood, grantedBy: "f1", paidUntil }],
+      undefined,
+      undefined,
+    ]);
+    await expect(service.verify("a1", ID)).resolves.toEqual({
+      id: ID,
+      silverUntil: "2099-12-31T12:00:00.000Z",
+    });
+    expect(after("update", memberSubscription, "set")).toEqual({
+      paidUntil: new Date("2026-11-20T08:00:00Z"),
+      updatedAt: NOW,
+    });
+    expect(calls.some((c) => c.op === "insert" && c.args[0] === memberSubscription)).toBe(false);
+    expect(left()).toBe(0);
+  });
+
   it("only counts a payment once, however many admins press it", async () => {
     const { service, push } = make([[], [{ status: "verified" }]]);
     await expect(service.verify("a2", ID)).rejects.toThrow("This payment is already verified.");
