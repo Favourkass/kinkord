@@ -378,5 +378,11 @@
     "count": 168634,
     "unmappedRecordCount": 15,
     "changes": "GeoNames feature class P excluding historical, abandoned and destroyed places; administrative code mapped via admin1CodesASCII; names up to 80 characters, deduplicated per subdivision. Standard build-location-files filtering applies. Unlisted places can be typed in signup."
+  },
+  "requestedNames": {
+    "source": "Product owner messages and two pasted USA lists, 2026-10-20",
+    "file": "requested-location-options.json",
+    "scope": "320 Ghana entries across all 16 regions; 1,233 unique USA entries across 30 states and Washington, D.C. (1,240 supplied lines, 7 exact repeats).",
+    "processing": "Preserve exact supplied spelling and regional grouping. Deduplicate repeated names within each group, merge with existing additional names, and sort alphabetically. Supplied names take precedence over normalized variants and bypass generic cleanup, preserving Wa, Ho and Ko. These are product-supplied groupings, not independently verified geographic corrections."
   }
 }

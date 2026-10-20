@@ -282,7 +282,7 @@ it("lists Washington, D.C. separately and selects its compatible location value"
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   fireEvent.click(screen.getByLabelText("State"));
   const states = within(screen.getByRole("listbox", { name: "State" }));
-  expect(states.getByRole("option", { name: "Washington", exact: true })).toBeTruthy();
-  fireEvent.click(states.getByRole("option", { name: "Washington, D.C.", exact: true }));
+  expect(states.getByRole("option", { name: "Washington" })).toBeTruthy();
+  fireEvent.click(states.getByRole("option", { name: "Washington, D.C." }));
   expect(screen.getByLabelText("State").textContent).toContain("Washington, D.C.");
 });

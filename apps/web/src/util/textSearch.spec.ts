@@ -59,3 +59,13 @@ describe("optionMatcher", () => {
     expect(optionMatcher(options(["Aba"]))("")).toEqual({ hits: options(["Aba"]), more: false });
   });
 });
+
+it("keeps an exact town match visible ahead of more than 50 word-prefix matches", () => {
+  const match = optionMatcher(
+    options([...Array.from({ length: 70 }, (_, i) => `Area ${i} Mobile Home Park`), "Mobile"]),
+  );
+  const result = match("  MOBILE  ");
+  expect(result.hits[0].label).toBe("Mobile");
+  expect(result.hits).toHaveLength(SEARCH_RESULT_LIMIT);
+  expect(result.more).toBe(true);
+});

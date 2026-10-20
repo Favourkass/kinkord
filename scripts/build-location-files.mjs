@@ -8,8 +8,9 @@
  * Inputs, in scripts/data:
  *   location-options.json    GeoNames places per state/county (see location-data-sources.json)
  *   ng-curated-areas.json    the areas signup offered before, so members' saved ones stay listed
+ *   requested-location-options.json    product-supplied names and groupings, preserved verbatim
  *
- * Run `node scripts/build-location-files.mjs` after changing either, and commit the output.
+ * Run `node scripts/build-location-files.mjs` after changing any input, and commit the output.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -116,7 +117,7 @@ function mergePlaces(...lists) {
  * { states: { NG: [...names] }, files: { "NG/akwa-ibom": [...places] } } from the
  * GeoNames lists and the curated Nigerian areas.
  */
-export function buildLocations(places, curated) {
+export function buildLocations(places, curated, requested = {}) {
   const states = {};
   const files = {};
   for (const [country, byState] of Object.entries(places)) {
@@ -129,9 +130,11 @@ export function buildLocations(places, curated) {
         .filter((name) => !isJunkPlace(name, country));
       const file = `${country}/${locationSlug(state)}`;
       if (file in files) throw new Error(`Two places share ${file}.json`);
-      // The spellings members saved come first, then ours, then GeoNames'.
+      // Product-supplied names bypass cleanup (including valid short names like Wa/Ho/Ko).
+      // Keep their spellings and groupings even when GeoNames differs.
       files[file] = mergePlaces(
         country === "NG" ? (curated[state] ?? []) : [],
+        requested[country]?.[state] ?? [],
         ADDED[country]?.[state] ?? [],
         geonames,
       );
@@ -139,17 +142,25 @@ export function buildLocations(places, curated) {
   }
   for (const state of Object.keys(curated))
     if (!states.NG?.includes(state)) throw new Error(`Curated areas for unknown state ${state}`);
+  for (const [country, byState] of Object.entries(requested))
+    for (const state of Object.keys(byState))
+      if (!states[country]?.includes(state))
+        throw new Error(`Requested places for unknown subdivision ${country}/${state}`);
   return { states, files };
 }
 
 export function readInputs(dir = DATA_DIR) {
   const read = (name) => JSON.parse(fs.readFileSync(path.join(dir, name), "utf8"));
-  return { places: read("location-options.json"), curated: read("ng-curated-areas.json") };
+  return {
+    places: read("location-options.json"),
+    curated: read("ng-curated-areas.json"),
+    requested: read("requested-location-options.json"),
+  };
 }
 
 function main() {
-  const { places, curated } = readInputs();
-  const { states, files } = buildLocations(places, curated);
+  const { places, curated, requested } = readInputs();
+  const { states, files } = buildLocations(places, curated, requested);
   fs.rmSync(OUT_DIR, { recursive: true, force: true });
   for (const [file, list] of Object.entries(files)) {
     const target = path.join(OUT_DIR, `${file}.json`);

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { optionMatcher } from "@/util/textSearch";
 
 const PUBLIC_DIR = path.resolve(__dirname, "../../public");
 /** Serves /locations/* from the generated files, as the app's server would. */
@@ -96,4 +97,27 @@ it.each([
   const towns = await regionsForState(country, state);
   expect(towns).toContain(town);
   expect(towns).toEqual([...towns].sort((a, b) => a.localeCompare(b)));
+});
+
+it("loads every product-supplied place and makes it selectable through exact-name search", async () => {
+  const requested = JSON.parse(
+    fs.readFileSync(
+      path.resolve(__dirname, "../../../../scripts/data/requested-location-options.json"),
+      "utf8",
+    ),
+  ) as Record<string, Record<string, string[]>>;
+  const { regionsForState } = await load();
+  for (const [country, regions] of Object.entries(requested)) {
+    for (const [region, names] of Object.entries(regions)) {
+      const loaded = await regionsForState(country, region);
+      const match = optionMatcher(loaded.map((label) => ({ label })));
+      for (const name of names) {
+        expect(loaded, `${country}/${region}: ${name}`).toContain(name);
+        expect(
+          match(name).hits.map((option) => option.label),
+          `Search ${country}/${region}: ${name}`,
+        ).toContain(name);
+      }
+    }
+  }
 });
