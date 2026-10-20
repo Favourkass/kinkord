@@ -60,7 +60,11 @@ describe("ModerationController", () => {
 
   it("tells the app whether the signed-in member is an admin", async () => {
     const { controller } = make();
-    await expect(controller.access(req)).resolves.toEqual({ isAdmin: true });
+    await expect(controller.access(req)).resolves.toEqual({ isAdmin: true, isFounder: true });
+    await expect(controller.access(teammate)).resolves.toEqual({
+      isAdmin: true,
+      isFounder: false,
+    });
   });
 
   it("passes a valid block through with the acting admin", async () => {
@@ -135,6 +139,15 @@ describe("team badge admin boundary", () => {
     expect(service.setTeamBadge).toHaveBeenCalledWith("u1", "u9", true);
     for (const body of [{ enabled: "true" }, {}, { enabled: true, role: "admin" }])
       expect(() => controller.teamBadge(req, "u9", body)).toThrow(BadRequestException);
+  });
+  it("lets only the founders give or remove it, not a staff admin", () => {
+    const { controller, service } = make();
+    for (const enabled of [true, false])
+      expect(() => controller.teamBadge(teammate, "u9", { enabled })).toThrow(ForbiddenException);
+    expect(() => controller.teamBadge(teammate, "u7", { enabled: true })).toThrow(
+      ForbiddenException,
+    );
+    expect(service.setTeamBadge).not.toHaveBeenCalled();
   });
   it("requires both authentication and admin authorization", async () => {
     const { GUARDS_METADATA } = await import("@nestjs/common/constants");

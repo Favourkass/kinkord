@@ -111,6 +111,7 @@ export function useMemberProfilePresenter(
   const [followBusy, setFollowBusy] = useState(false);
   const [friendBusy, setFriendBusy] = useState(false);
   const [friendError, setFriendError] = useState<string | null>(null);
+  const [confirmingUnfriend, setConfirmingUnfriend] = useState(false);
   const [peopleTab, setPeopleTab] = useState<FriendsTab>("all");
   const [people, setPeople] = useState<PeopleOutcome | null>(null);
   const [suggested, setSuggested] = useState<SuggestOutcome | null>(null);
@@ -293,6 +294,8 @@ export function useMemberProfilePresenter(
       }
       const current = currentSuggested?.items.find((item) => item.userId === row.userId);
       const action = friendshipActions(current?.friendship ?? "none", FRIENDSHIP_COPY).action;
+      // "Friends" here is only a label: removing someone happens on their profile, after a confirmation.
+      if (action === "remove") return;
       markBusy(row.userId, true);
       void friendshipService
         .change(row.username, action)
@@ -432,15 +435,29 @@ export function useMemberProfilePresenter(
     pm && !pm.isSelf && !organization
       ? {
           label: friendActions.label,
+          friends: pm.friendship === "friends",
           secondaryLabel: friendActions.secondaryLabel,
           busy: friendBusy,
           error: friendError,
-          onPrimary: () => void changeFriendship(friendActions.action),
+          // Removing a friend can't be taken back alone (they'd have to accept again), so it asks first.
+          onPrimary: () =>
+            friendActions.action === "remove"
+              ? setConfirmingUnfriend(true)
+              : void changeFriendship(friendActions.action),
           onSecondary: () => {
             if (friendActions.secondaryAction) void changeFriendship(friendActions.secondaryAction);
           },
         }
       : undefined;
+  const unfriendConfirm = {
+    open: confirmingUnfriend && pm?.friendship === "friends",
+    message: FRIENDSHIP_COPY.removeConfirm(pm?.displayName ?? ""),
+    confirmLabel: FRIENDSHIP_COPY.remove,
+    cancelLabel: FRIENDSHIP_COPY.keep,
+    busy: friendBusy,
+    onConfirm: () => void changeFriendship("remove").finally(() => setConfirmingUnfriend(false)),
+    onCancel: () => setConfirmingUnfriend(false),
+  };
 
   const stats = vm?.stats;
   const peopleLabel = (key: FriendsTab) =>
@@ -491,6 +508,7 @@ export function useMemberProfilePresenter(
     toggleFollow,
     followBusy,
     friendAction,
+    unfriendConfirm,
     friendRequestsHref: Routes.friendRequests,
     friendRequestsLabel: FRIENDSHIP_COPY.title,
     /**

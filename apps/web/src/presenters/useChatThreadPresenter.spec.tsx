@@ -264,7 +264,7 @@ describe("useChatThreadPresenter", () => {
       expect(result.current.thread.newChat?.text).toContain("Upgrade to Kinkord Premium");
     });
 
-    it("requires Premium before a Nigerian free member starts their first chat", async () => {
+    it("offers Premium straight away where free members can't start chats (Nigeria)", async () => {
       svc.history.mockResolvedValue([]);
       svc.allowance.mockResolvedValue({
         newChatsPerDay: 0,
@@ -273,12 +273,17 @@ describe("useChatThreadPresenter", () => {
         silver: false,
       });
       const { result } = await ready();
-      await waitFor(() => expect(result.current.thread.newChat?.blocking).toBe(true));
-      expect(result.current.thread.newChat?.link).toEqual({
-        label: CHAT_COPY.getSilver, href: "/subscription",
-      });
-      expect(result.current.thread.newChat?.text).toContain("requires a Premium subscription");
-      expect(result.current.thread.newChat?.text).not.toContain("after midnight");
+      await waitFor(() =>
+        expect(result.current.thread.newChat).toEqual({
+          text: CHAT_COPY.newChatLimit(0),
+          blocking: true,
+          link: { label: "Upgrade to Premium", href: "/subscription" },
+        }),
+      );
+      const text = result.current.thread.newChat?.text ?? "";
+      expect(text).toContain("Messaging Is a Premium Feature");
+      expect(text).toContain("You can always reply when someone messages you first.");
+      expect(text).not.toContain("midnight");
     });
 
     it("offers a Silver member nothing more, only when it resets", async () => {

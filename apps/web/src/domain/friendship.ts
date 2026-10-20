@@ -19,6 +19,8 @@ export interface FriendshipCopy {
   accept: string;
   decline: string;
   remove: string;
+  /** Shown while friends; removing goes through a confirmation, never one tap. */
+  friends: string;
   cancel: string;
 }
 
@@ -40,7 +42,7 @@ export function friendshipActions(state: FriendshipState, copy: FriendshipCopy) 
       };
     case "friends":
       return {
-        label: copy.remove,
+        label: copy.friends,
         action: "remove" as const,
         secondaryLabel: null,
         secondaryAction: null,

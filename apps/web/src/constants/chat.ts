@@ -41,7 +41,11 @@ export const CHAT_COPY = {
     `You can start ${perDay} new ${perDay === 1 ? "chat" : "chats"} a day. Sending a message here uses one of today's.`,
   /** At the free allowance: the way to more is Silver. */
   newChatLimit: (perDay: number | null) =>
-    `🔒 Messaging Is a Premium Feature\n\nUpgrade to Kinkord Premium to unlock messaging and start connecting with kinksters worldwide.\n\nEnjoy more ways to connect, chat, and build meaningful relationships.\n\n${perDay === 0 ? "Starting new chats requires a Premium subscription. Replies in your existing chats aren't limited." : `You've used today's ${perDay === null ? "" : `${perDay} `}new ${perDay === 1 ? "chat" : "chats"}. You can start another after midnight. Replies in your existing chats aren't limited.`}`,
+    `🔒 Messaging Is a Premium Feature\n\nUpgrade to Kinkord Premium to unlock messaging and start connecting with kinksters worldwide.\n\nEnjoy more ways to connect, chat, and build meaningful relationships.\n\n${
+      perDay === 0
+        ? "You can always reply when someone messages you first."
+        : `You've used today's ${perDay === null ? "" : `${perDay} `}new ${perDay === 1 ? "chat" : "chats"}. You can start another after midnight. Replies in your existing chats aren't limited.`
+    }`,
   /** At Silver's allowance: nothing bigger to offer, just the reset. */
   newChatLimitSilver: (perDay: number | null) =>
     `You've used today's ${perDay === null ? "" : `${perDay} `}new chats. You can message someone new after midnight. Replies in your existing chats aren't limited.`,
