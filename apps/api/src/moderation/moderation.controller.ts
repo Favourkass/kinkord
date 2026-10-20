@@ -41,7 +41,7 @@ const newAdminSchema = z.object({
     .pipe(z.string().min(1, "Enter their username.").max(64)),
 });
 
-/** Who gets the admin tools, or the Kinkord Team badge, is the founders' decision alone. */
+/** Who gets the admin tools, the Kinkord Team badge or given Silver is the founders' decision alone. */
 function foundersOnly(req: AuthedRequest, message = "Only the founders can add or remove admins.") {
   if (!isSuperAdmin(req.user)) {
     throw new ForbiddenException(message);
@@ -182,5 +182,14 @@ export class ModerationController {
   async removeAdmin(@Req() req: AuthedRequest, @Param("id") id: string) {
     foundersOnly(req);
     return this.moderation.removeAdmin(req.user.id, id);
+  }
+
+  /** Silver for good for an admin, or taken back. Only the founders give it. */
+  @Post("staff/:id/silver")
+  @UseGuards(AdminGuard)
+  adminSilver(@Req() req: AuthedRequest, @Param("id") id: string, @Body() body: unknown) {
+    foundersOnly(req, "Only the founders can give or remove Silver.");
+    const input = parse(z.object({ enabled: z.boolean() }).strict(), body);
+    return this.moderation.setAdminSilver(req.user.id, id, input.enabled);
   }
 }

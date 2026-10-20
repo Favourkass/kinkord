@@ -11,6 +11,8 @@ export interface AdminTeamLabels {
   placeholder: string;
   add: string;
   remove: string;
+  giveSilver: string;
+  removeSilver: string;
   loading: string;
 }
 
@@ -22,6 +24,8 @@ export interface AdminTeamViewProps {
   notice: string | null;
   dialog: AdminDialogVM | null;
   remove: (id: string) => void;
+  /** Gives or takes back Silver, whichever the row offers. */
+  silver: (id: string) => void;
   form: {
     username: string;
     setUsername: (v: string) => void;
@@ -39,6 +43,7 @@ export default function AdminTeamView({
   notice,
   dialog,
   remove,
+  silver,
   form,
   labels,
 }: AdminTeamViewProps) {
@@ -100,16 +105,30 @@ export default function AdminTeamView({
                 <span className="truncate text-[16px] font-bold text-app-name">{r.title}</span>
                 <span className="truncate text-[14px] text-app-subtle">{r.handle}</span>
                 {r.note ? <span className="text-[12px] text-app-muted">{r.note}</span> : null}
+                {r.silver ? <span className="text-[12px] text-app-muted">{r.silver}</span> : null}
               </span>
             </Link>
-            {r.removable ? (
-              <button
-                type="button"
-                onClick={() => remove(r.id)}
-                className="h-[34px] shrink-0 rounded-[10px] px-[10px] text-[14px] font-bold text-app-subtle hover:bg-app-input"
-              >
-                {labels.remove}
-              </button>
+            {r.silverAction || r.removable ? (
+              <span className="flex shrink-0 flex-col items-end gap-[2px] md:flex-row md:items-center">
+                {r.silverAction ? (
+                  <button
+                    type="button"
+                    onClick={() => silver(r.id)}
+                    className="h-[34px] rounded-[10px] px-[10px] text-[14px] font-bold text-app-subtle hover:bg-app-input"
+                  >
+                    {r.silverAction === "give" ? labels.giveSilver : labels.removeSilver}
+                  </button>
+                ) : null}
+                {r.removable ? (
+                  <button
+                    type="button"
+                    onClick={() => remove(r.id)}
+                    className="h-[34px] rounded-[10px] px-[10px] text-[14px] font-bold text-app-subtle hover:bg-app-input"
+                  >
+                    {labels.remove}
+                  </button>
+                ) : null}
+              </span>
             ) : null}
           </li>
         ))}

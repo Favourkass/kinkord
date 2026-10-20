@@ -100,5 +100,15 @@ export const memberSubscription = pgTable("member_subscription", {
    */
   checkHeldAt: timestamp("check_held_at", { withTimezone: true }),
   checkHoldReason: text("check_hold_reason").$type<SilverCheckHold>(),
+  /**
+   * The founder who gave this admin Silver for good; null when it's paid for,
+   * or a founder's own. Plain text, so the record outlives their account.
+   */
+  grantedBy: text("granted_by"),
+  /**
+   * While Silver is given: when the admin's own paid Silver would end. It's
+   * theirs again if the founders take the gift back.
+   */
+  paidUntil: timestamp("paid_until", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

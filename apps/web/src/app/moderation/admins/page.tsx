@@ -26,6 +26,7 @@ export default function ModerationAdminsPage() {
         notice={p.notice}
         dialog={p.dialog}
         remove={p.remove}
+        silver={p.silver}
         form={p.form}
         labels={p.labels}
       />

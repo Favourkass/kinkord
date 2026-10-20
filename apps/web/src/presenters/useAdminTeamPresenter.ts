@@ -8,13 +8,18 @@ import { moderationService } from "@/services/moderation.service";
 import { useAdminAccessPresenter } from "./useAdminAccessPresenter";
 import type { AdminDialogVM } from "./useAdminMemberPresenter";
 
-type Pending = { kind: "add"; username: string } | { kind: "remove"; id: string; name: string };
+type Pending =
+  | { kind: "add"; username: string }
+  | { kind: "remove" | "give-silver" | "remove-silver"; id: string; name: string };
 
 function messageOf(e: unknown): string {
   return e instanceof Error ? e.message : "Something went wrong. Try again.";
 }
 
-/** Who has the admin tools. Every admin sees the list; the founders add and remove. */
+/**
+ * Who has the admin tools. Every admin sees the list; the founders add and
+ * remove admins, and give them Silver or take it back.
+ */
 export function useAdminTeamPresenter() {
   const access = useAdminAccessPresenter();
   const copy = MODERATION_COPY.admins;
@@ -71,10 +76,19 @@ export function useAdminTeamPresenter() {
         );
         setUsername("");
         setNotice(copy.added(added.username ?? pending.username));
-      } else {
+      } else if (pending.kind === "remove") {
         await moderationService.removeAdmin(pending.id);
         setTeam((t) => t && { ...t, admins: t.admins.filter((a) => a.id !== pending.id) });
         setNotice(copy.removed(pending.name));
+      } else {
+        const giving = pending.kind === "give-silver";
+        const updated = await moderationService.setAdminSilver(pending.id, giving);
+        setTeam(
+          (t) => t && { ...t, admins: t.admins.map((a) => (a.id === updated.id ? updated : a)) },
+        );
+        setNotice(
+          giving ? copy.silverGivenNotice(pending.name) : copy.silverRemovedNotice(pending.name),
+        );
       }
       setPending(null);
     } catch (e) {
@@ -91,7 +105,12 @@ export function useAdminTeamPresenter() {
         toAdminTeamRowVM(a, {
           canManage,
           href: Routes.moderationMember,
-          labels: { founder: copy.founder, since: copy.since },
+          labels: {
+            founder: copy.founder,
+            since: copy.since,
+            silverGiven: copy.silverGiven,
+            silverPaid: copy.silverPaid,
+          },
         }),
       ),
     [team, canManage, copy],
@@ -99,15 +118,21 @@ export function useAdminTeamPresenter() {
 
   const dialog = useMemo((): AdminDialogVM | null => {
     if (!pending) return null;
-    const adding = pending.kind === "add";
+    const dialogs = {
+      remove: copy.removeDialog,
+      "give-silver": copy.giveSilverDialog,
+      "remove-silver": copy.removeSilverDialog,
+    };
+    const text =
+      pending.kind === "add"
+        ? { ...copy.addDialog, title: copy.addDialog.title(pending.username) }
+        : { ...dialogs[pending.kind], title: dialogs[pending.kind].title(pending.name) };
     return {
-      title: adding
-        ? copy.addDialog.title(pending.username)
-        : copy.removeDialog.title(pending.name),
-      body: adding ? copy.addDialog.body : copy.removeDialog.body,
-      confirmLabel: adding ? copy.addDialog.confirm : copy.removeDialog.confirm,
+      title: text.title,
+      body: text.body,
+      confirmLabel: text.confirm,
       cancelLabel: MODERATION_COPY.dialogs.cancel,
-      destructive: !adding,
+      destructive: pending.kind === "remove" || pending.kind === "remove-silver",
       reason: null,
       checkbox: null,
       typeToConfirm: null,
@@ -132,6 +157,15 @@ export function useAdminTeamPresenter() {
       const row = rows.find((r) => r.id === id);
       if (row?.removable) open({ kind: "remove", id, name: row.title });
     },
+    silver: (id: string) => {
+      const row = rows.find((r) => r.id === id);
+      if (!row?.silverAction) return;
+      open({
+        kind: row.silverAction === "give" ? "give-silver" : "remove-silver",
+        id,
+        name: row.title,
+      });
+    },
     form: {
       username,
       setUsername: (v: string) => {
@@ -148,6 +182,8 @@ export function useAdminTeamPresenter() {
       placeholder: copy.usernamePlaceholder,
       add: copy.add,
       remove: copy.remove,
+      giveSilver: copy.giveSilver,
+      removeSilver: copy.removeSilver,
       loading: copy.loading,
     },
   };

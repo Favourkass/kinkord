@@ -5,11 +5,12 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, ilike, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { BronzeService } from "../verification/bronze.service";
 import { DRIZZLE, type Db } from "../db/db.module";
 import {
   memberBan,
+  memberSubscription,
   moderationLog,
   post,
   postMedia,
@@ -24,6 +25,7 @@ import {
 } from "../db/schema";
 import { PostsService } from "../posts/posts.service";
 import { IMAGE_VARIANTS, StorageService, variantKey } from "../storage/storage.service";
+import { giveSilver, silverGiven, takeBackSilver } from "../subscriptions/given-silver";
 import { founderAccount, isAdmin, isBanned, isSuperAdmin } from "./admins";
 import { normalizeEmail, normalizeIp, normalizePhone } from "./signup-rules";
 
@@ -75,6 +77,12 @@ export interface AdminMemberDetail extends AdminMemberSummary {
   rules: AdminBlockRule[];
 }
 
+/**
+ * An admin's Silver: a founder's comes with their account, `given` is the
+ * founders' gift to an admin, `paid` they bought themselves.
+ */
+export type AdminSilver = "founder" | "given" | "paid";
+
 /** Someone with the admin tools. */
 export interface AdminTeamMember {
   id: string;
@@ -86,6 +94,10 @@ export interface AdminTeamMember {
   founder: boolean;
   /** When they were made an admin; null for a founder. */
   since: string | null;
+  /** Null on Basic. */
+  silver: AdminSilver | null;
+  /** When paid Silver runs out; null for any other kind. */
+  silverUntil: string | null;
 }
 
 export interface NewBlockRule {
@@ -188,16 +200,33 @@ export class ModerationService {
         teamMember: profile.teamMember,
         avatarKey: profile.avatarKey,
         since: staff.createdAt,
+        silverEnd: memberSubscription.currentPeriodEnd,
+        silverGivenBy: memberSubscription.grantedBy,
       })
       .from(user)
       .leftJoin(profile, eq(profile.userId, user.id))
-      .leftJoin(staff, eq(staff.userId, user.id));
+      .leftJoin(staff, eq(staff.userId, user.id))
+      .leftJoin(
+        memberSubscription,
+        and(
+          eq(memberSubscription.userId, user.id),
+          gt(memberSubscription.currentPeriodEnd, sql`now()`),
+        ),
+      );
   }
 
   private async toTeamMember(
     r: Awaited<ReturnType<ModerationService["teamSelect"]>>[number],
   ): Promise<AdminTeamMember> {
     const founder = isSuperAdmin(r);
+    const end = r.silverEnd;
+    const silver: AdminSilver | null = !end
+      ? null
+      : founder
+        ? "founder"
+        : silverGiven({ end, grantedBy: r.silverGivenBy })
+          ? "given"
+          : "paid";
     return {
       id: r.id,
       name: r.name,
@@ -206,6 +235,8 @@ export class ModerationService {
       avatarUrl: r.avatarKey ? await this.storage.presignDownload(r.avatarKey, "sm") : null,
       founder,
       since: founder ? null : (r.since?.toISOString() ?? null),
+      silver,
+      silverUntil: silver === "paid" && end ? end.toISOString() : null,
     };
   }
 
@@ -240,7 +271,10 @@ export class ModerationService {
     return this.toTeamMember({ ...row, since: added?.since ?? new Date() });
   }
 
-  /** Takes the admin tools away. A founder's come from their email, so they stay. */
+  /**
+   * Takes the admin tools away, and any Silver the founders gave with them. A
+   * founder's tools come from their email, so they stay.
+   */
   async removeAdmin(actorId: string, id: string): Promise<{ removed: string }> {
     const [row] = await this.db
       .select({ email: user.email, emailVerified: user.emailVerified, username: user.username })
@@ -250,13 +284,63 @@ export class ModerationService {
     if (row && isSuperAdmin(row)) {
       throw new ForbiddenException("The founders are admins by their email and can't be removed.");
     }
-    const [removed] = await this.db
-      .delete(staff)
-      .where(eq(staff.userId, id))
-      .returning({ userId: staff.userId });
-    if (!removed) throw new NotFoundException("That member isn't an admin.");
-    await this.log(actorId, "remove-admin", id, null, row?.username ? `@${row.username}` : null);
+    const handle = row?.username ? `@${row.username}` : null;
+    await this.db.transaction(async (tx) => {
+      const [removed] = await tx
+        .delete(staff)
+        .where(eq(staff.userId, id))
+        .returning({ userId: staff.userId });
+      if (!removed) throw new NotFoundException("That member isn't an admin.");
+      const silverTaken = await takeBackSilver(tx, id);
+      await tx
+        .insert(moderationLog)
+        .values({ actorId, action: "remove-admin", subjectUserId: id, detail: handle });
+      if (silverTaken) {
+        await tx
+          .insert(moderationLog)
+          .values({ actorId, action: "remove-silver", subjectUserId: id, detail: handle });
+      }
+    });
     return { removed: id };
+  }
+
+  /**
+   * Gives an admin Silver for good, or takes back what the founders gave. Only
+   * the founders may (the controller checks), and only to admins: Silver given
+   * this way comes with the role and goes when it does. Paid Silver is never
+   * lost; see giveSilver and takeBackSilver.
+   */
+  async setAdminSilver(actorId: string, id: string, enabled: boolean): Promise<AdminTeamMember> {
+    await this.db.transaction(async (tx) => {
+      const [row] = await tx
+        .select({
+          email: user.email,
+          emailVerified: user.emailVerified,
+          username: user.username,
+          admin: staff.userId,
+        })
+        .from(user)
+        .leftJoin(staff, eq(staff.userId, user.id))
+        .where(eq(user.id, id))
+        .limit(1);
+      if (!row) throw new NotFoundException("Member not found.");
+      if (isSuperAdmin(row)) {
+        throw new ConflictException("The founders' Silver comes with their account.");
+      }
+      if (enabled && !row.admin) throw new ConflictException("Only admins can be given Silver.");
+      const changed = enabled ? await giveSilver(tx, id, actorId) : await takeBackSilver(tx, id);
+      if (changed) {
+        await tx.insert(moderationLog).values({
+          actorId,
+          action: enabled ? "give-silver" : "remove-silver",
+          subjectUserId: id,
+          detail: row.username ? `@${row.username}` : null,
+        });
+      }
+    });
+    const [after] = await this.teamSelect().where(eq(user.id, id)).limit(1);
+    if (!after) throw new NotFoundException("Member not found.");
+    return this.toTeamMember(after);
   }
 
   /** A public identity badge only. Never adds/removes staff or verification. */

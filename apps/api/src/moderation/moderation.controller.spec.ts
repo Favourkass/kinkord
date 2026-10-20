@@ -22,6 +22,7 @@ function make() {
     team: vi.fn(async () => []),
     addAdmin: vi.fn(async () => ({ id: "u7" })),
     removeAdmin: vi.fn(async () => ({ removed: "u7" })),
+    setAdminSilver: vi.fn(async () => ({ id: "u7", silver: "given" })),
   };
   const reports = {
     list: vi.fn(async () => []),
@@ -156,6 +157,40 @@ describe("team badge admin boundary", () => {
     expect(Reflect.getMetadata(GUARDS_METADATA, ModerationController)).toContain(AuthGuard);
     expect(
       Reflect.getMetadata(GUARDS_METADATA, ModerationController.prototype.teamBadge),
+    ).toContain(AdminGuard);
+  });
+});
+
+describe("given Silver admin boundary", () => {
+  it("gives or takes back as the acting founder, and accepts only an explicit boolean", async () => {
+    const { controller, service } = make();
+    await controller.adminSilver(req, "u7", { enabled: true });
+    await controller.adminSilver(req, "u7", { enabled: false });
+    expect(service.setAdminSilver.mock.calls).toEqual([
+      ["u1", "u7", true],
+      ["u1", "u7", false],
+    ]);
+    for (const body of [{ enabled: "true" }, {}, { enabled: true, until: "2099-12-31" }])
+      expect(() => controller.adminSilver(req, "u7", body)).toThrow(BadRequestException);
+  });
+
+  it("lets only the founders do it, not a staff admin, not even for themselves", () => {
+    const { controller, service } = make();
+    for (const enabled of [true, false])
+      expect(() => controller.adminSilver(teammate, "u8", { enabled })).toThrow(
+        "Only the founders can give or remove Silver.",
+      );
+    expect(() => controller.adminSilver(teammate, "u7", { enabled: true })).toThrow(
+      ForbiddenException,
+    );
+    expect(service.setAdminSilver).not.toHaveBeenCalled();
+  });
+
+  it("requires both authentication and admin authorization", async () => {
+    const { GUARDS_METADATA } = await import("@nestjs/common/constants");
+    const { AdminGuard } = await import("./admin.guard");
+    expect(
+      Reflect.getMetadata(GUARDS_METADATA, ModerationController.prototype.adminSilver),
     ).toContain(AdminGuard);
   });
 });

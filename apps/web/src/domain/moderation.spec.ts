@@ -25,6 +25,7 @@ import {
   validateNewRule,
   type AdminMemberDetailPM,
   type AdminMemberPM,
+  type AdminTeamMemberPM,
 } from "./moderation";
 
 const now = new Date("2026-09-28T09:00:00Z");
@@ -524,9 +525,14 @@ describe("admin 2FA step-up", () => {
 });
 
 describe("toAdminTeamRowVM", () => {
-  const labels = { founder: "Founder", since: (d: string) => `Admin since ${d}` };
+  const labels = {
+    founder: "Founder",
+    since: (d: string) => `Admin since ${d}`,
+    silverGiven: "Silver, from the founders",
+    silverPaid: (d: string) => `Silver until ${d}`,
+  };
   const href = (id: string) => `/moderation/members/${id}`;
-  const jane = {
+  const jane: AdminTeamMemberPM = {
     id: "u7",
     name: "Jane Doe",
     displayName: "  ",
@@ -534,6 +540,8 @@ describe("toAdminTeamRowVM", () => {
     avatarUrl: null,
     founder: false,
     since: "2026-10-10T09:00:00.000Z",
+    silver: null,
+    silverUntil: null,
   };
 
   it("says since when, and is removable only by someone who manages admins", () => {
@@ -545,16 +553,42 @@ describe("toAdminTeamRowVM", () => {
       note: "Admin since 10 Oct 2026",
       href: "/moderation/members/u7",
       removable: true,
+      silver: "",
+      silverAction: "give",
     });
-    expect(toAdminTeamRowVM(jane, { canManage: false, href, labels }).removable).toBe(false);
+    expect(toAdminTeamRowVM(jane, { canManage: false, href, labels })).toMatchObject({
+      removable: false,
+      silverAction: null,
+    });
   });
 
-  it("never offers to remove a founder", () => {
-    const founder = { ...jane, founder: true, since: null, username: null };
+  it("never offers to remove a founder, or to change their Silver", () => {
+    const founder = {
+      ...jane,
+      founder: true,
+      since: null,
+      username: null,
+      silver: "founder" as const,
+    };
     expect(toAdminTeamRowVM(founder, { canManage: true, href, labels })).toMatchObject({
       handle: "no username",
       note: "Founder",
       removable: false,
+      silver: "",
+      silverAction: null,
+    });
+  });
+
+  it("says whose Silver it is, and offers to take back only what the founders gave", () => {
+    const given = { ...jane, silver: "given" as const };
+    expect(toAdminTeamRowVM(given, { canManage: true, href, labels })).toMatchObject({
+      silver: "Silver, from the founders",
+      silverAction: "remove",
+    });
+    const paid = { ...jane, silver: "paid" as const, silverUntil: "2026-11-06T12:00:00.000Z" };
+    expect(toAdminTeamRowVM(paid, { canManage: true, href, labels })).toMatchObject({
+      silver: "Silver until 6 Nov 2026",
+      silverAction: "give",
     });
   });
 });
