@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import type { FeedEmptyVM, FeedTabVM, PostVM } from "@/domain/post";
 import FeedScreen, { type FeedScreenProps } from "./FeedScreen";
 
@@ -31,7 +31,10 @@ vi.mock("./ConfirmDialog", () => ({ default: () => null }));
 vi.mock("./Toast", () => ({ default: () => null }));
 vi.mock("./GiftDialog", () => ({ default: () => null }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 const tabs = (selected: string): FeedTabVM[] =>
   (["for_you", "following", "nearby"] as const).map((value) => ({
@@ -58,7 +61,7 @@ function show(over: Partial<FeedScreenProps> = {}) {
     copy: { loading: "Loading…", loadMore: "Load more", asideHeading: "Kinkord", asideTagline: "" },
     ...over,
   } as unknown as FeedScreenProps;
-  render(<FeedScreen {...props} />);
+  return { ...render(<FeedScreen {...props} />), props };
 }
 
 describe("FeedScreen", () => {
@@ -109,4 +112,57 @@ describe("FeedScreen", () => {
     expect(screen.getByText("Loading…")).toBeTruthy();
     expect(screen.queryByText("Nothing near you yet.")).toBeNull();
   });
+});
+
+it("automatically loads near the bottom, pauses during loading, and stops at the end", () => {
+  const callbacks: IntersectionObserverCallback[] = [];
+  const disconnect = vi.fn();
+  vi.stubGlobal(
+    "IntersectionObserver",
+    class {
+      constructor(callback: IntersectionObserverCallback) {
+        callbacks.push(callback);
+      }
+      observe = vi.fn();
+      disconnect = disconnect;
+    },
+  );
+  const onLoadMore = vi.fn();
+  const { rerender, props } = show({ hasMore: true, onLoadMore });
+  const intersect = () =>
+    act(() =>
+      callbacks.at(-1)!(
+        [{ isIntersecting: true } as IntersectionObserverEntry],
+        {} as IntersectionObserver,
+      ),
+    );
+  expect(screen.queryByRole("button", { name: "Load more" })).toBeNull();
+  intersect();
+  intersect();
+  expect(onLoadMore).toHaveBeenCalledTimes(1);
+  rerender(<FeedScreen {...props} loadingMore />);
+  expect(disconnect).toHaveBeenCalledTimes(1);
+  expect(screen.getByText("Loading…")).toBeTruthy();
+  intersect();
+  expect(onLoadMore).toHaveBeenCalledTimes(1);
+  rerender(<FeedScreen {...props} loadingMore={false} />);
+  intersect();
+  expect(onLoadMore).toHaveBeenCalledTimes(2);
+  rerender(<FeedScreen {...props} hasMore={false} />);
+  expect(disconnect).toHaveBeenCalledTimes(2);
+});
+
+it("does not automatically retry pagination errors or load an old tab while switching", () => {
+  const observe = vi.fn();
+  vi.stubGlobal(
+    "IntersectionObserver",
+    class {
+      observe = observe;
+      disconnect = vi.fn();
+    },
+  );
+  const { rerender, props } = show({ hasMore: true, error: "Please refresh to try again." });
+  expect(observe).not.toHaveBeenCalled();
+  rerender(<FeedScreen {...props} error={null} loading />);
+  expect(observe).not.toHaveBeenCalled();
 });
