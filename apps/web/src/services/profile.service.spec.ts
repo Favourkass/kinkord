@@ -112,6 +112,7 @@ describe("buildEditRows", () => {
     expect(buildEditRows("privacy", ctx).map((r) => r.key)).toEqual([
       "socialLinks",
       "profileVisibility",
+      "groupsVisibility",
     ]);
   });
 
@@ -153,7 +154,12 @@ describe("buildEditRows", () => {
       occupation: null,
       languages: "English",
     });
-    expect(valuesOf("privacy")).toEqual({ socialLinks: "Facebook", profileVisibility: "public" });
+    expect(valuesOf("privacy")).toEqual({
+      socialLinks: "Facebook",
+      profileVisibility: "public",
+      // Shown unless the member hides their groups.
+      groupsVisibility: "show",
+    });
   });
 
   it("carries the 30-day locks and the picker lists into the editors", () => {

@@ -13,6 +13,7 @@ export type AppNav =
   | "saved"
   | "edit-profile"
   | "kinkcoins"
+  | "groups"
   | "none";
 
 export interface AppNavLinks {
@@ -25,6 +26,7 @@ export interface AppNavLinks {
   settings: string;
   saved: string;
   kinkcoins?: string;
+  groups?: string;
   subscription: string;
 }
 
@@ -38,12 +40,14 @@ export interface AppNavLabels {
   settings: string;
   saved: string;
   kinkcoins?: string;
+  groups?: string;
   subscription: string;
   logout: string;
 }
 
 export type DrawerIcon =
   | "members"
+  | "groups"
   | "saved"
   | "kinkopedia"
   | "verification"

@@ -57,6 +57,16 @@ export interface PostPM {
   mine: boolean;
   /** Each @handle in the body that names a member, and whom. Absent from an older API. */
   mentions?: MentionPM[];
+  /** The group a discussion belongs to; null (or absent) for a feed post. */
+  group?: { id: string; slug: string; name: string } | null;
+  /** A group discussion's title. */
+  title?: string | null;
+  /** Pinned to the top of its group. */
+  pinned?: boolean;
+  /** Closed to new replies. */
+  closed?: boolean;
+  /** A group discussion's latest reply, or its posting. */
+  lastActivityAt?: string | null;
 }
 
 /** The home feed's tabs, as the API names them. */

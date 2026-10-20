@@ -1,5 +1,8 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import MaskIcon from "@/components/app/MaskIcon";
+import GroupTile from "@/components/groups/GroupTile";
 import VerifiedMark from "@/components/brand/VerifiedMark";
 import type { PublicProfileVM, SocialLinkVM, SocialPlatform } from "@/domain/member";
 
@@ -36,9 +39,19 @@ export interface AboutLabels {
   privateNotice: string;
 }
 
+export interface AboutGroupRow {
+  key: string;
+  name: string;
+  /** "Member · 2,345 members". */
+  meta: string;
+  href: string;
+}
+
 export interface AboutTabProps {
   vm: PublicProfileVM;
   labels: AboutLabels;
+  /** The open groups they're in (Figma's "Groups & Communities" rows). */
+  groups?: AboutGroupRow[];
 }
 
 const ICONS = {
@@ -139,7 +152,7 @@ function Tags({ items }: { items: string[] }) {
  * Roles / Kinks / Looking For tags, Limits, Groups, Social Links, Verification, "Member since".
  * Nothing here is editable — everything changes through Edit Profile (CEO, 2026-09-12).
  */
-export default function AboutTab({ vm, labels }: AboutTabProps) {
+export default function AboutTab({ vm, labels, groups = [] }: AboutTabProps) {
   const row = (icon: string, label: string, value: string | null) => (
     <div
       key={label}
@@ -235,7 +248,29 @@ export default function AboutTab({ vm, labels }: AboutTabProps) {
       ) : null}
 
       <Card icon={ICONS.groups} title={labels.groups}>
-        <p className="text-[13px] text-pf-muted">{labels.noGroups}</p>
+        {groups.length === 0 ? (
+          <p className="text-[13px] text-pf-muted">{labels.noGroups}</p>
+        ) : (
+          <ul className="flex flex-col gap-[8px]">
+            {groups.map((g) => (
+              <li key={g.key}>
+                <Link
+                  href={g.href}
+                  className="flex items-center gap-[12px] rounded-[12px] border border-pf-card-border p-[10px]"
+                >
+                  <GroupTile size={40} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[14px] font-semibold text-pf-text">
+                      {g.name}
+                    </span>
+                    <span className="block truncate text-[12px] text-pf-muted">{g.meta}</span>
+                  </span>
+                  <ChevronRight aria-hidden="true" size={16} className="shrink-0 text-pf-muted" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </Card>
 
       <Card icon={ICONS.social} title={labels.social}>

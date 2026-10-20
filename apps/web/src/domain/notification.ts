@@ -2,6 +2,8 @@ export type NotificationKind =
   | "message"
   | "friend_request"
   | "friend_accepted"
+  | "group_request"
+  | "group_approved"
   | "follow"
   | "comment"
   | "mention"
@@ -86,6 +88,16 @@ const KINDS: Record<
     category: "Friend accepted",
     icon: "person-add",
     action: () => "accepted your friend request.",
+  },
+  group_request: {
+    category: "Group request",
+    icon: "person-add",
+    action: () => "asked to join your group.",
+  },
+  group_approved: {
+    category: "Group",
+    icon: "person-add",
+    action: () => "approved your request to join their group.",
   },
   follow: { category: "New follower", icon: "person-add", action: () => "followed you." },
   mention: { category: "Mention", icon: "mention", action: () => "mentioned you." },

@@ -41,9 +41,11 @@ const visibilityCopy = (value: string) =>
   PROFILE_EDIT_COPY.visibility[value as ProfileVisibility] ?? { label: value, help: "" };
 const badgeCopy = (value: string) =>
   PROFILE_EDIT_COPY.verifiedBadge[value as "show" | "hide"] ?? { label: value, help: "" };
+const groupsCopy = (value: string) =>
+  PROFILE_EDIT_COPY.groupsVisibility[value as "show" | "hide"] ?? { label: value, help: "" };
 /** Rows whose options carry their own label and help text. */
 const OPTION_COPY: Partial<Record<EditRowKey, (value: string) => { label: string; help: string }>> =
-  { profileVisibility: visibilityCopy, verifiedBadge: badgeCopy };
+  { profileVisibility: visibilityCopy, verifiedBadge: badgeCopy, groupsVisibility: groupsCopy };
 
 /** Editor sheet props for one row's spec, with copy applied. */
 function toEditorVM(key: EditRowKey, spec: EditorSpec) {

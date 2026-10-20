@@ -7,7 +7,7 @@ import MediaLightbox, { type MediaLightboxProps } from "@/components/feed/MediaL
 import Toast, { type ToastProps } from "@/components/feed/Toast";
 import type { CoinBalanceVM } from "@/domain/kinkcoins";
 import type { PublicProfileVM } from "@/domain/member";
-import AboutTab, { type AboutLabels } from "./AboutTab";
+import AboutTab, { type AboutGroupRow, type AboutLabels } from "./AboutTab";
 import MediaTab, { type MediaTabProps } from "./MediaTab";
 import PeopleTab, { type PeopleTabProps } from "./PeopleTab";
 import PostsTab, { type PostsTabProps } from "./PostsTab";
@@ -34,6 +34,8 @@ export interface ProfileScreenProps {
   toggleFollow: () => void;
   followBusy: boolean;
   friendAction?: FriendshipActionProps;
+  /** "Groups & Communities" rows on the About tab. */
+  profileGroups?: AboutGroupRow[];
   /** "Remove friend?" — asked before a friendship ends. */
   unfriendConfirm?: ConfirmDialogProps;
   friendRequestsHref?: string;
@@ -120,7 +122,9 @@ export default function ProfileScreen(p: ProfileScreenProps) {
         {ready && p.vm ? (
           <>
             <ProfileTabs tabs={p.tabs} active={p.tab} onSelect={p.setTab} />
-            {p.tab === "about" && <AboutTab vm={p.vm} labels={p.aboutLabels} />}
+            {p.tab === "about" && (
+              <AboutTab vm={p.vm} labels={p.aboutLabels} groups={p.profileGroups} />
+            )}
             {p.tab === "people" && <PeopleTab {...p.people} />}
             {p.tab === "posts" && <PostsTab {...p.posts} />}
             {p.tab === "media" && <MediaTab {...p.media} />}

@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Coins } from "lucide-react";
+import { Coins, Layers } from "lucide-react";
 import AvatarCircle from "./AvatarCircle";
 import MaskIcon, { type MaskIconName } from "./MaskIcon";
 import type { AppNav, AppNavLabels, AppNavLinks } from "./nav";
@@ -96,6 +96,18 @@ export default function DesktopSidebar({
             {labels[item.key]}
           </Link>
         ))}
+        {links.groups && labels.groups && (
+          <Link
+            href={links.groups}
+            aria-current={active === "groups" ? "page" : undefined}
+            className={row(active === "groups")}
+          >
+            <span className="grid size-[29px] place-items-center">
+              <Layers size={27} aria-hidden="true" />
+            </span>
+            {labels.groups}
+          </Link>
+        )}
         <Link
           href={links.profile}
           aria-current={active === "profile" || active === "edit-profile" ? "page" : undefined}
