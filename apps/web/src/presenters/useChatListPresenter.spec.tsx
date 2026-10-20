@@ -4,7 +4,9 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import type { ConversationSummaryPM } from "@/domain/chat";
 import { LIST_FALLBACK_POLL_MS, LIST_POLL_MS, useChatListPresenter } from "./useChatListPresenter";
 
-vi.mock("./useHomePresenter", () => ({ useHomePresenter: () => ({}) }));
+vi.mock("./useHomePresenter", () => ({
+  useHomePresenter: () => ({ signedIn: true, messagesCount: 9 }),
+}));
 
 const polls = new Map<number, () => Promise<void> | void>();
 vi.mock("./usePolling", () => ({
@@ -23,8 +25,10 @@ vi.mock("./useRealtime", () => ({
 const list = vi.fn();
 const counts = vi.fn();
 const me = vi.fn();
+const seen = vi.fn().mockResolvedValue({ ok: true });
 vi.mock("@/services/chat.service", () => ({
   chatService: {
+    seeInbox: () => seen(),
     list: (view?: { q?: string; filter?: string }) => list(view),
     counts: (q?: string) => counts(q),
     me: () => me(),
@@ -266,4 +270,18 @@ describe("useChatListPresenter", () => {
     expect(result.current.list.rows[0].typing).toBe(false);
     expect(list).not.toHaveBeenCalled();
   });
+});
+
+it("clears only the navigation badge on inbox entry while retaining unread chats and filters", async () => {
+  const unread = { ...row, unreadCount: 3 };
+  list.mockResolvedValue([unread]);
+  counts.mockResolvedValue({ all: 1, unread: 1, online: 1 });
+  const { result } = renderHook(() => useChatListPresenter());
+  expect(result.current.shell.messagesCount).toBe(0);
+  await waitFor(() => expect(seen).toHaveBeenCalled());
+  await act(async () => {
+    for (const tick of polls.values()) await tick();
+  });
+  await waitFor(() => expect(result.current.list.rows[0]?.unread).toBe(3));
+  expect(result.current.list.filters.find((f) => f.key === "unread")?.count).toBe("1");
 });

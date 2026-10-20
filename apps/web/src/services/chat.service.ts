@@ -2,6 +2,7 @@
  * Chat API. Delivery is by asking: an open thread polls for anything newer than
  * its last message, because the API's host can't hold WebSockets open.
  */
+import { notifyInboxChanged } from "./notifications.service";
 import type {
   ChatAllowancePM,
   ChatMessagePM,
@@ -29,6 +30,14 @@ export function listenForChatRead(onRead: () => void): () => void {
 }
 
 export const chatService = {
+  seeInbox: async () => {
+    const result = await api.post<{ ok: true }>("/chat/inbox-seen", {});
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event(CHAT_READ_EVENT));
+      notifyInboxChanged();
+    }
+    return result;
+  },
   unreadCount: () => api.get<{ count: number }>("/chat/unread-count"),
   /** The inbox, newest first. A search or a tab looks through every chat, not just the latest. */
   list: (view: { q?: string; filter?: ChatInboxFilter } = {}) => {
@@ -90,7 +99,10 @@ export const chatService = {
 
   markRead: async (id: string, messageId: string) => {
     const result = await api.post<{ ok: true }>(`${thread(id)}/read`, { messageId });
-    if (typeof window !== "undefined") window.dispatchEvent(new Event(CHAT_READ_EVENT));
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event(CHAT_READ_EVENT));
+      notifyInboxChanged();
+    }
     return result;
   },
 

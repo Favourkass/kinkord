@@ -1,3 +1,4 @@
+import { messageBadgeCount } from "../chat/inbox-badge";
 import { teamBadge } from "../members/team-badge";
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import {
@@ -244,7 +245,6 @@ export class NotificationsService {
     const rows = await this.rows(
       and(
         eq(notification.userId, userId),
-        ne(notification.type, "message"),
         query.type ? eq(notification.type, query.type) : undefined,
         query.unreadOnly ? isNull(notification.readAt) : undefined,
         term ? this.matching(term) : undefined,
@@ -274,12 +274,7 @@ export class NotificationsService {
       .select({ total: count() })
       .from(notification)
       .where(
-        and(
-          eq(notification.userId, userId),
-          isNull(notification.readAt),
-          this.shownTo(userId),
-          ne(notification.type, "message"),
-        ),
+        and(eq(notification.userId, userId), isNull(notification.readAt), this.shownTo(userId)),
       );
     return { count: Number(row?.total ?? 0) };
   }
@@ -295,7 +290,6 @@ export class NotificationsService {
       .where(
         and(
           eq(notification.userId, userId),
-          ne(notification.type, "message"),
           this.shownTo(userId),
           ...(unreadOnly ? [isNull(notification.readAt)] : []),
         ),
@@ -338,7 +332,9 @@ export class NotificationsService {
     return this.toItem(row);
   }
 
-  async readAll(userId: string) {
+  /** Only read the exact versions displayed; a newer message bump stays unread. */
+  async readViewed(userId: string, items: { id: string; createdAt: string; count: number }[]) {
+    if (!items.length) return { readIds: [] as string[] };
     const marked = await this.db
       .update(notification)
       .set({ readAt: new Date() })
@@ -346,9 +342,44 @@ export class NotificationsService {
         and(
           eq(notification.userId, userId),
           isNull(notification.readAt),
-          ne(notification.type, "message"),
+          this.shownTo(userId),
+          or(
+            ...items.map((item) =>
+              and(
+                eq(notification.id, item.id),
+                eq(notification.createdAt, new Date(item.createdAt)),
+                eq(notification.count, item.count),
+              ),
+            ),
+          ),
         ),
       )
+      .returning({ id: notification.id });
+    if (marked.length) void this.realtime.notify([userId], { type: "notification" });
+    return { readIds: marked.map((item) => item.id) };
+  }
+
+  /** Message alerts are represented by the message badge, never counted twice. */
+  async appBadgeCount(userId: string) {
+    const [row] = await this.db
+      .select({ total: sql<number>`count(*) + ${messageBadgeCount(userId)}` })
+      .from(notification)
+      .where(
+        and(
+          eq(notification.userId, userId),
+          isNull(notification.readAt),
+          ne(notification.type, "message"),
+          this.shownTo(userId),
+        ),
+      );
+    return { count: Number(row?.total ?? 0) };
+  }
+
+  async readAll(userId: string) {
+    const marked = await this.db
+      .update(notification)
+      .set({ readAt: new Date() })
+      .where(and(eq(notification.userId, userId), isNull(notification.readAt)))
       .returning({ id: notification.id });
     if (marked.length) void this.realtime.notify([userId], { type: "notification" });
     return { ok: true };

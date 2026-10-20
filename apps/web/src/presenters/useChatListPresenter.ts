@@ -32,6 +32,22 @@ function messageOf(e: unknown): string {
 
 export function useChatListPresenter() {
   const shell = useHomePresenter();
+  // Persist inbox attention, never conversation read pointers or tab counts.
+  useEffect(() => {
+    if (!shell.signedIn) return;
+    const seen = () => {
+      if (document.visibilityState !== "hidden") void chatService.seeInbox().catch(() => undefined);
+    };
+    seen();
+    window.addEventListener("online", seen);
+    window.addEventListener("focus", seen);
+    document.addEventListener("visibilitychange", seen);
+    return () => {
+      window.removeEventListener("online", seen);
+      window.removeEventListener("focus", seen);
+      document.removeEventListener("visibilitychange", seen);
+    };
+  }, [shell.signedIn]);
   const { active: typing, receive: receiveTyping, clear: clearTyping } = useTypingIndicators();
   const [viewerId, setViewerId] = useState<string | null>(null);
   const [summaries, setSummaries] = useState<ConversationSummaryPM[] | null>(null);
@@ -164,7 +180,7 @@ export function useChatListPresenter() {
   );
 
   return {
-    shell,
+    shell: { ...shell, messagesCount: 0 },
     list: {
       rows,
       query,

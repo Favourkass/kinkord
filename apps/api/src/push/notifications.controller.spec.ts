@@ -9,6 +9,8 @@ function make() {
     unreadCount: vi.fn(),
     read: vi.fn(),
     readAll: vi.fn(),
+    readViewed: vi.fn(),
+    appBadgeCount: vi.fn(),
     delete: vi.fn(),
     counts: vi.fn(),
   };
@@ -56,4 +58,20 @@ it("deletes for the session recipient and refuses a malformed id", () => {
   controller.delete(req, ID);
   expect(inbox.delete).toHaveBeenCalledWith("member", ID);
   expect(() => controller.delete(req, "bad-id")).toThrow();
+});
+
+it("scopes viewed rows to the authenticated recipient and validates bounded version snapshots", () => {
+  const { controller, inbox } = make();
+  const snapshot = { id: ID, createdAt: "2026-10-19T10:00:00Z", count: 1 };
+  controller.readViewed(req, { items: [snapshot] });
+  expect(inbox.readViewed).toHaveBeenCalledWith("member", [snapshot]);
+  for (const body of [
+    { items: [] },
+    { items: [snapshot], userId: "other" },
+    { items: [{ ...snapshot, id: "bad" }] },
+    { items: Array(51).fill(snapshot) },
+  ])
+    expect(() => controller.readViewed(req, body)).toThrow();
+  controller.appBadgeCount(req);
+  expect(inbox.appBadgeCount).toHaveBeenCalledWith("member");
 });

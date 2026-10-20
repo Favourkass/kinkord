@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Delete,
   Get,
@@ -43,6 +44,34 @@ export class NotificationsController {
     const parsed = querySchema.safeParse(query);
     if (!parsed.success) throw new BadRequestException("Invalid notification query.");
     return this.inbox.counts(req.user.id, parsed.data.unread === "true");
+  }
+
+  @Get("app-badge-count")
+  appBadgeCount(@Req() req: AuthedRequest) {
+    return this.inbox.appBadgeCount(req.user.id);
+  }
+
+  @Post("read-viewed")
+  readViewed(@Req() req: AuthedRequest, @Body() body: unknown) {
+    const parsed = z
+      .object({
+        items: z
+          .array(
+            z
+              .object({
+                id: z.string().uuid(),
+                createdAt: z.string().datetime(),
+                count: z.number().int().positive(),
+              })
+              .strict(),
+          )
+          .min(1)
+          .max(50),
+      })
+      .strict()
+      .safeParse(body);
+    if (!parsed.success) throw new BadRequestException("Invalid viewed notifications.");
+    return this.inbox.readViewed(req.user.id, parsed.data.items);
   }
 
   @Get("unread-count")
