@@ -28,7 +28,7 @@ describe("chatDay", () => {
 });
 
 describe("newChatsPerDay", () => {
-  it("requires a subscription in Nigeria and gives other countries three free new chats", () => {
+  it("gives Nigeria no free new chats and other countries three", () => {
     const who = { email: "ada@example.com", emailVerified: true };
     for (const country of ["NG", "ng", " NG ", null, undefined])
       expect(newChatsPerDay(who, false, country)).toBe(NIGERIA_FREE_NEW_CHATS_PER_DAY);

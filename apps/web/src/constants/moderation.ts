@@ -269,11 +269,12 @@ export const MODERATION_COPY = {
   },
   teamBadge: {
     title: "Kinkord Team badge",
-    body: "Identifies an official Kinkord team member. Assigned manually by an admin; separate from identity verification and Silver. Grants no admin permissions.",
+    body: "Identifies an official Kinkord team member. Given by a founder; separate from identity verification and Silver. Grants no admin permissions.",
     assigned: "Kinkord Team member",
     unassigned: "No team badge",
     assign: "Assign team badge",
     remove: "Remove team badge",
+    foundersOnly: "Only the founders can give or remove this badge.",
   },
   dialogs: {
     assignTeamBadge: {
