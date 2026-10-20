@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SEXUALITY_FIELD } from "@/constants/onboarding";
 import SignupPage from "./page";
@@ -256,4 +256,19 @@ it("lets the member skip step 4 when the preference options can't load", async (
   fireEvent.click(await screen.findByRole("button", { name: "Skip for now" }));
   expect(await screen.findByText("STEP 5 OF 5")).toBeTruthy();
   expect(fixture.update).not.toHaveBeenCalled();
+});
+
+it("shows and selects Wyoming in the complete USA state list without searching", () => {
+  fixture.stage = "country";
+  render(<SignupPage />);
+  fireEvent.click(screen.getByLabelText("Country"));
+  fireEvent.click(screen.getByRole("option", { name: "USA" }));
+  for (const checkbox of screen.getAllByRole("checkbox")) fireEvent.click(checkbox);
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  fireEvent.click(screen.getByLabelText("State"));
+  const states = within(screen.getByRole("listbox", { name: "State" })).getAllByRole("option");
+  expect(states).toHaveLength(51);
+  expect(states.at(-1)?.textContent).toBe("Wyoming");
+  fireEvent.click(screen.getByRole("option", { name: "Wyoming" }));
+  expect(screen.getByLabelText("State").textContent).toContain("Wyoming");
 });

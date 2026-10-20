@@ -214,6 +214,7 @@ function SignupWizard() {
                 id={fieldId("state")}
                 label={p.aboutStep.location.stateLabel}
                 options={p.aboutStep.location.states}
+                resultLimit={p.aboutStep.location.states.length}
                 placeholder={p.aboutStep.location.statePlaceholder}
                 searchPlaceholder={p.aboutStep.location.stateSearchPlaceholder}
                 emptyLabel="No matching regions"

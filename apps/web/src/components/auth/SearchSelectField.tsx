@@ -32,6 +32,8 @@ interface Props {
   emptyLabel: string;
   /** Under a list cut short at the first matches. */
   moreLabel?: string;
+  /** Override the default cap for small, complete lists such as states. */
+  resultLimit?: number;
   other?: SearchSelectOther | null;
   error?: string;
   disabled?: boolean;
@@ -49,7 +51,10 @@ export default function SearchSelectField(p: Props) {
   const [active, setActive] = useState(0);
   // Long lists (thousands of towns) are only searched while open.
   const match = useMemo(() => (open ? optionMatcher(p.options) : null), [open, p.options]);
-  const { hits, more } = useMemo(() => (match ? match(query) : NOTHING), [match, query]);
+  const { hits, more } = useMemo(
+    () => (match ? match(query, p.resultLimit) : NOTHING),
+    [match, query, p.resultLimit],
+  );
   const other = p.other ?? null;
   const typed = query.trim();
   const rows = hits.length + (other ? 1 : 0);
