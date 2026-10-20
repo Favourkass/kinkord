@@ -48,6 +48,7 @@ export interface NotificationPagePM {
 
 export interface NotificationVM {
   id: string;
+  activityCount: number;
   /** The whole sentence, for screen readers. */
   body: string;
   category: string;
@@ -179,6 +180,7 @@ export function toNotificationVM(
   const action = kind.action(item.count);
   return {
     id: item.id,
+    activityCount: item.count,
     body: actorName ? `${actorName} ${action}` : action,
     category: kind.category,
     actorName,
@@ -210,8 +212,6 @@ export function countsAfterRead(
   counts: NotificationTabCounts,
   type: NotificationKind,
 ): NotificationTabCounts {
-  // Messages never count toward the inbox.
-  if (type === "message") return counts;
   return {
     all: Math.max(0, counts.all - 1),
     comment: Math.max(0, counts.comment - (type === "comment" ? 1 : 0)),

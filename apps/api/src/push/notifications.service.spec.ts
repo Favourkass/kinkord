@@ -288,7 +288,7 @@ describe("NotificationsService reading", () => {
   it("marks all of this member's unread rows", async () => {
     const t = make([[{ id: ID }]]);
     await expect(t.service.readAll("kemi")).resolves.toEqual({ ok: true });
-    expect(t.sqlOf(t.arg("update", "where")).params).toEqual(["kemi", "message"]);
+    expect(t.sqlOf(t.arg("update", "where")).params).toEqual(["kemi"]);
     expect(t.realtime.notify).toHaveBeenCalledTimes(1);
   });
 
@@ -334,12 +334,12 @@ describe("notification links and search words", () => {
 });
 
 describe("notification menu and category totals", () => {
-  it("counts all pages and excludes message alerts from category totals", async () => {
+  it("counts all pages including message alerts in category totals", async () => {
     const t = make([[{ all: "8", comment: "2", mention: "3" }]]);
     expect(await t.service.counts("kemi", true)).toEqual({ all: 8, comment: 2, mention: 3 });
     const where = t.sqlOf(t.arg("select", "where"));
     expect(where.params).toContain("kemi");
-    expect(where.params).toContain("message");
+    expect(where.params).not.toContain("message");
     expect(where.sql).toContain('"read_at" is null');
   });
   it("deletes only the owned row and notifies other devices", async () => {
@@ -359,4 +359,35 @@ it("still opens a message push even though messages are hidden from the inbox", 
   expect(item.url).toBe("/messages/c1");
   const where = t.sqlOf(t.arg("select", "where"));
   expect(where.sql).not.toContain('"notification"."type" <>');
+});
+
+describe("viewed notification versions", () => {
+  it("reads only the recipient's exact displayed row versions and syncs devices", async () => {
+    const t = make([[{ id: ID }]]);
+    await expect(
+      t.service.readViewed("kemi", [{ id: ID, createdAt: AT.toISOString(), count: 2 }]),
+    ).resolves.toEqual({ readIds: [ID] });
+    const query = t.sqlOf(t.arg("update", "where"));
+    expect(query.params).toContain("kemi");
+    expect(query.params).toContain(ID);
+    expect(query.params).toContain(AT.toISOString());
+    expect(query.params).toContain(2);
+    expect(query.sql).toContain('"notification"."read_at" is null');
+    expect(query.sql).toContain('"notification"."count" =');
+    expect(t.realtime.notify).toHaveBeenCalledWith(["kemi"], { type: "notification" });
+  });
+  it("leaves newer bumps untouched, and doesn't broadcast a no-op", async () => {
+    const t = make([[]]);
+    await expect(
+      t.service.readViewed("kemi", [{ id: ID, createdAt: AT.toISOString(), count: 1 }]),
+    ).resolves.toEqual({ readIds: [] });
+    expect(t.realtime.notify).not.toHaveBeenCalled();
+  });
+  it("doesn't double-count message notification rows in the launcher badge", async () => {
+    const t = make([[{ total: 5 }]]);
+    await expect(t.service.appBadgeCount("kemi")).resolves.toEqual({ count: 5 });
+    expect(t.sqlOf(t.arg("select", "where")).params).toContain("message");
+    const selection = t.chains[0].find((c) => c.method === "select")!.args[0] as { total: SQL };
+    expect(t.sqlOf(selection.total).sql).toContain('"chat_inbox_seen"');
+  });
 });

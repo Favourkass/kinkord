@@ -252,6 +252,25 @@ describe("ProfilesService", () => {
     createdAt: new Date("2026-09-01T00:00:00Z"),
   };
 
+  it("blocks sexuality selection for Nigeria, including a country change in the same request", async () => {
+    const row = { ...makeService().row, country: "NG", orientation: "Bisexual" };
+    const existing = makeService({ selects: [[row]] });
+    await expect(
+      existing.service.updateOwn("u1", { orientation: "Straight" }, "Favour"),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(existing.setCalls).toEqual([]);
+    const moving = makeService();
+    await expect(
+      moving.service.updateOwn("u1", { country: "NG", orientation: "Straight" }, "Favour"),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    const other = makeService();
+    await other.service.updateOwn("u1", { country: "KE", orientation: "Straight" }, "Favour");
+    expect(other.setCalls[0]).toMatchObject({ orientation: "Straight" });
+    const unchanged = makeService({ selects: [[row]] });
+    await unchanged.service.updateOwn("u1", { bio: "Hello" }, "Favour");
+    expect(unchanged.setCalls[0]).not.toHaveProperty("orientation");
+  });
+
   it("puts a Silver member's check on hold when their name or photo changes", async () => {
     const renamed = makeService();
     await renamed.service.updateOwn("u1", { displayName: "Favour K" }, "Favour", now);

@@ -129,3 +129,42 @@ export const POST_CARD_LABELS = {
   follow: FEED_COPY.follow,
   following: FEED_COPY.following,
 } as const;
+
+/** Display-ready controls for the post editor. */
+export const FEED_EDITOR = {
+  formats: [
+    { value: "bold", label: "Bold" },
+    { value: "italic", label: "Italic" },
+    { value: "underline", label: "Underline" },
+  ] as const,
+  labels: {
+    toolbar: "Post formatting",
+    emoji: "Add emoji",
+    preview: "Preview formatting",
+    previewTitle: "Post preview",
+    edit: "Back to writing",
+    text: "Post text",
+    hint: "Enter starts a new line. Use **bold**, *italic* or __underline__.",
+    limit: "There isn't enough room for that. Shorten your post and try again.",
+  },
+  emojis: [
+    { value: "😀", label: "Grinning face" },
+    { value: "😊", label: "Smiling face" },
+    { value: "😉", label: "Winking face" },
+    { value: "😍", label: "Heart eyes" },
+    { value: "🥰", label: "Smiling with hearts" },
+    { value: "😂", label: "Tears of joy" },
+    { value: "😎", label: "Sunglasses" },
+    { value: "🤔", label: "Thinking" },
+    { value: "❤️", label: "Red heart" },
+    { value: "💛", label: "Gold heart" },
+    { value: "🔥", label: "Fire" },
+    { value: "✨", label: "Sparkles" },
+    { value: "🙌", label: "Raised hands" },
+    { value: "👏", label: "Clapping" },
+    { value: "👍", label: "Thumbs up" },
+    { value: "👋", label: "Waving hand" },
+    { value: "🎉", label: "Celebration" },
+    { value: "💯", label: "Hundred points" },
+  ],
+} as const;

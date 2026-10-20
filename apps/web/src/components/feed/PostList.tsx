@@ -1,3 +1,4 @@
+import InfiniteSentinel from "@/components/members/InfiniteSentinel";
 import type { PostMediaVM, PostVM } from "@/domain/post";
 import PostCard, { type PostCardProps } from "./PostCard";
 
@@ -68,18 +69,13 @@ export default function PostList(p: PostListProps) {
           />
         ))}
 
-      {p.hasMore && (
-        <div className="px-[25px] py-[20px] text-center">
-          <button
-            type="button"
-            onClick={p.onLoadMore}
-            disabled={p.loadingMore}
-            className="rounded-[8px] border border-feed-line px-[20px] py-[8px] text-[14px] font-medium text-feed-text disabled:opacity-50"
-          >
-            {p.loadingMore ? p.copy.loading : p.copy.loadMore}
-          </button>
-        </div>
-      )}
+      <InfiniteSentinel
+        onVisible={p.onLoadMore}
+        enabled={p.hasMore && !p.loading && !p.loadingMore && !p.error}
+        loading={p.loadingMore}
+        loadingText={p.copy.loading}
+        endText={null}
+      />
     </>
   );
 }

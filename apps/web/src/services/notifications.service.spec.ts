@@ -84,3 +84,23 @@ it("deletes through the API and broadcasts only after success", async () => {
   expect(changed).toHaveBeenCalledOnce();
   stop();
 });
+
+it("batches only viewed snapshots and broadcasts after the backend confirms", async () => {
+  const snapshots = [item, { ...item, id: "n2" }].map(({ id, createdAt, count }) => ({
+    id,
+    createdAt,
+    count,
+  }));
+  post.mockResolvedValue({ readIds: ["n1", "n2"] });
+  const results = await Promise.all(
+    snapshots.map((snapshot) => notificationsApi.readViewed([snapshot])),
+  );
+  expect(post).toHaveBeenCalledExactlyOnceWith("/notifications/read-viewed", { items: snapshots });
+  expect(results).toEqual([{ readIds: ["n1", "n2"] }, { readIds: ["n1", "n2"] }]);
+});
+it("preserves unread state on an offline viewed-read failure so the view can retry", async () => {
+  const snapshot = { id: item.id, createdAt: item.createdAt, count: 1 };
+  post.mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce({ readIds: [item.id] });
+  await expect(notificationsApi.readViewed([snapshot])).rejects.toThrow("offline");
+  await expect(notificationsApi.readViewed([snapshot])).resolves.toEqual({ readIds: [item.id] });
+});

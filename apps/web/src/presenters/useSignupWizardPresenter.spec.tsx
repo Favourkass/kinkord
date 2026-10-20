@@ -169,6 +169,15 @@ describe("useSignupWizardPresenter", () => {
     reachCombinedStep(result);
     fillAccount(result);
     fillAbout(result);
+    act(() => result.current.stepOne.setCountry("KE"));
+    act(() =>
+      result.current.aboutStep.set({
+        ...result.current.aboutStep.draft,
+        state: "Nairobi",
+        city: "Nairobi",
+      }),
+    );
+    expect(result.current.aboutStep.showSexuality).toBe(true);
     act(() =>
       result.current.aboutStep.set({ ...result.current.aboutStep.draft, orientation: "Bisexual" }),
     );
@@ -639,4 +648,27 @@ describe("useSignupWizardPresenter towns", () => {
     expect(result.current.aboutStep.location.customArea).toBe(true);
     expect(result.current.aboutStep.draft.city).toBe("Ikota Villa");
   });
+});
+
+it("hides and clears a selection when switching to Nigeria, and omits stale selections on submit", async () => {
+  const { result } = renderHook(() => useSignupWizardPresenter());
+  reachCombinedStep(result);
+  fillAccount(result);
+  fillAbout(result);
+  act(() => result.current.stepOne.setCountry("KE"));
+  act(() =>
+    result.current.aboutStep.set({ ...result.current.aboutStep.draft, orientation: "Bisexual" }),
+  );
+  act(() => result.current.stepOne.setCountry("NG"));
+  expect(result.current.aboutStep.showSexuality).toBe(false);
+  expect(result.current.aboutStep.draft.orientation).toBeNull();
+  fillAbout(result);
+  act(() =>
+    result.current.aboutStep.set({ ...result.current.aboutStep.draft, orientation: "Straight" }),
+  );
+  await act(() => result.current.submitCombinedStep());
+  expect(post).toHaveBeenCalledWith(
+    "/auth-ext/sign-up",
+    expect.objectContaining({ country: "NG", orientation: null }),
+  );
 });

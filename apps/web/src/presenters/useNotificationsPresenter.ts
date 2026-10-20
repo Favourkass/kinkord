@@ -201,6 +201,56 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
     [router],
   );
 
+  const viewedRefreshPending = useRef(false);
+  const viewing = useRef(new Map<string, Promise<void>>());
+  const onViewed = useCallback(
+    (id: string, createdAt: string, count: number): Promise<void> => {
+      if (!ready || document.visibilityState === "hidden")
+        return Promise.reject(new Error("Not visible"));
+      const before = itemsRef.current.find((row) => row.id === id);
+      if (
+        !before ||
+        before.readAt !== null ||
+        before.createdAt !== createdAt ||
+        before.count !== count
+      )
+        return Promise.resolve();
+      const key = `${id}:${createdAt}:${count}`;
+      const existing = viewing.current.get(key);
+      if (existing) return existing;
+      const appliedBefore = countsApplied.current;
+      const operation = notificationsApi
+        .readViewed([{ id, createdAt, count }])
+        .then(({ readIds }) => {
+          revision.current++;
+          if (readIds.includes(id)) {
+            if (countsApplied.current === appliedBefore)
+              setTabCounts((previous) => countsAfterRead(previous, before.type));
+            setItems((previous) =>
+              previous.map((row) =>
+                row.id === id && row.createdAt === createdAt && row.count === count
+                  ? { ...row, readAt: row.readAt ?? new Date().toISOString() }
+                  : row,
+              ),
+            );
+          }
+          if (!viewedRefreshPending.current) {
+            viewedRefreshPending.current = true;
+            queueMicrotask(() => {
+              viewedRefreshPending.current = false;
+              refreshRef.current();
+            });
+          }
+        })
+        .finally(() => {
+          viewing.current.delete(key);
+        });
+      viewing.current.set(key, operation);
+      return operation;
+    },
+    [ready],
+  );
+
   const markAll = useCallback(async () => {
     if (busy.current) return;
     busy.current = true;
@@ -284,6 +334,7 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
 
   return {
     items: visibleItems,
+    onViewed,
     tabCounts,
     deleteNotification,
     tab,

@@ -1,3 +1,4 @@
+import ViewedNotificationRow from "./ViewedNotificationRow";
 import TeamBadge from "@/components/app/TeamBadge";
 import {
   AtSign,
@@ -29,6 +30,7 @@ const ICONS = {
 
 export interface NotificationInboxProps {
   items: NotificationVM[];
+  onViewed?: (id: string, createdAt: string, count: number) => Promise<void>;
   tabCounts: Record<"all" | "comment" | "mention", number>;
   tab: "all" | "comment" | "mention";
   setTab: (tab: "all" | "comment" | "mention") => void;
@@ -203,8 +205,13 @@ export default function NotificationInbox(p: NotificationInboxProps) {
           {p.items.map((item) => {
             const Icon = ICONS[item.icon];
             return (
-              <li
+              <ViewedNotificationRow
                 key={item.id}
+                id={item.id}
+                createdAt={item.dateTime}
+                activityCount={item.activityCount}
+                unread={item.unread}
+                onViewed={p.onViewed}
                 className="relative flex min-h-[67px] items-center border-b border-app-card-border px-4 lg:min-h-[88px]"
               >
                 <button
@@ -340,7 +347,7 @@ export default function NotificationInbox(p: NotificationInboxProps) {
                     </button>
                   </div>
                 )}
-              </li>
+              </ViewedNotificationRow>
             );
           })}
         </ul>
