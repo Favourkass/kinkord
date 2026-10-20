@@ -90,3 +90,12 @@ it("assigns and removes only the team identity badge", async () => {
   expect(post).toHaveBeenCalledWith("/admin/members/u%2F9/team-badge", { enabled: true });
   expect(post).toHaveBeenCalledWith("/admin/members/u%2F9/team-badge", { enabled: false });
 });
+
+it("gives an admin Silver, or takes the founders' gift back", async () => {
+  await moderationService.setAdminSilver("u/7", true);
+  await moderationService.setAdminSilver("u/7", false);
+  expect(post.mock.calls.slice(-2)).toEqual([
+    ["/admin/staff/u%2F7/silver", { enabled: true }],
+    ["/admin/staff/u%2F7/silver", { enabled: false }],
+  ]);
+});

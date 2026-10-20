@@ -8,12 +8,14 @@ const access = vi.fn();
 const team = vi.fn();
 const addAdmin = vi.fn();
 const removeAdmin = vi.fn();
+const setAdminSilver = vi.fn();
 vi.mock("@/services/moderation.service", () => ({
   moderationService: {
     access: () => access(),
     team: () => team(),
     addAdmin: (...a: unknown[]) => addAdmin(...a),
     removeAdmin: (...a: unknown[]) => removeAdmin(...a),
+    setAdminSilver: (...a: unknown[]) => setAdminSilver(...a),
   },
 }));
 
@@ -25,6 +27,8 @@ const founder: AdminTeamMemberPM = {
   avatarUrl: null,
   founder: true,
   since: null,
+  silver: "founder",
+  silverUntil: null,
 };
 
 const jane: AdminTeamMemberPM = {
@@ -35,6 +39,8 @@ const jane: AdminTeamMemberPM = {
   avatarUrl: null,
   founder: false,
   since: "2026-10-10T09:00:00.000Z",
+  silver: null,
+  silverUntil: null,
 };
 
 describe("useAdminTeamPresenter", () => {
@@ -43,6 +49,7 @@ describe("useAdminTeamPresenter", () => {
     team.mockReset().mockResolvedValue({ admins: [founder], canManage: true });
     addAdmin.mockReset().mockResolvedValue(jane);
     removeAdmin.mockReset().mockResolvedValue({ removed: "u7" });
+    setAdminSilver.mockReset().mockResolvedValue({ ...jane, silver: "given" });
   });
   afterEach(cleanup);
 
@@ -113,13 +120,51 @@ describe("useAdminTeamPresenter", () => {
     expect(result.current.rows.map((r) => r.id)).toEqual(["u1"]);
   });
 
+  it("asks before giving an admin Silver, then shows it on their row", async () => {
+    team.mockResolvedValue({ admins: [founder, jane], canManage: true });
+    const { result } = renderHook(() => useAdminTeamPresenter());
+    await waitFor(() => expect(result.current.rows).toHaveLength(2));
+    expect(result.current.rows.map((r) => r.silverAction)).toEqual([null, "give"]);
+    act(() => result.current.silver("u7"));
+    expect(setAdminSilver).not.toHaveBeenCalled();
+    expect(result.current.dialog).toMatchObject({
+      title: "Give Lady Jane Silver?",
+      confirmLabel: "Give Silver",
+      destructive: false,
+    });
+    await act(async () => result.current.dialog?.confirm());
+    expect(setAdminSilver).toHaveBeenCalledWith("u7", true);
+    expect(result.current.notice).toBe("Lady Jane now has Silver.");
+    expect(result.current.rows[1]).toMatchObject({
+      silver: "Silver, from the founders",
+      silverAction: "remove",
+    });
+  });
+
+  it("takes the founders' Silver back once confirmed", async () => {
+    team.mockResolvedValue({ admins: [founder, { ...jane, silver: "given" }], canManage: true });
+    setAdminSilver.mockResolvedValue(jane);
+    const { result } = renderHook(() => useAdminTeamPresenter());
+    await waitFor(() => expect(result.current.rows).toHaveLength(2));
+    act(() => result.current.silver("u7"));
+    expect(result.current.dialog).toMatchObject({
+      title: "Take back Lady Jane's Silver?",
+      destructive: true,
+    });
+    await act(async () => result.current.dialog?.confirm());
+    expect(setAdminSilver).toHaveBeenCalledWith("u7", false);
+    expect(result.current.notice).toBe("Lady Jane no longer has the Silver the founders gave.");
+    expect(result.current.rows[1]).toMatchObject({ silver: "", silverAction: "give" });
+  });
+
   it("shows other admins the list but nothing to change it with", async () => {
     team.mockResolvedValue({ admins: [founder, jane], canManage: false });
     const { result } = renderHook(() => useAdminTeamPresenter());
     await waitFor(() => expect(result.current.rows).toHaveLength(2));
     expect(result.current.canManage).toBe(false);
-    expect(result.current.rows.every((r) => !r.removable)).toBe(true);
+    expect(result.current.rows.every((r) => !r.removable && !r.silverAction)).toBe(true);
     act(() => result.current.remove("u7"));
+    act(() => result.current.silver("u7"));
     expect(result.current.dialog).toBeNull();
   });
 

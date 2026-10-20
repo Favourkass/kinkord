@@ -2,15 +2,26 @@ import { ConflictException, ForbiddenException, NotFoundException } from "@nestj
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { BronzeService } from "../verification/bronze.service";
 import { describe, expect, it, vi } from "vitest";
-import { memberBan, moderationLog, profile, session, signupBlock, staff, user } from "../db/schema";
+import {
+  memberBan,
+  memberSubscription,
+  moderationLog,
+  profile,
+  session,
+  signupBlock,
+  staff,
+  user,
+} from "../db/schema";
 import type { PostsService } from "../posts/posts.service";
 import type { StorageService } from "../storage/storage.service";
+import { FOUNDER_SILVER_UNTIL } from "../subscriptions/plans";
 import { containsPattern, ModerationService, normalizeRuleValue } from "./moderation.service";
 
 /**
  * A stand-in for the Drizzle client. Every builder call returns the chain, and
  * each `await` takes the next queued answer, so a spec lists the database's
  * replies in the order the code asks and then checks what was written.
+ * `transaction(fn)` runs `fn` on the same stub, so its queries queue in line.
  */
 function queuedDb(answers: unknown[]) {
   const queue = [...answers];
@@ -22,12 +33,14 @@ function queuedDb(answers: unknown[]) {
           const value = queue.shift();
           return (resolve: (v: unknown) => void) => resolve(value);
         }
+        if (prop === "transaction") return (fn: (tx: unknown) => unknown) => fn(db);
         return (...args: unknown[]) => {
           calls.push({ op: String(prop), args });
           return chain();
         };
       },
     });
+  const db = chain();
   const indexOf = (op: string, table: unknown) =>
     calls.findIndex((c) => c.op === op && c.args[0] === table);
   /** The argument `op` received next after `anchor` was called on `table`. */
@@ -35,7 +48,7 @@ function queuedDb(answers: unknown[]) {
     const start = indexOf(anchor, table);
     return start < 0 ? undefined : calls.slice(start + 1).find((c) => c.op === op)?.args[0];
   };
-  return { db: chain() as never, calls, indexOf, after };
+  return { db: db as never, calls, indexOf, after, left: () => queue.length };
 }
 
 function make(answers: unknown[]) {
@@ -308,6 +321,8 @@ const teammate = {
   displayName: "Lady Jane",
   avatarKey: "avatars/u7/a.png",
   since: null as Date | null,
+  silverEnd: null as Date | null,
+  silverGivenBy: null as string | null,
 };
 
 describe("ModerationService.team", () => {
@@ -320,6 +335,7 @@ describe("ModerationService.team", () => {
       email: "maxihandsome@gmail.com",
       displayName: null,
       avatarKey: null,
+      silverEnd: FOUNDER_SILVER_UNTIL,
     };
     const since = new Date("2026-10-10T09:00:00Z");
     const { service } = make([[{ ...teammate, since }, founder]]);
@@ -332,6 +348,8 @@ describe("ModerationService.team", () => {
         avatarUrl: null,
         founder: true,
         since: null,
+        silver: "founder",
+        silverUntil: null,
       },
       {
         id: "u7",
@@ -341,7 +359,27 @@ describe("ModerationService.team", () => {
         avatarUrl: "https://media/avatars/u7/a.png?sm",
         founder: false,
         since: "2026-10-10T09:00:00.000Z",
+        silver: null,
+        silverUntil: null,
       },
+    ]);
+  });
+
+  it("tells Silver the founders gave from Silver an admin paid for", async () => {
+    const paidEnd = new Date("2026-11-06T12:00:00Z");
+    const { service } = make([
+      [
+        { ...teammate, silverEnd: FOUNDER_SILVER_UNTIL, silverGivenBy: "u1" },
+        { ...teammate, id: "u8", silverEnd: paidEnd },
+        // Silver for good set by hand, before there was a button: the founders' too.
+        { ...teammate, id: "u9", silverEnd: FOUNDER_SILVER_UNTIL },
+      ],
+    ]);
+    const team = await service.team();
+    expect(team.map((a) => [a.id, a.silver, a.silverUntil])).toEqual([
+      ["u7", "given", null],
+      ["u8", "paid", "2026-11-06T12:00:00.000Z"],
+      ["u9", "given", null],
     ]);
   });
 });
@@ -401,15 +439,43 @@ describe("ModerationService.addAdmin", () => {
 
 describe("ModerationService.removeAdmin", () => {
   it("deletes their admin row and logs who removed them", async () => {
-    const { service, indexOf, after } = make([[teammate], [{ userId: "u7" }], undefined]);
+    const { service, indexOf, after, left } = make([
+      [teammate],
+      [{ userId: "u7" }],
+      [], // no Silver to take back
+      undefined,
+    ]);
     await expect(service.removeAdmin("u1", "u7")).resolves.toEqual({ removed: "u7" });
     expect(indexOf("delete", staff)).toBeGreaterThan(-1);
+    expect(indexOf("update", memberSubscription)).toBe(-1);
     expect(after("insert", moderationLog, "values")).toMatchObject({
       actorId: "u1",
       action: "remove-admin",
       subjectUserId: "u7",
       detail: "@ladyjane",
     });
+    expect(left()).toBe(0);
+  });
+
+  it("takes back the Silver the founders gave with the role, and logs that too", async () => {
+    const { service, calls, after, left } = make([
+      [teammate],
+      [{ userId: "u7" }],
+      [{ end: FOUNDER_SILVER_UNTIL, grantedBy: "u1", paidUntil: null }],
+      undefined,
+      undefined,
+      undefined,
+    ]);
+    await service.removeAdmin("u2", "u7");
+    expect(after("update", memberSubscription, "set")).toMatchObject({
+      grantedBy: null,
+      paidUntil: null,
+    });
+    const logged = calls
+      .filter((c) => c.op === "values" && (c.args[0] as { action?: string }).action)
+      .map((c) => (c.args[0] as { action: string }).action);
+    expect(logged).toEqual(["remove-admin", "remove-silver"]);
+    expect(left()).toBe(0);
   });
 
   it("can't remove a founder", async () => {
@@ -483,5 +549,97 @@ describe("ModerationService team badge", () => {
     );
     await expect(service.setTeamBadge("admin", "absent", true)).rejects.toThrow(NotFoundException);
     expect(tx.insert).not.toHaveBeenCalled();
+  });
+});
+
+describe("ModerationService.setAdminSilver", () => {
+  const adminRow = {
+    email: "jane@example.com",
+    emailVerified: true,
+    username: "ladyjane",
+    admin: "u7",
+  };
+  const since = new Date("2026-10-10T09:00:00Z");
+
+  it("gives an admin Silver for good, logs which founder did, and returns their row", async () => {
+    const { service, after, left } = make([
+      [adminRow],
+      [], // not on Silver yet
+      undefined,
+      undefined,
+      [{ ...teammate, since, silverEnd: FOUNDER_SILVER_UNTIL, silverGivenBy: "u1" }],
+    ]);
+    await expect(service.setAdminSilver("u1", "u7", true)).resolves.toMatchObject({
+      id: "u7",
+      silver: "given",
+      silverUntil: null,
+    });
+    expect(after("insert", memberSubscription, "values")).toMatchObject({
+      userId: "u7",
+      plan: "silver",
+      currentPeriodEnd: FOUNDER_SILVER_UNTIL,
+      grantedBy: "u1",
+    });
+    expect(after("insert", moderationLog, "values")).toEqual({
+      actorId: "u1",
+      action: "give-silver",
+      subjectUserId: "u7",
+      detail: "@ladyjane",
+    });
+    expect(left()).toBe(0);
+  });
+
+  it("takes it back and logs that", async () => {
+    const { service, after } = make([
+      [adminRow],
+      [{ end: FOUNDER_SILVER_UNTIL, grantedBy: "u1", paidUntil: null }],
+      undefined,
+      undefined,
+      [{ ...teammate, since }],
+    ]);
+    await expect(service.setAdminSilver("u2", "u7", false)).resolves.toMatchObject({
+      silver: null,
+    });
+    expect(after("insert", moderationLog, "values")).toMatchObject({
+      actorId: "u2",
+      action: "remove-silver",
+    });
+  });
+
+  it("logs nothing when nothing changes", async () => {
+    const { service, indexOf } = make([
+      [adminRow],
+      [{ end: FOUNDER_SILVER_UNTIL, grantedBy: "u2" }],
+      [{ ...teammate, since, silverEnd: FOUNDER_SILVER_UNTIL, silverGivenBy: "u2" }],
+    ]);
+    await service.setAdminSilver("u1", "u7", true);
+    expect(indexOf("insert", memberSubscription)).toBe(-1);
+    expect(indexOf("insert", moderationLog)).toBe(-1);
+  });
+
+  it("only gives Silver to admins", async () => {
+    const { service, indexOf } = make([[{ ...adminRow, admin: null }]]);
+    await expect(service.setAdminSilver("u1", "u7", true)).rejects.toThrow(
+      new ConflictException("Only admins can be given Silver."),
+    );
+    expect(indexOf("insert", memberSubscription)).toBe(-1);
+  });
+
+  it("leaves a founder's Silver alone, either way", async () => {
+    for (const enabled of [true, false]) {
+      const founder = { ...adminRow, email: "nnabuekassidy@gmail.com" };
+      const { service, indexOf } = make([[founder]]);
+      await expect(service.setAdminSilver("u1", "u3", enabled)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      expect(indexOf("update", memberSubscription)).toBe(-1);
+    }
+  });
+
+  it("is a 404 for a member who doesn't exist", async () => {
+    const { service } = make([[]]);
+    await expect(service.setAdminSilver("u1", "nobody", true)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 });

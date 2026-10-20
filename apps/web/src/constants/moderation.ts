@@ -207,7 +207,7 @@ export const MODERATION_COPY = {
   admins: {
     intro:
       "Admins can use everything in this area. The founders are admins by their email and can't be removed.",
-    locked: "Only the founders can add or remove admins.",
+    locked: "Only the founders can add or remove admins, or give them Silver.",
     usernameLabel: "Username",
     usernamePlaceholder: "@username",
     enterUsername: "Enter their username.",
@@ -216,8 +216,14 @@ export const MODERATION_COPY = {
     loading: "Loading admins…",
     founder: "Founder",
     since: (date: string) => `Admin since ${date}`,
+    silverGiven: "Silver, from the founders",
+    silverPaid: (date: string) => `Silver until ${date}`,
+    giveSilver: "Give Silver",
+    removeSilver: "Remove Silver",
     added: (handle: string) => `@${handle} is now an admin.`,
     removed: (name: string) => `${name} is no longer an admin.`,
+    silverGivenNotice: (name: string) => `${name} now has Silver.`,
+    silverRemovedNotice: (name: string) => `${name} no longer has the Silver the founders gave.`,
     addDialog: {
       title: (handle: string) => `Make @${handle} an admin?`,
       body: "They'll see members' emails and phone numbers, block and delete accounts and posts, handle reports, and verify Silver payments and badges. They're notified when one of those needs review. Wallet payouts and settings stay with the founders.",
@@ -225,8 +231,18 @@ export const MODERATION_COPY = {
     },
     removeDialog: {
       title: (name: string) => `Remove ${name} as an admin?`,
-      body: "They lose the admin tools straight away. Their account isn't changed otherwise.",
+      body: "They lose the admin tools straight away, and any Silver the founders gave them. Their account isn't changed otherwise.",
       confirm: "Remove admin",
+    },
+    giveSilverDialog: {
+      title: (name: string) => `Give ${name} Silver?`,
+      body: "Everything in Silver, with nothing to pay, for as long as they're an admin. If they're paying for Silver now, the time they have left is kept for them. Either founder can take it back here.",
+      confirm: "Give Silver",
+    },
+    removeSilverDialog: {
+      title: (name: string) => `Take back ${name}'s Silver?`,
+      body: "The Silver the founders gave ends now. Paid time they had left from before comes back to them.",
+      confirm: "Remove Silver",
     },
   },
   denied: "This area is for admins only.",

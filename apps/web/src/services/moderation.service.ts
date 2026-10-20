@@ -97,4 +97,8 @@ export const moderationService = {
   /** Founders only. */
   removeAdmin: (id: string) =>
     api.del<{ removed: string }>(`/admin/staff/${encodeURIComponent(id)}`),
+
+  /** Founders only: Silver for good for an admin, or the founders' gift taken back. */
+  setAdminSilver: (id: string, enabled: boolean) =>
+    api.post<AdminTeamMemberPM>(`/admin/staff/${encodeURIComponent(id)}/silver`, { enabled }),
 };
