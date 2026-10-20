@@ -13,7 +13,7 @@ export function useMessageBadgePresenter(enabled: boolean) {
   const refreshRef = useRef<() => void>(() => undefined);
   // A chat event (a new message, or a read on another device) can change the count.
   const onRealtime = useCallback((e: RealtimeEventPM) => {
-    if (e.type === "message") refreshRef.current();
+    if (e.type === "message" || e.type === "inbox_seen") refreshRef.current();
   }, []);
   const { live } = useRealtime(onRealtime, enabled);
 

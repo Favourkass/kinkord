@@ -4,11 +4,12 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { useNotificationsPresenter } from "./useNotificationsPresenter";
 import { Routes } from "@/constants/Routes";
 import type { NotificationPM } from "@/domain/notification";
-const { counts, list, read, readAll, push, replace, remove } = vi.hoisted(() => ({
+const { counts, list, read, readAll, readViewed, push, replace, remove } = vi.hoisted(() => ({
   counts: vi.fn(),
   list: vi.fn(),
   read: vi.fn(),
   readAll: vi.fn(),
+  readViewed: vi.fn(),
   push: vi.fn(),
   replace: vi.fn(),
   remove: vi.fn(),
@@ -21,6 +22,7 @@ vi.mock("@/services/notifications.service", async (original) => ({
     list,
     read,
     readAll,
+    readViewed,
     delete: remove,
     counts,
   },
@@ -63,6 +65,7 @@ beforeEach(() => {
     return updated;
   });
   readAll.mockReset().mockResolvedValue(undefined);
+  readViewed.mockReset().mockResolvedValue({ readIds: [] });
   push.mockClear();
   replace.mockClear();
 });
@@ -366,5 +369,40 @@ describe("unread tab badges", () => {
     await waitFor(() =>
       expect(result.current.tabCounts).toEqual({ all: 3, comment: 0, mention: 1 }),
     );
+  });
+});
+
+describe("automatically reading viewed notification rows", () => {
+  it.each(["message", "friend_request", "comment", "mention"] as const)(
+    "reads a viewed %s without navigating or reading a conversation",
+    async (type) => {
+      const viewed = { ...item, type };
+      list.mockResolvedValue({ items: [viewed], nextCursor: null });
+      readViewed.mockImplementation(async () => {
+        list.mockResolvedValue({
+          items: [{ ...viewed, readAt: item.createdAt }],
+          nextCursor: null,
+        });
+        return { readIds: [item.id] };
+      });
+      const { result } = renderHook(() => useNotificationsPresenter(true));
+      await waitFor(() => expect(result.current.items).toHaveLength(1));
+      expect(readViewed).not.toHaveBeenCalled();
+      await act(async () => result.current.onViewed(item.id, item.createdAt, item.count));
+      expect(readViewed).toHaveBeenCalledExactlyOnceWith([
+        { id: item.id, createdAt: item.createdAt, count: item.count },
+      ]);
+      await waitFor(() => expect(result.current.items[0].unread).toBe(false));
+      expect(read).not.toHaveBeenCalled();
+      expect(readAll).not.toHaveBeenCalled();
+      expect(push).not.toHaveBeenCalled();
+    },
+  );
+  it("ignores stale observer reports after a newer message bump", async () => {
+    list.mockResolvedValue({ items: [{ ...item, count: 2 }], nextCursor: null });
+    const { result } = renderHook(() => useNotificationsPresenter(true));
+    await waitFor(() => expect(result.current.items).toHaveLength(1));
+    await act(async () => result.current.onViewed(item.id, item.createdAt, 1));
+    expect(readViewed).not.toHaveBeenCalled();
   });
 });

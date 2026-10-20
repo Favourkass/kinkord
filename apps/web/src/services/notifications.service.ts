@@ -39,6 +39,48 @@ export interface NotificationListOptions {
   q?: string;
 }
 
+type ViewedSnapshot = { id: string; createdAt: string; count: number };
+let viewedQueue: {
+  item: ViewedSnapshot;
+  resolve: (value: { readIds: string[] }) => void;
+  reject: (error: unknown) => void;
+}[] = [];
+let viewedTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** Batch rows entering the viewport together; the backend validates every version. */
+function queueViewedRead(items: ViewedSnapshot[]): Promise<{ readIds: string[] }> {
+  if (!items.length) return Promise.resolve({ readIds: [] });
+  return Promise.all(
+    items.map(
+      (item) =>
+        new Promise<{ readIds: string[] }>((resolve, reject) => {
+          viewedQueue.push({ item, resolve, reject });
+          if (viewedTimer) return;
+          viewedTimer = setTimeout(() => {
+            viewedTimer = undefined;
+            const pending = viewedQueue;
+            viewedQueue = [];
+            // A viewport can never send an unbounded mutation.
+            for (let start = 0; start < pending.length; start += 50) {
+              const group = pending.slice(start, start + 50);
+              void api
+                .post<{ readIds: string[] }>("/notifications/read-viewed", {
+                  items: group.map((entry) => entry.item),
+                })
+                .then(
+                  (result) => {
+                    notifyInboxChanged();
+                    group.forEach((entry) => entry.resolve(result));
+                  },
+                  (error: unknown) => group.forEach((entry) => entry.reject(error)),
+                );
+            }
+          }, 50);
+        }),
+    ),
+  ).then((results) => ({ readIds: [...new Set(results.flatMap((result) => result.readIds))] }));
+}
+
 export const notificationsApi = {
   list: ({ unread = false, cursor, type, q }: NotificationListOptions = {}) => {
     const query = new URLSearchParams();
@@ -66,6 +108,7 @@ export const notificationsApi = {
     notifyInboxChanged();
     return result;
   },
+  readViewed: queueViewedRead,
   readAll: async () => {
     await api.post<{ ok: true }>("/notifications/read-all", {});
     notifyInboxChanged();

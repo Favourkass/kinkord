@@ -1,3 +1,4 @@
+import { messageBadgeCount } from "./inbox-badge";
 import { teamBadge } from "../members/team-badge";
 import { randomUUID } from "node:crypto";
 import {
@@ -29,7 +30,14 @@ import {
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { DRIZZLE, type Db } from "../db/db.module";
-import { conversation, conversationParticipant, message, profile, user } from "../db/schema";
+import {
+  chatInboxSeen,
+  conversation,
+  conversationParticipant,
+  message,
+  profile,
+  user,
+} from "../db/schema";
 import { isSuperAdmin, notBanned } from "../moderation/admins";
 import { ONLINE_WINDOW_SECONDS, PresenceService } from "../presence/presence.service";
 import { containsPattern } from "../push/notifications.service";
@@ -515,7 +523,6 @@ export class ChatService {
       .where(and(eq(message.id, messageId), eq(message.conversationId, conversationId)))
       .limit(1);
     if (!known) throw new BadRequestException("Unknown message.");
-    this.push.chatRead(userId, conversationId, known.createdAt);
     const readAt = sql`(select "created_at" from "message" where "id" = ${messageId})`;
     await this.db
       .update(conversationParticipant)
@@ -527,30 +534,30 @@ export class ChatService {
           sql`(${conversationParticipant.lastReadAt} is null or ${conversationParticipant.lastReadAt} < ${readAt})`,
         ),
       );
+    this.push.chatRead(userId, conversationId, known.createdAt);
+    void this.realtime.notify([userId], { type: "message", conversationId });
   }
 
-  /** Total unread incoming messages, across every accessible conversation. */
+  /** Seeing the inbox does not read any conversation. */
   async unreadCount(userId: string): Promise<{ count: number }> {
     const [row] = await this.db
-      .select({ total: count() })
-      .from(message)
-      .innerJoin(
-        conversationParticipant,
-        and(
-          eq(conversationParticipant.conversationId, message.conversationId),
-          eq(conversationParticipant.userId, userId),
-        ),
-      )
-      .where(
-        and(
-          isNull(message.deletedAt),
-          ne(message.senderId, userId),
-          notBanned(message.senderId),
-          notBlocking(message.senderId, userId),
-          sql`${message.createdAt} > coalesce(${conversationParticipant.lastReadAt}, 'epoch')`,
-        ),
-      );
+      .select({ total: messageBadgeCount(userId) })
+      .from(user)
+      .where(eq(user.id, userId));
     return { count: Number(row?.total ?? 0) };
+  }
+
+  async seeInbox(userId: string): Promise<{ ok: true }> {
+    const seenAt = new Date();
+    await this.db
+      .insert(chatInboxSeen)
+      .values({ userId, seenAt })
+      .onConflictDoUpdate({
+        target: chatInboxSeen.userId,
+        set: { seenAt: sql`greatest(${chatInboxSeen.seenAt}, excluded.seen_at)` },
+      });
+    void this.realtime.notify([userId], { type: "inbox_seen" });
+    return { ok: true };
   }
 
   /**

@@ -182,6 +182,6 @@ describe("countsAfterRead", () => {
       comment: 0,
       mention: 0,
     });
-    expect(countsAfterRead(counts, "message")).toBe(counts);
+    expect(countsAfterRead(counts, "message")).toEqual({ ...counts, all: 4 });
   });
 });

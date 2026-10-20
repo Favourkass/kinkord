@@ -6,9 +6,11 @@ import { showsVerificationEntry } from "@/domain/bronzeVerification";
 import { authClient } from "@/services/authClient";
 import { bronzeVerificationApi } from "@/services/bronzeVerification.service";
 import { api, ApiError } from "@/services/apiClient";
+import { appBadgeService } from "@/services/app-badge.service";
 import { pushService } from "@/services/push.service";
 import { Routes } from "@/constants/Routes";
 import type { MeVM, ProfileVM } from "./useProfilePresenter";
+import { useAppBadgePresenter } from "./useAppBadgePresenter";
 import { useMessageBadgePresenter } from "./useMessageBadgePresenter";
 import { useNotificationCountPresenter } from "./useNotificationBadgePresenter";
 
@@ -23,6 +25,7 @@ export function useHomePresenter() {
   const [signedIn, setSignedIn] = useState(false);
   const messagesCount = useMessageBadgePresenter(signedIn);
   const notificationsCount = useNotificationCountPresenter(signedIn);
+  useAppBadgePresenter(signedIn, messagesCount, notificationsCount);
   const notificationsUnread = notificationsCount > 0;
   const [error, setError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -96,6 +99,7 @@ export function useHomePresenter() {
 
   const logout = useCallback(async () => {
     setSignedIn(false);
+    await appBadgeService.clear();
     // While still signed in, so the API forgets this device for this member.
     await pushService.forgetDevice();
     await authClient.signOut();
