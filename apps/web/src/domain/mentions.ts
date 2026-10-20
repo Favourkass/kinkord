@@ -10,7 +10,14 @@ const MENTION = /(^|[^A-Za-z0-9_.@])@([A-Za-z0-9_.]{3,})/g;
 /** "@que" being typed right up to the caret; the query may still be empty. */
 const TYPING = /(^|[^A-Za-z0-9_.@])@([A-Za-z0-9_.]{0,30})$/;
 
-export type BodyPart = { text: string } | { mention: string; href: string };
+export interface TextMarks {
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+}
+export type BodyPart = ({ text: string } | { mention: string; href: string }) & {
+  marks?: TextMarks;
+};
 
 /** An @handle as written (lowercased, without the @) and the member the API says it names. */
 export interface MentionPM {
@@ -59,7 +66,11 @@ export function clipParts(parts: BodyPart[], length: number): BodyPart[] {
   for (const part of parts) {
     if (room <= 0) break;
     const text = "mention" in part ? part.mention : part.text;
-    clipped.push(text.length <= room ? part : { text: text.slice(0, room) });
+    clipped.push(
+      text.length <= room
+        ? part
+        : { text: text.slice(0, room), ...(part.marks ? { marks: part.marks } : {}) },
+    );
     room -= text.length;
   }
   return clipped;
