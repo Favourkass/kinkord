@@ -34,7 +34,12 @@ export function signupLocationFields(
     helper: `Your ${term} and region / city / town help us show you local communities and events.`,
     credit: PLACE_NAMES_CREDIT,
     stateSearchPlaceholder: `Search ${county ? "counties" : region ? "regions" : "states"}`,
-    states: statesForCountry(code).map((value) => ({ value, label: value })),
+    states: statesForCountry(code)
+      .map((value) => ({
+        value,
+        label: code === "US" && value === "District of Columbia" ? "Washington, D.C." : value,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label)),
     areaLabel: "Region / City / Town",
     areaPlaceholder: !state ? `Select your ${term} first` : "Select your region, city or town",
     areaSearchPlaceholder: "Search regions / cities / towns",

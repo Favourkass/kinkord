@@ -90,6 +90,7 @@ it.each([
   ["GH", "Ashanti", "Kumasi"],
   ["US", "South Dakota", "Sioux Falls"],
   ["US", "Tennessee", "Spring Hill"],
+  ["US", "District of Columbia", "Washington"],
 ])("loads real, alphabetical towns for %s / %s", async (country, state, town) => {
   const { regionsForState } = await load();
   const towns = await regionsForState(country, state);

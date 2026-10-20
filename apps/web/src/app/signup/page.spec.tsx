@@ -272,3 +272,17 @@ it("shows and selects Wyoming in the complete USA state list without searching",
   fireEvent.click(screen.getByRole("option", { name: "Wyoming" }));
   expect(screen.getByLabelText("State").textContent).toContain("Wyoming");
 });
+
+it("lists Washington, D.C. separately and selects its compatible location value", () => {
+  fixture.stage = "country";
+  render(<SignupPage />);
+  fireEvent.click(screen.getByLabelText("Country"));
+  fireEvent.click(screen.getByRole("option", { name: "USA" }));
+  for (const checkbox of screen.getAllByRole("checkbox")) fireEvent.click(checkbox);
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  fireEvent.click(screen.getByLabelText("State"));
+  const states = within(screen.getByRole("listbox", { name: "State" }));
+  expect(states.getByRole("option", { name: "Washington", exact: true })).toBeTruthy();
+  fireEvent.click(states.getByRole("option", { name: "Washington, D.C.", exact: true }));
+  expect(screen.getByLabelText("State").textContent).toContain("Washington, D.C.");
+});
