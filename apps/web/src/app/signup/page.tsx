@@ -297,14 +297,16 @@ function SignupWizard() {
                 </p>
               )}
             </div>
-            <SelectField
-              label={p.aboutStep.sexuality.label}
-              options={p.aboutStep.sexuality.options}
-              clearLabel={p.aboutStep.sexuality.clearLabel}
-              helper={p.aboutStep.sexuality.helper}
-              value={p.aboutStep.draft.orientation ?? ""}
-              onChange={(orientation) => p.aboutStep.set({ ...p.aboutStep.draft, orientation })}
-            />
+            {p.aboutStep.showSexuality && (
+              <SelectField
+                label={p.aboutStep.sexuality.label}
+                options={p.aboutStep.sexuality.options}
+                clearLabel={p.aboutStep.sexuality.clearLabel}
+                helper={p.aboutStep.sexuality.helper}
+                value={p.aboutStep.draft.orientation ?? ""}
+                onChange={(orientation) => p.aboutStep.set({ ...p.aboutStep.draft, orientation })}
+              />
+            )}
             {p.topError && <p className="text-[13px] text-red-400 lg:text-[15px]">{p.topError}</p>}
             <GoldCta
               label="Send OTP"

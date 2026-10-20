@@ -1,3 +1,4 @@
+import { canSelectSexuality } from "./profile-field-policy";
 import { ALL_COUNTRY_CODES } from "@/constants/countries";
 import { DEFAULT_SIGNUP_COUNTRY, LAUNCH_COUNTRIES } from "@/constants/onboarding";
 import { PROFILE_EDIT_COPY } from "@/constants/profileEdit";
@@ -329,6 +330,7 @@ export function buildEditRow(key: EditRowKey, ctx: EditRowsContext): EditRowPM {
 export function buildEditRows(section: EditSectionKey, ctx: EditRowsContext): EditRowPM[] {
   return SECTION_ROWS[section]
     .filter((key) => key !== "verifiedBadge" || ctx.profile.identityVerified)
+    .filter((key) => key !== "orientation" || canSelectSexuality(profileCountry(ctx.profile)))
     .map((key) => buildEditRow(key, ctx));
 }
 
@@ -401,7 +403,7 @@ export function patchFor(key: EditRowKey, draft: EditorDraft, profile: OwnProfil
     case "gender":
       return { gender: t || null };
     case "orientation":
-      return { orientation: t || null };
+      return canSelectSexuality(profileCountry(profile)) ? { orientation: t || null } : {};
     case "dateOfBirth":
       return { dateOfBirth: t };
     case "nationality":

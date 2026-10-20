@@ -111,7 +111,6 @@ describe("useEditSectionPresenter", () => {
       ["Display Name", "Naughty Neze"],
       ["Bio", "Chill"],
       ["Gender", "Female"],
-      ["Sexuality", "Not set"],
       ["Date of Birth", "26 Mar 1998"],
       ["Nationality", "Nigeria"],
       ["Relationship Status", "Single"],
@@ -136,8 +135,10 @@ describe("useEditSectionPresenter", () => {
     expect(result.current.rows[2].subtitle).toBe("New bio");
   });
 
-  it("lets the member set or clear their private sexuality", async () => {
-    apiPatch.mockResolvedValue({ ...profile, orientation: "Bisexual" });
+  it("lets a Kenyan member set or clear their private sexuality", async () => {
+    const kenyanProfile = { ...profile, country: "KE" };
+    serve(kenyanProfile);
+    apiPatch.mockResolvedValue({ ...kenyanProfile, orientation: "Bisexual" });
     const { result } = renderHook(() => useEditSectionPresenter("basic"));
     await waitFor(() => expect(result.current.loading).toBe(false));
     const row = () => result.current.rows.find((r) => r.key === "orientation")!;
@@ -157,7 +158,7 @@ describe("useEditSectionPresenter", () => {
     expect(apiPatch).toHaveBeenCalledWith("/profile", { orientation: "Bisexual" });
     expect(row().subtitle).toBe("Bisexual");
 
-    apiPatch.mockResolvedValue({ ...profile, orientation: null });
+    apiPatch.mockResolvedValue({ ...kenyanProfile, orientation: null });
     act(() => row().onClick?.());
     act(() => result.current.editor?.onDraft({ kind: "single", value: "" }));
     act(() => result.current.editor?.onSave());
