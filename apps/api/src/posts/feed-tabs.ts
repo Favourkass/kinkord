@@ -71,6 +71,8 @@ function originalReadable(viewerId: string) {
   return and(
     isNull(original.deletedAt),
     isNull(original.archivedAt),
+    // A group discussion stays in its group, whatever points at it.
+    isNull(original.groupId),
     eq(original.visibility, "public"),
     notBanned(original.authorId),
     noBlockEitherWay(original.authorId, viewerId),

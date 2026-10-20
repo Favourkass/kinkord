@@ -6,6 +6,7 @@ import {
   Database,
   Gem,
   Info,
+  Layers,
   Lock,
   Shield,
   ShieldCheck,
@@ -19,6 +20,7 @@ import type { DrawerIcon } from "./nav";
 
 const icons: Record<DrawerIcon, LucideIcon> = {
   members: UsersRound,
+  groups: Layers,
   saved: Bookmark,
   kinkopedia: BookOpenText,
   verification: ShieldCheck,

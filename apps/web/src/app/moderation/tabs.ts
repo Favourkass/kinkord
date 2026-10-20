@@ -5,6 +5,7 @@ import type { ModerationTab } from "@/components/moderation/ModerationFrame";
 export function moderationTabs(
   active:
     | "posts"
+    | "groups"
     | "members"
     | "reports"
     | "payments"
@@ -15,6 +16,7 @@ export function moderationTabs(
 ): ModerationTab[] {
   return [
     { label: "All posts", href: Routes.moderationPosts, active: active === "posts" },
+    { label: "Groups", href: Routes.moderationGroups, active: active === "groups" },
     { label: "Wallet", href: Routes.moderationWallet, active: active === "wallet" },
     { label: MODERATION_COPY.tabs.members, href: Routes.moderation, active: active === "members" },
     {

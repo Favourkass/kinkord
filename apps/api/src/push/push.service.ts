@@ -193,6 +193,44 @@ export class PushService {
     });
   }
 
+  /**
+   * Someone asked to join a closed group the recipient runs. Discreet like
+   * every push: who, never which group (a group's name can say a lot).
+   */
+  groupRequest(requesterId: string, moderatorId: string, groupSlug: string): void {
+    this.groupActivity("group_request", requesterId, moderatorId, groupSlug);
+  }
+
+  /** A moderator let the recipient into a closed group. */
+  groupApproved(moderatorId: string, memberId: string, groupSlug: string): void {
+    this.groupActivity("group_approved", moderatorId, memberId, groupSlug);
+  }
+
+  private groupActivity(
+    type: "group_request" | "group_approved",
+    actorId: string,
+    recipientId: string,
+    groupSlug: string,
+  ): void {
+    if (actorId === recipientId) return;
+    this.notify(async () => {
+      const who = await this.member(actorId);
+      return {
+        to: recipientId,
+        event: { type, actorId, subjectId: groupSlug },
+        message: {
+          title: "Kinkord",
+          body:
+            type === "group_request"
+              ? `${who.name} asked to join your group`
+              : "Your request to join a group was approved",
+          url: notificationUrl(type, groupSlug, who.username),
+          tag: `${type}-${groupSlug}`,
+        },
+      };
+    });
+  }
+
   newFollower(followerId: string, followedId: string): void {
     if (followerId === followedId) return;
     this.notify(async () => {

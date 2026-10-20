@@ -1,5 +1,12 @@
 export const Routes = {
   friendRequests: "/friends/requests",
+  groups: "/groups",
+  newGroup: "/groups/new",
+  group: (slug: string) => `/g/${encodeURIComponent(slug)}`,
+  groupEdit: (slug: string) => `/g/${encodeURIComponent(slug)}/edit`,
+  groupThread: (slug: string, postId: string) =>
+    `/g/${encodeURIComponent(slug)}/t/${encodeURIComponent(postId)}`,
+  moderationGroups: "/moderation/groups",
   home: "/",
   kinkopedia: "/kinkopedia",
   about: "/about",

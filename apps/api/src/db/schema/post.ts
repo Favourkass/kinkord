@@ -11,6 +11,7 @@ import {
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { user } from "./auth";
+import { communityGroup } from "./group";
 
 /** Who may see a post. Mirrors `profile.profileVisibility`, so the two agree. */
 export type PostVisibility = "public" | "friends";
@@ -48,6 +49,19 @@ export const post = pgTable(
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     /** Admin archive is reversible and retains media, comments and reactions. */
     archivedAt: timestamp("archived_at", { withTimezone: true }),
+    /**
+     * Set when the post is a discussion in a group. Group discussions never leave
+     * the group: no feed, profile, search, repost or gift reads them (visibility.ts).
+     */
+    groupId: uuid("group_id").references(() => communityGroup.id, { onDelete: "cascade" }),
+    /** A group discussion's title; feed posts have none. */
+    title: text("title"),
+    /** Pinned by a group moderator to the top of the group. */
+    pinnedAt: timestamp("pinned_at", { withTimezone: true }),
+    /** Closed by a group moderator: no new replies. */
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    /** A group discussion's last reply (or its posting): the group lists discussions by it. */
+    lastActivityAt: timestamp("last_activity_at", { withTimezone: true }),
   },
   (t) => [
     // The feed and a profile's Posts tab both read newest-first by author.
@@ -63,6 +77,10 @@ export const post = pgTable(
     uniqueIndex("post_repost_unique")
       .on(t.authorId, t.repostOfId)
       .where(sql`${t.deletedAt} is null and ${t.repostOfId} is not null`),
+    // A group's discussions, most recently active first.
+    index("post_group_activity_idx")
+      .on(t.groupId, t.lastActivityAt)
+      .where(sql`${t.groupId} is not null`),
   ],
 );
 

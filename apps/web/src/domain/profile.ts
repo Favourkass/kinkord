@@ -41,6 +41,8 @@ export interface OwnProfilePM {
   identityVerified: boolean;
   /** Whether other members see the verified badge. */
   showVerifiedBadge: boolean;
+  /** Whether the profile lists the open groups they're in. Absent from an older API. */
+  showGroups?: boolean;
   displayNameChangedAt: string | null;
   /** null = a change is allowed now; otherwise when the 30-day lock lifts. */
   canChangeDisplayNameAt: string | null;
@@ -110,7 +112,9 @@ export type EditRowKey =
   | "socialLinks"
   | "profileVisibility"
   /** Show or hide the verified badge; only offered once the member is verified. */
-  | "verifiedBadge";
+  | "verifiedBadge"
+  /** Show or hide the open groups they're in, on their profile. */
+  | "groupsVisibility";
 
 export interface EditorOption {
   value: string;

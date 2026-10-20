@@ -3,6 +3,7 @@ import { Routes } from "@/constants/Routes";
 
 type AppShellDrawerIcon =
   | "members"
+  | "groups"
   | "saved"
   | "kinkopedia"
   | "verification"
@@ -24,7 +25,7 @@ interface AppShellDrawerItemVM {
   href: string;
   icon: AppShellDrawerIcon;
   count?: "members";
-  nav?: "members" | "saved" | "settings" | "kinkcoins";
+  nav?: "members" | "groups" | "saved" | "settings" | "kinkcoins";
   soon?: boolean;
   verification?: boolean;
 }
@@ -52,6 +53,7 @@ export interface AppShellNavVM {
     settings: string;
     saved: string;
     kinkcoins: string;
+    groups: string;
     subscription: string;
   };
   labels: {
@@ -64,6 +66,7 @@ export interface AppShellNavVM {
     settings: string;
     saved: string;
     kinkcoins: string;
+    groups: string;
     subscription: string;
     logout: string;
   };
@@ -86,6 +89,7 @@ function drawerNavigation(): AppShellDrawerVM {
         count: "members",
         nav: "members",
       },
+      { key: "groups", label: nav.groups, href: Routes.groups, icon: "groups", nav: "groups" },
       { key: "saved", label: nav.saved, href: Routes.saved, icon: "saved", nav: "saved" },
       {
         key: "kinkopedia",
@@ -201,6 +205,7 @@ export function getAppShellNav(): AppShellNavVM {
       settings: Routes.settings,
       saved: Routes.saved,
       kinkcoins: Routes.kinkcoins,
+      groups: Routes.groups,
       subscription: Routes.subscription,
     },
     labels: { ...MEMBERS_COPY.nav },

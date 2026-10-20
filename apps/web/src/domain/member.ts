@@ -1,3 +1,4 @@
+import type { ProfileGroupPM } from "./group";
 import type { FriendshipState } from "./friendship";
 /**
  * Members directory + public member profile. PMs mirror the API payloads
@@ -119,6 +120,8 @@ export function toMemberCardVM(pm: MemberCardPM, organization = false): MemberCa
 
 export interface PublicProfilePM {
   coinBalance?: number;
+  /** "Groups & Communities": the open groups they're in, unless they hide them. */
+  groups?: ProfileGroupPM[];
   userId: string;
   username: string | null;
   displayName: string;

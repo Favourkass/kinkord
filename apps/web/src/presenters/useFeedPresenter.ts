@@ -294,12 +294,17 @@ export function useFeedPresenter({
   /** Which page of which list to read — the surfaces differ only here. */
   const loadPage = useCallback(
     async (cursor: string | null): Promise<FeedPagePM> => {
-      if (postId) return { items: [await postsApi.byId(postId)], nextCursor: null };
+      if (postId) {
+        const pm = await postsApi.byId(postId);
+        // A group discussion lives on its group's page; a notification or link may land here.
+        if (pm.group) router.replace(Routes.groupThread(pm.group.slug, pm.postId));
+        return { items: [pm], nextCursor: null };
+      }
       if (saved) return postsApi.saved(cursor);
       if (tab) return postsApi.feed(cursor, undefined, null, null, tab);
       return postsApi.feed(cursor, undefined, author, search);
     },
-    [author, postId, saved, search, tab],
+    [author, postId, saved, search, tab, router],
   );
 
   const onUnauthorized = useCallback(

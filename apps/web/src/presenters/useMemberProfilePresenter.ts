@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FRIENDSHIP_COPY } from "@/constants/friendship";
+import { GROUP_LABELS, GROUPS_COPY } from "@/constants/groups";
 import { friendshipActions, type FriendshipAction } from "@/domain/friendship";
 import { friendshipService } from "@/services/friendship.service";
 import { MEMBERS_COPY } from "@/constants/members";
@@ -509,6 +510,13 @@ export function useMemberProfilePresenter(
     followBusy,
     friendAction,
     unfriendConfirm,
+    /** "Groups & Communities" on the About tab: the open groups they're in. */
+    profileGroups: (pm?.groups ?? []).map((g) => ({
+      key: g.slug,
+      name: g.name,
+      meta: GROUPS_COPY.profileRow(GROUP_LABELS.roles[g.role], g.members),
+      href: Routes.group(g.slug),
+    })),
     friendRequestsHref: Routes.friendRequests,
     friendRequestsLabel: FRIENDSHIP_COPY.title,
     /**

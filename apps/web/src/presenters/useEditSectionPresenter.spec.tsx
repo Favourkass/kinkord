@@ -223,7 +223,7 @@ describe("useEditSectionPresenter", () => {
     const { result } = renderHook(() => useEditSectionPresenter("privacy"));
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.variant).toBe("cards");
-    expect(result.current.rows.map((r) => r.subtitle)).toEqual(["Facebook", "Public"]);
+    expect(result.current.rows.map((r) => r.subtitle)).toEqual(["Facebook", "Public", "Shown"]);
     act(() => result.current.rows[1].onClick?.());
     const editor = result.current.editor?.editor;
     expect(editor?.kind).toBe("single");
@@ -236,7 +236,12 @@ describe("useEditSectionPresenter", () => {
     serve({ ...profile, identityVerified: true, showVerifiedBadge: false });
     const { result } = renderHook(() => useEditSectionPresenter("privacy"));
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.rows.map((r) => r.subtitle)).toEqual(["Facebook", "Public", "Hidden"]);
+    expect(result.current.rows.map((r) => r.subtitle)).toEqual([
+      "Facebook",
+      "Public",
+      "Hidden",
+      "Shown",
+    ]);
     act(() => result.current.rows[2].onClick?.());
     const editor = result.current.editor?.editor;
     if (editor?.kind !== "single") throw new Error("expected a picker");

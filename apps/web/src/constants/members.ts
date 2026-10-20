@@ -205,6 +205,7 @@ export const MEMBERS_COPY = {
     settings: "Settings and Privacy",
     saved: "Saved",
     kinkcoins: "KinkCoins & Payment",
+    groups: "Groups",
     subscription: "Silver Premium",
     logout: "Log Out",
   },

@@ -7,7 +7,19 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
-import { and, count, desc, eq, ilike, inArray, isNull, lt, sql } from "drizzle-orm";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -15,6 +27,7 @@ import { Db, DRIZZLE } from "../db/db.module";
 import { containsPattern } from "../push/notifications.service";
 import { PushService } from "../push/push.service";
 import {
+  communityGroup,
   follow,
   memberSubscription,
   post,
@@ -47,7 +60,8 @@ import {
 import { hasSilver, SILVER_POST_BODY_MAX, silverCheck } from "../subscriptions/plans";
 import type { FeedHint, FeedTab, RankedTab } from "./feed-ranking";
 import { followingConditions, followsAnyone, rankedTabPage } from "./feed-tabs";
-import { visibleTo } from "./visibility";
+import { noBlockEitherWay } from "../safety/blocks";
+import { visibleTo, type VisibilityOptions } from "./visibility";
 
 /** Photos only for now; the column takes video so the grid can grow into it. */
 const IMAGE_TYPES: Record<string, string> = {
@@ -169,6 +183,27 @@ export interface PostVM {
   mine: boolean;
   /** Each @handle in the body that names a member, and whom: the ones the app links. */
   mentions: Mention[];
+  /** The group a discussion belongs to; null for a feed post. */
+  group: { id: string; slug: string; name: string } | null;
+  /** A group discussion's title. */
+  title: string | null;
+  /** Pinned to the top of its group. */
+  pinned: boolean;
+  /** Closed to new replies. */
+  closed: boolean;
+  /** A group discussion's latest reply, or its posting. */
+  lastActivityAt: string | null;
+}
+
+/** Where a new post goes when it's a discussion in a group. */
+export interface GroupThreadTarget {
+  groupId: string;
+  title: string;
+}
+
+export interface SelectOptions extends VisibilityOptions {
+  /** In place of newest first. */
+  orderBy?: SQL[];
 }
 
 export interface RepostVM {
@@ -246,7 +281,16 @@ export class PostsService {
     };
   }
 
-  async create(userId: string, input: CreatePostInput): Promise<PostVM> {
+  /**
+   * A new post. With `thread`, it's a discussion in a group: it gets a title,
+   * starts the group's activity clock, and is only ever read inside the group.
+   * (Whether the member may post there is the groups module's check.)
+   */
+  async create(
+    userId: string,
+    input: CreatePostInput,
+    thread?: GroupThreadTarget,
+  ): Promise<PostVM> {
     if ((input.body?.length ?? 0) > POST_BODY_MAX && !(await hasSilver(this.db, userId))) {
       throw new BadRequestException(LONG_POST_NEEDS_SILVER);
     }
@@ -256,7 +300,11 @@ export class PostsService {
       .values({
         authorId: userId,
         body: input.body?.length ? input.body : null,
-        visibility: input.visibility,
+        // A group decides who reads its discussions, not the post.
+        visibility: thread ? "public" : input.visibility,
+        ...(thread
+          ? { groupId: thread.groupId, title: thread.title, lastActivityAt: new Date() }
+          : {}),
       })
       .returning();
     if (input.media.length) {
@@ -270,14 +318,16 @@ export class PostsService {
       );
     }
     this.notifyMentions(row.id, userId, input.body);
-    const vm = await this.byId(row.id, userId);
+    const vm = await this.byId(row.id, userId, { groups: Boolean(thread) });
     if (!vm) throw new NotFoundException("Post not found");
     return vm;
   }
 
   /** Whether the viewer can read this post, by the feed's own rules. */
   async canSee(postId: string, viewerId: string): Promise<boolean> {
-    return (await this.selectPosts(viewerId, [eq(post.id, postId)], 1)).length > 0;
+    return (
+      (await this.selectPosts(viewerId, [eq(post.id, postId)], 1, { groups: true })).length > 0
+    );
   }
 
   /**
@@ -359,12 +409,57 @@ export class PostsService {
     };
   }
 
-  /** One post, or null when it is missing, deleted or not visible to the viewer. */
-  async byId(postId: string, viewerId: string): Promise<PostVM | null> {
-    const rows = await this.selectPosts(viewerId, [eq(post.id, postId)], 1);
+  /**
+   * One post, or null when it is missing, deleted or not visible to the viewer.
+   * A group discussion is found only with `groups`, and only by whoever may
+   * read the group.
+   */
+  async byId(
+    postId: string,
+    viewerId: string,
+    options: VisibilityOptions = {},
+  ): Promise<PostVM | null> {
+    const rows = await this.selectPosts(viewerId, [eq(post.id, postId)], 1, options);
     if (!rows.length) return null;
     const [vm] = await this.decorate(rows, viewerId);
     return vm ?? null;
+  }
+
+  /**
+   * A group's discussions for the viewer: on the first page every pinned one,
+   * then the rest by latest reply. A block hides each member's discussions from
+   * the other, except from the group's moderators, who see everything.
+   * (Whether the viewer may read the group at all is the groups module's check.)
+   */
+  async groupThreads(
+    viewerId: string,
+    groupId: string,
+    params: { cursor?: string | null; limit?: number; moderator?: boolean } = {},
+  ): Promise<FeedVM> {
+    const limit = clamp(params.limit ?? FEED_PAGE_SIZE, 1, FEED_MAX_PAGE_SIZE);
+    const cursor = parseCursor(params.cursor);
+    const base = [
+      eq(post.groupId, groupId),
+      isNull(post.repostOfId),
+      ...(params.moderator ? [] : [noBlockEitherWay(post.authorId, viewerId)]),
+    ];
+    const pinned = cursor
+      ? []
+      : await this.selectPosts(viewerId, [...base, isNotNull(post.pinnedAt)], 50, {
+          groups: true,
+          orderBy: [desc(post.pinnedAt)],
+        });
+    const rows = await this.selectPosts(
+      viewerId,
+      [...base, isNull(post.pinnedAt), ...(cursor ? [lt(post.lastActivityAt, cursor)] : [])],
+      limit + 1,
+      { groups: true, orderBy: [desc(post.lastActivityAt), desc(post.id)] },
+    );
+    const page = rows.slice(0, limit);
+    return {
+      items: await this.decorate([...pinned, ...page], viewerId),
+      nextCursor: rows.length > limit ? (page.at(-1)?.lastActivityAt?.toISOString() ?? null) : null,
+    };
   }
 
   /**
@@ -643,7 +738,12 @@ export class PostsService {
    * Rows the viewer is allowed to see: anything public, everything of their own,
    * and friends-only posts from members they and the author both follow.
    */
-  private async selectPosts(viewerId: string, extra: ReturnType<typeof eq>[], limit: number) {
+  private async selectPosts(
+    viewerId: string,
+    extra: (SQL | undefined)[],
+    limit: number,
+    { orderBy, ...visibility }: SelectOptions = {},
+  ) {
     const viewerFollows = alias(follow, "viewer_follows_author");
     const authorFollows = alias(follow, "author_follows_viewer");
     return this.db
@@ -663,10 +763,18 @@ export class PostsService {
         subscribed: sql<boolean>`exists (select 1 from ${memberSubscription} where ${memberSubscription.userId} = ${post.authorId} and ${memberSubscription.currentPeriodEnd} > now())`,
         // The visibility rule's own join, so it costs nothing extra.
         viewerFollowsAuthor: sql<boolean>`${viewerFollows.followerId} is not null`,
+        groupId: post.groupId,
+        groupSlug: communityGroup.slug,
+        groupName: communityGroup.name,
+        title: post.title,
+        pinnedAt: post.pinnedAt,
+        closedAt: post.closedAt,
+        lastActivityAt: post.lastActivityAt,
       })
       .from(post)
       .innerJoin(user, eq(user.id, post.authorId))
       .leftJoin(profile, eq(profile.userId, post.authorId))
+      .leftJoin(communityGroup, eq(communityGroup.id, post.groupId))
       .leftJoin(
         viewerFollows,
         and(eq(viewerFollows.followerId, viewerId), eq(viewerFollows.followingId, post.authorId)),
@@ -678,11 +786,11 @@ export class PostsService {
       .where(
         and(
           and(isNull(post.deletedAt), isNull(post.archivedAt)),
-          visibleTo(viewerId, viewerFollows, authorFollows),
+          visibleTo(viewerId, viewerFollows, authorFollows, visibility),
           ...extra,
         ),
       )
-      .orderBy(desc(post.createdAt))
+      .orderBy(...(orderBy ?? [desc(post.createdAt)]))
       .limit(limit);
   }
 
@@ -711,10 +819,18 @@ export class PostsService {
         subscribed: sql<boolean>`exists (select 1 from ${memberSubscription} where ${memberSubscription.userId} = ${post.authorId} and ${memberSubscription.currentPeriodEnd} > now())`,
         // A repost's card shows the original's author, so it's their follow that counts.
         viewerFollowsAuthor: sql<boolean>`${viewerFollows.followerId} is not null`,
+        groupId: post.groupId,
+        groupSlug: communityGroup.slug,
+        groupName: communityGroup.name,
+        title: post.title,
+        pinnedAt: post.pinnedAt,
+        closedAt: post.closedAt,
+        lastActivityAt: post.lastActivityAt,
       })
       .from(post)
       .innerJoin(user, eq(user.id, post.authorId))
       .leftJoin(profile, eq(profile.userId, post.authorId))
+      .leftJoin(communityGroup, eq(communityGroup.id, post.groupId))
       .leftJoin(
         viewerFollows,
         and(eq(viewerFollows.followerId, viewerId), eq(viewerFollows.followingId, post.authorId)),
@@ -724,6 +840,8 @@ export class PostsService {
           inArray(post.id, ids),
           and(isNull(post.deletedAt), isNull(post.archivedAt)),
           eq(post.visibility, "public"),
+          // A group discussion stays in its group, whatever points at it.
+          isNull(post.groupId),
         ),
       );
     return new Map(rows.map((r) => [r.id, r]));
@@ -870,6 +988,14 @@ export class PostsService {
               },
         mine: row.authorId === viewerId,
         mentions: mentionsIn(content.body, members),
+        group:
+          content.groupId && content.groupSlug && content.groupName
+            ? { id: content.groupId, slug: content.groupSlug, name: content.groupName }
+            : null,
+        title: content.title ?? null,
+        pinned: Boolean(content.pinnedAt),
+        closed: Boolean(content.closedAt),
+        lastActivityAt: content.lastActivityAt?.toISOString() ?? null,
       })),
     );
   }

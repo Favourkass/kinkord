@@ -18,3 +18,5 @@ export * from "./subscription";
 export * from "./wallet";
 
 export * from "./friendship";
+
+export * from "./group";

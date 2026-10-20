@@ -1,10 +1,11 @@
 import { teamBadge } from "../members/team-badge";
 import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, count, desc, eq, isNull, lt } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, isNull, lt } from "drizzle-orm";
 import { z } from "zod";
 import { Db, DRIZZLE } from "../db/db.module";
 import { PushService } from "../push/push.service";
 import {
+  groupLog,
   post,
   postComment,
   postLike,
@@ -16,14 +17,24 @@ import {
 import { knownHandles, mentionCandidates, mentionsIn, type Mention } from "./mentions";
 import { StorageService } from "../storage/storage.service";
 import { silverCheck } from "../subscriptions/plans";
+import { groupAccess, membershipOf } from "../groups/group-policy";
+import { noBlockEitherWay } from "../safety/blocks";
 import {
   clamp,
   parseCursor,
   COMMENT_MAX_PAGE_SIZE,
   COMMENT_PAGE_SIZE,
   PostsService,
+  type PostVM,
   type SaveVM,
 } from "./posts.service";
+
+/** Said to someone who reads an open group but hasn't joined it. */
+export const JOIN_TO_TAKE_PART = "Join the group to take part.";
+export const DISCUSSION_CLOSED = "This discussion is closed to new replies.";
+
+/** Replies to a group discussion read oldest first, like a conversation; a feed post's newest first. */
+export type CommentOrder = "newest" | "oldest";
 
 export const createCommentSchema = z.object({
   body: z.string().trim().min(1, "Write a comment first.").max(COMMENT_BODY_MAX),
@@ -78,7 +89,7 @@ export class PostInteractionsService {
 
   /** Idempotent: the composite primary key is what makes a double tap harmless. */
   async like(postId: string, userId: string): Promise<LikeVM> {
-    const authorId = await this.visiblePost(postId, userId);
+    const authorId = (await this.takingPart(postId, userId)).author.userId;
     const added = await this.db
       .insert(postLike)
       .values({ postId, userId })
@@ -114,11 +125,24 @@ export class PostInteractionsService {
     return { postId: target, savedByMe: false };
   }
 
-  /** Newest first, so a fresh comment is the first thing under a fresh post. */
-  async comments(postId: string, viewerId: string, cursorArg?: string | null, limitArg?: number) {
-    const authorId = await this.visiblePost(postId, viewerId);
+  /**
+   * Newest first, so a fresh comment is the first thing under a fresh post; a
+   * group discussion's replies can read oldest first. In a group, a block hides
+   * each member's replies from the other, except from the moderators.
+   */
+  async comments(
+    postId: string,
+    viewerId: string,
+    cursorArg?: string | null,
+    limitArg?: number,
+    order: CommentOrder = "newest",
+  ) {
+    const vm = await this.visibleVM(postId, viewerId);
+    const authorId = vm.author.userId;
+    const moderator = vm.group ? await this.moderates(vm.group.id, viewerId) : false;
     const limit = clamp(limitArg ?? COMMENT_PAGE_SIZE, 1, COMMENT_MAX_PAGE_SIZE);
     const cursor = parseCursor(cursorArg);
+    const oldest = order === "oldest";
     const rows = await this.db
       .select({
         id: postComment.id,
@@ -138,10 +162,13 @@ export class PostInteractionsService {
         and(
           eq(postComment.postId, postId),
           isNull(postComment.deletedAt),
-          ...(cursor ? [lt(postComment.createdAt, cursor)] : []),
+          ...(cursor
+            ? [oldest ? gt(postComment.createdAt, cursor) : lt(postComment.createdAt, cursor)]
+            : []),
+          ...(vm.group && !moderator ? [noBlockEitherWay(postComment.authorId, viewerId)] : []),
         ),
       )
-      .orderBy(desc(postComment.createdAt))
+      .orderBy(oldest ? asc(postComment.createdAt) : desc(postComment.createdAt))
       .limit(limit + 1);
     const page = rows.slice(0, limit);
     const [totalRow] = await this.db
@@ -166,7 +193,7 @@ export class PostInteractionsService {
           silver: Boolean(r.silver),
           teamMember: Boolean(r.teamMember),
         },
-        canDelete: r.authorId === viewerId || authorId === viewerId,
+        canDelete: r.authorId === viewerId || authorId === viewerId || moderator,
       })),
     );
     return {
@@ -178,11 +205,17 @@ export class PostInteractionsService {
 
   async comment(postId: string, userId: string, body: string): Promise<CommentVM> {
     // Resolved for its visibility check: a post you cannot read, you cannot answer.
-    const authorId = await this.visiblePost(postId, userId);
+    const vm = await this.takingPart(postId, userId);
+    if (vm.closed) throw new ForbiddenException(DISCUSSION_CLOSED);
+    const authorId = vm.author.userId;
     const [row] = await this.db
       .insert(postComment)
       .values({ postId, authorId: userId, body })
       .returning();
+    // A reply brings its discussion back to the top of the group.
+    if (vm.group) {
+      await this.db.update(post).set({ lastActivityAt: row.createdAt }).where(eq(post.id, postId));
+    }
     this.push.newComment(postId, authorId, userId);
     // The post's author hears of the comment already; once is enough.
     this.posts.notifyMentions(postId, userId, body, [authorId]);
@@ -223,28 +256,62 @@ export class PostInteractionsService {
     const [row] = await this.db
       .select({
         commentAuthorId: postComment.authorId,
+        postId: post.id,
         postAuthorId: post.authorId,
+        groupId: post.groupId,
         deletedAt: postComment.deletedAt,
       })
       .from(postComment)
       .innerJoin(post, eq(post.id, postComment.postId))
       .where(eq(postComment.id, commentId));
     if (!row || row.deletedAt) throw new NotFoundException("Comment not found");
-    if (row.commentAuthorId !== userId && row.postAuthorId !== userId) {
-      throw new ForbiddenException("That isn't your comment");
-    }
+    const own = row.commentAuthorId === userId || row.postAuthorId === userId;
+    // A group's moderators look after every reply in it.
+    const moderator = !own && row.groupId ? await this.moderates(row.groupId, userId) : false;
+    if (!own && !moderator) throw new ForbiddenException("That isn't your comment");
     await this.db
       .update(postComment)
       .set({ deletedAt: new Date() })
       .where(eq(postComment.id, commentId));
+    if (moderator && row.groupId) {
+      await this.db.insert(groupLog).values({
+        groupId: row.groupId,
+        actorId: userId,
+        subjectUserId: row.commentAuthorId,
+        subjectPostId: row.postId,
+        action: "remove-reply",
+      });
+    }
     return { deleted: commentId };
   }
 
   /** Resolves the post through the feed's visibility rules; returns its author id. */
   private async visiblePost(postId: string, viewerId: string): Promise<string> {
-    const vm = await this.posts.byId(postId, viewerId);
+    return (await this.visibleVM(postId, viewerId)).author.userId;
+  }
+
+  /** The post as the viewer may read it, a group discussion included. */
+  private async visibleVM(postId: string, viewerId: string): Promise<PostVM> {
+    const vm = await this.posts.byId(postId, viewerId, { groups: true });
     if (!vm) throw new NotFoundException("Post not found");
-    return vm.author.userId;
+    return vm;
+  }
+
+  /**
+   * Readable, and the viewer may join in: anyone on a feed post they can see,
+   * only members on a group discussion (an open group can be read by anyone).
+   */
+  private async takingPart(postId: string, userId: string): Promise<PostVM> {
+    const vm = await this.visibleVM(postId, userId);
+    if (vm.group) {
+      const membership = await membershipOf(this.db, vm.group.id, userId);
+      if (!groupAccess("open", membership).canPost) throw new ForbiddenException(JOIN_TO_TAKE_PART);
+    }
+    return vm;
+  }
+
+  private async moderates(groupId: string, userId: string): Promise<boolean> {
+    return groupAccess("open", await membershipOf(this.db, groupId, userId)).canModerate;
   }
 
   /**

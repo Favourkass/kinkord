@@ -38,6 +38,8 @@ const feedQuerySchema = z.object({
 const commentsQuerySchema = z.object({
   cursor: z.string().trim().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(50).optional(),
+  /** A group discussion reads its replies oldest first. */
+  order: z.enum(["newest", "oldest"]).optional(),
 });
 
 @Controller("posts")
@@ -90,9 +92,10 @@ export class PostsController {
     return this.posts.create(req.user.id, parsed.data);
   }
 
+  /** One post. A group discussion too, for whoever may read its group (its link opens it). */
   @Get(":id")
   async byId(@Req() req: AuthedRequest, @Param("id") id: string) {
-    const vm = await this.posts.byId(parseId(id), req.user.id);
+    const vm = await this.posts.byId(parseId(id), req.user.id, { groups: true });
     if (!vm) throw new NotFoundException("Post not found");
     return vm;
   }
@@ -146,6 +149,7 @@ export class PostsController {
       req.user.id,
       parsed.data.cursor,
       parsed.data.limit,
+      parsed.data.order,
     );
   }
 

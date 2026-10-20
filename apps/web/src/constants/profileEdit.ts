@@ -31,6 +31,7 @@ export const ROW_ICONS: Record<EditRowKey, string> = {
   socialLinks: "/app/profile/edit/row-social-links.svg",
   profileVisibility: "/app/profile/edit/row-visibility.svg",
   verifiedBadge: "/app/profile/icon-verified.svg",
+  groupsVisibility: "/app/profile/about-groups.svg",
 };
 
 export const PROFILE_EDIT_COPY = {
@@ -131,16 +132,24 @@ export const PROFILE_EDIT_COPY = {
       title: "Verified Badge",
       help: "Members who can see your profile see only the badge, not your ID or selfie.",
     },
+    groupsVisibility: {
+      title: "Groups on Profile",
+      help: "The open groups you're in. Closed groups never show.",
+    },
   } satisfies Record<EditRowKey, { title: string; help: string | null }>,
   verifiedBadge: {
     show: { label: "Shown", help: "Members see that your identity is verified." },
     hide: { label: "Hidden", help: "Only you see your badge." },
   },
+  groupsVisibility: {
+    show: { label: "Shown", help: "Members see the open groups you're in." },
+    hide: { label: "Hidden", help: "Only you see your groups." },
+  },
   visibility: {
     public: { label: "Public", help: "Every member can see your full profile." },
     friends: {
       label: "Friends only",
-      help: "Only friends (you follow each other) see your About details.",
+      help: "Only your friends see your About details.",
     },
   } satisfies Record<ProfileVisibility, { label: string; help: string }>,
   links: {

@@ -14,6 +14,7 @@ describe("getAppShellNav", () => {
       settings: "/settings",
       saved: "/saved",
       kinkcoins: "/kinkcoins",
+      groups: "/groups",
       subscription: "/subscription",
     });
     expect(nav.labels).toEqual({
@@ -26,6 +27,7 @@ describe("getAppShellNav", () => {
       settings: "Settings and Privacy",
       saved: "Saved",
       kinkcoins: "KinkCoins & Payment",
+      groups: "Groups",
       subscription: "Silver Premium",
       logout: "Log Out",
     });
@@ -42,6 +44,7 @@ describe("the account menu", () => {
   it("keeps Philip's order, with Silver Premium and KinkCoins live", () => {
     expect(drawer.primary.map((i) => i.label)).toEqual([
       "Members",
+      "Groups",
       "Saved",
       "Kinkopedia",
       "Verification",

@@ -5,6 +5,8 @@ export type NotificationType =
   | "message"
   | "friend_request"
   | "friend_accepted"
+  | "group_request"
+  | "group_approved"
   | "follow"
   | "comment"
   | "mention"

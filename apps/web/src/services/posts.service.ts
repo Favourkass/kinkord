@@ -84,10 +84,12 @@ export const postsApi = {
     const q = qs.toString();
     return api.get<FeedPM>(`/posts/saved${q ? `?${q}` : ""}`);
   },
-  comments: (id: string, cursor?: string | null, limit?: number) => {
+  /** Newest first, or `oldest` first as a group discussion reads its replies. */
+  comments: (id: string, cursor?: string | null, limit?: number, order?: "newest" | "oldest") => {
     const qs = new URLSearchParams();
     if (cursor) qs.set("cursor", cursor);
     if (limit) qs.set("limit", String(limit));
+    if (order) qs.set("order", order);
     const q = qs.toString();
     return api.get<CommentsPM>(`/posts/${encodeURIComponent(id)}/comments${q ? `?${q}` : ""}`);
   },
