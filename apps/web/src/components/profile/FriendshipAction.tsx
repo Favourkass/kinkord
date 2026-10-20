@@ -1,6 +1,8 @@
-import { UserPlus } from "lucide-react";
+import { UserCheck, UserPlus } from "lucide-react";
 export interface FriendshipActionProps {
   label: string;
+  /** Already friends: a check instead of the add-person icon. */
+  friends?: boolean;
   secondaryLabel: string | null;
   busy: boolean;
   error: string | null;
@@ -16,7 +18,7 @@ export default function FriendshipAction(p: FriendshipActionProps) {
         disabled={p.busy}
         className="flex min-h-9 w-full items-center justify-center gap-1 rounded-xl border border-kink-gold-bright px-1 text-[11px] font-bold text-kink-gold-bright disabled:opacity-60"
       >
-        <UserPlus size={15} aria-hidden />
+        {p.friends ? <UserCheck size={15} aria-hidden /> : <UserPlus size={15} aria-hidden />}
         {p.label}
       </button>
       {p.secondaryLabel && (

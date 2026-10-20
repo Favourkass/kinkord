@@ -4,6 +4,10 @@ export const FRIENDSHIP_COPY = {
   accept: "Accept request",
   decline: "Decline",
   remove: "Remove friend",
+  friends: "Friends",
+  keep: "Keep friend",
+  removeConfirm: (name: string) =>
+    `Remove ${name} from your friends? To be friends again, one of you will need to send a new request.`,
   cancel: "Cancel request",
   title: "Friend requests",
   incoming: "Received",
