@@ -1,5 +1,5 @@
 /**
- * Nigerian states, Kenyan counties and the places within each. The names ship
+ * Supported countries’ states, counties, regions and the places within each. The names ship
  * with the app; a state's places (thousands, for some) are fetched from
  * /locations the first time it is picked, then kept for the session. Both are
  * built from GeoNames by scripts/build-location-files.mjs.

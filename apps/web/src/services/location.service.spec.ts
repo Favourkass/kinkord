@@ -22,7 +22,7 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("states and counties", () => {
-  it("lists the 37 Nigerian states and 47 Kenyan counties, sorted, and nothing else", async () => {
+  it("lists all supported administrative divisions", async () => {
     const { statesForCountry, isKnownState } = await load();
     expect(statesForCountry("ng")).toHaveLength(37);
     expect(statesForCountry("NG")).toContain("FCT Abuja");
@@ -30,7 +30,9 @@ describe("states and counties", () => {
     expect(statesForCountry("KE")).toEqual(
       [...statesForCountry("KE")].sort((a, b) => a.localeCompare(b)),
     );
-    expect(statesForCountry("GH")).toEqual([]);
+    expect(statesForCountry("GH")).toHaveLength(16);
+    expect(statesForCountry("US")).toHaveLength(51);
+    expect(statesForCountry("ZZ")).toEqual([]);
     expect(isKnownState("ng", "Delta")).toBe(true);
     expect(isKnownState("KE", "Delta")).toBe(false);
     expect(isKnownState("NG", null)).toBe(false);
@@ -40,7 +42,7 @@ describe("states and counties", () => {
     const { locationSlug, statesForCountry } = await load();
     expect(locationSlug("Akwa Ibom")).toBe("akwa-ibom");
     expect(locationSlug("Murang’a")).toBe("muranga");
-    for (const country of ["NG", "KE"])
+    for (const country of ["NG", "KE", "GH", "US"])
       for (const state of statesForCountry(country))
         expect(
           fs.existsSync(path.join(PUBLIC_DIR, "locations", country, `${locationSlug(state)}.json`)),
@@ -68,7 +70,7 @@ describe("regionsForState", () => {
   it("asks for nothing it has no list for", async () => {
     const { regionsForState } = await load();
     expect(await regionsForState("NG", "Atlantis")).toEqual([]);
-    expect(await regionsForState("GH", "Ashanti")).toEqual([]);
+    expect(await regionsForState("ZZ", "Ashanti")).toEqual([]);
     expect(fromDisk).not.toHaveBeenCalled();
   });
 
@@ -81,4 +83,16 @@ describe("regionsForState", () => {
     expect(await regionsForState("NG", "Lagos")).toContain("Ikeja");
     expect(fromDisk).toHaveBeenCalledTimes(3);
   });
+});
+
+it.each([
+  ["GH", "Greater Accra", "Accra"],
+  ["GH", "Ashanti", "Kumasi"],
+  ["US", "South Dakota", "Sioux Falls"],
+  ["US", "Tennessee", "Spring Hill"],
+])("loads real, alphabetical towns for %s / %s", async (country, state, town) => {
+  const { regionsForState } = await load();
+  const towns = await regionsForState(country, state);
+  expect(towns).toContain(town);
+  expect(towns).toEqual([...towns].sort((a, b) => a.localeCompare(b)));
 });

@@ -26,13 +26,14 @@ export function signupLocationFields(
 ) {
   const code = country?.toUpperCase() ?? "";
   const county = code === "KE";
-  const term = county ? "county" : "state";
+  const region = code === "GH";
+  const term = county ? "county" : region ? "region" : "state";
   return {
-    stateLabel: county ? "County" : "State",
+    stateLabel: county ? "County" : region ? "Region" : "State",
     statePlaceholder: `Select your ${term}`,
     helper: `Your ${term} and region / city / town help us show you local communities and events.`,
     credit: PLACE_NAMES_CREDIT,
-    stateSearchPlaceholder: `Search ${county ? "counties" : "states"}`,
+    stateSearchPlaceholder: `Search ${county ? "counties" : region ? "regions" : "states"}`,
     states: statesForCountry(code).map((value) => ({ value, label: value })),
     areaLabel: "Region / City / Town",
     areaPlaceholder: !state ? `Select your ${term} first` : "Select your region, city or town",
@@ -44,7 +45,7 @@ export function signupLocationFields(
     areas: loaded.areas.map((value) => ({ value, label: value })),
     // Pinned under every search, so an unlisted town never blocks signup.
     otherArea:
-      (code === "NG" || county) && state
+      LAUNCH_COUNTRIES.some((country) => country.code === code) && state
         ? { value: OTHER_AREA, label: "Other region / city / town", typedLabel: typedPlaceLabel }
         : null,
   };

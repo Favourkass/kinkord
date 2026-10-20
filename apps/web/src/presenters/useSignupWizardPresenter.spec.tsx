@@ -149,6 +149,9 @@ describe("useSignupWizardPresenter", () => {
   it.each([
     ["KE", "Nairobi", "Nairobi"],
     ["NG", "Lagos", "Ikeja"],
+    ["GH", "Greater Accra", "Accra"],
+    ["US", "South Dakota", "Sioux Falls"],
+    ["US", "Tennessee", "Spring Hill"],
   ])("submits the chosen country and region for %s", async (country, state, city) => {
     const { result } = renderHook(() => useSignupWizardPresenter());
     reachCombinedStep(result);

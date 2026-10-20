@@ -119,6 +119,29 @@ describe("AuthExtController", () => {
     );
   });
 
+  it.each([
+    ["GH", "Greater Accra", "Accra"],
+    ["US", "South Dakota", "Sioux Falls"],
+    ["US", "Tennessee", "Spring Hill"],
+  ])(
+    "accepts email signup for %s / %s and preserves its location",
+    async (country, state, city) => {
+      const { controller, signUpWithProfile } = makeController();
+      await controller.signUpCombined(req, makeRes(), {
+        ...validSignUp,
+        country,
+        state,
+        city,
+        phone: undefined,
+      });
+      expect(signUpWithProfile).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ country, state, city }),
+        expect.any(Headers),
+      );
+    },
+  );
+
   it("normalizes the username and forwards the combined sign-up session", async () => {
     const { controller, signUpWithProfile } = makeController({
       signUpResult: {

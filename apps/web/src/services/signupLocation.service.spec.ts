@@ -8,12 +8,14 @@ import {
 } from "./signupLocation.service";
 
 describe("signup countries and locations", () => {
-  it("offers only Kenya and Nigeria alphabetically", () => {
-    expect(signupCountryOptions().map((option) => option.value)).toEqual(["KE", "NG"]);
+  it("offers Ghana, Kenya, Nigeria and USA alphabetically", () => {
+    expect(signupCountryOptions().map((option) => option.value)).toEqual(["GH", "KE", "NG", "US"]);
   });
   it.each([
     ["KE", 47, "Nairobi", "West Pokot"],
     ["NG", 37, "FCT Abuja", "Zamfara"],
+    ["GH", 16, "Greater Accra", "Western North"],
+    ["US", 51, "South Dakota", "Wyoming"],
   ])("includes all configured regions for %s", (code, count, capital, last) => {
     const location = signupLocationFields(String(code), "");
     const names = location.states.map((option) => option.value);
@@ -29,12 +31,12 @@ describe("signup countries and locations", () => {
       stateSearchPlaceholder: "Search counties",
       areaLabel: "Region / City / Town",
     });
-    expect(signupLocationFields("US", "California").states).toEqual([]);
+    expect(signupLocationFields("US", "California").stateLabel).toBe("State");
     const delta = signupLocationFields("NG", "Delta", false, { areas: ["Abraka"], loading: false });
     expect(delta.areas).toEqual([{ value: "Abraka", label: "Abraka" }]);
   });
   it("does not substitute Nigerian states for an unknown country", () => {
-    expect(signupLocationFields("GH", "").states).toEqual([]);
+    expect(signupLocationFields("ZZ", "").states).toEqual([]);
   });
 });
 
@@ -59,6 +61,8 @@ it("uses county consistently for Kenyan location copy and validation", () => {
 it.each([
   ["NG", "Lagos", "Ikeja"],
   ["KE", "Nairobi", "Westlands"],
+  ["GH", "Greater Accra", "Accra"],
+  ["US", "South Dakota", "Sioux Falls"],
 ])("offers dependent towns and custom entry for %s", (country, parent, town) => {
   const location = signupLocationFields(country, parent, false, { areas: [town], loading: false });
   expect(location.areaLabel).toBe("Region / City / Town");
@@ -86,4 +90,14 @@ it("says the towns are loading until they arrive, and credits GeoNames", () => {
     licence: "CC BY 4.0",
     href: "https://creativecommons.org/licenses/by/4.0/",
   });
+});
+
+it("uses Region for Ghana throughout the signup field and error copy", () => {
+  expect(signupLocationFields("GH", "")).toMatchObject({
+    stateLabel: "Region",
+    statePlaceholder: "Select your region",
+    stateSearchPlaceholder: "Search regions",
+    areaPlaceholder: "Select your region first",
+  });
+  expect(signupLocationErrorMessage("GH", ["state"])).toBe("Check your region above.");
 });

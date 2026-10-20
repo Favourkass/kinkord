@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Builds the place lists signup and Edit Profile offer: one file per Nigerian
- * state and Kenyan county, apps/web/public/locations/<CC>/<slug>.json, which
+ * Builds the place lists signup and Edit Profile offer: one file per supported
+ * state, county or region, apps/web/public/locations/<CC>/<slug>.json, which
  * the app fetches only once someone picks that state, plus the short list of
  * state and county names it bundles (apps/web/src/constants/location-states.json).
  *
@@ -20,7 +20,7 @@ const DATA_DIR = path.join(ROOT, "scripts/data");
 export const OUT_DIR = path.join(ROOT, "apps/web/public/locations");
 export const STATES_FILE = path.join(ROOT, "apps/web/src/constants/location-states.json");
 
-const COUNTRY_NAMES = { NG: "Nigeria", KE: "Kenya" };
+const COUNTRY_NAMES = { NG: "Nigeria", KE: "Kenya", GH: "Ghana", US: "United States" };
 
 /** GeoNames records filed under the wrong county or state. */
 export const MISFILED = {

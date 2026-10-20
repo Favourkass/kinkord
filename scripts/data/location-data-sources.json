@@ -2,7 +2,9 @@
   "retrievedAt": "2026-10-13",
   "scope": {
     "NG": "36 states plus FCT; populated places and named areas, excluding abandoned/historical places",
-    "KE": "47 counties; GeoNames populated places and named areas, excluding abandoned/historical places"
+    "KE": "47 counties; GeoNames populated places and named areas, excluding abandoned/historical places",
+    "GH": "16 regions; populated places and named areas",
+    "US": "50 states plus District of Columbia; populated places and named areas"
   },
   "processing": "scripts/build-location-files.mjs splits the lists per state/county into apps/web/public/locations. It drops records that are not places people live (one- or two-letter names, names with digits after removing a trailing sub-area number such as \"Umoja 1\", facilities such as schools, markets and camps, addresses), removes misfiled records, adds a few well-known places, and merges the Nigerian areas signup offered before (ng-curated-areas.json).",
   "kenyaPlaces": {
@@ -348,5 +350,33 @@
       "Ajobo",
       "Mogun"
     ]
+  },
+  "ghanaPlaces": {
+    "publisher": "GeoNames",
+    "url": "https://www.geonames.org/",
+    "download": "https://download.geonames.org/export/dump/GH.zip",
+    "administrativeDivisions": "https://download.geonames.org/export/dump/admin1CodesASCII.txt",
+    "retrievedAt": "2026-10-20",
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256TextSnapshot": "3af69d078153560e1b8a4517c7cc7379909783c9740af2b72d5a0875e0e33d87",
+    "sha256AdminSnapshot": "b577baa3476bbe94f0454545e517e1835401d79c5b1105c8e02cf1d4a505e8ec",
+    "count": 14131,
+    "unmappedRecordCount": 39,
+    "changes": "GeoNames feature class P excluding historical, abandoned and destroyed places; administrative code mapped via admin1CodesASCII; names up to 80 characters, deduplicated per subdivision. Standard build-location-files filtering applies. Unlisted places can be typed in signup."
+  },
+  "usaPlaces": {
+    "publisher": "GeoNames",
+    "url": "https://www.geonames.org/",
+    "download": "https://download.geonames.org/export/dump/US.zip",
+    "administrativeDivisions": "https://download.geonames.org/export/dump/admin1CodesASCII.txt",
+    "retrievedAt": "2026-10-20",
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256TextSnapshot": "0bd6c41b0dc9dfbe7ef1d386eaadd891baba3f49a77204271ed210b4fa809e8b",
+    "sha256AdminSnapshot": "b577baa3476bbe94f0454545e517e1835401d79c5b1105c8e02cf1d4a505e8ec",
+    "count": 168634,
+    "unmappedRecordCount": 15,
+    "changes": "GeoNames feature class P excluding historical, abandoned and destroyed places; administrative code mapped via admin1CodesASCII; names up to 80 characters, deduplicated per subdivision. Standard build-location-files filtering applies. Unlisted places can be typed in signup."
   }
 }
