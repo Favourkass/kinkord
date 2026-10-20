@@ -220,3 +220,53 @@ describe("like notifications", () => {
     expect(push.newLike).toHaveBeenCalledWith("p1", "u2", "u1");
   });
 });
+
+describe("group discussions", () => {
+  const discussion = (closed = false) => ({
+    byId: vi.fn(async () => ({
+      postId: "p1",
+      author: { userId: "u2" },
+      group: { id: "g1", slug: "lagos-munch", name: "Lagos Munch" },
+      closed,
+    })),
+    notifyMentions: vi.fn(),
+  });
+
+  it("finds a discussion through its group's own rule", async () => {
+    const p = discussion();
+    await service(makeDb([[]]), p)
+      .like("p1", "u1")
+      .catch(() => undefined);
+    expect(p.byId).toHaveBeenCalledWith("p1", "u1", { groups: true });
+  });
+
+  it("lets only members like or reply, even in an open group anyone can read", async () => {
+    await expect(service(makeDb([[]]), discussion()).like("p1", "u1")).rejects.toThrow(
+      "Join the group to take part.",
+    );
+    await expect(service(makeDb([[]]), discussion()).comment("p1", "u1", "hi")).rejects.toThrow(
+      "Join the group to take part.",
+    );
+  });
+
+  it("takes no new replies on a closed discussion", async () => {
+    const db = makeDb([[{ role: "member", status: "active" }]]);
+    await expect(service(db, discussion(true)).comment("p1", "u1", "hi")).rejects.toThrow(
+      "This discussion is closed to new replies.",
+    );
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it("brings a discussion back to the top of its group when someone replies", async () => {
+    const db = makeDb([
+      [{ role: "member", status: "active" }],
+      [{ id: "c9", body: "hi", createdAt: new Date("2026-10-20T12:00:00Z") }],
+      [],
+      [{ username: "me", displayName: "Me", avatarKey: null }],
+    ]);
+    await expect(service(db, discussion()).comment("p1", "u1", "hi")).resolves.toMatchObject({
+      id: "c9",
+    });
+    expect(db.update).toHaveBeenCalledTimes(1);
+  });
+});

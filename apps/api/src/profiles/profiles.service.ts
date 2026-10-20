@@ -109,6 +109,8 @@ export const updateProfileSchema = z.object({
   socialLinks: socialLinksSchema.optional(),
   profileVisibility: z.enum(PROFILE_VISIBILITIES).optional(),
   showVerifiedBadge: z.boolean().optional(),
+  /** Whether the profile lists the open groups they're in. */
+  showGroups: z.boolean().optional(),
 });
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 
@@ -451,6 +453,7 @@ export class ProfilesService {
       /** Verified for the photo, birth date and gender the profile has now. */
       identityVerified: stillVerified(verification, row),
       showVerifiedBadge: row.showVerifiedBadge,
+      showGroups: row.showGroups,
       displayNameChangedAt: row.displayNameChangedAt?.toISOString() ?? null,
       /** null = a change is allowed now; otherwise the date the 30-day lock lifts. */
       canChangeDisplayNameAt:

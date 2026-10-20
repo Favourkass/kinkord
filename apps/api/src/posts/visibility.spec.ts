@@ -19,4 +19,19 @@ describe("the visibility rule", () => {
     expect(sql).not.toContain('"viewer_follows_author"');
     expect(params).toEqual(["public", "viewer-1", "friends", "viewer-1", "viewer-1"]);
   });
+
+  it("leaves every group discussion out unless a group's own read asks for them", () => {
+    const follows = [
+      alias(follow, "viewer_follows_author"),
+      alias(follow, "author_follows_viewer"),
+    ] as const;
+    const plain = new PgDialect().sqlToQuery(visibleTo("viewer-1", ...follows)!);
+    expect(plain.sql).toContain('"post"."group_id" is null');
+    expect(plain.sql).not.toContain('"readable_group"');
+    const inGroups = new PgDialect().sqlToQuery(
+      visibleTo("viewer-1", ...follows, { groups: true })!,
+    );
+    expect(inGroups.sql).toContain('("post"."group_id" is null or exists (');
+    expect(inGroups.sql).toContain(`"readable_group"."privacy" = 'open'`);
+  });
 });

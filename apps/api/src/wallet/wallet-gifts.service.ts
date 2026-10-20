@@ -121,7 +121,8 @@ export class WalletGiftsService {
         .from(post)
         .where(and(eq(post.id, input.postId), and(isNull(post.deletedAt), isNull(post.archivedAt))))
         .for("share");
-      if (!target || target.authorId !== recipientId || target.repostOfId)
+      // Group discussions stay in their group: no gifts there.
+      if (!target || target.authorId !== recipientId || target.repostOfId || target.groupId)
         throw new NotFoundException("Choose the original post to send a gift.");
       // Visibility was checked before the transaction, and the share lock above keeps the post
       // from being deleted or changed until the gift lands. Checking again here would take a

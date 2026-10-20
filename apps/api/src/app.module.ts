@@ -9,6 +9,7 @@ import { DbModule } from "./db/db.module";
 import { EmailModule } from "./email/email.module";
 import { HealthController } from "./health/health.controller";
 import { HealthService } from "./health/health.service";
+import { GroupsModule } from "./groups/groups.module";
 import { MembersModule } from "./members/members.module";
 import { MessagingModule } from "./messaging/messaging.module";
 import { ModerationModule } from "./moderation/moderation.module";
@@ -34,6 +35,7 @@ import { VerificationModule } from "./verification/verification.module";
     ProfilesModule,
     CommunityModule,
     MembersModule,
+    GroupsModule,
     VerificationModule,
     OtpModule,
     PostsModule,

@@ -1,4 +1,5 @@
 import { friendshipStateSql } from "./friendship-policy";
+import { profileGroups } from "../groups/profile-groups";
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import {
   and,
@@ -379,6 +380,8 @@ export class MembersService {
       // The Silver check, X-style: shown with the month their Silver began.
       silver: silver ? { since: silver.toISOString() } : null,
       teamMember: Boolean(p.teamMember),
+      // "Groups & Communities": part of About, so a friends-only profile keeps it from non-friends.
+      groups: restricted ? [] : await profileGroups(this.db, u.id, viewerId, p.showGroups),
     };
   }
 
