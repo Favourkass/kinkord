@@ -72,12 +72,7 @@ it("renders account signup without phone entry or phone instructions", () => {
   expect(screen.getByLabelText("Email address")).toBeTruthy();
   expect(screen.getByLabelText("Username")).toBeTruthy();
   expect(screen.getByLabelText("State")).toBeTruthy();
-  const sexuality = screen.getByLabelText("Sexuality");
-  expect(screen.getByRole("option", { name: "Straight" })).toBeTruthy();
-  expect(screen.getByRole("option", { name: "Bisexual" })).toBeTruthy();
-  expect(screen.queryByRole("option", { name: "Gay" })).toBeNull();
-  fireEvent.change(sexuality, { target: { value: "Bisexual" } });
-  expect((sexuality as HTMLSelectElement).value).toBe("Bisexual");
+  expect(screen.queryByLabelText("Sexuality")).toBeNull();
   expect(screen.getByText("Select your state")).toBeTruthy();
   expect(screen.queryByText("Select your county")).toBeNull();
   expect(screen.queryByText(/phone number/i)).toBeNull();
@@ -225,20 +220,12 @@ it("no longer knows a phone step to resume", () => {
   expect(screen.getByLabelText("Email address")).toBeTruthy();
 });
 
-it("keeps sexuality private and lets the member clear it", () => {
+it("hides sexuality and its helper for the default Nigerian signup", () => {
   render(<SignupPage />);
-  const sexuality = screen.getByLabelText("Sexuality") as HTMLSelectElement;
+  expect(screen.queryByLabelText("Sexuality")).toBeNull();
   expect(
-    screen.getByText("Only you can see this. You can change or clear it in Edit Profile."),
-  ).toBeTruthy();
-  const clear = screen.getByRole("option", { name: "Prefer not to say" }) as HTMLOptionElement;
-  expect(clear.disabled).toBe(false);
-  expect(sexuality.value).toBe("");
-  fireEvent.change(sexuality, { target: { value: "Straight" } });
-  expect(sexuality.value).toBe("Straight");
-  fireEvent.change(sexuality, { target: { value: "" } });
-  expect(sexuality.value).toBe("");
-  expect(clear.selected).toBe(true);
+    screen.queryByText("Only you can see this. You can change or clear it in Edit Profile."),
+  ).toBeNull();
 });
 
 it("offers the same sexualities the API accepts", () => {
