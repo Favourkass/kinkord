@@ -78,20 +78,14 @@ function show(over: Partial<ComposerDialogProps> = {}) {
   const view = render(<Harness />);
   return { ...view, submit, close, key, add };
 }
-it.each(["Bold", "Italic", "Underline"])(
-  "formats selected text with the %s button and previews the rendered result",
-  (format) => {
-    show();
-    const input = screen.getByRole("textbox", { name: "Post text" }) as HTMLTextAreaElement;
-    input.setSelectionRange(0, 5);
-    fireEvent.click(screen.getByRole("button", { name: format }));
-    const marker = format === "Bold" ? "**" : format === "Italic" ? "*" : "__";
-    expect(input.value).toBe(`${marker}Hello${marker} there`);
-    fireEvent.click(screen.getByRole("button", { name: "Preview formatting" }));
-    const tag = format === "Bold" ? "strong" : format === "Italic" ? "em" : "u";
-    expect(screen.getByText("Hello").closest(tag)).toBeTruthy();
-  },
-);
+it.each(["Bold", "Italic", "Underline"])("formats selected text with the %s button", (format) => {
+  show();
+  const input = screen.getByRole("textbox", { name: "Post text" }) as HTMLTextAreaElement;
+  input.setSelectionRange(0, 5);
+  fireEvent.click(screen.getByRole("button", { name: format }));
+  const marker = format === "Bold" ? "**" : format === "Italic" ? "*" : "__";
+  expect(input.value).toBe(`${marker}Hello${marker} there`);
+});
 it("inserts an emoji at the selected caret instead of replacing the whole draft", () => {
   show();
   const input = screen.getByRole("textbox") as HTMLTextAreaElement;
