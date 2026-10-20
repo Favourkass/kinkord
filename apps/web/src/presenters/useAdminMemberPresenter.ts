@@ -302,7 +302,11 @@ export function useAdminMemberPresenter(id: string) {
     },
     backHref: Routes.moderation,
     teamBadgeLabels: copy.teamBadge,
-    onToggleTeamBadge: () => open(member?.teamMember ? "removeTeamBadge" : "assignTeamBadge"),
+    /** Only the founders give or remove the Kinkord Team badge; other admins just see it. */
+    canChangeTeamBadge: access.isFounder,
+    onToggleTeamBadge: () => {
+      if (access.isFounder) open(member?.teamMember ? "removeTeamBadge" : "assignTeamBadge");
+    },
     onBlock: () => open("block"),
     onUnblock: () => open("unblock"),
     onDeletePosts: () => open("deletePosts"),

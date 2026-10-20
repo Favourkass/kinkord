@@ -345,7 +345,7 @@ export class ChatService {
             code: NEW_CHAT_LIMIT,
             message:
               limit === 0
-                ? "Starting a new chat requires a Premium subscription."
+                ? "Starting new chats is part of Premium. You can always reply when someone messages you first."
                 : "You've used today's new chats. You can message someone new after midnight.",
             resetsAt: day.end.toISOString(),
           },

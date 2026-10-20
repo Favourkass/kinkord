@@ -14,13 +14,25 @@ describe("useAdminAccessPresenter", () => {
   it("starts out checking, then admits an admin", async () => {
     access.mockResolvedValue({ isAdmin: true });
     const { result } = renderHook(() => useAdminAccessPresenter());
-    expect(result.current).toEqual({ checking: true, isAdmin: false });
-    await waitFor(() => expect(result.current).toEqual({ checking: false, isAdmin: true }));
+    expect(result.current).toEqual({ checking: true, isAdmin: false, isFounder: false });
+    await waitFor(() =>
+      expect(result.current).toEqual({ checking: false, isAdmin: true, isFounder: false }),
+    );
+  });
+
+  it("knows a founder from a staff admin", async () => {
+    access.mockResolvedValue({ isAdmin: true, isFounder: true });
+    const { result } = renderHook(() => useAdminAccessPresenter());
+    await waitFor(() =>
+      expect(result.current).toEqual({ checking: false, isAdmin: true, isFounder: true }),
+    );
   });
 
   it("treats a failed check (signed out, offline) as no access", async () => {
     access.mockRejectedValue(new Error("401"));
     const { result } = renderHook(() => useAdminAccessPresenter());
-    await waitFor(() => expect(result.current).toEqual({ checking: false, isAdmin: false }));
+    await waitFor(() =>
+      expect(result.current).toEqual({ checking: false, isAdmin: false, isFounder: false }),
+    );
   });
 });

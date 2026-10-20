@@ -5,6 +5,7 @@ const FRIENDSHIP_COPY = {
   accept: "Accept",
   decline: "Decline",
   remove: "Remove",
+  friends: "Friends",
   cancel: "Cancel",
 };
 import { friendshipActions } from "./friendship";
@@ -20,5 +21,12 @@ describe("friendship actions", () => {
     });
     expect(friendshipActions("friends", FRIENDSHIP_COPY).action).toBe("remove");
     expect(friendshipActions("none", FRIENDSHIP_COPY).action).toBe("request");
+  });
+
+  it("labels an existing friendship as Friends, not with the removal", () => {
+    expect(friendshipActions("friends", FRIENDSHIP_COPY)).toMatchObject({
+      label: "Friends",
+      action: "remove",
+    });
   });
 });

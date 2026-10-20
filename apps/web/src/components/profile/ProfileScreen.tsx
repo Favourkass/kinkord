@@ -34,6 +34,8 @@ export interface ProfileScreenProps {
   toggleFollow: () => void;
   followBusy: boolean;
   friendAction?: FriendshipActionProps;
+  /** "Remove friend?" — asked before a friendship ends. */
+  unfriendConfirm?: ConfirmDialogProps;
   friendRequestsHref?: string;
   friendRequestsLabel?: string;
   messageHref: string;
@@ -130,6 +132,7 @@ export default function ProfileScreen(p: ProfileScreenProps) {
       <CommentsPanel {...p.postOverlays.comments} />
       <GiftDialog {...p.postOverlays.gift} />
       <ConfirmDialog {...p.postOverlays.confirm} />
+      {p.unfriendConfirm ? <ConfirmDialog {...p.unfriendConfirm} /> : null}
       <MediaLightbox {...p.postOverlays.lightbox} />
       <Toast {...p.postOverlays.toast} />
     </>
