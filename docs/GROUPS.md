@@ -20,7 +20,7 @@ Members can like and reply; anyone who can read an open group can read but not t
 
 ## How it's built
 
-- **Tables:** `community_group`, `group_member` (one `owner` row per group, by unique index), `group_log`. Migration `0034_groups` only adds tables and columns.
+- **Tables:** `community_group`, `group_member` (one `owner` row per group, by unique index), `group_log`. Migration `0036_groups` only adds tables and columns.
 - **Discussions are posts** with `post.group_id`, `title`, `pinned_at`, `closed_at` and `last_activity_at` (a reply moves a discussion back to the top). Likes, replies (oldest first), mentions and media reuse the post code.
 - **Visibility.** `visibleTo` (`apps/api/src/posts/visibility.ts`) leaves every group post out unless a read asks for `{ groups: true }`. Only the group's own reads do (its discussions, one discussion, replies, likes, the post page that redirects to the group). Then it admits only the groups the viewer may read (`groupReadableBy`).
 - **Mentions** in a closed group notify only members.
