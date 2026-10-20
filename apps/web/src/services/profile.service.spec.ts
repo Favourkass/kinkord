@@ -136,7 +136,6 @@ describe("buildEditRows", () => {
       displayName: "Naughty Neze",
       bio: "Chill",
       gender: "Female",
-      orientation: null,
       dateOfBirth: "26 Mar 1998",
       nationality: "Nigeria",
       relationshipStatus: "Single",
@@ -212,7 +211,8 @@ describe("buildEditRows", () => {
 
 describe("sexuality row", () => {
   it("offers the API's list after a choice that clears it, and saves that as null", () => {
-    const row = buildEditRow("orientation", ctx);
+    const profile = { ...ctx.profile, country: "KE" };
+    const row = buildEditRow("orientation", { ...ctx, profile });
     expect(row.value).toBeNull();
     expect(row.editor).toEqual({
       kind: "single",
@@ -418,4 +418,16 @@ describe("loadCityOptions", () => {
     await expect(loadCityOptions({ ...profile, state: null })).resolves.toEqual([]);
     expect(fetch).toHaveBeenCalledTimes(1);
   });
+});
+
+it("hides sexuality for Nigerian profiles without changing saved values", () => {
+  const local = { ...ctx, profile: { ...profile, country: "NG", orientation: "Bisexual" } };
+  expect(buildEditRows("basic", local).some((r) => r.key === "orientation")).toBe(false);
+  expect(patchFor("orientation", { kind: "single", value: "Straight" }, local.profile)).toEqual({});
+  expect(local.profile.orientation).toBe("Bisexual");
+  expect(
+    buildEditRows("basic", { ...local, profile: { ...local.profile, country: "KE" } }).some(
+      (r) => r.key === "orientation",
+    ),
+  ).toBe(true);
 });

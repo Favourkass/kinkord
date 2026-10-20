@@ -1,3 +1,4 @@
+import { canSelectSexuality } from "../profiles/profile-field-policy";
 import {
   ForbiddenException,
   Inject,
@@ -103,7 +104,13 @@ export class SignUpService {
     }
 
     try {
-      await this.db.update(profile).set(fields).where(eq(profile.userId, userId));
+      await this.db
+        .update(profile)
+        .set({
+          ...fields,
+          orientation: canSelectSexuality(fields.country) ? fields.orientation : null,
+        })
+        .where(eq(profile.userId, userId));
     } catch {
       // Roll the half-created account back (cascades to profile + session) so the
       // combined step can be retried instead of erroring "email already exists".

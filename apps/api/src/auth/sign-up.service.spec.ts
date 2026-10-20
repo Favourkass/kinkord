@@ -67,7 +67,7 @@ describe("SignUpService", () => {
       new Headers(),
     );
     expect(result.status).toBe(200);
-    expect(set).toHaveBeenCalledWith({ ...fields, phone: null });
+    expect(set).toHaveBeenCalledWith({ ...fields, phone: null, orientation: null });
     expect(review).not.toHaveBeenCalled();
   });
 
@@ -92,7 +92,7 @@ describe("SignUpService", () => {
     const result = await service.signUpWithProfile(account, fields, new Headers());
 
     expect(update).toHaveBeenCalledTimes(1);
-    expect(set).toHaveBeenCalledWith(fields);
+    expect(set).toHaveBeenCalledWith({ ...fields, orientation: null });
     expect(result.status).toBe(200);
     expect(result.cookies).toEqual(["kinkord.session_token=abc; Path=/"]);
     expect(result.body).toContain("u1");
@@ -137,4 +137,12 @@ describe("SignUpService", () => {
 
     expect(review).not.toHaveBeenCalled();
   });
+});
+
+it("stores the selected sexuality for Kenya", async () => {
+  const { service, set } = make({
+    signUpResponse: new Response(JSON.stringify({ user: { id: "u1" } }), { status: 200 }),
+  });
+  await service.signUpWithProfile(account, { ...fields, country: "KE" }, new Headers());
+  expect(set).toHaveBeenCalledWith({ ...fields, country: "KE" });
 });

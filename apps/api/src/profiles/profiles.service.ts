@@ -1,3 +1,4 @@
+import { canSelectSexuality } from "./profile-field-policy";
 import {
   BadRequestException,
   ConflictException,
@@ -182,6 +183,12 @@ export class ProfilesService {
     now = new Date(),
   ) {
     const current = await this.ensureRow(userId, fallbackName);
+    const country = input.country ?? current.country;
+    if (input.orientation != null && !canSelectSexuality(country)) {
+      throw new BadRequestException({
+        orientation: ["Sexuality selection is unavailable for this country."],
+      });
+    }
     // Photos can only be skipped at first sign-up, before the member has ever
     // had a profile photo: one who deletes theirs is asked for a new one.
     if (input.signupPhotosSkipped && !current.photoSkipAvailable) {

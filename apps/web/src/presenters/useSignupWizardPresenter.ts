@@ -1,5 +1,7 @@
 "use client";
 
+import { canSelectSexuality } from "@/services/profile-field-policy";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, uploadToPresignedUrl } from "@/services/apiClient";
@@ -150,7 +152,12 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
   const selectCountry = useCallback((value: string) => {
     setCountry(value);
     setCustomArea(false);
-    setAbout((current) => ({ ...current, state: "", city: "" }));
+    setAbout((current) => ({
+      ...current,
+      state: "",
+      city: "",
+      orientation: canSelectSexuality(value) ? current.orientation : null,
+    }));
     setAboutErrors({});
   }, []);
 
@@ -295,7 +302,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
         dateOfBirth: dobToIso(about),
         gender: about.gender,
         // "Prefer not to say" is the empty choice: nothing is stored.
-        orientation: about.orientation || null,
+        orientation: canSelectSexuality(country) ? about.orientation || null : null,
       });
       setStage("email");
     } catch (e) {
@@ -500,6 +507,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
         selectArea,
         areaValue: customArea ? OTHER_AREA : about.city,
         sexuality: SEXUALITY_FIELD,
+        showSexuality: canSelectSexuality(country),
       },
       firstInvalid,
       submitCombinedStep,
