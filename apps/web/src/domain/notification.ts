@@ -2,6 +2,8 @@ export type NotificationKind =
   | "message"
   | "friend_request"
   | "friend_accepted"
+  | "relationship_request"
+  | "relationship_accepted"
   | "follow"
   | "comment"
   | "mention"
@@ -86,6 +88,16 @@ const KINDS: Record<
     category: "Friend accepted",
     icon: "person-add",
     action: () => "accepted your friend request.",
+  },
+  relationship_request: {
+    category: "Relationship request",
+    icon: "person-add",
+    action: () => "wants to link a relationship with you.",
+  },
+  relationship_accepted: {
+    category: "Relationship linked",
+    icon: "person-add",
+    action: () => "accepted your relationship request.",
   },
   follow: { category: "New follower", icon: "person-add", action: () => "followed you." },
   mention: { category: "Mention", icon: "mention", action: () => "mentioned you." },

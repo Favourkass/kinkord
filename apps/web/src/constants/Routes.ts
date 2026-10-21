@@ -1,5 +1,9 @@
 export const Routes = {
   friendRequests: "/friends/requests",
+  relationships: "/relationships",
+  /** The Relationships screen with the request form filled in for this member. */
+  relationshipWith: (username: string) =>
+    `/relationships?with=${encodeURIComponent(username.replace(/^@/, ""))}`,
   home: "/",
   kinkopedia: "/kinkopedia",
   about: "/about",

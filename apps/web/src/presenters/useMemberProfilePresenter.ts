@@ -21,6 +21,8 @@ import {
 } from "@/domain/member";
 import { ApiError } from "@/services/apiClient";
 import { isOfficialOrganization } from "@/services/organization-placeholder.service";
+import { RELATIONSHIPS_COPY } from "@/constants/relationships";
+import { toRelationshipRowVM, type RelationshipsCardVM } from "@/domain/relationship";
 import {
   decodeParam,
   isCountryAvailable,
@@ -371,6 +373,22 @@ export function useMemberProfilePresenter(
     () => (pm ? toPublicProfileVM(pm, placeHref, new Date(), organization) : null),
     [pm, organization],
   );
+  // The organization has followers, not relationships; a friends-only profile withholds them.
+  const relationships = useMemo((): RelationshipsCardVM | null => {
+    if (!pm || organization || pm.restricted) return null;
+    const card = RELATIONSHIPS_COPY.card;
+    const rows = (pm.relationships ?? []).map((r) => toRelationshipRowVM(r, Routes.member));
+    return {
+      title: card.title,
+      rows,
+      empty: pm.isSelf && rows.length === 0 ? card.emptyOwn : null,
+      manage: pm.isSelf ? { href: Routes.relationships, label: card.manage } : null,
+      link:
+        !pm.isSelf && pm.username
+          ? { href: Routes.relationshipWith(pm.username), label: card.linkWith(pm.displayName) }
+          : null,
+    };
+  }, [pm, organization]);
   // The organization's VM carries no presence, so it shows none.
   const presenceText = vm
     ? vm.isOnline
@@ -485,6 +503,7 @@ export function useMemberProfilePresenter(
     status: current?.notFound ? copy.notFound : (current?.error ?? null),
     loadingText: MEMBERS_COPY.common.loading,
     vm,
+    relationships,
     presenceText,
     activeTab: pm?.isSelf ? ("profile" as const) : undefined,
     nav: {
