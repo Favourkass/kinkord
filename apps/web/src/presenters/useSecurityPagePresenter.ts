@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SECURITY_COPY } from "@/constants/profileEdit";
 import { Routes } from "@/constants/Routes";
@@ -8,8 +8,12 @@ import type { MePM, OwnProfilePM } from "@/domain/profile";
 import { ApiError } from "@/services/apiClient";
 import { profileApi } from "@/services/profile.service";
 import { saveSettingsPhone } from "@/services/phoneSettings.service";
+import { backupCodesText, groupedKey } from "@/services/two-factor.service";
 import { useVerification } from "./useVerification";
 import { useSecurityPresenter } from "./useProfilePresenter";
+
+/** How long a copy button says "Copied". */
+const COPIED_MS = 2000;
 
 /**
  * Settings → Security & 2FA (moved off /profile; CEO 2026-09-12: "we still need to keep
@@ -26,6 +30,26 @@ export function useSecurityPagePresenter() {
   const [password, setPassword] = useState("");
   const [pw, setPw] = useState({ current: "", next: "" });
   const sec = useSecurityPresenter((enabled) => setTwoFactorOn(enabled));
+
+  /** Which value was just copied, so its button says so for a moment. */
+  const [copied, setCopied] = useState<"key" | "codes" | null>(null);
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    },
+    [],
+  );
+  const copyValue = useCallback(async (target: "key" | "codes", value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      return; // No clipboard here (an old browser, an insecure page): the text can still be selected.
+    }
+    setCopied(target);
+    if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    copiedTimer.current = setTimeout(() => setCopied(null), COPIED_MS);
+  }, []);
 
   const [phoneDraft, setPhoneDraft] = useState("");
   const [savingPhone, setSavingPhone] = useState(false);
@@ -112,8 +136,23 @@ export function useSecurityPagePresenter() {
               instructions: tf.instructions,
               qrDataUrl: sec.setup.qrDataUrl,
               qrAlt: tf.qrAlt,
+              samePhone: tf.samePhone,
+              openAppLabel: tf.openApp,
+              openAppHref: sec.setup.uri,
+              setupKeyLabel: tf.setupKey,
+              setupKey: sec.setup.key ? groupedKey(sec.setup.key) : null,
+              copyKeyLabel: copied === "key" ? tf.copied : tf.copyKey,
+              onCopyKey: () => {
+                const key = sec.setup?.key;
+                if (key) void copyValue("key", key);
+              },
               backupTitle: tf.backupCodes,
               backupCodes: sec.setup.backupCodes,
+              copyCodesLabel: copied === "codes" ? tf.copied : tf.copyCodes,
+              onCopyCodes: () => {
+                const codes = sec.setup?.backupCodes ?? [];
+                if (codes.length) void copyValue("codes", backupCodesText(codes));
+              },
               code: sec.code,
               onCode: sec.setCode,
               confirmLabel: tf.confirm,

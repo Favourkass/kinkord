@@ -8,6 +8,7 @@ import { api, ApiError } from "@/services/apiClient";
 import { uploadProfileImage } from "@/services/profile.service";
 import { Routes } from "@/constants/Routes";
 import type { MePM, OwnProfilePM } from "@/domain/profile";
+import { setupKeyOf } from "@/services/two-factor.service";
 
 export type MeVM = MePM;
 export type ProfileVM = OwnProfilePM;
@@ -124,7 +125,14 @@ export function useSecurityPresenter(onTwoFactorChange?: (enabled: boolean) => v
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [setup, setSetup] = useState<{ qrDataUrl: string; backupCodes: string[] } | null>(null);
+  const [setup, setSetup] = useState<{
+    qrDataUrl: string;
+    backupCodes: string[];
+    /** The authenticator link itself: tapping it opens the app on the same phone. */
+    uri: string;
+    /** The setup key, to copy into the app when the QR can't be scanned. */
+    key: string | null;
+  } | null>(null);
   const [code, setCode] = useState("");
 
   const beginEnable = useCallback(async (password: string) => {
@@ -136,7 +144,12 @@ export function useSecurityPresenter(onTwoFactorChange?: (enabled: boolean) => v
         throw new Error(err?.message ?? "Could not start 2FA setup");
       }
       const qrDataUrl = await QRCode.toDataURL(data.totpURI, { margin: 1, width: 220 });
-      setSetup({ qrDataUrl, backupCodes: data.backupCodes ?? [] });
+      setSetup({
+        qrDataUrl,
+        backupCodes: data.backupCodes ?? [],
+        uri: data.totpURI,
+        key: setupKeyOf(data.totpURI),
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start 2FA setup.");
     } finally {

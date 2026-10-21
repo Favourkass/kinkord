@@ -206,6 +206,11 @@ describe("useSecurityPresenter", () => {
     });
     await waitFor(() => expect(result.current.setup?.qrDataUrl).toMatch(/^data:image\/png/));
     expect(result.current.setup?.backupCodes).toHaveLength(2);
+    // Kept for setting up on the same phone: the link opens the app, the key can be pasted.
+    expect(result.current.setup).toMatchObject({
+      uri: "otpauth://totp/Kinkord?secret=S",
+      key: "S",
+    });
 
     act(() => result.current.setCode("123456"));
     act(() => {
