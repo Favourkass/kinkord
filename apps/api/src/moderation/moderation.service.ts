@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Inject,
@@ -23,6 +24,7 @@ import {
   type SignupRuleAction,
   type SignupRuleKind,
 } from "../db/schema";
+import { AVAILABLE_COUNTRIES } from "../members/members.service";
 import { PostsService } from "../posts/posts.service";
 import { IMAGE_VARIANTS, StorageService, variantKey } from "../storage/storage.service";
 import { giveSilver, silverGiven, takeBackSilver } from "../subscriptions/given-silver";
@@ -46,6 +48,9 @@ export interface AdminMemberSummary {
   banned: boolean;
   admin: boolean;
   teamMember: boolean;
+  /** An organization's account (AccountType), tied to `country`. */
+  organization: boolean;
+  country: string | null;
 }
 
 export interface AdminPostSummary {
@@ -153,6 +158,8 @@ export class ModerationService {
         createdAt: user.createdAt,
         displayName: profile.displayName,
         teamMember: profile.teamMember,
+        accountType: profile.accountType,
+        country: profile.country,
         phone: profile.phone,
         avatarKey: profile.avatarKey,
         lastSeenAt: profile.lastSeenAt,
@@ -181,6 +188,8 @@ export class ModerationService {
       banned: Boolean(r.banned),
       admin: Boolean(r.staff) || isSuperAdmin(r),
       teamMember: Boolean(r.teamMember),
+      organization: r.accountType === "organization",
+      country: r.country ?? null,
     };
   }
 
@@ -358,6 +367,32 @@ export class ModerationService {
         action: enabled ? "assign-team-badge" : "remove-team-badge",
       });
       return { teamMember: row.teamMember };
+    });
+  }
+
+  /**
+   * Makes the account an organization's, tied to one of the countries Kinkord
+   * serves, or a person's again. Only the founders may (the controller checks).
+   * Nothing else about the account changes: its posts, followers and sign-in stay.
+   */
+  async setOrganization(actorId: string, id: string, enabled: boolean, country: string | null) {
+    if (enabled && !AVAILABLE_COUNTRIES.some((c) => c.code === country)) {
+      throw new BadRequestException("Choose the organization's country.");
+    }
+    return this.db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(profile)
+        .set({ accountType: enabled ? "organization" : "person", ...(enabled ? { country } : {}) })
+        .where(eq(profile.userId, id))
+        .returning({ accountType: profile.accountType, country: profile.country });
+      if (!row) throw new NotFoundException("Member profile not found.");
+      await tx.insert(moderationLog).values({
+        actorId,
+        subjectUserId: id,
+        action: enabled ? "make-organization" : "remove-organization",
+        detail: enabled ? country : null,
+      });
+      return { organization: row.accountType === "organization", country: row.country };
     });
   }
 

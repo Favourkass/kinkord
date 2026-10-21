@@ -7,8 +7,9 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
-import { and, count, desc, eq, ilike, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, count, desc, eq, gt, ilike, inArray, isNull, lt, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+import { noBlockEitherWay } from "../safety/blocks";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { Db, DRIZZLE } from "../db/db.module";
@@ -23,6 +24,7 @@ import {
   postShare,
   postMedia,
   postSave,
+  postTag,
   profile,
   user,
   walletGift,
@@ -38,6 +40,14 @@ import {
   mentionsIn,
   type Mention,
 } from "./mentions";
+import {
+  MAX_TAGS,
+  tags,
+  taggableIds,
+  tagSuggestions,
+  tagsOn,
+  type TaggedMemberVM,
+} from "./post-tags";
 import {
   IMAGE_VARIANTS,
   StorageService,
@@ -61,6 +71,12 @@ export const POST_MEDIA_MAX_MB = 10;
 const maxBytes = POST_MEDIA_MAX_MB * 1024 * 1024;
 
 export const FEED_PAGE_SIZE = 10;
+/** How long an organization's post opens For You in its country, and how many at once. */
+export const ORGANIZATION_PIN_HOURS = 48;
+export const ORGANIZATION_PINS = 3;
+// Aliased so the organization check can sit beside the author's own joined profile.
+const ORG = "org_profile";
+const orgProfile = alias(profile, ORG);
 export const FEED_MAX_PAGE_SIZE = 30;
 export const COMMENT_PAGE_SIZE = 10;
 export const COMMENT_MAX_PAGE_SIZE = 50;
@@ -87,6 +103,16 @@ export const createPostSchema = z
       )
       .max(POST_MEDIA_MAX)
       .default([]),
+    /** Usernames of the friends the author tags. */
+    tags: z
+      .array(
+        z
+          .string()
+          .trim()
+          .regex(/^@?[a-z0-9_]{3,30}$/i, "Tag members by their username."),
+      )
+      .max(MAX_TAGS)
+      .default([]),
   })
   .refine((v) => Boolean(v.body?.length) || v.media.length > 0, {
     message: "Write something or add a photo.",
@@ -110,6 +136,8 @@ export interface FeedParams {
   limit?: number;
   /** Narrows the feed to one member's posts — this is the profile Posts tab. */
   author?: string | null;
+  /** Narrows the feed to the posts that tag one member — the profile Tagged tab. */
+  tagged?: string | null;
   /** Search: only posts whose text contains this. Reposts carry no text, so originals only. */
   q?: string | null;
   /**
@@ -169,6 +197,10 @@ export interface PostVM {
   mine: boolean;
   /** Each @handle in the body that names a member, and whom: the ones the app links. */
   mentions: Mention[];
+  /** The author's friends tagged in the post, as the viewer may see them. */
+  tagged: TaggedMemberVM[];
+  /** The viewer is one of them, so the post offers to take their tag off. */
+  taggedMe: boolean;
 }
 
 export interface RepostVM {
@@ -251,6 +283,8 @@ export class PostsService {
       throw new BadRequestException(LONG_POST_NEEDS_SILVER);
     }
     await this.verifyMedia(userId, input.media);
+    // Checked before anything is written, so a refused tag never leaves a post behind.
+    const tagged = await taggableIds(this.db, userId, input.tags ?? []);
     const [row] = await this.db
       .insert(post)
       .values({
@@ -269,7 +303,14 @@ export class PostsService {
         })),
       );
     }
-    this.notifyMentions(row.id, userId, input.body);
+    if (tagged.length) {
+      await this.db
+        .insert(postTag)
+        .values(tagged.map((taggedId) => ({ postId: row.id, userId: taggedId })));
+      for (const taggedId of tagged) this.push.tagged(row.id, taggedId, userId);
+    }
+    // A tagged member hears of the tag; a mention of them too would tell them twice.
+    this.notifyMentions(row.id, userId, input.body, tagged);
     const vm = await this.byId(row.id, userId);
     if (!vm) throw new NotFoundException("Post not found");
     return vm;
@@ -311,16 +352,18 @@ export class PostsService {
    */
   async feed(viewerId: string, params: FeedParams = {}): Promise<FeedVM> {
     const limit = clamp(params.limit ?? FEED_PAGE_SIZE, 1, FEED_MAX_PAGE_SIZE);
-    const tab = params.author || params.q ? null : (params.tab ?? null);
+    const tab = params.author || params.q || params.tagged ? null : (params.tab ?? null);
     if (tab === "for_you" || tab === "nearby") return this.rankedFeed(viewerId, tab, params, limit);
     const following = tab === "following";
     const cursor = parseCursor(params.cursor);
     const authorId = params.author ? await this.resolveAuthor(params.author) : null;
+    const taggedId = params.tagged ? await this.resolveAuthor(params.tagged) : null;
     const rows = await this.selectPosts(
       viewerId,
       [
         ...(cursor ? [lt(post.createdAt, cursor)] : []),
         ...(authorId ? [eq(post.authorId, authorId)] : []),
+        ...(taggedId ? [tags(post.id, taggedId)] : []),
         ...(params.q ? [ilike(post.body, containsPattern(params.q))] : []),
         ...(following ? followingConditions(viewerId) : []),
       ],
@@ -351,12 +394,46 @@ export class PostsService {
       ? await this.selectPosts(viewerId, [inArray(post.id, page.ids)], page.ids.length)
       : [];
     const byId = new Map(rows.map((r) => [r.id, r]));
-    const ordered = page.ids.flatMap((id) => byId.get(id) ?? []);
+    // The viewer's country's organizations' newest posts open For You.
+    const pinned = tab === "for_you" && !params.cursor ? await this.organizationPins(viewerId) : [];
+    const pinnedIds = new Set(pinned.map((r) => r.id));
+    const ordered = [
+      ...pinned,
+      ...page.ids.flatMap((id) => byId.get(id) ?? []).filter((r) => !pinnedIds.has(r.id)),
+    ];
     return {
       items: await this.decorate(ordered, viewerId),
       nextCursor: page.nextCursor,
       ...(page.hint ? { hint: page.hint } : {}),
     };
+  }
+
+  /**
+   * Organizations' posts are a must on For You (founder, 2026-10-21): for 48
+   * hours after posting, an organization's public post opens the first page
+   * for every member in its country, newest first and a few at most, so a busy
+   * organization can't bury the feed. Members who blocked it, or whom it
+   * blocked, never see it.
+   */
+  private async organizationPins(viewerId: string) {
+    const [viewer] = await this.db
+      .select({ country: profile.country })
+      .from(profile)
+      .where(eq(profile.userId, viewerId))
+      .limit(1);
+    if (!viewer?.country) return [];
+    return this.selectPosts(
+      viewerId,
+      [
+        gt(post.createdAt, sql`now() - (${ORGANIZATION_PIN_HOURS} * interval '1 hour')`),
+        isNull(post.repostOfId),
+        eq(post.visibility, "public"),
+        ne(post.authorId, viewerId),
+        noBlockEitherWay(post.authorId, viewerId),
+        sql`exists (select 1 from ${profile} ${sql.identifier(ORG)} where ${orgProfile.userId} = ${post.authorId} and ${orgProfile.accountType} = 'organization' and ${orgProfile.country} = ${viewer.country})`,
+      ],
+      ORGANIZATION_PINS,
+    );
   }
 
   /** One post, or null when it is missing, deleted or not visible to the viewer. */
@@ -832,6 +909,7 @@ export class PostsService {
       this.db,
       pairs.flatMap(({ content }) => mentionCandidates(content.body)),
     );
+    const tagged = await tagsOn(this.db, ids, viewerId);
 
     return Promise.all(
       pairs.map(async ({ row, content }) => ({
@@ -870,8 +948,40 @@ export class PostsService {
               },
         mine: row.authorId === viewerId,
         mentions: mentionsIn(content.body, members),
+        tagged: tagged.get(content.id) ?? [],
+        taggedMe: (tagged.get(content.id) ?? []).some((t) => t.userId === viewerId),
       })),
     );
+  }
+
+  /**
+   * The tagged member takes their own tag off a post; the author isn't told.
+   * Answers with who the post still tags, so every row showing it can update.
+   */
+  async removeTag(
+    viewerId: string,
+    postId: string,
+  ): Promise<{ postId: string; tagged: TaggedMemberVM[]; taggedMe: false }> {
+    const removed = await this.db
+      .delete(postTag)
+      .where(and(eq(postTag.postId, postId), eq(postTag.userId, viewerId)))
+      .returning({ postId: postTag.postId });
+    if (!removed.length) throw new NotFoundException("You aren't tagged in this post.");
+    const left = await tagsOn(this.db, [postId], viewerId);
+    return { postId, tagged: left.get(postId) ?? [], taggedMe: false };
+  }
+
+  /** Friends to offer in the composer's tag picker. */
+  async tagSuggestions(viewerId: string, query: string) {
+    const rows = await tagSuggestions(this.db, viewerId, query);
+    return {
+      items: await Promise.all(
+        rows.map(async ({ avatarKey, ...member }) => ({
+          ...member,
+          avatarUrl: avatarKey ? await this.storage.presignDownload(avatarKey, "sm") : null,
+        })),
+      ),
+    };
   }
 
   /**

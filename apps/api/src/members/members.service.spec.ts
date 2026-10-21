@@ -9,6 +9,11 @@ import { type PostsService } from "../posts/posts.service";
 import { type FollowsService } from "./follows.service";
 import { MembersService, ageFromDob, normalizePaging } from "./members.service";
 
+const { profileRelationships } = vi.hoisted(() => ({
+  profileRelationships: vi.fn(async (..._args: unknown[]) => [] as unknown[]),
+}));
+vi.mock("../relationships/profile-relationships", () => ({ profileRelationships }));
+
 const chain = (result: unknown) => {
   const p: unknown = new Proxy(() => p, {
     get: (_t, prop) =>
@@ -522,11 +527,53 @@ describe("MembersService.publicProfile visibility (Edit Profile → Privacy)", (
     expect(vm.interests).toEqual([]);
     expect(vm.occupation).toBeNull();
     expect(vm.socialLinks).toEqual({});
+    expect(vm.relationships).toEqual([]);
     // What the directory card already shows stays, so they can still follow back.
     expect(vm.displayName).toBe("Neze");
     expect(vm.roles).toEqual(["Dominant"]);
     expect(vm.city).toBe("Abraka");
     expect(vm.counts.followers).toBe(30);
+  });
+
+  it("shows nothing individual on an organization's profile", async () => {
+    const [row] = rowFor("public");
+    const { service, select } = makeService();
+    select.mockReturnValueOnce(chain([{ ...row, p: { ...row.p, accountType: "organization" } }]));
+    const vm = await service.publicProfile("nene", "me");
+    expect(vm).toMatchObject({
+      accountType: "organization",
+      country: "NG",
+      state: null,
+      city: null,
+      age: null,
+      gender: null,
+      roles: [],
+      interests: [],
+      lookingFor: [],
+      languages: [],
+      relationshipStatus: null,
+      nationality: null,
+      occupation: null,
+      limits: null,
+      relationships: [],
+    });
+    // What it says about itself stays: About us.
+    expect(vm.bio).toBe("Hi");
+  });
+
+  it("shows the linked relationships on a public profile, read for the viewer", async () => {
+    const link = { id: "r1", kind: "ds", type: "dominant", label: "submissive of" };
+    profileRelationships.mockResolvedValueOnce([link]);
+    const { service, select } = makeService();
+    select.mockReturnValueOnce(chain(rowFor("public")));
+    const vm = await service.publicProfile("nene", "me");
+    expect(profileRelationships).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.anything(),
+      "u2",
+      "me",
+    );
+    expect(vm.relationships).toEqual([link]);
   });
 
   it("shows everything to friends and to the member; public profiles skip the check", async () => {
@@ -1086,5 +1133,16 @@ describe("MembersService.dismissSuggestion", () => {
     expect(inserts.table[0][0]).toBe(suggestionDismissal);
     expect(inserts.values[0]).toEqual([{ userId: "me", dismissedUserId: "u2" }]);
     expect(inserts.onConflictDoNothing).toHaveLength(1);
+  });
+});
+
+describe("MembersService organizations", () => {
+  it("lists the organizations' accounts", async () => {
+    const rows = [
+      { userId: "o1", username: "kinkord_ng", displayName: "Kinkord Nigeria", country: "NG" },
+    ];
+    const { service, select } = makeService();
+    select.mockReturnValueOnce(chain(rows));
+    await expect(service.organizations()).resolves.toEqual({ items: rows });
   });
 });

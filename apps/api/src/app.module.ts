@@ -10,6 +10,7 @@ import { EmailModule } from "./email/email.module";
 import { HealthController } from "./health/health.controller";
 import { HealthService } from "./health/health.service";
 import { MembersModule } from "./members/members.module";
+import { RelationshipsModule } from "./relationships/relationships.module";
 import { MessagingModule } from "./messaging/messaging.module";
 import { ModerationModule } from "./moderation/moderation.module";
 import { PresenceModule } from "./presence/presence.module";
@@ -34,6 +35,7 @@ import { VerificationModule } from "./verification/verification.module";
     ProfilesModule,
     CommunityModule,
     MembersModule,
+    RelationshipsModule,
     VerificationModule,
     OtpModule,
     PostsModule,

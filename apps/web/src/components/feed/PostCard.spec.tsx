@@ -28,6 +28,8 @@ const labels = {
   verifiedOrganization: "Verified organization",
   follow: "Follow",
   following: "Following",
+  with: "with",
+  removeTag: "Remove my tag",
 };
 
 function show(silver: boolean, subscribed: boolean) {
@@ -108,11 +110,17 @@ function menuOf(over: Partial<PostPM>) {
     mine: false,
     ...over,
   };
-  const on = { close: vi.fn(), repost: vi.fn(), save: vi.fn(), remove: vi.fn() };
+  const on = {
+    close: vi.fn(),
+    repost: vi.fn(),
+    save: vi.fn(),
+    remove: vi.fn(),
+    removeTag: vi.fn(),
+  };
   const noop = vi.fn();
   render(
     <PostCard
-      post={toPostVM(pm, false, () => null)}
+      post={toPostVM(pm, false, (u) => (u ? `/u/${u}` : null))}
       labels={labels}
       menuOpen
       onMenu={noop}
@@ -127,10 +135,38 @@ function menuOf(over: Partial<PostPM>) {
       onGift={noop}
       onToggleAuthorFollow={noop}
       onOpenMedia={noop}
+      onRemoveTag={on.removeTag}
     />,
   );
   return on;
 }
+
+describe("tags on a post", () => {
+  it("says who the post is with, each out to their profile", () => {
+    menuOf({
+      tagged: [
+        { userId: "u3", username: "ada", displayName: "Ada" },
+        { userId: "u4", username: null, displayName: "Kemi" },
+      ],
+    });
+    expect(screen.getByText("with", { exact: false })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Ada" }).getAttribute("href")).toBe("/u/ada");
+    // No username yet: their name shows, linking nowhere.
+    expect(screen.queryByRole("link", { name: "Kemi" })).toBeNull();
+    expect(screen.getByText("Kemi")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Remove my tag" })).toBeNull();
+  });
+
+  it("lets a tagged viewer take their tag off from the menu", () => {
+    const on = menuOf({
+      tagged: [{ userId: "me", username: "me_here", displayName: "Me" }],
+      taggedMe: true,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Remove my tag" }));
+    expect(on.close).toHaveBeenCalledOnce();
+    expect(on.removeTag).toHaveBeenCalledOnce();
+  });
+});
 
 describe("the post menu", () => {
   it("keeps repost and save on anyone's post, and closes once one is picked", () => {

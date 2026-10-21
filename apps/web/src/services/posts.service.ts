@@ -19,6 +19,8 @@ import {
   type RepostPM,
   type SavePM,
   type SuggestionShow,
+  type TagSuggestionPM,
+  type TagsLeftPM,
 } from "@/domain/post";
 import { IMAGE_VARIANTS, buildUploadSet, type ImageVariant } from "@/util/image";
 import { api, uploadToPresignedUrl } from "./apiClient";
@@ -37,6 +39,8 @@ export interface CreatePostInput {
   visibility: PostVisibility;
   /** Keys returned by `uploadPostPhoto`, in the order they should appear. */
   mediaKeys: string[];
+  /** Usernames of the friends tagged in it. */
+  tags?: string[];
 }
 
 export const postsApi = {
@@ -44,6 +48,7 @@ export const postsApi = {
    * `author` narrows the feed to one member — that is the profile Posts tab.
    * `search` keeps the posts whose text contains it. `tab` is the home feed's
    * For You, Following or Nearby; the API reads newest first without one.
+   * `tagged` is the profile Tagged tab: the posts that tag one member.
    */
   feed: (
     cursor?: string | null,
@@ -51,12 +56,14 @@ export const postsApi = {
     author?: string | null,
     search?: string | null,
     tab?: FeedTab | null,
+    tagged?: string | null,
   ) => {
     const qs = new URLSearchParams();
     if (tab) qs.set("tab", tab);
     if (cursor) qs.set("cursor", cursor);
     if (limit) qs.set("limit", String(limit));
     if (author) qs.set("author", author.replace(/^@/, ""));
+    if (tagged) qs.set("tagged", tagged.replace(/^@/, ""));
     if (search) qs.set("q", search);
     const q = qs.toString();
     return api.get<FeedPM>(`/posts/feed${q ? `?${q}` : ""}`);
@@ -66,7 +73,15 @@ export const postsApi = {
       body: input.body.trim() || undefined,
       visibility: input.visibility,
       media: input.mediaKeys.map((key) => ({ key, kind: "image" as const })),
+      ...(input.tags?.length ? { tags: input.tags } : {}),
     }),
+  /** The viewer takes their own tag off a post. */
+  removeTag: (id: string) => api.del<TagsLeftPM>(`/posts/${encodeURIComponent(id)}/tags/me`),
+  /** Friends to tag, by name or username. */
+  tagSuggestions: (query: string) =>
+    api.get<{ items: TagSuggestionPM[] }>(
+      `/posts/tag-suggestions?q=${encodeURIComponent(query.trim())}`,
+    ),
   byId: (id: string) => api.get<PostPM>(`/posts/${encodeURIComponent(id)}`),
   remove: (id: string) => api.del<{ deleted: string }>(`/posts/${encodeURIComponent(id)}`),
   like: (id: string) => api.post<LikePM>(`/posts/${encodeURIComponent(id)}/like`, {}),
@@ -272,6 +287,11 @@ export function withSuggestionRestored(
 export function postPermalink(postId: string, origin?: string): string {
   const base = origin ?? (typeof window === "undefined" ? "" : window.location.origin);
   return `${base}/p/${encodeURIComponent(postId)}`;
+}
+
+/** A tag taken off: every row showing that post now tags whoever is left. */
+export function withTagsLeft(pm: PostPM, left: TagsLeftPM): PostPM {
+  return pm.postId === left.postId ? { ...pm, tagged: left.tagged, taggedMe: false } : pm;
 }
 
 /** Bumps a post's comment count after one is added or removed. */

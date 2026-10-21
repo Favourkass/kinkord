@@ -1,3 +1,4 @@
+import type { RelationshipPM } from "./relationship";
 import type { FriendshipState } from "./friendship";
 /**
  * Members directory + public member profile. PMs mirror the API payloads
@@ -158,6 +159,10 @@ export interface PublicProfilePM {
   /** The Silver check, with when their Silver began; absent from an older API. */
   teamMember?: boolean;
   silver?: { since: string } | null;
+  /** Linked D/s and other relationships, read from this member's side; absent from an older API. */
+  relationships?: RelationshipPM[];
+  /** "organization" for an organization's account (founders make them); absent from an older API. */
+  accountType?: "person" | "organization";
 }
 
 export type SocialPlatform = "facebook" | "x";

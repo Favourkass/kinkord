@@ -36,6 +36,7 @@ const {
   withCommentDelta,
   withSuggestionFollow,
   withSuggestionRestored,
+  withTagsLeft,
 } = await import("./posts.service");
 
 const pm = (over: Partial<PostPM> = {}): PostPM => ({
@@ -303,5 +304,41 @@ describe("uploadPostPhoto", () => {
     });
     // The original lands last, so a post never names a key whose sizes are missing.
     expect(upload.mock.calls.map((c) => c[0])).toEqual(["put-sm", "put-md", "put-original"]);
+  });
+});
+
+describe("tagging", () => {
+  beforeEach(() => {
+    get.mockReset().mockResolvedValue({ items: [] });
+    post.mockReset().mockResolvedValue({});
+    del.mockReset().mockResolvedValue({});
+  });
+
+  it("sends the tagged usernames only when there are some", async () => {
+    await postsApi.create({ body: "hi", visibility: "public", mediaKeys: [], tags: ["ada"] });
+    await postsApi.create({ body: "hi", visibility: "public", mediaKeys: [] });
+    expect(post.mock.calls[0][1]).toMatchObject({ tags: ["ada"] });
+    expect(post.mock.calls[1][1]).not.toHaveProperty("tags");
+  });
+
+  it("reads a profile's Tagged tab, takes a tag off and suggests friends", async () => {
+    await postsApi.feed(null, undefined, null, null, null, "@Ada");
+    await postsApi.tagSuggestions(" ad ");
+    await postsApi.removeTag("p/1");
+    expect(get.mock.calls.map((c) => c[0])).toEqual([
+      "/posts/feed?tagged=Ada",
+      "/posts/tag-suggestions?q=ad",
+    ]);
+    expect(del).toHaveBeenCalledWith("/posts/p%2F1/tags/me");
+  });
+
+  it("leaves every row of the post tagging whoever is left", () => {
+    const left = { postId: "p1", tagged: [], taggedMe: false as const };
+    const tagged = pm({
+      tagged: [{ userId: "me", username: "me", displayName: "Me" }],
+      taggedMe: true,
+    });
+    expect(withTagsLeft(tagged, left)).toMatchObject({ tagged: [], taggedMe: false });
+    expect(withTagsLeft(pm({ postId: "p2", taggedMe: true }), left).taggedMe).toBe(true);
   });
 });

@@ -12,7 +12,8 @@ import {
 } from "@/domain/chat";
 import type { RealtimeEventPM } from "@/domain/realtime";
 import { chatService } from "@/services/chat.service";
-import { isOfficialOrganization } from "@/services/organization-placeholder.service";
+import { isOrganization } from "@/services/organizations.service";
+import { useOrganizations } from "./useOrganizations";
 import { useHomePresenter } from "./useHomePresenter";
 import { usePolling } from "./usePolling";
 import { useTypingIndicators } from "./useTypingIndicators";
@@ -31,6 +32,7 @@ function messageOf(e: unknown): string {
 }
 
 export function useChatListPresenter() {
+  const organizations = useOrganizations();
   const shell = useHomePresenter();
   // Persist inbox attention, never conversation read pointers or tab counts.
   useEffect(() => {
@@ -166,7 +168,7 @@ export function useChatListPresenter() {
           viewerId,
           Routes.messageThread,
           new Date(),
-          isOfficialOrganization(s.peer?.userId),
+          isOrganization(s.peer?.userId, organizations),
         );
         const isTyping = typing.has(s.id) && !s.peer?.blockedByMe;
         return {
@@ -176,7 +178,7 @@ export function useChatListPresenter() {
           preview: isTyping ? CHAT_COPY.typing : row.preview,
         };
       }),
-    [selected, viewerId, typing],
+    [selected, viewerId, typing, organizations],
   );
 
   return {

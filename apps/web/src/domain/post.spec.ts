@@ -81,6 +81,28 @@ describe("clamping a long post", () => {
 });
 
 describe("toPostVM", () => {
+  it("names who the post tags, each out to their profile, and whether it's the viewer", () => {
+    const vm = toPostVM(
+      post({
+        tagged: [
+          { userId: "u3", username: "ada", displayName: "Ada" },
+          { userId: "u4", username: null, displayName: "Kemi" },
+        ],
+        taggedMe: true,
+      }),
+      false,
+      href,
+      NOW,
+    );
+    expect(vm.tagged).toEqual([
+      { userId: "u3", name: "Ada", href: "/u/ada" },
+      { userId: "u4", name: "Kemi", href: null },
+    ]);
+    expect(vm.taggedMe).toBe(true);
+    // An older API sends neither.
+    expect(toPostVM(post(), false, href, NOW)).toMatchObject({ tagged: [], taggedMe: false });
+  });
+
   it("shows compact counts and the short age of the post", () => {
     const vm = toPostVM(post(), false, href, NOW);
     expect(vm.likes).toBe("12.5K");

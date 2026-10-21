@@ -20,7 +20,8 @@ import type { PostMediaVM } from "@/domain/post";
 import type { RealtimeEventPM } from "@/domain/realtime";
 import { ApiError } from "@/services/apiClient";
 import { chatService } from "@/services/chat.service";
-import { isOfficialOrganization } from "@/services/organization-placeholder.service";
+import { isOrganization } from "@/services/organizations.service";
+import { useOrganizations } from "./useOrganizations";
 import { chatRulesStore } from "@/util/chatRules";
 import { useHomePresenter } from "./useHomePresenter";
 import { useChatSafety } from "./useChatSafety";
@@ -82,6 +83,7 @@ interface DraftPhoto {
  * or refuses. Who "own" is gets decided at render, once the viewer is known.
  */
 export function useChatThreadPresenter(conversationId: string) {
+  const organizations = useOrganizations();
   const shell = useHomePresenter();
   const { active: typing, receive: receiveTyping, clear: clearTyping } = useTypingIndicators();
   const [viewerId, setViewerId] = useState<string | null>(null);
@@ -356,7 +358,7 @@ export function useChatThreadPresenter(conversationId: string) {
     const vm = toThreadPeerVM(
       summary?.peer ?? null,
       Routes.member,
-      isOfficialOrganization(summary?.peer?.userId),
+      isOrganization(summary?.peer?.userId, organizations),
     );
     const isTyping = typing.has(conversationId) && !summary?.peer?.blockedByMe;
     return vm
@@ -366,7 +368,7 @@ export function useChatThreadPresenter(conversationId: string) {
           presenceLabel: isTyping ? CHAT_COPY.typing : CHAT_COPY.presence[vm.presence ?? "offline"],
         }
       : null;
-  }, [summary, typing, conversationId]);
+  }, [summary, typing, conversationId, organizations]);
   const notice = newChatNotice({
     empty,
     allowance: allowance?.for === conversationId ? allowance.value : null,

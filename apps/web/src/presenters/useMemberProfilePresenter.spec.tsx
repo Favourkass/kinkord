@@ -223,11 +223,69 @@ describe("useMemberProfilePresenter", () => {
     expect(apiPost).toHaveBeenCalledWith("/follows/nene", {});
   });
 
+  it("shows linked relationships, with a way to ask on someone else's profile", async () => {
+    const link = {
+      id: "r1",
+      kind: "ds" as const,
+      type: "dominant",
+      label: "submissive of",
+      member: { userId: "u3", username: "tolu", displayName: "Tolu", avatarUrl: null },
+      requestedBy: "self" as const,
+      createdAt: "2026-10-20T09:00:00.000Z",
+      acceptedAt: "2026-10-21T09:00:00.000Z",
+    };
+    apiGet.mockImplementation(routeGet({ ...profile, relationships: [link] }));
+    const { result } = renderHook(() => useMemberProfilePresenter("nene"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.relationships).toEqual({
+      title: "Relationships",
+      rows: [{ id: "r1", label: "submissive of", name: "Tolu", avatarUrl: null, href: "/u/tolu" }],
+      empty: null,
+      manage: null,
+      link: { href: "/relationships?with=nene", label: "Link a relationship with Naughty Neze" },
+    });
+  });
+
+  it("offers Manage on your own profile, and says when there are none yet", async () => {
+    apiGet.mockImplementation(routeGet({ ...profile, isSelf: true, relationships: [] }));
+    const { result } = renderHook(() => useMemberProfilePresenter("nene"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.relationships).toMatchObject({
+      rows: [],
+      empty: "Link your D/s dynamics and relationships.",
+      manage: { href: "/relationships", label: "Manage" },
+      link: null,
+    });
+  });
+
+  it("shows no relationships on a friends-only profile you can't see, or the organization's", async () => {
+    apiGet.mockImplementation(routeGet({ ...profile, restricted: true }));
+    const restricted = renderHook(() => useMemberProfilePresenter("nene"));
+    await waitFor(() => expect(restricted.result.current.loading).toBe(false));
+    expect(restricted.result.current.relationships).toBeNull();
+
+    vi.stubEnv("NEXT_PUBLIC_KINKORD_OFFICIAL_USER_ID", "u2");
+    apiGet.mockImplementation(routeGet());
+    const org = renderHook(() => useMemberProfilePresenter("nene"));
+    await waitFor(() => expect(org.result.current.loading).toBe(false));
+    expect(org.result.current.relationships).toBeNull();
+  });
+
   it("has no Follow to hand out on your own profile", async () => {
     apiGet.mockImplementation(routeGet({ ...profile, isSelf: true }));
     const { result } = renderHook(() => useMemberProfilePresenter("nene"));
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.authorFollow).toBeNull();
+  });
+
+  it("presents an account the API calls an organization's as one", async () => {
+    apiGet.mockImplementation(routeGet({ ...profile, accountType: "organization" }));
+    const { result } = renderHook(() => useMemberProfilePresenter("nene"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.vm).toMatchObject({ accountType: "organization", locationParts: [] });
+    expect(result.current.relationships).toBeNull();
+    // Organizations have followers, not friends to be tagged as.
+    expect(result.current.tabs.map((t) => t.key)).not.toContain("tagged");
   });
 
   it("loads the profile, defaults to the About tab and formats presence", async () => {
@@ -243,7 +301,13 @@ describe("useMemberProfilePresenter", () => {
     });
     expect(result.current.presenceText).toBe("Last seen an hour ago");
     expect(result.current.tab).toBe("about");
-    expect(result.current.tabs.map((t) => t.label)).toEqual(["Posts", "About", "Media", "People"]);
+    expect(result.current.tabs.map((t) => t.label)).toEqual([
+      "Posts",
+      "Tagged",
+      "About",
+      "Media",
+      "People",
+    ]);
     expect(result.current.heroLabels).toMatchObject({ addToStory: "Add to story" });
     expect(result.current.activeTab).toBeUndefined();
     expect(result.current.status).toBeNull();

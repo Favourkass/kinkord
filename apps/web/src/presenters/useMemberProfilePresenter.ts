@@ -20,7 +20,10 @@ import {
   type PublicProfilePM,
 } from "@/domain/member";
 import { ApiError } from "@/services/apiClient";
-import { isOfficialOrganization } from "@/services/organization-placeholder.service";
+import { isOrganization } from "@/services/organizations.service";
+import { useOrganizations } from "./useOrganizations";
+import { RELATIONSHIPS_COPY } from "@/constants/relationships";
+import { toRelationshipRowVM, type RelationshipsCardVM } from "@/domain/relationship";
 import {
   decodeParam,
   isCountryAvailable,
@@ -43,9 +46,9 @@ const placeHref: PlaceHref = ({ country, state, city }) => {
   return Routes.membersRegion(country, state, city);
 };
 
-export type ProfileTabKey = "posts" | "about" | "media" | "people";
+export type ProfileTabKey = "posts" | "tagged" | "about" | "media" | "people";
 
-const TAB_KEYS: ProfileTabKey[] = ["posts", "about", "media", "people"];
+const TAB_KEYS: ProfileTabKey[] = ["posts", "tagged", "about", "media", "people"];
 const isTabKey = (v: string | null | undefined): v is ProfileTabKey =>
   TAB_KEYS.includes(v as ProfileTabKey);
 const PEOPLE_TABS: FriendsTab[] = ["all", "followers", "following", "suggested"];
@@ -102,6 +105,7 @@ export function useMemberProfilePresenter(
   usernameParam: string | null,
   initialTab?: string | null,
 ) {
+  const organizations = useOrganizations();
   const router = useRouter();
   const copy = MEMBERS_COPY.profile;
   const username = usernameParam ? decodeParam(usernameParam).replace(/^@/, "") : null;
@@ -123,7 +127,8 @@ export function useMemberProfilePresenter(
   // Only an outcome for the *current* username counts; anything else means "loading".
   const current = username && outcome?.username === username ? outcome : null;
   const pm = current?.pm ?? null;
-  const organization = isOfficialOrganization(pm?.userId);
+  const organization =
+    pm?.accountType === "organization" || isOrganization(pm?.userId, organizations);
   const peopleTabs: FriendsTab[] = organization ? ["followers", "following"] : PEOPLE_TABS;
   const resolvedPeopleTab: FriendsTab = peopleTabs.includes(peopleTab) ? peopleTab : "followers";
 
@@ -371,6 +376,22 @@ export function useMemberProfilePresenter(
     () => (pm ? toPublicProfileVM(pm, placeHref, new Date(), organization) : null),
     [pm, organization],
   );
+  // The organization has followers, not relationships; a friends-only profile withholds them.
+  const relationships = useMemo((): RelationshipsCardVM | null => {
+    if (!pm || organization || pm.restricted) return null;
+    const card = RELATIONSHIPS_COPY.card;
+    const rows = (pm.relationships ?? []).map((r) => toRelationshipRowVM(r, Routes.member));
+    return {
+      title: card.title,
+      rows,
+      empty: pm.isSelf && rows.length === 0 ? card.emptyOwn : null,
+      manage: pm.isSelf ? { href: Routes.relationships, label: card.manage } : null,
+      link:
+        !pm.isSelf && pm.username
+          ? { href: Routes.relationshipWith(pm.username), label: card.linkWith(pm.displayName) }
+          : null,
+    };
+  }, [pm, organization]);
   // The organization's VM carries no presence, so it shows none.
   const presenceText = vm
     ? vm.isOnline
@@ -380,10 +401,14 @@ export function useMemberProfilePresenter(
         : null
     : null;
 
-  const tabs = TAB_KEYS.map((key) => ({ key, label: copy.tabs[key] }));
+  // The organization has followers, not friends, so nobody tags it: no Tagged tab.
+  const tabs = TAB_KEYS.filter((key) => key !== "tagged" || !organization).map((key) => ({
+    key,
+    label: copy.tabs[key],
+  }));
 
   const toRow = (f: FriendPM): FriendRowVM => {
-    const rowOrganization = isOfficialOrganization(f.userId);
+    const rowOrganization = isOrganization(f.userId, organizations);
     return {
       userId: f.userId,
       username: f.username,
@@ -485,6 +510,7 @@ export function useMemberProfilePresenter(
     status: current?.notFound ? copy.notFound : (current?.error ?? null),
     loadingText: MEMBERS_COPY.common.loading,
     vm,
+    relationships,
     presenceText,
     activeTab: pm?.isSelf ? ("profile" as const) : undefined,
     nav: {

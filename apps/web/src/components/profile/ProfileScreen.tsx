@@ -8,6 +8,7 @@ import Toast, { type ToastProps } from "@/components/feed/Toast";
 import type { CoinBalanceVM } from "@/domain/kinkcoins";
 import type { PublicProfileVM } from "@/domain/member";
 import AboutTab, { type AboutLabels } from "./AboutTab";
+import type { RelationshipsCardVM } from "@/domain/relationship";
 import MediaTab, { type MediaTabProps } from "./MediaTab";
 import PeopleTab, { type PeopleTabProps } from "./PeopleTab";
 import PostsTab, { type PostsTabProps } from "./PostsTab";
@@ -45,6 +46,8 @@ export interface ProfileScreenProps {
   heroLabels: ProfileHeroLabels;
   sideLabels: ProfileSideCardLabels;
   aboutLabels: AboutLabels;
+  /** Linked relationships on the About tab; null where a profile shows none. */
+  relationships: RelationshipsCardVM | null;
   people: PeopleTabProps;
   posts: PostsTabProps;
   /** Comment sheet, delete confirm and photo lightbox for the Posts tab. */
@@ -120,9 +123,11 @@ export default function ProfileScreen(p: ProfileScreenProps) {
         {ready && p.vm ? (
           <>
             <ProfileTabs tabs={p.tabs} active={p.tab} onSelect={p.setTab} />
-            {p.tab === "about" && <AboutTab vm={p.vm} labels={p.aboutLabels} />}
+            {p.tab === "about" && (
+              <AboutTab vm={p.vm} labels={p.aboutLabels} relationships={p.relationships} />
+            )}
             {p.tab === "people" && <PeopleTab {...p.people} />}
-            {p.tab === "posts" && <PostsTab {...p.posts} />}
+            {(p.tab === "posts" || p.tab === "tagged") && <PostsTab {...p.posts} />}
             {p.tab === "media" && <MediaTab {...p.media} />}
           </>
         ) : (

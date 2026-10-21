@@ -24,6 +24,8 @@ const feedQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(30).optional(),
   /** The profile Posts tab: one member's posts, same visibility rules. */
   author: z.string().trim().min(1).max(64).optional(),
+  /** The profile Tagged tab: posts that tag one member, same visibility rules. */
+  tagged: z.string().trim().min(1).max(64).optional(),
   /** Search: posts whose text contains this, same visibility rules. */
   q: z
     .string()
@@ -67,9 +69,16 @@ export class PostsController {
       cursor: parsed.data.cursor,
       limit: parsed.data.limit,
       author: parsed.data.author,
+      tagged: parsed.data.tagged,
       q: parsed.data.q,
       tab: parsed.data.tab,
     });
+  }
+
+  /** Friends to tag in a new post, by name or username. Declared before ":id". */
+  @Get("tag-suggestions")
+  tagSuggestions(@Req() req: AuthedRequest, @Query("q") q?: string) {
+    return this.posts.tagSuggestions(req.user.id, typeof q === "string" ? q : "");
   }
 
   @HttpPost("upload-url")
@@ -88,6 +97,12 @@ export class PostsController {
     const parsed = createPostSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException(parsed.error.flatten().fieldErrors);
     return this.posts.create(req.user.id, parsed.data);
+  }
+
+  /** The tagged member takes their tag off; the post stays. */
+  @Delete(":id/tags/me")
+  removeTag(@Req() req: AuthedRequest, @Param("id") id: string) {
+    return this.posts.removeTag(req.user.id, parseId(id));
   }
 
   @Get(":id")

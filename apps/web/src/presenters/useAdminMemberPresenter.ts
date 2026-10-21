@@ -22,6 +22,8 @@ import { useAdminAccessPresenter } from "./useAdminAccessPresenter";
 export type AdminDialogKind =
   | "assignTeamBadge"
   | "removeTeamBadge"
+  | "makeOrganization"
+  | "removeOrganization"
   | "block"
   | "unblock"
   | "deletePosts"
@@ -84,6 +86,8 @@ export function useAdminMemberPresenter(id: string) {
   const [notice, setNotice] = useState<string | null>(null);
 
   const [dialog, setDialog] = useState<AdminDialogKind | null>(null);
+  /** The country picked for a new organization's account. */
+  const [orgCountry, setOrgCountry] = useState("");
   const [postId, setPostId] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [twoFactorCode, setTwoFactorCode] = useState("");
@@ -154,7 +158,11 @@ export function useAdminMemberPresenter(id: string) {
     setTwoFactorOff(false);
     const why = reason.trim() || null;
     try {
-      if (dialog === "assignTeamBadge" || dialog === "removeTeamBadge") {
+      if (dialog === "makeOrganization" || dialog === "removeOrganization") {
+        const making = dialog === "makeOrganization";
+        await moderationService.setOrganization(id, making, making ? orgCountry : null);
+        setNotice(making ? "Now an organization's account." : "Now a person's account again.");
+      } else if (dialog === "assignTeamBadge" || dialog === "removeTeamBadge") {
         await moderationService.setTeamBadge(id, dialog === "assignTeamBadge");
         setNotice(
           dialog === "assignTeamBadge"
@@ -199,7 +207,7 @@ export function useAdminMemberPresenter(id: string) {
     } finally {
       setBusy(false);
     }
-  }, [checked, copy.notices, dialog, id, postId, reason, router, twoFactorCode]);
+  }, [checked, copy.notices, dialog, id, orgCountry, postId, reason, router, twoFactorCode]);
 
   const dialogVM = useMemo((): AdminDialogVM | null => {
     if (!dialog || !vm) return null;
@@ -244,7 +252,11 @@ export function useAdminMemberPresenter(id: string) {
       confirmLabel: text.confirm,
       cancelLabel: copy.dialogs.cancel,
       destructive:
-        dialog !== "unblock" && dialog !== "reopenVerification" && dialog !== "assignTeamBadge",
+        dialog !== "unblock" &&
+        dialog !== "reopenVerification" &&
+        dialog !== "assignTeamBadge" &&
+        dialog !== "makeOrganization" &&
+        dialog !== "removeOrganization",
       reason: reasonField,
       code,
       checkbox,
@@ -302,6 +314,24 @@ export function useAdminMemberPresenter(id: string) {
     },
     backHref: Routes.moderation,
     teamBadgeLabels: copy.teamBadge,
+    organizationAccount: {
+      organization: Boolean(member?.organization),
+      countryName:
+        copy.organizationCountries.find((c) => c.value === member?.country)?.label ??
+        member?.country ??
+        null,
+      canChange: access.isFounder,
+      choices: copy.organizationCountries,
+      selected: orgCountry,
+      setSelected: setOrgCountry,
+      onToggle: () => {
+        if (!access.isFounder) return;
+        if (member?.organization) open("removeOrganization");
+        else if (orgCountry) open("makeOrganization");
+        else setNotice(copy.organizationAccount.needsCountry);
+      },
+      labels: copy.organizationAccount,
+    },
     /** Only the founders give or remove the Kinkord Team badge; other admins just see it. */
     canChangeTeamBadge: access.isFounder,
     onToggleTeamBadge: () => {

@@ -58,6 +58,13 @@ describe("getProfilePosts", () => {
     expect(props.posts.emptyText).toBe("No posts yet.");
   });
 
+  it("reads the Tagged tab the same way, saying when nobody has tagged the member", () => {
+    const removeTag = vi.fn();
+    const props = getProfilePosts(feed({ removeTag }), null, null, true);
+    expect(props.posts.emptyText).toBe("No tagged posts yet.");
+    expect(props.posts.onRemoveTag).toBe(removeTag);
+  });
+
   it("closes the overlays when nothing is selected", () => {
     const props = getProfilePosts(feed(), null);
     expect(props.postOverlays.comments.open).toBe(false);

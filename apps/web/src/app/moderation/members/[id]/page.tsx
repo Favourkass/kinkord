@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import ConfirmDialog from "@/components/moderation/ConfirmDialog";
 import MemberDetailView from "@/components/moderation/MemberDetailView";
 import MemberTeamBadge from "@/components/moderation/MemberTeamBadge";
+import MemberOrganization from "@/components/moderation/MemberOrganization";
 import MemberSilverCheck from "@/components/moderation/MemberSilverCheck";
 import ModerationFrame from "@/components/moderation/ModerationFrame";
 import { MODERATION_COPY } from "@/constants/moderation";
@@ -42,12 +43,15 @@ export default function ModerationMemberPage() {
         onDeletePost={p.onDeletePost}
         teamBadge={
           p.vm ? (
-            <MemberTeamBadge
-              assigned={Boolean(p.vm.teamMember)}
-              canChange={p.canChangeTeamBadge}
-              onToggle={p.onToggleTeamBadge}
-              labels={p.teamBadgeLabels}
-            />
+            <>
+              <MemberTeamBadge
+                assigned={Boolean(p.vm.teamMember)}
+                canChange={p.canChangeTeamBadge}
+                onToggle={p.onToggleTeamBadge}
+                labels={p.teamBadgeLabels}
+              />
+              <MemberOrganization {...p.organizationAccount} />
+            </>
           ) : null
         }
         silverCheck={

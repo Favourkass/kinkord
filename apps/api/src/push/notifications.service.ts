@@ -106,6 +106,9 @@ const REPEATS: Partial<
   repost: { key: (e) => `repost:${e.actorId}:${e.subjectId}`, on: "skip" },
   friend_request: { key: (e) => `friend_request:${e.actorId}:${dayOf(e)}`, on: "skip" },
   friend_accepted: { key: (e) => `friend_accepted:${e.subjectId}`, on: "skip" },
+  relationship_request: { key: (e) => `relationship_request:${e.subjectId}`, on: "skip" },
+  tag: { key: (e) => `tag:${e.subjectId}`, on: "skip" },
+  relationship_accepted: { key: (e) => `relationship_accepted:${e.subjectId}`, on: "skip" },
   follow: { key: (e) => `follow:${e.actorId}:${dayOf(e)}`, on: "skip" },
   message: { key: (e) => `message:${e.subjectId}`, on: "bump" },
   test: { key: () => "test", on: "bump" },
@@ -118,9 +121,12 @@ const SEARCH_WORDS: Record<NotificationType, readonly string[]> = {
   message: ["message", "messages", "chat"],
   friend_request: ["friend", "friends", "request", "requests"],
   friend_accepted: ["friend", "friends", "accepted"],
+  relationship_request: ["relationship", "relationships", "request", "requests", "link"],
+  relationship_accepted: ["relationship", "relationships", "accepted", "link"],
   follow: ["follow", "followed", "follower", "followers"],
   comment: ["comment", "commented", "comments"],
   mention: ["mention", "mentioned", "mentions"],
+  tag: ["tag", "tagged", "tags"],
   like: ["like", "liked", "likes"],
   repost: ["repost", "reposted", "reposts"],
   report: ["report", "reports", "moderation"],
@@ -147,7 +153,10 @@ export function notificationUrl(
       return subjectId ? `/messages/${subjectId}` : "/messages";
     case "friend_request":
       return "/friends/requests";
+    case "relationship_request":
+      return "/relationships";
     case "friend_accepted":
+    case "relationship_accepted":
     case "follow":
       return actorUsername ? `/u/${encodeURIComponent(actorUsername)}` : "/notifications";
     case "report":

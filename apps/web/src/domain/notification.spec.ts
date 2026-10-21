@@ -34,6 +34,9 @@ describe("notification presentation", () => {
     "payment_verified",
     "payment_rejected",
     "silver_check",
+    "relationship_request",
+    "relationship_accepted",
+    "tag",
   ])("maps %s into a labelled notification", (type) => {
     const vm = toNotificationVM({ ...item, type }, new Date(item.createdAt));
     expect(vm.category).toBeTruthy();
@@ -183,5 +186,25 @@ describe("countsAfterRead", () => {
       mention: 0,
     });
     expect(countsAfterRead(counts, "message")).toEqual({ ...counts, all: 4 });
+  });
+});
+
+describe("relationship notifications", () => {
+  it("never say which relationship, only who", () => {
+    const at = new Date("2026-10-21T10:00:00Z");
+    const base = {
+      id: "n1",
+      actor: { name: "Ada", username: "ada", avatarUrl: null },
+      url: "/relationships",
+      count: 1,
+      createdAt: at.toISOString(),
+      readAt: null,
+    };
+    expect(toNotificationVM({ ...base, type: "relationship_request" }, at).action).toBe(
+      "wants to link a relationship with you.",
+    );
+    expect(toNotificationVM({ ...base, type: "relationship_accepted" }, at).action).toBe(
+      "accepted your relationship request.",
+    );
   });
 });
