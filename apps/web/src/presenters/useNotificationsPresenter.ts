@@ -18,7 +18,8 @@ import {
   mergeNotifications,
   notificationsApi,
 } from "@/services/notifications.service";
-import { isOfficialOrganization } from "@/services/organization-placeholder.service";
+import { isOrganization } from "@/services/organizations.service";
+import { useOrganizations } from "./useOrganizations";
 import { useRealtime } from "./useRealtime";
 
 /** Backstop refreshes: rare while live events arrive, more often while they can't. */
@@ -28,6 +29,7 @@ export const INBOX_FALLBACK_POLL_MS = 5 * 60_000;
 export const SEARCH_DEBOUNCE_MS = 300;
 
 export function useNotificationsPresenter(ready: boolean, openId: string | null = null) {
+  const organizations = useOrganizations();
   const router = useRouter();
   const [tabCounts, setTabCounts] = useState({ all: 0, comment: 0, mention: 0 });
   const [tab, setTab] = useState<NotificationTab>("all");
@@ -326,10 +328,10 @@ export function useNotificationsPresenter(ready: boolean, openId: string | null 
         ? items
             .filter((item) => !unreadOnly || item.readAt === null)
             .map((item) =>
-              toNotificationVM(item, new Date(), isOfficialOrganization(item.actor?.userId)),
+              toNotificationVM(item, new Date(), isOrganization(item.actor?.userId, organizations)),
             )
         : [],
-    [items, loadedFor, unreadOnly, filterKey],
+    [items, loadedFor, unreadOnly, filterKey, organizations],
   );
 
   return {

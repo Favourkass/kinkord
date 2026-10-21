@@ -292,7 +292,34 @@ export const MODERATION_COPY = {
     remove: "Remove team badge",
     foundersOnly: "Only the founders can give or remove this badge.",
   },
+  organizationAccount: {
+    title: "Organization account",
+    body: "For an organization, not a person: a yellow name and username, a square photo, and nothing individual (no age, location, roles or interests). About me reads About us. Its public posts open For You for every member in its country for 48 hours, with a Follow button. Founders only.",
+    person: "A person's account",
+    organization: (country: string) => `Organization in ${country}`,
+    country: "Country it speaks for",
+    choose: "Choose…",
+    make: "Make organization",
+    remove: "Make a person's account",
+    foundersOnly: "Only the founders can make an account an organization's.",
+    needsCountry: "Choose the organization's country first.",
+  },
+  /** The countries Kinkord serves, as the API's AVAILABLE_COUNTRIES. */
+  organizationCountries: [
+    { value: "NG", label: "Nigeria" },
+    { value: "KE", label: "Kenya" },
+  ],
   dialogs: {
+    makeOrganization: {
+      title: "Make this an organization's account?",
+      body: "It shows as an organization straight away, and its public posts start opening For You in its country. Its posts, followers and sign-in stay as they are.",
+      confirm: "Make organization",
+    },
+    removeOrganization: {
+      title: "Make this a person's account again?",
+      body: "It shows as a person again and stops opening For You. Nothing else changes.",
+      confirm: "Make a person's account",
+    },
     assignTeamBadge: {
       title: "Assign Kinkord Team badge?",
       body: "This badge tells members this person is part of the Kinkord team. It grants no admin access or paid benefits.",

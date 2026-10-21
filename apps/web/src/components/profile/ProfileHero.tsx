@@ -117,7 +117,9 @@ export default function ProfileHero({
 
       <div className="flex flex-col items-center gap-[10px] px-[16px] pb-[16px]">
         <p className="flex items-baseline gap-[6px]">
-          <span className="inline-flex items-center gap-[4px] text-[22px] font-bold leading-[27px] text-pf-text">
+          <span
+            className={`inline-flex items-center gap-[4px] text-[22px] font-bold leading-[27px] ${organization ? "text-kink-gold-bright" : "text-pf-text"}`}
+          >
             {vm.displayName}
             {vm.teamMember ? <TeamBadge size={18} /> : null}
 
@@ -131,7 +133,11 @@ export default function ProfileHero({
             ) : null}
           </span>
           {vm.handle && (
-            <span className="text-[16px] leading-[19px] text-pf-muted">· {vm.handle}</span>
+            <span
+              className={`text-[16px] leading-[19px] ${organization ? "text-kink-gold-bright" : "text-pf-muted"}`}
+            >
+              · {vm.handle}
+            </span>
           )}
         </p>
         {vm.verification.level === "identity" ? (

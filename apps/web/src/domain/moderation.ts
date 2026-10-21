@@ -22,6 +22,9 @@ export interface AdminMemberPM {
   banned: boolean;
   admin: boolean;
   teamMember?: boolean;
+  /** An organization's account, tied to `country`; absent from an older API. */
+  organization?: boolean;
+  country?: string | null;
 }
 
 export interface AdminPostPM {

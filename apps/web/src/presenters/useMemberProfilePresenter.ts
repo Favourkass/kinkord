@@ -20,7 +20,8 @@ import {
   type PublicProfilePM,
 } from "@/domain/member";
 import { ApiError } from "@/services/apiClient";
-import { isOfficialOrganization } from "@/services/organization-placeholder.service";
+import { isOrganization } from "@/services/organizations.service";
+import { useOrganizations } from "./useOrganizations";
 import { RELATIONSHIPS_COPY } from "@/constants/relationships";
 import { toRelationshipRowVM, type RelationshipsCardVM } from "@/domain/relationship";
 import {
@@ -104,6 +105,7 @@ export function useMemberProfilePresenter(
   usernameParam: string | null,
   initialTab?: string | null,
 ) {
+  const organizations = useOrganizations();
   const router = useRouter();
   const copy = MEMBERS_COPY.profile;
   const username = usernameParam ? decodeParam(usernameParam).replace(/^@/, "") : null;
@@ -125,7 +127,8 @@ export function useMemberProfilePresenter(
   // Only an outcome for the *current* username counts; anything else means "loading".
   const current = username && outcome?.username === username ? outcome : null;
   const pm = current?.pm ?? null;
-  const organization = isOfficialOrganization(pm?.userId);
+  const organization =
+    pm?.accountType === "organization" || isOrganization(pm?.userId, organizations);
   const peopleTabs: FriendsTab[] = organization ? ["followers", "following"] : PEOPLE_TABS;
   const resolvedPeopleTab: FriendsTab = peopleTabs.includes(peopleTab) ? peopleTab : "followers";
 
@@ -405,7 +408,7 @@ export function useMemberProfilePresenter(
   }));
 
   const toRow = (f: FriendPM): FriendRowVM => {
-    const rowOrganization = isOfficialOrganization(f.userId);
+    const rowOrganization = isOrganization(f.userId, organizations);
     return {
       userId: f.userId,
       username: f.username,

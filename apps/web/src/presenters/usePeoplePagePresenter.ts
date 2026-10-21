@@ -13,7 +13,8 @@ import {
   type PublicProfilePM,
 } from "@/domain/member";
 import { ApiError } from "@/services/apiClient";
-import { isOfficialOrganization } from "@/services/organization-placeholder.service";
+import { isOrganization } from "@/services/organizations.service";
+import { useOrganizations } from "./useOrganizations";
 import {
   decodeParam,
   hasMore,
@@ -49,6 +50,7 @@ interface PageOutcome {
 
 /** People "See more" page (Figma 1322:25 → 1528:274): the full list with infinite scroll. */
 export function usePeoplePagePresenter(usernameParam: string, tabParam?: string | null) {
+  const organizations = useOrganizations();
   const router = useRouter();
   const copy = MEMBERS_COPY.profile.people;
   const username = decodeParam(usernameParam).replace(/^@/, "");
@@ -62,7 +64,8 @@ export function usePeoplePagePresenter(usernameParam: string, tabParam?: string 
   const [fatal, setFatal] = useState<string | null>(null);
 
   const pm = profile?.username === username ? profile.pm : null;
-  const organization = isOfficialOrganization(pm?.userId);
+  const organization =
+    pm?.accountType === "organization" || isOrganization(pm?.userId, organizations);
   const availableTabs = useMemo<FriendsTab[]>(
     () => (organization ? ["followers", "following"] : TABS),
     [organization],
@@ -187,7 +190,7 @@ export function usePeoplePagePresenter(usernameParam: string, tabParam?: string 
             : copy.tabs.suggested;
 
   const rows = (current?.items ?? []).map((f) => {
-    const rowOrganization = isOfficialOrganization(f.userId);
+    const rowOrganization = isOrganization(f.userId, organizations);
     return {
       userId: f.userId,
       username: f.username,

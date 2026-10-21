@@ -278,6 +278,16 @@ describe("useMemberProfilePresenter", () => {
     expect(result.current.authorFollow).toBeNull();
   });
 
+  it("presents an account the API calls an organization's as one", async () => {
+    apiGet.mockImplementation(routeGet({ ...profile, accountType: "organization" }));
+    const { result } = renderHook(() => useMemberProfilePresenter("nene"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.vm).toMatchObject({ accountType: "organization", locationParts: [] });
+    expect(result.current.relationships).toBeNull();
+    // Organizations have followers, not friends to be tagged as.
+    expect(result.current.tabs.map((t) => t.key)).not.toContain("tagged");
+  });
+
   it("loads the profile, defaults to the About tab and formats presence", async () => {
     const { result } = renderHook(() => useMemberProfilePresenter("%40Nene"));
     await waitFor(() => expect(result.current.loading).toBe(false));

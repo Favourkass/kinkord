@@ -12,7 +12,8 @@ import {
   type RegionRowVM,
 } from "@/domain/member";
 import { ApiError } from "@/services/apiClient";
-import { isOfficialOrganization } from "@/services/organization-placeholder.service";
+import { isOrganization } from "@/services/organizations.service";
+import { useOrganizations } from "./useOrganizations";
 import {
   decodeParam,
   hasMore,
@@ -57,6 +58,7 @@ export function useMembersRegionPresenter(
   /** From `?region=` — a profile's city links straight to its own area. */
   initialRegion?: string | null,
 ) {
+  const organizations = useOrganizations();
   const router = useRouter();
   const copy = MEMBERS_COPY.region;
   const country = countryParam.toUpperCase();
@@ -214,7 +216,7 @@ export function useMembersRegionPresenter(
   const rows = useMemo<RegionRowVM[]>(
     () =>
       items.map((pm) => {
-        const card = toMemberCardVM(pm, isOfficialOrganization(pm.userId));
+        const card = toMemberCardVM(pm, isOrganization(pm.userId, organizations));
         return {
           card,
           href: Routes.member(pm.username ?? pm.userId),
@@ -222,7 +224,7 @@ export function useMembersRegionPresenter(
           busy: busy.has(pm.userId),
         };
       }),
-    [items, busy, copy],
+    [items, busy, copy, organizations],
   );
 
   const placeName = countryMode ? (countryName(country) ?? country) : displayState(state, country);

@@ -24,6 +24,13 @@ export const moderationService = {
   setTeamBadge: (id: string, enabled: boolean) =>
     api.post<{ teamMember: boolean }>(`${member(id)}/team-badge`, { enabled }),
 
+  /** Founders only: an organization's account tied to `country`, or a person's again. */
+  setOrganization: (id: string, enabled: boolean, country: string | null) =>
+    api.post<{ organization: boolean; country: string | null }>(`${member(id)}/organization`, {
+      enabled,
+      ...(enabled ? { country } : {}),
+    }),
+
   access: () => api.get<{ isAdmin: boolean; isFounder?: boolean }>("/admin/access"),
 
   search: (query: string) =>

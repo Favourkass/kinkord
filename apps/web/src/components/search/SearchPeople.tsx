@@ -46,7 +46,9 @@ function PersonSummary({
       />
       <span className="min-w-0">
         <span className="flex min-w-0 items-center gap-[4px] text-[15px] font-bold text-feed-text">
-          <span className="truncate">{r.name}</span>
+          <span className={`truncate ${r.organization ? "text-kink-gold-bright" : ""}`}>
+            {r.name}
+          </span>
           {r.teamMember ? <TeamBadge size={18} /> : null}
 
           {r.organization ? (
@@ -59,7 +61,9 @@ function PersonSummary({
           ) : null}
         </span>
         {r.handle || r.details ? (
-          <span className="block truncate text-[13px] text-feed-muted">
+          <span
+            className={`block truncate text-[13px] ${r.organization ? "text-kink-gold-bright" : "text-feed-muted"}`}
+          >
             {[r.handle, r.details].filter(Boolean).join(" · ")}
           </span>
         ) : null}

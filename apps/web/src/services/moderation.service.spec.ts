@@ -99,3 +99,12 @@ it("gives an admin Silver, or takes the founders' gift back", async () => {
     ["/admin/staff/u%2F7/silver", { enabled: false }],
   ]);
 });
+
+it("makes an organization's account for its country, or a person's again", async () => {
+  await moderationService.setOrganization("u/9", true, "NG");
+  await moderationService.setOrganization("u/9", false, "NG");
+  expect(post.mock.calls.slice(-2)).toEqual([
+    ["/admin/members/u%2F9/organization", { enabled: true, country: "NG" }],
+    ["/admin/members/u%2F9/organization", { enabled: false }],
+  ]);
+});

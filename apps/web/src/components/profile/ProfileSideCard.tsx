@@ -113,7 +113,9 @@ export default function ProfileSideCard({
       <div className="flex flex-col gap-[16px] px-[24px] pb-[24px]">
         <div className="flex flex-col gap-[4px]">
           <p className="flex items-baseline gap-[6px]">
-            <span className="inline-flex items-center gap-[4px] text-[22px] font-bold leading-[27px] text-pf-text">
+            <span
+              className={`inline-flex items-center gap-[4px] text-[22px] font-bold leading-[27px] ${organization ? "text-kink-gold-bright" : "text-pf-text"}`}
+            >
               {vm.displayName}
               {vm.teamMember ? <TeamBadge size={18} /> : null}
 
@@ -127,7 +129,11 @@ export default function ProfileSideCard({
               ) : null}
             </span>
             {vm.handle && (
-              <span className="text-[15px] leading-[18px] text-pf-muted">{vm.handle}</span>
+              <span
+                className={`text-[15px] leading-[18px] ${organization ? "text-kink-gold-bright" : "text-pf-muted"}`}
+              >
+                {vm.handle}
+              </span>
             )}
           </p>
           {vm.verification.level === "identity" ? (
