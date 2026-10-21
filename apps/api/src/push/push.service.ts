@@ -193,6 +193,40 @@ export class PushService {
     });
   }
 
+  /**
+   * A relationship request, and its acceptance. Discreet like every push: who,
+   * never which relationship, since a lock screen can be seen by anyone.
+   */
+  relationshipRequest(requesterId: string, recipientId: string, linkId: string): void {
+    this.relationshipActivity("relationship_request", requesterId, recipientId, linkId);
+  }
+
+  relationshipAccepted(acceptorId: string, requesterId: string, linkId: string): void {
+    this.relationshipActivity("relationship_accepted", acceptorId, requesterId, linkId);
+  }
+
+  private relationshipActivity(
+    type: "relationship_request" | "relationship_accepted",
+    actorId: string,
+    recipientId: string,
+    linkId: string,
+  ): void {
+    if (actorId === recipientId) return;
+    this.notify(async () => {
+      const who = await this.member(actorId);
+      return {
+        to: recipientId,
+        event: { type, actorId, subjectId: linkId },
+        message: {
+          title: "Kinkord",
+          body: `${who.name} ${type === "relationship_request" ? "wants to link a relationship with you" : "accepted your relationship request"}`,
+          url: notificationUrl(type, linkId, who.username),
+          tag: `${type}-${linkId}`,
+        },
+      };
+    });
+  }
+
   newFollower(followerId: string, followedId: string): void {
     if (followerId === followedId) return;
     this.notify(async () => {

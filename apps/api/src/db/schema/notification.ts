@@ -5,6 +5,9 @@ export type NotificationType =
   | "message"
   | "friend_request"
   | "friend_accepted"
+  // Someone asked to link a relationship with the member, or accepted their ask.
+  | "relationship_request"
+  | "relationship_accepted"
   | "follow"
   | "comment"
   | "mention"
