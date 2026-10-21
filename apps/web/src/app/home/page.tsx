@@ -54,6 +54,7 @@ export default function HomePage() {
       giftDialog={feed.giftDialog}
       onOpenMedia={feed.openMedia}
       onTogglePostAuthorFollow={feed.toggleFollow}
+      onRemoveTag={feed.removeTag}
       hasMore={feed.hasMore}
       loadingMore={feed.loadingMore}
       onLoadMore={feed.loadMore}
@@ -74,6 +75,7 @@ export default function HomePage() {
         editor: feed.editor,
         onDraftChange: feed.setDraft,
         mentions: feed.postMentions,
+        tags: { picker: feed.tagFriends, labels: FEED_COPY.tagFriends },
         maxLength: postBodyMax(home.silver),
         visibility: feed.visibility,
         visibilities: FEED_VISIBILITIES,

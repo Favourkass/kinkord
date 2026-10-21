@@ -57,6 +57,32 @@ export interface PostPM {
   mine: boolean;
   /** Each @handle in the body that names a member, and whom. Absent from an older API. */
   mentions?: MentionPM[];
+  /** The author's friends tagged in the post. Absent from an older API. */
+  tagged?: TaggedMemberPM[];
+  /** The viewer is tagged, so the post offers to take the tag off. */
+  taggedMe?: boolean;
+}
+
+/** Someone tagged in a post. */
+export interface TaggedMemberPM {
+  userId: string;
+  username: string | null;
+  displayName: string;
+}
+
+/** A friend the composer offers to tag. */
+export interface TagSuggestionPM extends TaggedMemberPM {
+  avatarUrl: string | null;
+}
+
+/** The most people one post tags; the API says the same. */
+export const POST_TAGS_MAX = 10;
+
+/** DELETE /posts/:id/tags/me: who the post still tags. */
+export interface TagsLeftPM {
+  postId: string;
+  tagged: TaggedMemberPM[];
+  taggedMe: false;
 }
 
 /** The home feed's tabs, as the API names them. */
@@ -210,6 +236,10 @@ export interface PostVM {
   mine: boolean;
   /** Friends-only posts say so, so nobody is surprised by who can read them. */
   visibilityNote: string | null;
+  /** Who the post tags, each out to their profile. */
+  tagged: { userId: string; name: string; href: string | null }[];
+  /** The viewer is tagged, so the menu offers to take the tag off. */
+  taggedMe: boolean;
 }
 
 /** A photo in the composer: local preview first, S3 key once it has landed. */
@@ -389,6 +419,12 @@ export function toPostVM(
     savedByMe: pm.savedByMe,
     mine: pm.mine,
     visibilityNote: pm.visibility === "friends" ? "Friends only" : null,
+    tagged: (pm.tagged ?? []).map((t) => ({
+      userId: t.userId,
+      name: t.displayName,
+      href: hrefFor(t.username),
+    })),
+    taggedMe: Boolean(pm.taggedMe),
   };
 }
 

@@ -16,11 +16,19 @@ export default function MemberProfilePage() {
   const nav = getAppShellNav();
   const vm = useMemberProfilePresenter(params.username, search.get("tab"));
   const feed = useFeedPresenter({ author: params.username });
+  // The Tagged tab's posts, read while that tab is open.
+  const showTagged = vm.tab === "tagged";
+  const taggedFeed = useFeedPresenter({ tagged: params.username, ready: showTagged });
 
   return (
     <ProfileScreen
       {...vm}
-      {...getProfilePosts(feed, shell.avatarUrl, vm.authorFollow)}
+      {...getProfilePosts(
+        showTagged ? taggedFeed : feed,
+        shell.avatarUrl,
+        vm.authorFollow,
+        showTagged,
+      )}
       viewerAvatarUrl={shell.avatarUrl}
       notificationsUnread={shell.notificationsUnread}
       notificationsCount={shell.notificationsCount}

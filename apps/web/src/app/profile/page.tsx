@@ -17,11 +17,17 @@ function OwnProfile() {
   // Your handle is resolved from the API first, so nothing loads until it is
   // known — otherwise the first render would fetch the home feed instead.
   const feed = useFeedPresenter({ author: vm.username, ready: Boolean(vm.username) });
+  // The Tagged tab's posts, read while that tab is open.
+  const showTagged = vm.tab === "tagged";
+  const taggedFeed = useFeedPresenter({
+    tagged: vm.username,
+    ready: showTagged && Boolean(vm.username),
+  });
 
   return (
     <ProfileScreen
       {...vm}
-      {...getProfilePosts(feed, shell.avatarUrl)}
+      {...getProfilePosts(showTagged ? taggedFeed : feed, shell.avatarUrl, null, showTagged)}
       viewerAvatarUrl={shell.avatarUrl}
       notificationsUnread={shell.notificationsUnread}
       notificationsCount={shell.notificationsCount}

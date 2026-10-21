@@ -127,7 +127,7 @@ export default function ProfileScreen(p: ProfileScreenProps) {
               <AboutTab vm={p.vm} labels={p.aboutLabels} relationships={p.relationships} />
             )}
             {p.tab === "people" && <PeopleTab {...p.people} />}
-            {p.tab === "posts" && <PostsTab {...p.posts} />}
+            {(p.tab === "posts" || p.tab === "tagged") && <PostsTab {...p.posts} />}
             {p.tab === "media" && <MediaTab {...p.media} />}
           </>
         ) : (

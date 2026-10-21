@@ -64,7 +64,9 @@ import {
   withCommentDelta,
   withSuggestionFollow,
   withSuggestionRestored,
+  withTagsLeft,
 } from "@/services/posts.service";
+import { useTagPicker } from "./useTagPicker";
 
 /** Profile link for an author; null for a member who has no username yet. */
 const memberHref = (username: string | null) => (username ? Routes.member(username) : null);
@@ -108,6 +110,8 @@ export interface FeedOptions {
    * stranger browsing the profile exactly as it does in the feed.
    */
   author?: string | null;
+  /** Show only the posts that tag this member — the profile Tagged tab. */
+  tagged?: string | null;
   /** One post on its own — the permalink page. */
   postId?: string | null;
   /** The viewer's saved posts instead of the feed. */
@@ -137,6 +141,7 @@ export interface FeedOptions {
  */
 export function useFeedPresenter({
   author = null,
+  tagged = null,
   postId = null,
   saved = false,
   search = null,
@@ -148,7 +153,7 @@ export function useFeedPresenter({
   // The home feed's tab: the one picked here, else the one this browser
   // session last showed. Read on the client only, and the feed waits for it,
   // so a remembered Following never loads For You first.
-  const home = !author && !postId && !saved && !search;
+  const home = !author && !tagged && !postId && !saved && !search;
   const rememberedTab = useSyncExternalStore(
     noOutsideChanges,
     feedTabMemory.read,
@@ -162,7 +167,7 @@ export function useFeedPresenter({
   const [cursor, setCursor] = useState<string | null>(null);
   /** Why the list may be empty, as its first page said. */
   const [hint, setHint] = useState<FeedHint | null>(null);
-  const surface = `${postId ?? ""}|${author ?? ""}|${saved}|${search ?? ""}|${tab ?? ""}`;
+  const surface = `${postId ?? ""}|${author ?? ""}|${tagged ?? ""}|${saved}|${search ?? ""}|${tab ?? ""}`;
   /**
    * Each first page starts a round of the list: another list, the same list
    * switched off and on again (a search cleared and typed again), or one gone
@@ -200,6 +205,8 @@ export function useFeedPresenter({
   const [photos, setPhotos] = useState<DraftPhoto[]>([]);
   const [posting, setPosting] = useState(false);
   const [composerError, setComposerError] = useState<string | null>(null);
+  const tagPicker = useTagPicker(composerOpen);
+  const resetTags = tagPicker.reset;
 
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
   const [comments, setComments] = useState<CommentPM[]>([]);
@@ -297,9 +304,10 @@ export function useFeedPresenter({
       if (postId) return { items: [await postsApi.byId(postId)], nextCursor: null };
       if (saved) return postsApi.saved(cursor);
       if (tab) return postsApi.feed(cursor, undefined, null, null, tab);
+      if (tagged) return postsApi.feed(cursor, undefined, null, null, null, tagged);
       return postsApi.feed(cursor, undefined, author, search);
     },
-    [author, postId, saved, search, tab],
+    [author, tagged, postId, saved, search, tab],
   );
 
   const onUnauthorized = useCallback(
@@ -342,7 +350,7 @@ export function useFeedPresenter({
 
   useEffect(() => {
     // Only the home feed carries the suggestions strip.
-    if (author || postId || saved || search || !ready) return;
+    if (author || tagged || postId || saved || search || !ready) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -360,7 +368,7 @@ export function useFeedPresenter({
     return () => {
       cancelled = true;
     };
-  }, [author, postId, saved, search, ready, suggestionsAsked]);
+  }, [author, tagged, postId, saved, search, ready, suggestionsAsked]);
 
   // Revoke every preview on unmount so a long session doesn't leak blobs.
   useEffect(
@@ -445,7 +453,8 @@ export function useFeedPresenter({
     setVisibility("public");
     setComposerError(null);
     discardPhotos();
-  }, [discardPhotos, closeMention]);
+    resetTags();
+  }, [discardPhotos, closeMention, resetTags]);
 
   const addPhotos = useCallback(
     (files: File[]) => {
@@ -514,6 +523,7 @@ export function useFeedPresenter({
         body: draft,
         visibility,
         mediaKeys: ready.map((p) => p.key as string),
+        tags: tagPicker.usernames,
       });
       setPosts((prev) => [created, ...prev]);
       closeComposer();
@@ -525,7 +535,21 @@ export function useFeedPresenter({
     } finally {
       setPosting(false);
     }
-  }, [draft, photos, posting, visibility, closeComposer, onUnauthorized]);
+  }, [draft, photos, posting, visibility, tagPicker.usernames, closeComposer, onUnauthorized]);
+
+  /** The viewer takes their tag off a post: every row showing it updates at once. */
+  const removeTag = useCallback(
+    async (postId: string) => {
+      setMenuFor(null);
+      try {
+        const left = await postsApi.removeTag(postId);
+        setPosts((prev) => prev.map((p) => withTagsLeft(p, left)));
+      } catch (e) {
+        onUnauthorized(e);
+      }
+    },
+    [onUnauthorized],
+  );
 
   // ---- reactions --------------------------------------------------------
 
@@ -1195,6 +1219,8 @@ export function useFeedPresenter({
     composerError,
     canPost: canSubmitPost(draft, photos.filter((p) => p.key).length) && !posting,
     submitPost,
+    tagFriends: tagPicker.vm,
+    removeTag,
 
     toggleLike,
     toggleRepost,

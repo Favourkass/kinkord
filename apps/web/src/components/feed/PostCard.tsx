@@ -21,6 +21,9 @@ export interface PostCardProps {
     verifiedOrganization: string;
     follow: string;
     following: string;
+    /** "with", before who the post tags. */
+    with: string;
+    removeTag: string;
   };
   /** Open when this card's overflow menu is showing. */
   menuOpen: boolean;
@@ -36,6 +39,8 @@ export interface PostCardProps {
   onGift: (currency?: "coin" | "star" | "crown") => void;
   onToggleAuthorFollow: (userId: string) => void;
   onOpenMedia: (media: PostMediaVM) => void;
+  /** The viewer takes their tag off; absent where a list can't. */
+  onRemoveTag?: () => void;
 }
 
 /**
@@ -58,6 +63,7 @@ export default function PostCard({
   onShare,
   onGift,
   onToggleAuthorFollow,
+  onRemoveTag,
   onOpenMedia,
 }: PostCardProps) {
   const name = (
@@ -110,6 +116,23 @@ export default function PostCard({
             {post.time}
             {post.visibilityNote && <span>· {post.visibilityNote}</span>}
           </p>
+          {post.tagged.length > 0 && (
+            <p className="pt-[2px] text-[12px] leading-[15px] text-feed-muted">
+              {labels.with}{" "}
+              {post.tagged.map((t, i) => (
+                <span key={t.userId}>
+                  {i > 0 ? ", " : null}
+                  {t.href ? (
+                    <Link href={t.href} className="font-semibold text-feed-text hover:underline">
+                      {t.name}
+                    </Link>
+                  ) : (
+                    <span className="font-semibold text-feed-text">{t.name}</span>
+                  )}
+                </span>
+              ))}
+            </p>
+          )}
         </div>
         {post.canFollowAuthor ? (
           <button
@@ -160,6 +183,18 @@ export default function PostCard({
               >
                 {post.savedByMe ? labels.unsave : labels.save}
               </button>
+              {post.taggedMe && onRemoveTag && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onCloseMenu();
+                    onRemoveTag();
+                  }}
+                  className="block w-full px-[14px] py-[10px] text-left text-[13px] font-medium text-feed-text"
+                >
+                  {labels.removeTag}
+                </button>
+              )}
               {post.mine && (
                 <button
                   type="button"

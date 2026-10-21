@@ -45,9 +45,9 @@ const placeHref: PlaceHref = ({ country, state, city }) => {
   return Routes.membersRegion(country, state, city);
 };
 
-export type ProfileTabKey = "posts" | "about" | "media" | "people";
+export type ProfileTabKey = "posts" | "tagged" | "about" | "media" | "people";
 
-const TAB_KEYS: ProfileTabKey[] = ["posts", "about", "media", "people"];
+const TAB_KEYS: ProfileTabKey[] = ["posts", "tagged", "about", "media", "people"];
 const isTabKey = (v: string | null | undefined): v is ProfileTabKey =>
   TAB_KEYS.includes(v as ProfileTabKey);
 const PEOPLE_TABS: FriendsTab[] = ["all", "followers", "following", "suggested"];
@@ -398,7 +398,11 @@ export function useMemberProfilePresenter(
         : null
     : null;
 
-  const tabs = TAB_KEYS.map((key) => ({ key, label: copy.tabs[key] }));
+  // The organization has followers, not friends, so nobody tags it: no Tagged tab.
+  const tabs = TAB_KEYS.filter((key) => key !== "tagged" || !organization).map((key) => ({
+    key,
+    label: copy.tabs[key],
+  }));
 
   const toRow = (f: FriendPM): FriendRowVM => {
     const rowOrganization = isOfficialOrganization(f.userId);
