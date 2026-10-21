@@ -104,6 +104,14 @@ describe("RelationshipsService.request", () => {
     );
   });
 
+  it("never links an organization's account", async () => {
+    const { service, calls } = make([[{ id: "org", accountType: "organization" }]]);
+    await expect(service.request("u1", "kinkord", "partner")).rejects.toThrow(
+      "Relationships link people, not organizations.",
+    );
+    expect(calls.some((c) => c.op === "insert")).toBe(false);
+  });
+
   it(`stops at ${MAX_PENDING_REQUESTS} requests waiting`, async () => {
     const { service, push } = make([[{ id: "u2" }], [{ n: MAX_PENDING_REQUESTS }]]);
     const refused = service.request("u1", "tolu", "dominant");

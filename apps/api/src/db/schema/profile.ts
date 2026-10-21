@@ -8,6 +8,13 @@ export interface SocialLinks {
 }
 
 /**
+ * "organization": an account that speaks for an organization rather than a
+ * person (founder, 2026-10-21). Set by the founders only, tied to `country`,
+ * and shown with nothing individual: no age, place, roles or interests.
+ */
+export type AccountType = "person" | "organization";
+
+/**
  * Public persona — deliberately separate from the auth `user` (legal identity).
  * Pseudonymity is a product feature: nothing here needs to match KYC data.
  */
@@ -18,6 +25,8 @@ export const profile = pgTable("profile", {
   displayName: text("display_name").notNull(),
   /** Public team identity, assigned only by an admin; grants no permissions. */
   teamMember: boolean("team_member").notNull().default(false),
+  /** A person, or an organization the founders made it; see AccountType. */
+  accountType: text("account_type").$type<AccountType>().notNull().default("person"),
   bio: text("bio"),
   pronouns: text("pronouns"),
   /** ISO 3166-1 alpha-2, from the country-selection onboarding step. */

@@ -23,6 +23,7 @@ function make() {
     addAdmin: vi.fn(async () => ({ id: "u7" })),
     removeAdmin: vi.fn(async () => ({ removed: "u7" })),
     setAdminSilver: vi.fn(async () => ({ id: "u7", silver: "given" })),
+    setOrganization: vi.fn(async () => ({ organization: true, country: "NG" })),
   };
   const reports = {
     list: vi.fn(async () => []),
@@ -192,5 +193,31 @@ describe("given Silver admin boundary", () => {
     expect(
       Reflect.getMetadata(GUARDS_METADATA, ModerationController.prototype.adminSilver),
     ).toContain(AdminGuard);
+  });
+});
+
+describe("organization accounts admin boundary", () => {
+  it("lets only the founders make an account an organization's", () => {
+    const { controller, service } = make();
+    expect(() => controller.organization(teammate, "u9", { enabled: true, country: "NG" })).toThrow(
+      "Only the founders can make an account an organization's.",
+    );
+    expect(service.setOrganization).not.toHaveBeenCalled();
+  });
+
+  it("reads the country however it's cased, and nothing else", async () => {
+    const { controller, service } = make();
+    await controller.organization(req, "u9", { enabled: true, country: " ng " });
+    await controller.organization(req, "u9", { enabled: false });
+    expect(service.setOrganization.mock.calls).toEqual([
+      ["u1", "u9", true, "NG"],
+      ["u1", "u9", false, null],
+    ]);
+    for (const body of [
+      { enabled: "yes" },
+      { enabled: true, country: "Nigeria" },
+      { enabled: true, role: "x" },
+    ])
+      expect(() => controller.organization(req, "u9", body)).toThrow(BadRequestException);
   });
 });

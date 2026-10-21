@@ -44,6 +44,9 @@ describe("taggableIds", () => {
     expect(sql).toContain('"member_ban"');
     expect(sql).toContain('"member_block"');
     expect(sql).toContain('"user"."id" <>');
+    // An organization's account is never tagged.
+    expect(sql).toContain('"profile"."account_type" =');
+    expect(params).toContain("person");
   });
 
   it("refuses the post when any tag isn't a friend, rather than quietly dropping it", async () => {

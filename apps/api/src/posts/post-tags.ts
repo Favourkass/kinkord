@@ -40,10 +40,13 @@ export async function taggableIds(
   const rows = await db
     .select({ id: user.id })
     .from(user)
+    .innerJoin(profile, eq(profile.userId, user.id))
     .where(
       and(
         inArray(user.username, handles),
         ne(user.id, authorId),
+        // An organization's account has followers, not friends to be tagged as.
+        eq(profile.accountType, "person"),
         notBanned(user.id),
         noBlockEitherWay(user.id, authorId),
         acceptedFriendship(user.id, authorId),
@@ -110,6 +113,7 @@ export async function tagSuggestions(db: Db, viewerId: string, query: string, li
     .where(
       and(
         ne(user.id, viewerId),
+        eq(profile.accountType, "person"),
         acceptedFriendship(user.id, viewerId),
         notBanned(user.id),
         noBlockEitherWay(user.id, viewerId),

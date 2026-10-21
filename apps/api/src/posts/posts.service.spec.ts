@@ -763,6 +763,43 @@ describe("the home feed's tabs", () => {
     expect(params.slice(5)).toEqual(["p2", "gone", "p1"]);
   });
 
+  it("opens For You with the viewer's country's organizations' posts from the last 48 hours", async () => {
+    vi.mocked(rankedTabPage).mockResolvedValueOnce({ ids: ["p2", "org1"], nextCursor: "next" });
+    const wheres: SQL[] = [];
+    const db = makeDb([
+      [mk("p2", 8), mk("org1", 7)], // the ranked page
+      [{ country: "NG" }], // the viewer's country
+      [mk("org1", 7)], // the pins
+      ...decorated(),
+    ]);
+    const recorded = { ...db, select: vi.fn(() => recordWhere(db.select(), wheres)) };
+
+    const page = await service(recorded as never).feed("viewer-1", { tab: "for_you" });
+
+    // Pinned first, and not shown again where the ranking put it.
+    expect(page.items.map((i) => i.id)).toEqual(["org1", "p2"]);
+    const pins = new PgDialect().sqlToQuery(wheres[2]);
+    expect(pins.sql).toContain('"org_profile"."account_type" = \'organization\'');
+    expect(pins.sql).toContain('"org_profile"."country" =');
+    expect(pins.sql).toContain("interval '1 hour'");
+    expect(pins.sql).toContain('"member_block"');
+    expect(pins.params).toEqual(expect.arrayContaining([48, "public", "viewer-1", "NG"]));
+  });
+
+  it("pins nothing past the first page, nor for a viewer with no country", async () => {
+    vi.mocked(rankedTabPage).mockResolvedValueOnce({ ids: [], nextCursor: null });
+    const later = makeDb();
+    await service(later).feed("viewer-1", { tab: "for_you", cursor: "opaque" });
+    expect(later.select).not.toHaveBeenCalled();
+
+    vi.mocked(rankedTabPage).mockResolvedValueOnce({ ids: [], nextCursor: null });
+    const nowhere = makeDb([[{ country: null }]]);
+    await expect(service(nowhere).feed("viewer-1", { tab: "for_you" })).resolves.toMatchObject({
+      items: [],
+    });
+    expect(nowhere.select).toHaveBeenCalledTimes(1);
+  });
+
   it("Nearby says when the viewer has no location, reading no posts", async () => {
     vi.mocked(rankedTabPage).mockResolvedValueOnce({
       ids: [],

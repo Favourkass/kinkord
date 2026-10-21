@@ -70,6 +70,15 @@ export class MembersController {
     return this.members.countries();
   }
 
+  /**
+   * Every organization's account: few, and public, so the app can show them as
+   * organizations wherever their names appear.
+   */
+  @Get("organizations")
+  organizations() {
+    return this.members.organizations();
+  }
+
   @Get("states")
   states(@Query() query: unknown) {
     const parsed = statesQuerySchema.safeParse(query);
