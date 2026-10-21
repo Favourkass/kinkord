@@ -195,6 +195,14 @@ export const SECURITY_COPY = {
     disable: "Disable 2FA",
     instructions: "1. Scan this QR with your authenticator app · 2. Enter the 6-digit code",
     qrAlt: "2FA QR code",
+    /** For a member setting up on the same phone, with nothing to scan the QR with. */
+    samePhone:
+      "Setting up on this phone? Open the link in your authenticator app, or copy the setup key and paste it in (choose “Enter a setup key”).",
+    openApp: "Open in authenticator app",
+    setupKey: "Setup key",
+    copyKey: "Copy setup key",
+    copyCodes: "Copy backup codes",
+    copied: "Copied",
     backupCodes: "Backup codes (save these)",
     confirm: "Confirm & turn on",
   },
