@@ -34,6 +34,7 @@ import { containsPattern } from "../push/notifications.service";
 import { ONLINE_WINDOW_SECONDS, PresenceService } from "../presence/presence.service";
 import { StorageService } from "../storage/storage.service";
 import { silverCheck, silverSince } from "../subscriptions/plans";
+import { profileRelationships } from "../relationships/profile-relationships";
 import { stillVerified } from "../verification/bronze-policy";
 import { FollowsService } from "./follows.service";
 import {
@@ -314,17 +315,26 @@ export class MembersService {
     const { u, p } = row;
     const isSelf = u.id === viewerId;
     const friendsOnly = p.profileVisibility === "friends" && !isSelf;
-    const [followCounts, mutualFriends, isFollowing, avatarUrl, coverUrl, isFriend, silver] =
-      await Promise.all([
-        this.follows.counts(u.id),
-        isSelf ? Promise.resolve(0) : this.follows.mutualFriendsCount(u.id, viewerId),
-        isSelf ? Promise.resolve(false) : this.follows.isFollowing(viewerId, u.id),
-        p.avatarKey ? this.storage.presignDownload(p.avatarKey, "md") : Promise.resolve(null),
-        // Covers are full-bleed, so they keep the original.
-        p.coverKey ? this.storage.presignDownload(p.coverKey) : Promise.resolve(null),
-        friendsOnly ? this.follows.areFriends(viewerId, u.id) : Promise.resolve(true),
-        silverSince(this.db, u.id),
-      ]);
+    const [
+      followCounts,
+      mutualFriends,
+      isFollowing,
+      avatarUrl,
+      coverUrl,
+      isFriend,
+      silver,
+      relationships,
+    ] = await Promise.all([
+      this.follows.counts(u.id),
+      isSelf ? Promise.resolve(0) : this.follows.mutualFriendsCount(u.id, viewerId),
+      isSelf ? Promise.resolve(false) : this.follows.isFollowing(viewerId, u.id),
+      p.avatarKey ? this.storage.presignDownload(p.avatarKey, "md") : Promise.resolve(null),
+      // Covers are full-bleed, so they keep the original.
+      p.coverKey ? this.storage.presignDownload(p.coverKey) : Promise.resolve(null),
+      friendsOnly ? this.follows.areFriends(viewerId, u.id) : Promise.resolve(true),
+      silverSince(this.db, u.id),
+      profileRelationships(this.db, this.storage, u.id, viewerId),
+    ]);
     const counts = { ...followCounts, mutualFriends };
     const friendship = isSelf ? "none" : await this.follows.friendshipState(viewerId, u.id);
     // Friends-only profile seen by a non-friend: what the directory card already shows
@@ -348,6 +358,8 @@ export class MembersService {
       // Sexuality is private: only the member sees their own.
       orientation: isSelf ? p.orientation : null,
       relationshipStatus: hidden(p.relationshipStatus, null),
+      // Linked D/s and other relationships, both members agreed: About details, so friends-only hides them.
+      relationships: hidden(relationships, []),
       bodyType: hidden(p.bodyType, null),
       roles: p.roles ?? [],
       interests: hidden(p.interests ?? [], []),

@@ -5,6 +5,7 @@ const PRIVATE_SECTIONS = [
   "home",
   "messages",
   "friends",
+  "relationships",
   "members",
   "u",
   "p",

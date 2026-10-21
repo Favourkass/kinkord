@@ -215,6 +215,39 @@ describe("PushService notifications", () => {
     expect(sent()).toMatchObject({ body: "raven accepted your friend request", url: "/u/raven" });
   });
 
+  it("asks about a relationship link without saying which kind", async () => {
+    const { db } = queuedDb([
+      [{ username: "raven", name: "Raven", displayName: null }],
+      [sub("s1")],
+      [KEYS],
+    ]);
+    new PushService(db, inbox()).relationshipRequest("u1", "u2", "link-1");
+    await flush();
+    expect(inboxRecord).toHaveBeenCalledWith("u2", {
+      type: "relationship_request",
+      actorId: "u1",
+      subjectId: "link-1",
+    });
+    expect(sent()).toMatchObject({
+      body: "raven wants to link a relationship with you",
+      url: "/relationships",
+    });
+  });
+
+  it("tells the asker when their relationship request is accepted", async () => {
+    const { db } = queuedDb([
+      [{ username: "raven", name: "Raven", displayName: null }],
+      [sub("s1")],
+      [KEYS],
+    ]);
+    new PushService(db, inbox()).relationshipAccepted("u2", "u1", "link-1");
+    await flush();
+    expect(sent()).toMatchObject({
+      body: "raven accepted your relationship request",
+      url: "/u/raven",
+    });
+  });
+
   it("tells an author about a comment, but not about their own", async () => {
     const own = queuedDb([]);
     new PushService(own.db, inbox()).newComment("p1", "u1", "u1");

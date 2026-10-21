@@ -1,7 +1,10 @@
 import type { ReactNode } from "react";
 import MaskIcon from "@/components/app/MaskIcon";
 import VerifiedMark from "@/components/brand/VerifiedMark";
+import Link from "next/link";
+import AvatarCircle from "@/components/app/AvatarCircle";
 import type { PublicProfileVM, SocialLinkVM, SocialPlatform } from "@/domain/member";
+import type { RelationshipsCardVM } from "@/domain/relationship";
 
 export interface AboutLabels {
   aboutMe: string;
@@ -39,6 +42,8 @@ export interface AboutLabels {
 export interface AboutTabProps {
   vm: PublicProfileVM;
   labels: AboutLabels;
+  /** Linked D/s and other relationships; null where the profile shows none. */
+  relationships?: RelationshipsCardVM | null;
 }
 
 const ICONS = {
@@ -78,6 +83,46 @@ function Card({ icon, title, children }: { icon: string; title: string; children
       </header>
       {children}
     </section>
+  );
+}
+
+/** Each linked member: "submissive of" over their name, out to their profile. */
+function Relationships({ card }: { card: RelationshipsCardVM }) {
+  const action = card.manage ?? card.link;
+  return (
+    <div className="flex flex-col gap-[8px]">
+      {card.rows.map((r) => {
+        const body = (
+          <>
+            <AvatarCircle src={r.avatarUrl} alt={r.name} size={36} />
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="text-[12px] text-pf-muted">{r.label}</span>
+              <span className="truncate text-[13px] font-semibold text-pf-text">{r.name}</span>
+            </span>
+          </>
+        );
+        const row =
+          "flex items-center gap-[12px] rounded-[12px] border border-pf-border bg-pf-surface-2 p-[12px]";
+        return r.href ? (
+          <Link key={r.id} href={r.href} className={row}>
+            {body}
+          </Link>
+        ) : (
+          <div key={r.id} className={row}>
+            {body}
+          </div>
+        );
+      })}
+      {card.empty ? <p className="text-[13px] text-pf-muted">{card.empty}</p> : null}
+      {action ? (
+        <Link
+          href={action.href}
+          className="self-start text-[13px] font-semibold text-kink-gold-bright"
+        >
+          {action.label}
+        </Link>
+      ) : null}
+    </div>
   );
 }
 
@@ -139,7 +184,7 @@ function Tags({ items }: { items: string[] }) {
  * Roles / Kinks / Looking For tags, Limits, Groups, Social Links, Verification, "Member since".
  * Nothing here is editable — everything changes through Edit Profile (CEO, 2026-09-12).
  */
-export default function AboutTab({ vm, labels }: AboutTabProps) {
+export default function AboutTab({ vm, labels, relationships }: AboutTabProps) {
   const row = (icon: string, label: string, value: string | null) => (
     <div
       key={label}
@@ -212,6 +257,12 @@ export default function AboutTab({ vm, labels }: AboutTabProps) {
           {row(ICONS.languages, labels.languages, p.languages)}
         </div>
       </Card>
+
+      {relationships ? (
+        <Card icon={ICONS.relationship} title={relationships.title}>
+          <Relationships card={relationships} />
+        </Card>
+      ) : null}
 
       {vm.roles.length > 0 ? (
         <Card icon={ICONS.roles} title={labels.roles}>
