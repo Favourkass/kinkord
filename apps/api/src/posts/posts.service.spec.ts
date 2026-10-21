@@ -9,6 +9,8 @@ import {
   PostsService,
 } from "./posts.service";
 import { rankedTabPage } from "./feed-tabs";
+import { post, postTag } from "../db/schema";
+import { TAG_FRIENDS_ONLY } from "./post-tags";
 
 // For You and Nearby pick their rows in feed-tabs.ts (feed-tabs.spec.ts); here
 // they are stubbed per test, and the real thing runs otherwise.
@@ -122,7 +124,7 @@ function makeStorage() {
   };
 }
 
-const push = { newRepost: vi.fn(), newMention: vi.fn() };
+const push = { newRepost: vi.fn(), newMention: vi.fn(), tagged: vi.fn() };
 
 const service = (db = makeDb(), storage = makeStorage()) =>
   new PostsService(db as never, storage as never, push as never);
@@ -293,6 +295,74 @@ describe("PostsService.create", () => {
       }),
     ).rejects.toThrow(/too large/i);
     expect(storage.remove).toHaveBeenCalledWith("posts/u1/huge.jpg");
+  });
+});
+
+describe("PostsService tags", () => {
+  beforeEach(() => push.tagged.mockReset());
+
+  it("checks the tags before anything is written, and refuses a post tagging a non-friend", async () => {
+    const db = makeDb([[{ id: "u2" }]]);
+    await expect(
+      service(db).create("u1", {
+        body: "With friends",
+        visibility: "public",
+        media: [],
+        tags: ["@ada", "kemi"],
+      }),
+    ).rejects.toThrow(TAG_FRIENDS_ONLY);
+    expect(db.insert).not.toHaveBeenCalled();
+    expect(push.tagged).not.toHaveBeenCalled();
+  });
+
+  it("records each tag and tells each friend", async () => {
+    const db = makeDb([[{ id: "u2" }, { id: "u3" }], [{ id: "p1" }]]);
+    // The stub has no row to read the new post back with; what was written is what counts.
+    await expect(
+      service(db).create("u1", {
+        body: "With friends",
+        visibility: "public",
+        media: [],
+        tags: ["ada", "kemi"],
+      }),
+    ).rejects.toThrow("Post not found");
+    expect(db.insert.mock.calls.map((c: unknown[]) => c[0])).toEqual([post, postTag]);
+    expect(push.tagged.mock.calls).toEqual([
+      ["p1", "u2", "u1"],
+      ["p1", "u3", "u1"],
+    ]);
+  });
+
+  it("lets a tagged member take their own tag off, and only theirs", async () => {
+    const tagged = makeDb([
+      [{ postId: "p1" }],
+      [{ postId: "p1", userId: "u3", username: "kemi", displayName: "Kemi" }],
+    ]);
+    await expect(service(tagged).removeTag("u2", "p1")).resolves.toEqual({
+      postId: "p1",
+      tagged: [{ userId: "u3", username: "kemi", displayName: "Kemi" }],
+      taggedMe: false,
+    });
+    const untagged = makeDb([[]]);
+    await expect(service(untagged).removeTag("u9", "p1")).rejects.toThrow(
+      "You aren't tagged in this post.",
+    );
+  });
+
+  it("offers the viewer's friends to tag, with their photos", async () => {
+    const db = makeDb([
+      [{ userId: "u2", username: "ada", displayName: "Ada", avatarKey: "avatars/u2/a.jpg" }],
+    ]);
+    await expect(service(db).tagSuggestions("u1", "ad")).resolves.toEqual({
+      items: [
+        {
+          userId: "u2",
+          username: "ada",
+          displayName: "Ada",
+          avatarUrl: "https://s3.test/get/avatars/u2/a.jpg?v=sm",
+        },
+      ],
+    });
   });
 });
 
@@ -567,6 +637,23 @@ describe("the feed's visibility rules", () => {
     expect(params[5]).toBe("u2");
   });
 
+  it("narrows a profile's Tagged tab to the posts that tag that member", async () => {
+    const wheres: SQL[] = [];
+    const svc = new PostsService(
+      makeRecordingDb(wheres) as never,
+      makeStorage() as never,
+      push as never,
+    );
+    vi.spyOn(svc as never, "resolveAuthor").mockResolvedValue("u2" as never);
+
+    await svc.feed("viewer-1", { tagged: "tega", tab: "for_you" });
+    const { sql, params } = new PgDialect().sqlToQuery(wheres[0]);
+
+    // The tab is ignored, as for a profile's Posts tab: newest first, every visible post.
+    expect(sql).toContain('from "post_tag" where "post_tag"."post_id" = "post"."id"');
+    expect(params).toContain("u2");
+  });
+
   it("pages by timestamp so a post arriving mid-scroll cannot shift the page", async () => {
     const { sql, params } = await feedSql({ cursor: "2026-09-18T09:00:00.000Z" });
     expect(sql).toContain('"post"."created_at" < $6');
@@ -647,7 +734,8 @@ describe("the home feed's tabs", () => {
     const busy = makeDb([[mk("p1", 9)], ...decorated()]);
     const page = await service(busy).feed("u1", { tab: "following" });
     expect(page.hint).toBeUndefined();
-    expect(busy.select).toHaveBeenCalledTimes(9);
+    // The page itself, the eight counts beside its posts, and who they tag.
+    expect(busy.select).toHaveBeenCalledTimes(10);
   });
 
   it("For You shows the rows the ranking chose, in its order, read through the visibility rule", async () => {

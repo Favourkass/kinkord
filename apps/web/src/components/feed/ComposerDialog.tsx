@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
-import { Bold, Italic, Underline, Smile, X, ImagePlus } from "lucide-react";
+import { Bold, Italic, Underline, Smile, X, ImagePlus, UserPlus } from "lucide-react";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import type { DraftPhotoVM } from "@/domain/post";
 import type { BodyPart } from "@/domain/mentions";
 import type { PostTextFormat, DraftSelection } from "@/domain/text-format";
 import { useVisibleViewport } from "@/components/chat/useVisibleViewport";
+import TagFriendsPanel, { TagChips, type TagFriendsLabels } from "./TagFriendsPanel";
+import type { TagPickerVM } from "@/presenters/useTagPicker";
 import MentionSuggestions, {
   activeMentionId,
   composing,
@@ -41,6 +43,8 @@ export interface ComposerDialogProps {
   /** The text, and where the caret is: "@" right before it suggests members. */
   onDraftChange: (value: string, caret?: number) => void;
   mentions: MentionPickerProps;
+  /** Friends tagged in the post; absent where a composer doesn't tag. */
+  tags?: { picker: TagPickerVM; labels: TagFriendsLabels };
   maxLength: number;
   visibility: string;
   visibilities: readonly { value: string; label: string }[];
@@ -83,6 +87,7 @@ function OpenComposerDialog(p: ComposerDialogProps) {
   const [emojiOpen, setEmojiOpen] = useState(false);
   const mentionListId = useId();
   const emojiId = useId();
+  const tagsId = useId();
   const viewport = useVisibleViewport();
 
   useEffect(() => {
@@ -279,6 +284,13 @@ function OpenComposerDialog(p: ComposerDialogProps) {
           )}
         </div>
         <footer className="shrink-0 border-t border-white/15 bg-[#0a0a0a] px-4 pt-2 pb-[max(12px,env(safe-area-inset-bottom))]">
+          {p.tags ? (
+            <>
+              {/* Beside the Tag button, so who's tagged stays in view however long the draft. */}
+              <TagChips tags={p.tags.picker} labels={p.tags.labels} />
+              <TagFriendsPanel tags={p.tags.picker} labels={p.tags.labels} id={tagsId} />
+            </>
+          ) : null}
           {emojiOpen && (
             <div
               id={emojiId}
@@ -363,6 +375,19 @@ function OpenComposerDialog(p: ComposerDialogProps) {
               <ImagePlus size={21} className="text-kink-gold-bright" />
               {p.labels.addPhoto}
             </button>
+            {p.tags ? (
+              <button
+                type="button"
+                onClick={p.tags.picker.open ? p.tags.picker.onClose : p.tags.picker.onOpen}
+                aria-expanded={p.tags.picker.open}
+                aria-controls={tagsId}
+                disabled={p.posting}
+                className="flex min-h-11 items-center gap-2 rounded-xl border border-white/20 px-3 text-sm font-semibold text-white disabled:opacity-40"
+              >
+                <UserPlus size={21} className="text-kink-gold-bright" />
+                {p.tags.labels.button}
+              </button>
+            ) : null}
             <span className="ml-auto text-xs text-[#a3a3a3]">
               {p.draft.length}/{p.maxLength}
             </span>

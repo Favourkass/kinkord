@@ -31,6 +31,8 @@ const byId = vi.fn();
 const follow = vi.fn();
 const unfollow = vi.fn();
 const uploadPostPhoto = vi.fn();
+const removeTag = vi.fn();
+const tagSuggestions = vi.fn();
 
 vi.mock("@/services/posts.service", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/posts.service")>()),
@@ -54,6 +56,8 @@ vi.mock("@/services/posts.service", async (importOriginal) => ({
     dismissSuggestion: (...a: unknown[]) => dismissSuggestion(...a),
     follow: (...a: unknown[]) => follow(...a),
     unfollow: (...a: unknown[]) => unfollow(...a),
+    removeTag: (...a: unknown[]) => removeTag(...a),
+    tagSuggestions: (...a: unknown[]) => tagSuggestions(...a),
   },
   uploadPostPhoto: (...a: unknown[]) => uploadPostPhoto(...a),
 }));
@@ -268,10 +272,33 @@ describe("the composer", () => {
     act(() => result.current.setDraft("fresh"));
     await act(async () => result.current.submitPost());
 
-    expect(create).toHaveBeenCalledWith({ body: "fresh", visibility: "public", mediaKeys: [] });
+    expect(create).toHaveBeenCalledWith({
+      body: "fresh",
+      visibility: "public",
+      mediaKeys: [],
+      tags: [],
+    });
     expect(result.current.posts[0].id).toBe("p-new");
     expect(result.current.composerOpen).toBe(false);
     expect(result.current.draft).toBe("");
+  });
+
+  it("tags the friends picked in the composer, and forgets them once posted", async () => {
+    tagSuggestions.mockResolvedValue({
+      items: [{ userId: "u3", username: "ada", displayName: "Ada", avatarUrl: null }],
+    });
+    const { result } = await loaded();
+    act(() => result.current.openComposer());
+    act(() => result.current.setDraft("with friends"));
+    act(() => result.current.tagFriends.onOpen());
+    await waitFor(() => expect(result.current.tagFriends.results).toHaveLength(1));
+    expect(tagSuggestions).toHaveBeenCalledWith("");
+    act(() => result.current.tagFriends.results[0].onPick());
+    expect(result.current.tagFriends.chips.map((c) => c.name)).toEqual(["Ada"]);
+    await act(async () => result.current.submitPost());
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ tags: ["ada"] }));
+    expect(result.current.tagFriends.chips).toEqual([]);
+    expect(result.current.tagFriends.open).toBe(false);
   });
 
   it("keeps the draft on screen when publishing fails", async () => {
@@ -1929,4 +1956,26 @@ it("keeps editor formatting and emoji in the persisted post body with a styled p
   expect(result.current.editor.previewParts[0]).toEqual({ text: "Hello", marks: { bold: true } });
   await act(async () => result.current.submitPost());
   expect(create).toHaveBeenCalledWith(expect.objectContaining({ body: "**Hello**\nworld🔥" }));
+});
+
+describe("taking your tag off", () => {
+  it("updates every row showing the post, and closes the menu", async () => {
+    feed.mockResolvedValueOnce({
+      items: [
+        pm({ tagged: [{ userId: "me", username: "me", displayName: "Me" }], taggedMe: true }),
+        pm({ id: "r1", postId: "p1", taggedMe: true }),
+      ],
+      nextCursor: null,
+    });
+    removeTag.mockResolvedValue({ postId: "p1", tagged: [], taggedMe: false });
+    const { result } = await loaded();
+    act(() => result.current.openMenu("p1"));
+    await act(async () => result.current.removeTag("p1"));
+    expect(removeTag).toHaveBeenCalledWith("p1");
+    expect(result.current.posts.map((p) => [p.id, p.taggedMe, p.tagged.length])).toEqual([
+      ["p1", false, 0],
+      ["r1", false, 0],
+    ]);
+    expect(result.current.menuFor).toBeNull();
+  });
 });

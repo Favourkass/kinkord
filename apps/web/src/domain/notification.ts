@@ -7,6 +7,7 @@ export type NotificationKind =
   | "follow"
   | "comment"
   | "mention"
+  | "tag"
   | "like"
   | "repost"
   | "report"
@@ -88,6 +89,11 @@ const KINDS: Record<
     category: "Friend accepted",
     icon: "person-add",
     action: () => "accepted your friend request.",
+  },
+  tag: {
+    category: "Tag",
+    icon: "mention",
+    action: () => "tagged you in a post.",
   },
   relationship_request: {
     category: "Relationship request",

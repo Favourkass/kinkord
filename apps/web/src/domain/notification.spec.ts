@@ -36,6 +36,7 @@ describe("notification presentation", () => {
     "silver_check",
     "relationship_request",
     "relationship_accepted",
+    "tag",
   ])("maps %s into a labelled notification", (type) => {
     const vm = toNotificationVM({ ...item, type }, new Date(item.createdAt));
     expect(vm.category).toBeTruthy();

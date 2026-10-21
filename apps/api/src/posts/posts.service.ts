@@ -23,6 +23,7 @@ import {
   postShare,
   postMedia,
   postSave,
+  postTag,
   profile,
   user,
   walletGift,
@@ -38,6 +39,14 @@ import {
   mentionsIn,
   type Mention,
 } from "./mentions";
+import {
+  MAX_TAGS,
+  tags,
+  taggableIds,
+  tagSuggestions,
+  tagsOn,
+  type TaggedMemberVM,
+} from "./post-tags";
 import {
   IMAGE_VARIANTS,
   StorageService,
@@ -87,6 +96,16 @@ export const createPostSchema = z
       )
       .max(POST_MEDIA_MAX)
       .default([]),
+    /** Usernames of the friends the author tags. */
+    tags: z
+      .array(
+        z
+          .string()
+          .trim()
+          .regex(/^@?[a-z0-9_]{3,30}$/i, "Tag members by their username."),
+      )
+      .max(MAX_TAGS)
+      .default([]),
   })
   .refine((v) => Boolean(v.body?.length) || v.media.length > 0, {
     message: "Write something or add a photo.",
@@ -110,6 +129,8 @@ export interface FeedParams {
   limit?: number;
   /** Narrows the feed to one member's posts — this is the profile Posts tab. */
   author?: string | null;
+  /** Narrows the feed to the posts that tag one member — the profile Tagged tab. */
+  tagged?: string | null;
   /** Search: only posts whose text contains this. Reposts carry no text, so originals only. */
   q?: string | null;
   /**
@@ -169,6 +190,10 @@ export interface PostVM {
   mine: boolean;
   /** Each @handle in the body that names a member, and whom: the ones the app links. */
   mentions: Mention[];
+  /** The author's friends tagged in the post, as the viewer may see them. */
+  tagged: TaggedMemberVM[];
+  /** The viewer is one of them, so the post offers to take their tag off. */
+  taggedMe: boolean;
 }
 
 export interface RepostVM {
@@ -251,6 +276,8 @@ export class PostsService {
       throw new BadRequestException(LONG_POST_NEEDS_SILVER);
     }
     await this.verifyMedia(userId, input.media);
+    // Checked before anything is written, so a refused tag never leaves a post behind.
+    const tagged = await taggableIds(this.db, userId, input.tags ?? []);
     const [row] = await this.db
       .insert(post)
       .values({
@@ -269,7 +296,14 @@ export class PostsService {
         })),
       );
     }
-    this.notifyMentions(row.id, userId, input.body);
+    if (tagged.length) {
+      await this.db
+        .insert(postTag)
+        .values(tagged.map((taggedId) => ({ postId: row.id, userId: taggedId })));
+      for (const taggedId of tagged) this.push.tagged(row.id, taggedId, userId);
+    }
+    // A tagged member hears of the tag; a mention of them too would tell them twice.
+    this.notifyMentions(row.id, userId, input.body, tagged);
     const vm = await this.byId(row.id, userId);
     if (!vm) throw new NotFoundException("Post not found");
     return vm;
@@ -311,16 +345,18 @@ export class PostsService {
    */
   async feed(viewerId: string, params: FeedParams = {}): Promise<FeedVM> {
     const limit = clamp(params.limit ?? FEED_PAGE_SIZE, 1, FEED_MAX_PAGE_SIZE);
-    const tab = params.author || params.q ? null : (params.tab ?? null);
+    const tab = params.author || params.q || params.tagged ? null : (params.tab ?? null);
     if (tab === "for_you" || tab === "nearby") return this.rankedFeed(viewerId, tab, params, limit);
     const following = tab === "following";
     const cursor = parseCursor(params.cursor);
     const authorId = params.author ? await this.resolveAuthor(params.author) : null;
+    const taggedId = params.tagged ? await this.resolveAuthor(params.tagged) : null;
     const rows = await this.selectPosts(
       viewerId,
       [
         ...(cursor ? [lt(post.createdAt, cursor)] : []),
         ...(authorId ? [eq(post.authorId, authorId)] : []),
+        ...(taggedId ? [tags(post.id, taggedId)] : []),
         ...(params.q ? [ilike(post.body, containsPattern(params.q))] : []),
         ...(following ? followingConditions(viewerId) : []),
       ],
@@ -832,6 +868,7 @@ export class PostsService {
       this.db,
       pairs.flatMap(({ content }) => mentionCandidates(content.body)),
     );
+    const tagged = await tagsOn(this.db, ids, viewerId);
 
     return Promise.all(
       pairs.map(async ({ row, content }) => ({
@@ -870,8 +907,40 @@ export class PostsService {
               },
         mine: row.authorId === viewerId,
         mentions: mentionsIn(content.body, members),
+        tagged: tagged.get(content.id) ?? [],
+        taggedMe: (tagged.get(content.id) ?? []).some((t) => t.userId === viewerId),
       })),
     );
+  }
+
+  /**
+   * The tagged member takes their own tag off a post; the author isn't told.
+   * Answers with who the post still tags, so every row showing it can update.
+   */
+  async removeTag(
+    viewerId: string,
+    postId: string,
+  ): Promise<{ postId: string; tagged: TaggedMemberVM[]; taggedMe: false }> {
+    const removed = await this.db
+      .delete(postTag)
+      .where(and(eq(postTag.postId, postId), eq(postTag.userId, viewerId)))
+      .returning({ postId: postTag.postId });
+    if (!removed.length) throw new NotFoundException("You aren't tagged in this post.");
+    const left = await tagsOn(this.db, [postId], viewerId);
+    return { postId, tagged: left.get(postId) ?? [], taggedMe: false };
+  }
+
+  /** Friends to offer in the composer's tag picker. */
+  async tagSuggestions(viewerId: string, query: string) {
+    const rows = await tagSuggestions(this.db, viewerId, query);
+    return {
+      items: await Promise.all(
+        rows.map(async ({ avatarKey, ...member }) => ({
+          ...member,
+          avatarUrl: avatarKey ? await this.storage.presignDownload(avatarKey, "sm") : null,
+        })),
+      ),
+    };
   }
 
   /**

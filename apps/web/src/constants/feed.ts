@@ -87,6 +87,20 @@ export const FEED_COPY = {
   /** Members and the official organization alike are followed, on posts and in the strip. */
   follow: "Follow",
   following: "Following",
+  /** Tagging friends in a post (founder, 2026-10-21). */
+  taggedWith: "with",
+  removeTag: "Remove my tag",
+  tagFriends: {
+    button: "Tag",
+    title: "Tag friends",
+    search: "Search your friends",
+    loading: "Looking…",
+    empty: "No friends match. Only friends can be tagged.",
+    full: "That's the most you can tag in one post.",
+    done: "Done",
+    with: "with",
+    remove: (name: string) => `Remove ${name}`,
+  },
   organization: "Official",
   verifiedOrganization: "Official Kinkord account",
   /** Desktop right rail, which the mobile frame has no room for. */
@@ -128,6 +142,8 @@ export const POST_CARD_LABELS = {
   verifiedOrganization: FEED_COPY.verifiedOrganization,
   follow: FEED_COPY.follow,
   following: FEED_COPY.following,
+  with: FEED_COPY.taggedWith,
+  removeTag: FEED_COPY.removeTag,
 } as const;
 
 /** Display-ready controls for the post editor. */

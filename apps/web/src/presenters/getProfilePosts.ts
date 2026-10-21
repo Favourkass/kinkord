@@ -30,6 +30,8 @@ export function getProfilePosts(
   feed: Feed,
   viewerAvatarUrl: string | null,
   authorFollow: AuthorFollow | null = null,
+  /** The Tagged tab reads the same way, over the posts that tag the member. */
+  tagged = false,
 ) {
   const copy = MEMBERS_COPY.profile.posts;
   const posts = authorFollow
@@ -53,7 +55,7 @@ export function getProfilePosts(
       labels: POST_CARD_LABELS,
       loading: feed.loading,
       loadingText: copy.loading,
-      emptyText: copy.empty,
+      emptyText: tagged ? copy.taggedEmpty : copy.empty,
       menuFor: feed.menuFor,
       onOpenMenu: feed.openMenu,
       onCloseMenu: feed.closeMenu,
@@ -67,6 +69,7 @@ export function getProfilePosts(
       onGift: feed.openGift,
       onOpenMedia: feed.openMedia,
       onTogglePostAuthorFollow: toggleAuthorFollow,
+      onRemoveTag: feed.removeTag,
       hasMore: feed.hasMore,
       loadingMore: feed.loadingMore,
       onLoadMore: feed.loadMore,

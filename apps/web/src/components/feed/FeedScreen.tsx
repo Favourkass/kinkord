@@ -38,6 +38,8 @@ export interface FeedScreenProps {
   onGift: (postId: string, currency?: "coin" | "star" | "crown") => void;
   onOpenMedia: (media: PostMediaVM) => void;
   onTogglePostAuthorFollow: (userId: string) => void;
+  /** The viewer takes their tag off a post. */
+  onRemoveTag?: (postId: string) => void;
   hasMore: boolean;
   loadingMore: boolean;
   onLoadMore: () => void;
@@ -89,6 +91,7 @@ export default function FeedScreen(p: FeedScreenProps) {
       onGift={(currency) => p.onGift(post.postId, currency)}
       onOpenMedia={p.onOpenMedia}
       onToggleAuthorFollow={p.onTogglePostAuthorFollow}
+      onRemoveTag={p.onRemoveTag ? () => p.onRemoveTag?.(post.postId) : undefined}
     />
   );
 

@@ -66,7 +66,7 @@ export const MEMBERS_COPY = {
   profile: {
     brand: "KINKORD",
     actions: { search: "Search", more: "More options", share: "Share profile" },
-    tabs: { posts: "Posts", about: "About", media: "Media", people: "People" },
+    tabs: { posts: "Posts", tagged: "Tagged", about: "About", media: "Media", people: "People" },
     follow: "Follow",
     following: "Following",
     message: "Message",
@@ -150,6 +150,8 @@ export const MEMBERS_COPY = {
     },
     posts: {
       empty: "No posts yet.",
+      /** The Tagged tab: posts that tag this member. */
+      taggedEmpty: "No tagged posts yet.",
       /** What a visitor sees where a friends-only post would be — the API simply omits it. */
       loading: "Loading posts…",
       loadMore: "Load more posts",

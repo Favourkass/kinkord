@@ -215,6 +215,25 @@ describe("PushService notifications", () => {
     expect(sent()).toMatchObject({ body: "raven accepted your friend request", url: "/u/raven" });
   });
 
+  it("says who tagged a member, never what the post says", async () => {
+    const { db } = queuedDb([
+      [{ username: "raven", name: "Raven", displayName: null }],
+      [sub("s1")],
+      [KEYS],
+    ]);
+    new PushService(db, inbox()).tagged("p1", "u2", "u1");
+    await flush();
+    expect(inboxRecord).toHaveBeenCalledWith("u2", { type: "tag", actorId: "u1", subjectId: "p1" });
+    expect(sent()).toMatchObject({ body: "raven tagged you in a post", url: "/p/p1" });
+  });
+
+  it("never tells an author they tagged themselves", async () => {
+    const own = queuedDb([]);
+    new PushService(own.db, inbox()).tagged("p1", "u1", "u1");
+    await flush();
+    expect(own.calls).toHaveLength(0);
+  });
+
   it("asks about a relationship link without saying which kind", async () => {
     const { db } = queuedDb([
       [{ username: "raven", name: "Raven", displayName: null }],
