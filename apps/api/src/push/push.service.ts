@@ -193,6 +193,24 @@ export class PushService {
     });
   }
 
+  /** Tagged in a post: who, never what the post says, like every push. */
+  tagged(postId: string, taggedId: string, authorId: string): void {
+    if (taggedId === authorId) return;
+    this.notify(async () => {
+      const who = await this.member(authorId);
+      return {
+        to: taggedId,
+        event: { type: "tag", actorId: authorId, subjectId: postId },
+        message: {
+          title: "Kinkord",
+          body: `${who.name} tagged you in a post`,
+          url: notificationUrl("tag", postId, who.username),
+          tag: `tag-${postId}`,
+        },
+      };
+    });
+  }
+
   /**
    * A relationship request, and its acceptance. Discreet like every push: who,
    * never which relationship, since a lock screen can be seen by anyone.

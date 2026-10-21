@@ -11,6 +11,8 @@ export type NotificationType =
   | "follow"
   | "comment"
   | "mention"
+  // The member was tagged in a post.
+  | "tag"
   | "like"
   | "repost"
   | "report"

@@ -13,6 +13,8 @@ const postsService = () => ({
   repost: vi.fn(async () => ({ postId: ID, reposts: 1, repostedByMe: true })),
   unrepost: vi.fn(async () => ({ postId: ID, reposts: 0, repostedByMe: false })),
   savedFeed: vi.fn(async () => ({ items: [], nextCursor: null })),
+  removeTag: vi.fn(async () => ({ removed: true })),
+  tagSuggestions: vi.fn(async () => ({ items: [] })),
 });
 
 const interactions = () => ({
@@ -94,7 +96,39 @@ describe("PostsController", () => {
       body: "hello",
       visibility: "public",
       media: [],
+      tags: [],
     });
+  });
+
+  it("takes tags as usernames, ten at most", () => {
+    const posts = postsService();
+    void controller(posts).create(req("u1"), { body: "hi", tags: ["@ada", "kemi_9"] });
+    expect(posts.create).toHaveBeenCalledWith(
+      "u1",
+      expect.objectContaining({ tags: ["@ada", "kemi_9"] }),
+    );
+    expect(() => controller().create(req("u1"), { body: "hi", tags: ["not a name"] })).toThrow();
+    const eleven = Array.from({ length: 11 }, (_, i) => `friend_${i}`);
+    expect(() => controller().create(req("u1"), { body: "hi", tags: eleven })).toThrow();
+  });
+
+  it("lets the tagged member take their tag off, and suggests friends to tag", async () => {
+    const posts = postsService();
+    await controller(posts).removeTag(req("u2"), ID);
+    expect(posts.removeTag).toHaveBeenCalledWith("u2", ID);
+    expect(() => controller(posts).removeTag(req("u2"), "not-an-id")).toThrow();
+    await controller(posts).tagSuggestions(req("u1"), "ad");
+    await controller(posts).tagSuggestions(req("u1"), undefined);
+    expect(posts.tagSuggestions.mock.calls).toEqual([
+      ["u1", "ad"],
+      ["u1", ""],
+    ]);
+  });
+
+  it("reads a profile's Tagged tab from the feed", async () => {
+    const posts = postsService();
+    await controller(posts).feed(req("u1"), { tagged: "ada" });
+    expect(posts.feed).toHaveBeenCalledWith("u1", expect.objectContaining({ tagged: "ada" }));
   });
 
   it("rejects a post with neither words nor photos", () => {

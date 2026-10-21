@@ -174,3 +174,26 @@ export const postSave = pgTable(
     index("post_save_user_idx").on(t.userId, t.createdAt),
   ],
 );
+
+/**
+ * Members tagged in a post by its author (founder, 2026-10-21): only the
+ * author's friends can be tagged, each is told, and each can take their tag
+ * off. A tagged post shows on the member's profile under Tagged.
+ */
+export const postTag = pgTable(
+  "post_tag",
+  {
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => post.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.postId, t.userId] }),
+    // The profile's Tagged tab reads newest-first by member.
+    index("post_tag_user_idx").on(t.userId, t.createdAt),
+  ],
+);

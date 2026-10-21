@@ -308,6 +308,7 @@ describe("notification links and search words", () => {
     expect(notificationUrl("friend_request", "request-1", "ada")).toBe("/friends/requests");
     expect(notificationUrl("friend_accepted", "request-1", "ada")).toBe("/u/ada");
     expect(notificationUrl("relationship_request", "link-1", "ada")).toBe("/relationships");
+    expect(notificationUrl("tag", "p1", "ada")).toBe("/p/p1");
     expect(notificationUrl("relationship_accepted", "link-1", "ada")).toBe("/u/ada");
     expect(notificationUrl("follow", null, "ada x")).toBe("/u/ada%20x");
     expect(notificationUrl("follow", null, null)).toBe("/notifications");
