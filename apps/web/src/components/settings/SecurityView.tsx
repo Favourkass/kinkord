@@ -17,8 +17,20 @@ export interface SecurityViewProps {
       instructions: string;
       qrDataUrl: string;
       qrAlt: string;
+      /** For setting up on the same phone, with nothing to scan the QR with. */
+      samePhone: string;
+      openAppLabel: string;
+      /** The authenticator link: on a phone, it opens the app with the account filled in. */
+      openAppHref: string;
+      setupKeyLabel: string;
+      /** Grouped for reading; null if the link carried none. */
+      setupKey: string | null;
+      copyKeyLabel: string;
+      onCopyKey: () => void;
       backupTitle: string;
       backupCodes: string[];
+      copyCodesLabel: string;
+      onCopyCodes: () => void;
       code: string;
       onCode: (value: string) => void;
       confirmLabel: string;
@@ -132,6 +144,30 @@ export default function SecurityView(p: SecurityViewProps) {
               alt={tf.setup.qrAlt}
               className="rounded-[8px] bg-white p-2"
             />
+            <div className="flex w-full flex-col gap-[10px] rounded-[10px] bg-app-input/60 p-[12px]">
+              <p className="text-[13px] text-app-subtle">{tf.setup.samePhone}</p>
+              <a
+                href={tf.setup.openAppHref}
+                className={`${gold} flex w-full items-center justify-center`}
+              >
+                {tf.setup.openAppLabel}
+              </a>
+              {tf.setup.setupKey ? (
+                <div className="flex flex-col gap-[6px]">
+                  <span className={label}>{tf.setup.setupKeyLabel}</span>
+                  <code className="select-all break-all rounded-[8px] border border-app-input-border bg-app-input px-[12px] py-[10px] font-mono text-[15px] tracking-[1px] text-app-value">
+                    {tf.setup.setupKey}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={tf.setup.onCopyKey}
+                    className="min-h-[44px] rounded-[10px] border border-kink-amber px-[14px] text-[14px] font-bold text-kink-amber"
+                  >
+                    {tf.setup.copyKeyLabel}
+                  </button>
+                </div>
+              ) : null}
+            </div>
             <details className="w-full text-[13px] text-app-subtle">
               <summary className="cursor-pointer text-kink-gold-bright">
                 {tf.setup.backupTitle}
@@ -141,6 +177,15 @@ export default function SecurityView(p: SecurityViewProps) {
                   <span key={c}>{c}</span>
                 ))}
               </div>
+              {tf.setup.backupCodes.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={tf.setup.onCopyCodes}
+                  className="mt-3 min-h-[40px] rounded-[10px] border border-kink-amber px-[14px] text-[13px] font-bold text-kink-amber"
+                >
+                  {tf.setup.copyCodesLabel}
+                </button>
+              ) : null}
             </details>
             <CodeInput value={tf.setup.code} onChange={tf.setup.onCode} />
             <button

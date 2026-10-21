@@ -26,12 +26,13 @@ vi.mock("@/services/verification.service", async (importOriginal) => ({
 type AuthCall = (...a: unknown[]) => Promise<{ error: null }>;
 const changePassword = vi.fn<AuthCall>(async () => ({ error: null }));
 const disable = vi.fn<AuthCall>(async () => ({ error: null }));
+const enable2fa = vi.fn();
 vi.mock("@/services/authClient", () => ({
   authClient: {
     signOut: vi.fn(),
     changePassword: (...a: unknown[]) => changePassword(...a),
     twoFactor: {
-      enable: vi.fn(),
+      enable: (...a: unknown[]) => enable2fa(...a),
       verifyTotp: vi.fn(),
       disable: (...a: unknown[]) => disable(...a),
     },
@@ -52,6 +53,38 @@ describe("useSecurityPagePresenter", () => {
     verifyCode.mockReset().mockResolvedValue({ verified: true, attemptsLeft: null });
     changePassword.mockClear();
     disable.mockClear();
+  });
+
+  it("offers the setup key and the app link for setting up on the same phone, and copies them", async () => {
+    me.mockResolvedValue({ twoFactorEnabled: false });
+    const uri = "otpauth://totp/Kinkord:ada?secret=JBSWY3DPEHPK3PXP&issuer=Kinkord";
+    enable2fa.mockResolvedValue({
+      data: { totpURI: uri, backupCodes: ["aaaa-1111", "bbbb-2222"] },
+      error: null,
+    });
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    const { result } = renderHook(() => useSecurityPagePresenter());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => result.current.view.twoFactor.onPassword("supersecret123"));
+    act(() => result.current.view.twoFactor.onAction());
+    await waitFor(() => expect(result.current.view.twoFactor.setup).not.toBeNull());
+    expect(result.current.view.twoFactor.setup).toMatchObject({
+      setupKey: "JBSW Y3DP EHPK 3PXP",
+      openAppHref: uri,
+      copyKeyLabel: "Copy setup key",
+      copyCodesLabel: "Copy backup codes",
+    });
+
+    // The key is copied whole, without the spaces that only help reading it.
+    await act(async () => result.current.view.twoFactor.setup?.onCopyKey());
+    expect(writeText).toHaveBeenCalledWith("JBSWY3DPEHPK3PXP");
+    expect(result.current.view.twoFactor.setup?.copyKeyLabel).toBe("Copied");
+
+    await act(async () => result.current.view.twoFactor.setup?.onCopyCodes());
+    expect(writeText).toHaveBeenLastCalledWith("aaaa-1111\nbbbb-2222");
+    expect(result.current.view.twoFactor.setup?.copyCodesLabel).toBe("Copied");
+    expect(result.current.view.twoFactor.setup?.copyKeyLabel).toBe("Copy setup key");
   });
 
   it("reflects the account's 2FA state and wires the disable + password flows", async () => {
