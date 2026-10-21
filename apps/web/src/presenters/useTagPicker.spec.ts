@@ -52,6 +52,12 @@ describe("useTagPicker", () => {
     act(() => result.current.vm.results[0].onPick());
     expect(result.current.vm.chips.map((c) => c.name)).toEqual(["Friend 1"]);
     expect(result.current.vm.results.map((r) => r.name)).toEqual(["Friend 2"]);
+    act(() => result.current.vm.results[0].onPick());
+    // Everyone who matched is tagged now: nothing to offer, but no "no match" either.
+    await waitFor(() => expect(result.current.vm.loading).toBe(false));
+    expect(result.current.vm.results).toEqual([]);
+    expect(result.current.vm.empty).toBe(false);
+    act(() => result.current.vm.chips[1].onRemove());
     expect(result.current.usernames).toEqual(["friend_1"]);
     act(() => result.current.vm.chips[0].onRemove());
     expect(result.current.usernames).toEqual([]);

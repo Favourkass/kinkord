@@ -277,7 +277,6 @@ function OpenComposerDialog(p: ComposerDialogProps) {
               ))}
             </ul>
           )}
-          {p.tags ? <TagChips tags={p.tags.picker} labels={p.tags.labels} /> : null}
           {p.error && (
             <p role="alert" className="pt-3 text-sm text-red-300">
               {p.error}
@@ -286,7 +285,11 @@ function OpenComposerDialog(p: ComposerDialogProps) {
         </div>
         <footer className="shrink-0 border-t border-white/15 bg-[#0a0a0a] px-4 pt-2 pb-[max(12px,env(safe-area-inset-bottom))]">
           {p.tags ? (
-            <TagFriendsPanel tags={p.tags.picker} labels={p.tags.labels} id={tagsId} />
+            <>
+              {/* Beside the Tag button, so who's tagged stays in view however long the draft. */}
+              <TagChips tags={p.tags.picker} labels={p.tags.labels} />
+              <TagFriendsPanel tags={p.tags.picker} labels={p.tags.labels} id={tagsId} />
+            </>
           ) : null}
           {emojiOpen && (
             <div

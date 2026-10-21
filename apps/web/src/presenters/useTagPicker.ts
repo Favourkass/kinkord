@@ -93,7 +93,8 @@ export function useTagPicker(enabled: boolean) {
         onPick: () => add(m),
       })),
       loading,
-      empty: open && !loading && items.length === 0,
+      // Nobody matched; a friend already tagged isn't offered again, but isn't "no match" either.
+      empty: open && !loading && (found?.items.length ?? 0) === 0,
       chips: selected.map((m) => ({
         userId: m.userId,
         name: m.displayName,

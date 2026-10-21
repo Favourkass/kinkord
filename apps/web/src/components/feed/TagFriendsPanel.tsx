@@ -17,11 +17,11 @@ export interface TagFriendsLabels {
   remove: (name: string) => string;
 }
 
-/** Who's tagged so far, under the draft: "with Ada ×, Kemi ×". */
+/** Who's tagged so far, above the composer's toolbar: "with Ada ×, Kemi ×". */
 export function TagChips({ tags, labels }: { tags: TagPickerVM; labels: TagFriendsLabels }) {
   if (!tags.chips.length) return null;
   return (
-    <p className="mt-3 flex flex-wrap items-center gap-2 text-sm text-[#a3a3a3]">
+    <p className="mb-2 flex flex-wrap items-center gap-2 text-sm text-[#a3a3a3]">
       <span>{labels.with}</span>
       {tags.chips.map((chip) => (
         <span
