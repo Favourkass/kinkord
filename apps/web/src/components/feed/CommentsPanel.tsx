@@ -94,7 +94,9 @@ export default function CommentsPanel(p: CommentsPanelProps) {
             {p.comments.map((c) => {
               const name = (
                 <>
-                  {c.authorName}
+                  <span className={c.authorOrganization ? "text-kink-gold-bright" : undefined}>
+                    {c.authorName}
+                  </span>
                   {c.authorTeamMember ? <TeamBadge size={18} /> : null}
 
                   {c.authorOrganization ? (

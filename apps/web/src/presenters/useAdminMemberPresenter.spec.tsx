@@ -12,6 +12,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => router }));
 
 const svc = {
   setTeamBadge: vi.fn(),
+  setOrganization: vi.fn(),
   access: vi.fn(),
   member: vi.fn(),
   block: vi.fn(),
@@ -97,6 +98,42 @@ describe("useAdminMemberPresenter", () => {
     expect(hook.result.current.dialog?.title).toContain("Remove Kinkord Team");
     await act(async () => hook.result.current.dialog?.confirm());
     expect(svc.setTeamBadge).toHaveBeenCalledWith("u9", false);
+  });
+
+  it("makes an organization's account for the country picked, once a founder confirms", async () => {
+    svc.access.mockResolvedValue({ isAdmin: true, isFounder: true });
+    const hook = await ready();
+    await waitFor(() => expect(hook.result.current.organizationAccount.canChange).toBe(true));
+    expect(hook.result.current.organizationAccount.organization).toBe(false);
+    // A country first.
+    act(() => hook.result.current.organizationAccount.onToggle());
+    expect(hook.result.current.dialog).toBeNull();
+    expect(hook.result.current.notice).toBe("Choose the organization's country first.");
+    act(() => hook.result.current.organizationAccount.setSelected("KE"));
+    act(() => hook.result.current.organizationAccount.onToggle());
+    expect(hook.result.current.dialog?.title).toBe("Make this an organization's account?");
+    expect(svc.setOrganization).not.toHaveBeenCalled();
+    svc.member.mockResolvedValue({ ...detail, organization: true, country: "KE" });
+    await act(async () => hook.result.current.dialog?.confirm());
+    expect(svc.setOrganization).toHaveBeenCalledWith("u9", true, "KE");
+    await waitFor(() =>
+      expect(hook.result.current.organizationAccount).toMatchObject({
+        organization: true,
+        countryName: "Kenya",
+      }),
+    );
+    act(() => hook.result.current.organizationAccount.onToggle());
+    expect(hook.result.current.dialog?.title).toBe("Make this a person's account again?");
+    await act(async () => hook.result.current.dialog?.confirm());
+    expect(svc.setOrganization).toHaveBeenLastCalledWith("u9", false, null);
+  });
+
+  it("shows a staff admin the kind of account without letting them change it", async () => {
+    const hook = await ready();
+    expect(hook.result.current.organizationAccount.canChange).toBe(false);
+    act(() => hook.result.current.organizationAccount.setSelected("NG"));
+    act(() => hook.result.current.organizationAccount.onToggle());
+    expect(hook.result.current.dialog).toBeNull();
   });
 
   it("shows a staff admin the team badge without letting them change it", async () => {

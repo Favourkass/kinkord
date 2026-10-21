@@ -85,7 +85,9 @@ export default function PeopleTab(p: PeopleTabProps) {
               </span>
               <span className="flex min-w-0 flex-col gap-[2px]">
                 <span className="flex min-w-0 items-center gap-[3px] text-[13px] font-bold leading-[16px] text-pf-text">
-                  <span className="truncate">{r.displayName}</span>
+                  <span className={`truncate ${r.organization ? "text-kink-gold-bright" : ""}`}>
+                    {r.displayName}
+                  </span>
                   {r.teamMember ? <TeamBadge size={18} /> : null}
 
                   {r.organization ? (

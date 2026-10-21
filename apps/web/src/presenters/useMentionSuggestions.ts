@@ -10,7 +10,8 @@ import {
   type MentionSuggestionVM,
 } from "@/domain/mentions";
 import { membersApi } from "@/services/members.service";
-import { isOfficialOrganization } from "@/services/organization-placeholder.service";
+import { isOrganization } from "@/services/organizations.service";
+import { useOrganizations } from "./useOrganizations";
 
 /** How long typing pauses before members are suggested. */
 export const MENTION_DELAY_MS = 150;
@@ -38,6 +39,7 @@ export interface MentionPickerVM {
  * closes it. `setText` is how the picked text reaches the box's draft.
  */
 export function useMentionSuggestions(setText: (field: MentionField, text: string) => void) {
+  const organizations = useOrganizations();
   const [typing, setTyping] = useState<(MentionAt & { field: MentionField; text: string }) | null>(
     null,
   );
@@ -71,10 +73,10 @@ export function useMentionSuggestions(setText: (field: MentionField, text: strin
     () =>
       typing && found?.query === typing.query
         ? found.members
-            .map((m) => toMentionSuggestionVM(m, isOfficialOrganization(m.userId)))
+            .map((m) => toMentionSuggestionVM(m, isOrganization(m.userId, organizations)))
             .filter((s): s is MentionSuggestionVM => s !== null)
         : [],
-    [typing, found],
+    [typing, found, organizations],
   );
   // A fresh list can be shorter than the one the highlight was on.
   const current = items.length ? Math.min(highlighted, items.length - 1) : 0;

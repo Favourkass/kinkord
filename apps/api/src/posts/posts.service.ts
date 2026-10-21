@@ -7,8 +7,9 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
-import { and, count, desc, eq, ilike, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, count, desc, eq, gt, ilike, inArray, isNull, lt, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+import { noBlockEitherWay } from "../safety/blocks";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { Db, DRIZZLE } from "../db/db.module";
@@ -70,6 +71,12 @@ export const POST_MEDIA_MAX_MB = 10;
 const maxBytes = POST_MEDIA_MAX_MB * 1024 * 1024;
 
 export const FEED_PAGE_SIZE = 10;
+/** How long an organization's post opens For You in its country, and how many at once. */
+export const ORGANIZATION_PIN_HOURS = 48;
+export const ORGANIZATION_PINS = 3;
+// Aliased so the organization check can sit beside the author's own joined profile.
+const ORG = "org_profile";
+const orgProfile = alias(profile, ORG);
 export const FEED_MAX_PAGE_SIZE = 30;
 export const COMMENT_PAGE_SIZE = 10;
 export const COMMENT_MAX_PAGE_SIZE = 50;
@@ -387,12 +394,46 @@ export class PostsService {
       ? await this.selectPosts(viewerId, [inArray(post.id, page.ids)], page.ids.length)
       : [];
     const byId = new Map(rows.map((r) => [r.id, r]));
-    const ordered = page.ids.flatMap((id) => byId.get(id) ?? []);
+    // The viewer's country's organizations' newest posts open For You.
+    const pinned = tab === "for_you" && !params.cursor ? await this.organizationPins(viewerId) : [];
+    const pinnedIds = new Set(pinned.map((r) => r.id));
+    const ordered = [
+      ...pinned,
+      ...page.ids.flatMap((id) => byId.get(id) ?? []).filter((r) => !pinnedIds.has(r.id)),
+    ];
     return {
       items: await this.decorate(ordered, viewerId),
       nextCursor: page.nextCursor,
       ...(page.hint ? { hint: page.hint } : {}),
     };
+  }
+
+  /**
+   * Organizations' posts are a must on For You (founder, 2026-10-21): for 48
+   * hours after posting, an organization's public post opens the first page
+   * for every member in its country, newest first and a few at most, so a busy
+   * organization can't bury the feed. Members who blocked it, or whom it
+   * blocked, never see it.
+   */
+  private async organizationPins(viewerId: string) {
+    const [viewer] = await this.db
+      .select({ country: profile.country })
+      .from(profile)
+      .where(eq(profile.userId, viewerId))
+      .limit(1);
+    if (!viewer?.country) return [];
+    return this.selectPosts(
+      viewerId,
+      [
+        gt(post.createdAt, sql`now() - (${ORGANIZATION_PIN_HOURS} * interval '1 hour')`),
+        isNull(post.repostOfId),
+        eq(post.visibility, "public"),
+        ne(post.authorId, viewerId),
+        noBlockEitherWay(post.authorId, viewerId),
+        sql`exists (select 1 from ${profile} ${sql.identifier(ORG)} where ${orgProfile.userId} = ${post.authorId} and ${orgProfile.accountType} = 'organization' and ${orgProfile.country} = ${viewer.country})`,
+      ],
+      ORGANIZATION_PINS,
+    );
   }
 
   /** One post, or null when it is missing, deleted or not visible to the viewer. */

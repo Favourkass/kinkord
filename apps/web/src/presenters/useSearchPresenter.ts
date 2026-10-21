@@ -14,7 +14,8 @@ import {
 } from "@/domain/search";
 import { ApiError } from "@/services/apiClient";
 import { membersApi, toggleFollowOnCard } from "@/services/members.service";
-import { isOfficialOrganization } from "@/services/organization-placeholder.service";
+import { isOrganization } from "@/services/organizations.service";
+import { useOrganizations } from "./useOrganizations";
 
 /** How long typing pauses before searching; clearing the box applies at once. */
 export const SEARCH_DELAY_MS = 300;
@@ -60,6 +61,7 @@ interface FollowSet {
  * sits in the address (`?q=`), so Back and a shared link land on it again.
  */
 export function useSearchPresenter(initialQuery: string | null) {
+  const organizations = useOrganizations();
   const router = useRouter();
   const copy = SEARCH_COPY;
   const [query, setQuery] = useState(initialQuery ?? "");
@@ -236,10 +238,10 @@ export function useSearchPresenter(initialQuery: string | null) {
   const rows = useMemo(
     () =>
       (current?.items ?? []).map((pm) => ({
-        ...toSearchPersonVM(pm, Routes.member, isOfficialOrganization(pm.userId)),
+        ...toSearchPersonVM(pm, Routes.member, isOrganization(pm.userId, organizations)),
         busy: busy.has(pm.userId),
       })),
-    [current, busy],
+    [current, busy, organizations],
   );
 
   const onAll = tab === "all";

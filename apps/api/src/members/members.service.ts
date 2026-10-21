@@ -143,6 +143,23 @@ export class MembersService {
   ) {}
 
   /** Available countries with how many members have set that country. */
+  /** The organizations' accounts, by the country each speaks for; nobody suspended. */
+  async organizations() {
+    const rows = await this.db
+      .select({
+        userId: user.id,
+        username: user.username,
+        displayName: profile.displayName,
+        country: profile.country,
+      })
+      .from(user)
+      .innerJoin(profile, eq(profile.userId, user.id))
+      .where(and(eq(profile.accountType, "organization"), notBanned(user.id)))
+      .orderBy(asc(profile.displayName))
+      .limit(500);
+    return { items: rows };
+  }
+
   async countries() {
     const rows = await this.db
       .select({ country: profile.country, members: count() })
@@ -341,6 +358,9 @@ export class MembersService {
     // stays (so they can still follow back), the About details are withheld.
     const restricted = friendsOnly && !isFriend;
     const hidden = <T>(value: T, empty: T) => (restricted ? empty : value);
+    // An organization's account shows nothing that only describes a person.
+    const organization = p.accountType === "organization";
+    const personal = <T>(value: T, empty: T) => (organization ? empty : hidden(value, empty));
 
     return {
       userId: u.id,
@@ -350,24 +370,25 @@ export class MembersService {
       avatarUrl,
       coverUrl,
       bio: hidden(p.bio, null),
+      accountType: p.accountType,
       country: p.country,
-      state: p.state,
-      city: p.city,
-      age: ageFromDob(p.dateOfBirth),
-      gender: p.gender,
+      state: organization ? null : p.state,
+      city: organization ? null : p.city,
+      age: organization ? null : ageFromDob(p.dateOfBirth),
+      gender: organization ? null : p.gender,
       // Sexuality is private: only the member sees their own.
       orientation: isSelf ? p.orientation : null,
-      relationshipStatus: hidden(p.relationshipStatus, null),
+      relationshipStatus: personal(p.relationshipStatus, null),
       // Linked D/s and other relationships, both members agreed: About details, so friends-only hides them.
-      relationships: hidden(relationships, []),
-      bodyType: hidden(p.bodyType, null),
-      roles: p.roles ?? [],
-      interests: hidden(p.interests ?? [], []),
-      lookingFor: hidden(p.lookingFor ?? [], []),
-      languages: hidden(p.languages ?? [], []),
-      nationality: hidden(p.nationality ?? null, null),
-      occupation: hidden(p.occupation ?? null, null),
-      limits: hidden(p.limits ?? null, null),
+      relationships: personal(relationships, []),
+      bodyType: personal(p.bodyType, null),
+      roles: organization ? [] : (p.roles ?? []),
+      interests: personal(p.interests ?? [], []),
+      lookingFor: personal(p.lookingFor ?? [], []),
+      languages: personal(p.languages ?? [], []),
+      nationality: personal(p.nationality ?? null, null),
+      occupation: personal(p.occupation ?? null, null),
+      limits: personal(p.limits ?? null, null),
       socialLinks: hidden(p.socialLinks ?? {}, {}),
       joinedAt: u.createdAt.toISOString(),
       lastSeenAt: p.lastSeenAt ? p.lastSeenAt.toISOString() : null,

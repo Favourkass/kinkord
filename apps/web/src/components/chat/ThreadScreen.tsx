@@ -113,7 +113,9 @@ export default function ThreadScreen(p: ThreadScreenProps) {
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-[3px]">
-          <span className="truncate text-[15px] font-bold text-app-text">
+          <span
+            className={`truncate text-[15px] font-bold ${p.peer?.organization ? "text-kink-gold-bright" : "text-app-text"}`}
+          >
             {p.peer?.displayName ?? (p.loading ? "…" : "Member")}
           </span>
           {p.peer?.teamMember ? <TeamBadge size={16} /> : null}

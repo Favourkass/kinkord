@@ -9,7 +9,7 @@ import {
 } from "@nestjs/common";
 import { and, count, eq, ne, or } from "drizzle-orm";
 import { DRIZZLE, type Db } from "../db/db.module";
-import { memberRelationship, user } from "../db/schema";
+import { memberRelationship, profile, user } from "../db/schema";
 import { orderedPair } from "../members/friendship-policy";
 import { notBanned } from "../moderation/admins";
 import { PushService } from "../push/push.service";
@@ -132,14 +132,18 @@ export class RelationshipsService {
 
   private async target(viewerId: string, handle: string): Promise<string> {
     const [row] = await this.db
-      .select({ id: user.id })
+      .select({ id: user.id, accountType: profile.accountType })
       .from(user)
+      .innerJoin(profile, eq(profile.userId, user.id))
       .where(
         and(eq(user.username, handle), notBanned(user.id), noBlockEitherWay(user.id, viewerId)),
       )
       .limit(1);
     if (!row) throw new NotFoundException(`No member has the username @${handle}.`);
     if (row.id === viewerId) throw new BadRequestException("You can't link with yourself.");
+    if (row.accountType === "organization") {
+      throw new BadRequestException("Relationships link people, not organizations.");
+    }
     return row.id;
   }
 }

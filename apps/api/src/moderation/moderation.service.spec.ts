@@ -643,3 +643,49 @@ describe("ModerationService.setAdminSilver", () => {
     );
   });
 });
+
+describe("ModerationService.setOrganization", () => {
+  it("makes the account an organization's, tied to its country, and logs it", async () => {
+    const { service, after } = make([[{ accountType: "organization", country: "KE" }], undefined]);
+    await expect(service.setOrganization("f1", "u7", true, "KE")).resolves.toEqual({
+      organization: true,
+      country: "KE",
+    });
+    expect(after("update", profile, "set")).toEqual({ accountType: "organization", country: "KE" });
+    expect(after("insert", moderationLog, "values")).toEqual({
+      actorId: "f1",
+      subjectUserId: "u7",
+      action: "make-organization",
+      detail: "KE",
+    });
+  });
+
+  it("needs one of the countries Kinkord serves", async () => {
+    for (const country of [null, "GB"]) {
+      const { service, indexOf } = make([]);
+      await expect(service.setOrganization("f1", "u7", true, country)).rejects.toThrow(
+        "Choose the organization's country.",
+      );
+      expect(indexOf("update", profile)).toBe(-1);
+    }
+  });
+
+  it("makes it a person's again without moving it", async () => {
+    const { service, after } = make([[{ accountType: "person", country: "NG" }], undefined]);
+    await expect(service.setOrganization("f1", "u7", false, null)).resolves.toEqual({
+      organization: false,
+      country: "NG",
+    });
+    expect(after("update", profile, "set")).toEqual({ accountType: "person" });
+    expect(after("insert", moderationLog, "values")).toMatchObject({
+      action: "remove-organization",
+    });
+  });
+
+  it("is a 404 for an account with no profile", async () => {
+    const { service } = make([[]]);
+    await expect(service.setOrganization("f1", "nobody", true, "NG")).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+});

@@ -55,7 +55,9 @@ export default function MemberCard({ vm, href, labels, onToggleFollow, busy }: M
           aria-label={labels.openProfile}
           className="flex min-w-0 items-center gap-[4px] text-[13px] font-semibold leading-[16px] text-mem-list-text after:absolute after:inset-0 after:content-[''] lg:gap-[6px] lg:text-[20px] lg:leading-[24px]"
         >
-          <span className="truncate">{vm.title}</span>
+          <span className={`truncate ${vm.organization ? "text-kink-gold-bright" : ""}`}>
+            {vm.title}
+          </span>
           {vm.teamMember ? <TeamBadge size={18} /> : null}
 
           {vm.organization ? (

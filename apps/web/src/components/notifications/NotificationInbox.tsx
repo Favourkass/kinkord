@@ -270,7 +270,11 @@ export default function NotificationInbox(p: NotificationInboxProps) {
                     <span className="block break-words text-[13px] font-medium leading-[19px] min-[420px]:text-[14px] lg:text-[16px]">
                       {item.actorName && (
                         <>
-                          <strong className="font-extrabold">{item.actorName}</strong>
+                          <strong
+                            className={`font-extrabold ${item.actorOrganization ? "text-kink-gold-bright" : ""}`}
+                          >
+                            {item.actorName}
+                          </strong>
                           {item.actorTeamMember ? <TeamBadge size={16} /> : null}
                           {item.actorOrganization ? (
                             <span className="ml-[4px] inline-flex align-[-2px]">

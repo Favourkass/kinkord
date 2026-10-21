@@ -41,7 +41,8 @@ import type { GiftInDoubt } from "@/domain/wallet";
 import { GIFT_COPY, postGiftsService } from "@/services/post-gifts.service";
 import { pendingTransfersService } from "@/services/pendingTransfers.service";
 import { ApiError } from "@/services/apiClient";
-import { isOfficialOrganization } from "@/services/organization-placeholder.service";
+import { isOrganization } from "@/services/organizations.service";
+import { useOrganizations } from "./useOrganizations";
 import { useMentionSuggestions, type MentionField } from "./useMentionSuggestions";
 import {
   appendNewRows,
@@ -148,6 +149,7 @@ export function useFeedPresenter({
   postMaxLength = postBodyMax(false),
   ready = true,
 }: FeedOptions = {}) {
+  const organizations = useOrganizations();
   const router = useRouter();
 
   // The home feed's tab: the one picked here, else the one this browser
@@ -835,19 +837,19 @@ export function useFeedPresenter({
           expanded.includes(p.id),
           memberHref,
           new Date(),
-          isOfficialOrganization(p.author.userId),
+          isOrganization(p.author.userId, organizations),
         ),
         authorFollowBusy: followBusy.includes(p.author.userId),
       })),
-    [posts, expanded, followBusy],
+    [posts, expanded, followBusy, organizations],
   );
 
   const commentVMs: CommentVM[] = useMemo(
     () =>
       comments.map((c) =>
-        toCommentVM(c, memberHref, new Date(), isOfficialOrganization(c.author.userId)),
+        toCommentVM(c, memberHref, new Date(), isOrganization(c.author.userId, organizations)),
       ),
-    [comments],
+    [comments, organizations],
   );
 
   const suggestionVMs: FeedSuggestionVM[] = useMemo(
@@ -857,10 +859,10 @@ export function useFeedPresenter({
           s,
           memberHref,
           followBusy.includes(s.userId),
-          isOfficialOrganization(s.userId),
+          isOrganization(s.userId, organizations),
         ),
       ),
-    [suggestions, followBusy],
+    [suggestions, followBusy, organizations],
   );
 
   // Until the client has read the remembered tab (the server render), none is

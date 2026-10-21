@@ -49,7 +49,9 @@ export default function ConversationRow({
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex items-baseline gap-[8px]">
             <span className="flex min-w-0 flex-1 items-center gap-[3px]">
-              <span className="truncate text-[15px] font-bold text-app-text">
+              <span
+                className={`truncate text-[15px] font-bold ${row.organization ? "text-kink-gold-bright" : "text-app-text"}`}
+              >
                 {row.displayName}
               </span>
               {row.teamMember ? <TeamBadge size={16} /> : null}

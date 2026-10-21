@@ -91,6 +91,23 @@ export class ModerationController {
     return this.moderation.setTeamBadge(req.user.id, id, input.enabled);
   }
 
+  /** An organization's account, tied to its country, or a person's again: the founders' call. */
+  @Post("members/:id/organization")
+  @UseGuards(AdminGuard)
+  organization(@Req() req: AuthedRequest, @Param("id") id: string, @Body() body: unknown) {
+    foundersOnly(req, "Only the founders can make an account an organization's.");
+    const input = parse(
+      z
+        .object({
+          enabled: z.boolean(),
+          country: z.string().trim().toUpperCase().length(2).nullish(),
+        })
+        .strict(),
+      body,
+    );
+    return this.moderation.setOrganization(req.user.id, id, input.enabled, input.country ?? null);
+  }
+
   @Post("members/:id/block")
   @UseGuards(AdminGuard)
   async block(@Req() req: AuthedRequest, @Param("id") id: string, @Body() body: unknown) {

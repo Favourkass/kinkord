@@ -1,0 +1,1 @@
+ALTER TABLE "profile" ADD COLUMN "account_type" text DEFAULT 'person' NOT NULL;

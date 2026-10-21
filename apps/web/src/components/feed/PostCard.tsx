@@ -67,7 +67,9 @@ export default function PostCard({
   onOpenMedia,
 }: PostCardProps) {
   const name = (
-    <span className="inline-flex items-center gap-[3px] text-[14px] font-bold leading-[17px] text-feed-text">
+    <span
+      className={`inline-flex items-center gap-[3px] text-[14px] font-bold leading-[17px] ${post.authorOrganization ? "text-kink-gold-bright" : "text-feed-text"}`}
+    >
       {post.authorName}
       {post.authorTeamMember ? <TeamBadge size={18} /> : null}
 
@@ -107,7 +109,9 @@ export default function PostCard({
               name
             )}
             {post.handle && (
-              <span className="text-[12px] font-light leading-[15px] text-feed-muted">
+              <span
+                className={`text-[12px] font-light leading-[15px] ${post.authorOrganization ? "text-kink-gold-bright" : "text-feed-muted"}`}
+              >
                 {post.handle}
               </span>
             )}
