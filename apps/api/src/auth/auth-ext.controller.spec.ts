@@ -41,7 +41,7 @@ const validSignUp = {
   state: "Delta",
   city: "Sapele",
   dateOfBirth: "1999-08-04",
-  gender: "male",
+  gender: "Male",
   phone: "+2348031234567",
 };
 

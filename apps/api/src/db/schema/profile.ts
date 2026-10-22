@@ -38,6 +38,8 @@ export const profile = pgTable("profile", {
   city: text("city"),
   dateOfBirth: date("date_of_birth"),
   gender: text("gender"),
+  /** Member-selected genders; the legacy primary gender remains compatible. */
+  genders: jsonb("genders").$type<string[]>().notNull().default([]),
   /** Kink roles picked during profile setup; validated against the role options. */
   roles: jsonb("roles").$type<string[]>().notNull().default([]),
   relationshipStatus: text("relationship_status"),
@@ -45,6 +47,8 @@ export const profile = pgTable("profile", {
   interests: jsonb("interests").$type<string[]>().notNull().default([]),
   /** Public-profile "About" rows (members flow); free-form labels, member-chosen. */
   orientation: text("orientation"),
+  /** Private, separately selected orientation labels; never inferred from sexuality. */
+  orientationSelections: jsonb("orientation_selections").$type<string[]>().notNull().default([]),
   bodyType: text("body_type"),
   languages: jsonb("languages").$type<string[]>().notNull().default([]),
   /** Presence heartbeat: bumped (throttled) on authenticated API activity. Drives

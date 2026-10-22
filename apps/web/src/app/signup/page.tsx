@@ -1,13 +1,12 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { AtSign, CheckCircle2, ChevronDown, Lock, Mail, MapPin, User, Users } from "lucide-react";
+import { AtSign, CheckCircle2, Lock, Mail, MapPin, User } from "lucide-react";
 import EditRowsCard from "@/components/profile/edit/EditRowsCard";
 import FieldEditorSheet from "@/components/profile/edit/FieldEditorSheet";
 import SignupShell from "@/components/auth/SignupShell";
-import SelectField from "@/components/auth/SelectField";
 import SearchSelectField from "@/components/auth/SearchSelectField";
 import CheckRow from "@/components/auth/CheckRow";
 import GoldCta from "@/components/auth/GoldCta";
@@ -15,7 +14,7 @@ import TextField from "@/components/auth/TextField";
 import DobPicker from "@/components/auth/DobPicker";
 import CodeInput from "@/components/auth/CodeInput";
 import UploadTile from "@/components/auth/UploadTile";
-import RoleChips from "@/components/auth/RoleChips";
+import MultiSelectField from "@/components/auth/MultiSelectField";
 import PhotoConfirmation from "@/components/profile/PhotoConfirmation";
 import AgePill from "@/components/ui/AgePill";
 import { ShieldCheckIcon } from "@/components/auth/AuthIcons";
@@ -48,7 +47,6 @@ function SignupWizard() {
   const p = useSignupWizardPresenter(
     resume === "email" || resume === "preferences" || resume === "profile" ? resume : undefined,
   );
-  const [rolesOpen, setRolesOpen] = useState(false);
 
   // A failed Send OTP says what's wrong by the button; bring the first bad
   // field into view too, since on a phone it's usually scrolled off the top.
@@ -204,11 +202,6 @@ function SignupWizard() {
               />
             </div>
 
-            <div className="my-2 flex w-full items-center justify-center lg:my-3">
-              <div className="h-px w-full bg-gradient-to-r from-transparent via-[#faab14]/40 to-transparent" />
-            </div>
-
-            <StageHeading plain="TELL US" highlight="ABOUT YOU" />
             <div className="grid w-full gap-4 sm:grid-cols-2 lg:gap-6">
               <SearchSelectField
                 id={fieldId("state")}
@@ -225,11 +218,11 @@ function SignupWizard() {
               <SearchSelectField
                 label={p.aboutStep.location.areaLabel}
                 options={p.aboutStep.location.areas}
+                loadMoreOnScroll
                 placeholder={p.aboutStep.location.areaPlaceholder}
                 searchPlaceholder={p.aboutStep.location.areaSearchPlaceholder}
                 disabled={p.aboutStep.location.areaDisabled}
                 emptyLabel={p.aboutStep.location.areaEmptyLabel}
-                moreLabel={p.aboutStep.location.areaMoreLabel}
                 other={p.aboutStep.location.otherArea}
                 value={p.aboutStep.areaValue}
                 onChange={p.aboutStep.selectArea}
@@ -274,40 +267,23 @@ function SignupWizard() {
               error={p.aboutStep.errors.dob}
             />
             <div id={fieldId("gender")} className="w-full">
-              <p className="mb-2 text-[12px] font-medium text-white lg:text-[20px]">Gender</p>
-              <div className="grid grid-cols-2 gap-4 lg:gap-6">
-                {(["male", "female"] as const).map((g) => (
-                  <button
-                    key={g}
-                    type="button"
-                    aria-pressed={p.aboutStep.draft.gender === g}
-                    onClick={() => p.aboutStep.set({ ...p.aboutStep.draft, gender: g })}
-                    className={`flex h-[44px] items-center justify-center gap-2 rounded-[12px] border bg-kink-field text-[15px] capitalize transition lg:h-[56px] lg:text-[17px] ${
-                      p.aboutStep.draft.gender === g
-                        ? "border-kink-gold-bright font-semibold text-kink-gold-bright"
-                        : "border-kink-edge text-kink-cream hover:border-kink-gold-bright/50"
-                    }`}
-                  >
-                    {g === "male" ? "♂" : "♀"} {g}
-                  </button>
-                ))}
-              </div>
+              <MultiSelectField
+                label="Gender"
+                max={5}
+                selected={p.aboutStep.genders}
+                options={p.aboutStep.genderOptions}
+                query={p.aboutStep.genderSearch}
+                searchLabel="Search genders"
+                onQuery={p.aboutStep.setGenderSearch}
+                onToggle={p.aboutStep.toggleGender}
+              />
               {p.aboutStep.errors.gender && (
-                <p className="mt-1.5 text-[11px] text-red-400 lg:text-[14px]">
+                <p role="alert" className="mt-1.5 text-[12px] text-red-400">
                   {p.aboutStep.errors.gender}
                 </p>
               )}
             </div>
-            {p.aboutStep.showSexuality && (
-              <SelectField
-                label={p.aboutStep.sexuality.label}
-                options={p.aboutStep.sexuality.options}
-                clearLabel={p.aboutStep.sexuality.clearLabel}
-                helper={p.aboutStep.sexuality.helper}
-                value={p.aboutStep.draft.orientation ?? ""}
-                onChange={(orientation) => p.aboutStep.set({ ...p.aboutStep.draft, orientation })}
-              />
-            )}
+
             {p.topError && <p className="text-[13px] text-red-400 lg:text-[15px]">{p.topError}</p>}
             <GoldCta
               label="Send OTP"
@@ -411,6 +387,18 @@ function SignupWizard() {
             ) : (
               <EditRowsCard rows={p.preferencesStep.rows} />
             )}
+            {p.preferencesStep.showSexuality && (
+              <MultiSelectField
+                label="Sexual orientation"
+                max={5}
+                selected={p.preferencesStep.orientationSelections}
+                options={p.preferencesStep.orientationOptions}
+                query={p.preferencesStep.orientationSearch}
+                searchLabel="Search orientations"
+                onQuery={p.preferencesStep.setOrientationSearch}
+                onToggle={p.preferencesStep.toggleOrientation}
+              />
+            )}
             {p.preferencesStep.error && (
               <div className="text-center">
                 <p role="alert" className="text-[13px] text-red-400">
@@ -480,58 +468,16 @@ function SignupWizard() {
               note={p.profileStep.lockedHint ?? undefined}
               onFile={(f) => p.profileStep.uploadImage("cover", f)}
             />
-            <div className="w-full">
-              <button
-                type="button"
-                aria-expanded={rolesOpen}
-                onClick={() => setRolesOpen((v) => !v)}
-                className="flex h-[52px] w-full items-center gap-4 rounded-[12px] border border-kink-edge bg-kink-field px-5 lg:h-[59px]"
-              >
-                <Users size={20} className="text-white" aria-hidden />
-                <span className="flex-1 text-left text-[15px] font-medium text-white lg:text-[20px]">
-                  Roles
-                  {p.profileStep.roles.length > 0 && (
-                    <span className="ml-2 text-[12px] text-kink-gold-bright lg:text-[15px]">
-                      {p.profileStep.roles.length} selected
-                    </span>
-                  )}
-                </span>
-                <ChevronDown
-                  size={18}
-                  aria-hidden
-                  className={`text-kink-help transition-transform ${rolesOpen ? "rotate-180" : ""}`}
-                />
-              </button>
-              {rolesOpen && (
-                <div className="mt-3">
-                  <label className="mb-3 block">
-                    <span className="sr-only">Search roles</span>
-                    <input
-                      type="search"
-                      placeholder="Search roles"
-                      value={p.profileStep.roleSearch}
-                      onChange={(e) => p.profileStep.setRoleSearch(e.target.value)}
-                      className="h-[44px] w-full rounded-lg border border-kink-edge bg-kink-field px-4 text-white outline-none focus:border-kink-gold-bright"
-                    />
-                  </label>
-                  <div
-                    className="max-h-[260px] overflow-y-auto overscroll-contain rounded-lg border border-kink-edge p-3"
-                    role="region"
-                    aria-label="Available roles"
-                    tabIndex={0}
-                  >
-                    <RoleChips
-                      options={p.profileStep.roleOptions}
-                      selected={p.profileStep.roles}
-                      onToggle={p.profileStep.toggleRole}
-                    />
-                    {p.profileStep.roleOptions.length === 0 && (
-                      <p className="text-[13px] text-kink-help">No roles match your search.</p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+            <MultiSelectField
+              label="Roles"
+              max={5}
+              selected={p.profileStep.roles}
+              options={p.profileStep.roleOptions}
+              query={p.profileStep.roleSearch}
+              searchLabel="Search roles"
+              onQuery={p.profileStep.setRoleSearch}
+              onToggle={p.profileStep.toggleRole}
+            />
             {p.profileStep.error && (
               <p className="text-[13px] text-red-400 lg:text-[15px]">{p.profileStep.error}</p>
             )}

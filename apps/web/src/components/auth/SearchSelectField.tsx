@@ -34,6 +34,8 @@ interface Props {
   moreLabel?: string;
   /** Override the default cap for small, complete lists such as states. */
   resultLimit?: number;
+  /** Reveal the entire list in batches as the member scrolls. */
+  loadMoreOnScroll?: boolean;
   other?: SearchSelectOther | null;
   error?: string;
   disabled?: boolean;
@@ -41,6 +43,7 @@ interface Props {
 }
 
 const NOTHING: SearchResult<Option> = { hits: [], more: false };
+const SCROLL_BATCH_SIZE = 50;
 
 /** Searchable display options with keyboard selection and focus dismissal. */
 export default function SearchSelectField(p: Props) {
@@ -49,11 +52,13 @@ export default function SearchSelectField(p: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
+  const [visibleLimit, setVisibleLimit] = useState(SCROLL_BATCH_SIZE);
+  const limit = p.loadMoreOnScroll ? visibleLimit : p.resultLimit;
   // Long lists (thousands of towns) are only searched while open.
   const match = useMemo(() => (open ? optionMatcher(p.options) : null), [open, p.options]);
   const { hits, more } = useMemo(
-    () => (match ? match(query, p.resultLimit) : NOTHING),
-    [match, query, p.resultLimit],
+    () => (match ? match(query, limit) : NOTHING),
+    [match, query, limit],
   );
   const other = p.other ?? null;
   const typed = query.trim();
@@ -98,6 +103,7 @@ export default function SearchSelectField(p: Props) {
           setOpen(!open);
           setQuery("");
           setActive(0);
+          setVisibleLimit(SCROLL_BATCH_SIZE);
         }}
         className={`flex h-[44px] w-full items-center justify-between rounded-lg border bg-kink-field px-4 text-left text-[15px] text-white focus:border-kink-gold-bright lg:h-[65px] lg:text-[20px] ${p.error ? "border-red-500/70" : "border-kink-edge"}`}
       >
@@ -130,6 +136,9 @@ export default function SearchSelectField(p: Props) {
               onChange={(e) => {
                 setQuery(e.target.value);
                 setActive(0);
+                setVisibleLimit(SCROLL_BATCH_SIZE);
+                const list = document.getElementById(`${id}-options`);
+                if (list) list.scrollTop = 0;
               }}
               onKeyDown={(e) => {
                 if (e.key === "Escape") {
@@ -138,7 +147,12 @@ export default function SearchSelectField(p: Props) {
                 }
                 if (e.key === "ArrowDown") {
                   e.preventDefault();
-                  setActive(Math.max(0, Math.min(active + 1, rows - 1)));
+                  if (p.loadMoreOnScroll && more && active + 1 >= hits.length) {
+                    setVisibleLimit((count) => count + SCROLL_BATCH_SIZE);
+                    setActive(active + 1);
+                  } else {
+                    setActive(Math.max(0, Math.min(active + 1, rows - 1)));
+                  }
                 }
                 if (e.key === "ArrowUp") {
                   e.preventDefault();
@@ -159,6 +173,16 @@ export default function SearchSelectField(p: Props) {
             // iOS Safari doesn't focus a tapped button, so without this the search
             // box's blur closes the list before the tap lands on an option.
             onMouseDown={(e) => e.preventDefault()}
+            onScroll={(e) => {
+              const list = e.currentTarget;
+              if (
+                p.loadMoreOnScroll &&
+                more &&
+                list.scrollHeight - list.scrollTop - list.clientHeight < 120
+              ) {
+                setVisibleLimit((count) => count + SCROLL_BATCH_SIZE);
+              }
+            }}
             className="max-h-[240px] overflow-y-auto"
           >
             {hits.map((option, index) => (

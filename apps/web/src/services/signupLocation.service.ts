@@ -1,3 +1,4 @@
+import { genderSelectionIssue, selectedGenders } from "./genderSelection.service";
 import { validateAbout, type AboutDraft, type SignupField } from "@/domain/onboarding";
 import { LAUNCH_COUNTRIES, signupFixFieldsMessage } from "@/constants/onboarding";
 import { KEEP_TYPING, PLACE_NAMES_CREDIT, typedPlaceLabel } from "@/constants/location";
@@ -58,6 +59,8 @@ export function signupLocationFields(
 
 export function validateSignupAbout(country: string | null, draft: AboutDraft) {
   const errors = validateAbout(draft);
+  const genderError = genderSelectionIssue(country, selectedGenders(draft.genders, draft.gender));
+  if (genderError) errors.gender = genderError;
   if (errors.state)
     errors.state = `${signupLocationFields(country, draft.state).statePlaceholder}.`;
   return errors;

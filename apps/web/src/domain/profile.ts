@@ -20,11 +20,13 @@ export interface OwnProfilePM {
   city: string | null;
   dateOfBirth: string | null;
   gender: string | null;
+  genders?: string[];
   roles: string[];
   relationshipStatus: string | null;
   lookingFor: string[];
   interests: string[];
   orientation: string | null;
+  orientationSelections?: string[];
   bodyType: string | null;
   languages: string[];
   location: string | null;
@@ -68,6 +70,7 @@ export interface ProfileOptionsPM {
   genders: readonly string[];
   /** Sexuality choices; the value is private to the member. */
   orientations: readonly string[];
+  orientationSelections?: readonly string[];
   relationshipStatuses: readonly string[];
   roles: readonly string[];
   kinks: readonly string[];
@@ -95,6 +98,7 @@ export type EditRowKey =
   | "gender"
   /** Sexuality: private, shown only to the member. */
   | "orientation"
+  | "orientationSelections"
   | "dateOfBirth"
   | "nationality"
   | "relationshipStatus"

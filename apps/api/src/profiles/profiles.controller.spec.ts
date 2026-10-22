@@ -63,11 +63,12 @@ describe("ProfilesController", () => {
 
   it("serves the option lists the pickers render", () => {
     const options = new ProfilesController(serviceMock()).options();
-    expect(options.genders).toEqual(["Male", "Female"]);
+    expect(options.genders.slice(0, 2)).toEqual(["Male", "Female"]);
+    expect(options.genders).toHaveLength(95);
     expect(options.orientations).toEqual(["Straight", "Bisexual"]);
     expect(options.relationshipStatuses).toHaveLength(17);
-    expect(options.roles).toHaveLength(36);
-    expect(options.kinks).toHaveLength(50);
+    expect(options.roles).toHaveLength(868);
+    expect(options.kinks).toHaveLength(100);
     expect(options.lookingFor).toHaveLength(10);
     expect(options.nameChangeCooldownDays).toBe(30);
   });

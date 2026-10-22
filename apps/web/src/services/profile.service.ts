@@ -1,3 +1,5 @@
+import { sexualOrientationSelections } from "./sexualOrientation.service";
+import { genderOptions, selectedGenders } from "./genderSelection.service";
 import { canSelectSexuality } from "./profile-field-policy";
 import { ALL_COUNTRY_CODES } from "@/constants/countries";
 import { DEFAULT_SIGNUP_COUNTRY, LAUNCH_COUNTRIES } from "@/constants/onboarding";
@@ -38,7 +40,9 @@ export interface ProfilePatch {
   displayName?: string;
   bio?: string | null;
   gender?: string | null;
+  genders?: string[];
   orientation?: string | null;
+  orientationSelections?: string[];
   dateOfBirth?: string;
   nationality?: string | null;
   relationshipStatus?: string | null;
@@ -96,7 +100,7 @@ export const SECTION_ROWS: Record<EditSectionKey, EditRowKey[]> = {
     "displayName",
     "bio",
     "gender",
-    "orientation",
+    "orientationSelections",
     "dateOfBirth",
     "nationality",
     "relationshipStatus",
@@ -211,8 +215,24 @@ export function buildEditRow(key: EditRowKey, ctx: EditRowsContext): EditRowPM {
     case "gender":
       return {
         key,
-        value: capitalize(profile.gender) || null,
-        editor: single(capitalize(profile.gender) || null, plain(options.genders)),
+        value: joinList(selectedGenders(profile.genders, profile.gender)),
+        editor: multi(
+          selectedGenders(profile.genders, profile.gender),
+          genderOptions(profileCountry(profile), options.genders),
+          5,
+          true,
+        ),
+      };
+    case "orientationSelections":
+      return {
+        key,
+        value: joinList(sexualOrientationSelections(profile)),
+        editor: multi(
+          sexualOrientationSelections(profile),
+          options.orientationSelections ?? [],
+          5,
+          true,
+        ),
       };
     case "orientation":
       // Private: this row is only ever built for the member's own profile.
@@ -246,13 +266,18 @@ export function buildEditRow(key: EditRowKey, ctx: EditRowsContext): EditRowPM {
       return {
         key,
         value: joinList(profile.roles),
-        editor: multi(profile.roles, options.roles, 10),
+        editor: multi(profile.roles, options.roles, 5, true),
       };
     case "kinks":
       return {
         key,
         value: joinList(profile.interests),
-        editor: multi(profile.interests, options.kinks, 20, true),
+        editor: multi(
+          profile.interests,
+          [...new Set([...options.kinks, ...profile.interests])],
+          20,
+          true,
+        ),
       };
     case "lookingFor":
       return {
@@ -330,7 +355,11 @@ export function buildEditRow(key: EditRowKey, ctx: EditRowsContext): EditRowPM {
 export function buildEditRows(section: EditSectionKey, ctx: EditRowsContext): EditRowPM[] {
   return SECTION_ROWS[section]
     .filter((key) => key !== "verifiedBadge" || ctx.profile.identityVerified)
-    .filter((key) => key !== "orientation" || canSelectSexuality(profileCountry(ctx.profile)))
+    .filter(
+      (key) =>
+        (key !== "orientation" && key !== "orientationSelections") ||
+        canSelectSexuality(profileCountry(ctx.profile)),
+    )
     .map((key) => buildEditRow(key, ctx));
 }
 
@@ -401,7 +430,7 @@ export function patchFor(key: EditRowKey, draft: EditorDraft, profile: OwnProfil
     case "occupation":
       return { occupation: t || null };
     case "gender":
-      return { gender: t || null };
+      return { genders: listOf(draft) };
     case "orientation":
       return canSelectSexuality(profileCountry(profile)) ? { orientation: t || null } : {};
     case "dateOfBirth":
@@ -410,6 +439,10 @@ export function patchFor(key: EditRowKey, draft: EditorDraft, profile: OwnProfil
       return { nationality: t || null };
     case "relationshipStatus":
       return { relationshipStatus: t || null };
+    case "orientationSelections":
+      return canSelectSexuality(profileCountry(profile))
+        ? { orientation: null, orientationSelections: listOf(draft) }
+        : {};
     case "roles":
       return { roles: listOf(draft) };
     case "kinks":

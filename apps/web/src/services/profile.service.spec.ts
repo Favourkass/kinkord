@@ -98,13 +98,43 @@ const valuesOf = (section: Parameters<typeof buildEditRows>[0]) =>
   Object.fromEntries(buildEditRows(section, ctx).map((r) => [r.key, r.value]));
 
 describe("buildEditRows", () => {
+  it("edits private orientation selections separately and caps roles and orientations at five", () => {
+    const context = {
+      ...ctx,
+      profile: { ...profile, country: "GH", orientationSelections: ["Queer"] },
+      options: { ...options, orientationSelections: ["Queer", "Asexual"] },
+    };
+    const row = buildEditRow("orientationSelections", context);
+    expect(row.value).toBe("Queer");
+    expect(buildEditRows("basic", context).some((row) => row.key === "orientation")).toBe(false);
+    expect(
+      buildEditRow("orientationSelections", {
+        ...context,
+        profile: { ...context.profile, orientation: "Bisexual", orientationSelections: [] },
+      }).value,
+    ).toBe("Bisexual");
+    expect(row.editor).toMatchObject({ kind: "multi", max: 5, searchable: true });
+    expect(buildEditRow("roles", context).editor).toMatchObject({ kind: "multi", max: 5 });
+    expect(
+      patchFor(
+        "orientationSelections",
+        { kind: "multi", value: ["Queer", "Asexual"] },
+        context.profile,
+      ),
+    ).toEqual({ orientation: null, orientationSelections: ["Queer", "Asexual"] });
+    expect(
+      buildEditRows("basic", { ...context, profile: { ...context.profile, country: "NG" } }).some(
+        (row) => row.key === "orientationSelections",
+      ),
+    ).toBe(false);
+  });
   it("lays out each section in Figma order", () => {
     expect(SECTION_ROWS.basic).toEqual([
       "username",
       "displayName",
       "bio",
       "gender",
-      "orientation",
+      "orientationSelections",
       "dateOfBirth",
       "nationality",
       "relationshipStatus",
@@ -306,8 +336,8 @@ describe("drafts", () => {
     expect(patchFor("profileVisibility", { kind: "single", value: "friends" }, profile)).toEqual({
       profileVisibility: "friends",
     });
-    expect(patchFor("gender", { kind: "single", value: "Male" }, profile)).toEqual({
-      gender: "Male",
+    expect(patchFor("gender", { kind: "multi", value: ["Male", "Female"] }, profile)).toEqual({
+      genders: ["Male", "Female"],
     });
     expect(patchFor("username", { kind: "text", value: "x" }, profile)).toEqual({});
     expect(usernameFromDraft({ kind: "text", value: " @Sir.Tega " })).toBe("Sir.Tega");
@@ -427,7 +457,7 @@ it("hides sexuality for Nigerian profiles without changing saved values", () => 
   expect(local.profile.orientation).toBe("Bisexual");
   expect(
     buildEditRows("basic", { ...local, profile: { ...local.profile, country: "KE" } }).some(
-      (r) => r.key === "orientation",
+      (r) => r.key === "orientationSelections",
     ),
   ).toBe(true);
 });

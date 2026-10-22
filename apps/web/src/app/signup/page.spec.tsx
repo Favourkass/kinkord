@@ -11,6 +11,7 @@ const fixture = vi.hoisted(() => ({
   emailVerified: false,
   canSkipPhotos: true,
   resume: null as string | null,
+  country: "NG",
   options: vi.fn(),
 }));
 beforeEach(() => {
@@ -18,13 +19,20 @@ beforeEach(() => {
   fixture.emailVerified = false;
   fixture.canSkipPhotos = true;
   fixture.resume = null;
+  fixture.country = "NG";
   fixture.options.mockReset().mockResolvedValue({ kinks: ["Bondage"], lookingFor: ["Friendship"] });
   fixture.update.mockReset().mockResolvedValue({});
 });
 afterEach(cleanup);
 vi.mock("@/services/profile.service", () => ({
   profileApi: {
-    own: async () => ({ interests: [], lookingFor: [], limits: null }),
+    own: async () => ({
+      country: fixture.country,
+      orientation: null,
+      interests: [],
+      lookingFor: [],
+      limits: null,
+    }),
     options: () => fixture.options(),
     update: (...args: unknown[]) => fixture.update(...args),
   },
@@ -115,12 +123,12 @@ it("offers photo skipping and a searchable scrolling role list", async () => {
   expect(await screen.findByRole("button", { name: "Skip photos for now" })).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Roles" }));
   fireEvent.change(screen.getByLabelText("Search roles"), { target: { value: "aftercare" } });
-  expect(screen.getByRole("region", { name: "Available roles" }).className).toContain(
+  expect(screen.getByRole("listbox", { name: "Roles (max 5)" }).className).toContain(
     "overflow-y-auto",
   );
-  expect(screen.getByRole("button", { name: "Aftercare Buddy" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "Aftercare Specialist" })).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "Bottom" })).toBeNull();
+  expect(screen.getByRole("option", { name: "Aftercare Buddy" })).toBeTruthy();
+  expect(screen.getByRole("option", { name: "Aftercare Specialist" })).toBeTruthy();
+  expect(screen.queryByRole("option", { name: "Bottom" })).toBeNull();
 });
 
 it("searches towns inside a state and allows an unlisted place", async () => {
@@ -171,26 +179,16 @@ it("searches towns inside a state and allows an unlisted place", async () => {
   vi.unstubAllGlobals();
 });
 
-it("offers former roles and the ten additions in the same searchable list", () => {
+it("offers former and supplied roles in the searchable multi-select", () => {
   fixture.stage = "profile";
   render(<SignupPage />);
   fireEvent.click(screen.getByRole("button", { name: "Roles" }));
-  for (const role of [
-    "Bottom",
-    "Dominant",
-    "Submissive",
-    "Handler",
-    "Rigger",
-    "Rope Bunny",
-    "Acolyte",
-    "Adult Baby",
-    "Aftercare Buddy",
-  ]) {
-    expect(screen.getByRole("button", { name: role })).toBeTruthy();
+  for (const role of ["Dominant", "Acolyte", "Aftercare Buddy"]) {
+    fireEvent.change(screen.getByLabelText("Search roles"), { target: { value: role } });
+    expect(screen.getByRole("option", { name: role })).toBeTruthy();
   }
-  fireEvent.change(screen.getByLabelText("Search roles"), { target: { value: "rigger" } });
-  expect(screen.getByRole("button", { name: "Rigger" })).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "Acolyte" })).toBeNull();
+  fireEvent.click(screen.getByRole("option", { name: "Aftercare Buddy" }));
+  expect(screen.getByRole("button", { name: "Remove Aftercare Buddy" })).toBeTruthy();
 });
 
 it.each([
@@ -226,6 +224,41 @@ it("hides sexuality and its helper for the default Nigerian signup", () => {
   expect(
     screen.queryByText("Only you can see this. You can change or clear it in Edit Profile."),
   ).toBeNull();
+});
+
+it("offers only Male and Female in the Nigerian gender multi-select", () => {
+  render(<SignupPage />);
+  fireEvent.click(screen.getByRole("button", { name: "Gender" }));
+  expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
+    "Male",
+    "Female",
+  ]);
+  fireEvent.click(screen.getByRole("option", { name: "Male" }));
+  fireEvent.click(screen.getByRole("option", { name: "Female" }));
+  expect(screen.getByRole("button", { name: "Remove Male" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Remove Female" })).toBeTruthy();
+});
+
+it("removes the intermediate Tell us about you heading from the account page", () => {
+  render(<SignupPage />);
+  expect(screen.queryByRole("heading", { name: /TELL US ABOUT YOU/i })).toBeNull();
+  expect(screen.getByLabelText("Confirm password")).toBeTruthy();
+});
+
+it.each(["GH", "KE", "US"])("shows sexuality on the preferences step for %s", async (country) => {
+  fixture.country = country;
+  fixture.stage = "preferences";
+  render(<SignupPage />);
+  expect(await screen.findByRole("button", { name: /Sexual orientation/ })).toBeTruthy();
+  expect(screen.queryByLabelText("Sexuality")).toBeNull();
+  expect(screen.getByText("STEP 4 OF 5")).toBeTruthy();
+});
+
+it("keeps sexuality hidden on the preferences step for Nigeria", async () => {
+  fixture.stage = "preferences";
+  render(<SignupPage />);
+  await screen.findByRole("button", { name: /Kinks & Interests/ });
+  expect(screen.queryByLabelText("Sexuality")).toBeNull();
 });
 
 it("offers the same sexualities the API accepts", () => {

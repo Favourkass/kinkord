@@ -57,6 +57,26 @@ const make = (opts: {
 };
 
 describe("SignUpService", () => {
+  it("blocks unsupported Nigerian genders before creating an account", async () => {
+    const { service, signUpEmail } = make({ signUpResponse: new Response("{}") });
+    await expect(
+      service.signUpWithProfile(account, { ...fields, genders: ["Non-Binary"] }, new Headers()),
+    ).rejects.toThrow("Bad Request");
+    expect(signUpEmail).not.toHaveBeenCalled();
+  });
+  it("persists multiple genders outside Nigeria", async () => {
+    const { service, set } = make({
+      signUpResponse: new Response(JSON.stringify({ user: { id: "u1" } })),
+    });
+    await service.signUpWithProfile(
+      account,
+      { ...fields, country: "GH", gender: null, genders: ["Non-Binary", "Agender"] },
+      new Headers(),
+    );
+    expect(set).toHaveBeenCalledWith(
+      expect.objectContaining({ gender: "Non-Binary", genders: ["Non-Binary", "Agender"] }),
+    );
+  });
   it("creates a profile without a phone and skips the phone-only moderation check", async () => {
     const { service, set, review } = make({
       signUpResponse: new Response(JSON.stringify({ user: { id: "u1" } }), { status: 200 }),
@@ -67,7 +87,12 @@ describe("SignUpService", () => {
       new Headers(),
     );
     expect(result.status).toBe(200);
-    expect(set).toHaveBeenCalledWith({ ...fields, phone: null, orientation: null });
+    expect(set).toHaveBeenCalledWith({
+      ...fields,
+      phone: null,
+      genders: ["Male"],
+      orientation: null,
+    });
     expect(review).not.toHaveBeenCalled();
   });
 
@@ -92,7 +117,7 @@ describe("SignUpService", () => {
     const result = await service.signUpWithProfile(account, fields, new Headers());
 
     expect(update).toHaveBeenCalledTimes(1);
-    expect(set).toHaveBeenCalledWith({ ...fields, orientation: null });
+    expect(set).toHaveBeenCalledWith({ ...fields, genders: ["Male"], orientation: null });
     expect(result.status).toBe(200);
     expect(result.cookies).toEqual(["kinkord.session_token=abc; Path=/"]);
     expect(result.body).toContain("u1");
@@ -144,5 +169,5 @@ it("stores the selected sexuality for Kenya", async () => {
     signUpResponse: new Response(JSON.stringify({ user: { id: "u1" } }), { status: 200 }),
   });
   await service.signUpWithProfile(account, { ...fields, country: "KE" }, new Headers());
-  expect(set).toHaveBeenCalledWith({ ...fields, country: "KE" });
+  expect(set).toHaveBeenCalledWith({ ...fields, country: "KE", genders: ["Male"] });
 });

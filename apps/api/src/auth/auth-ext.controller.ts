@@ -1,10 +1,11 @@
+import { canonicalGender } from "../profiles/gender-policy";
 import { BadRequestException, Body, Controller, Post, Req, Res } from "@nestjs/common";
 import type { Request, Response as ExpressResponse } from "express";
 import { fromNodeHeaders } from "better-auth/node";
 import { z } from "zod";
 import { PhoneSignInService } from "./phone-sign-in.service";
 import { isAllowedPhone, PHONE_NOT_ALLOWED } from "../profiles/phone-rules";
-import { ORIENTATIONS } from "../profiles/profile-options";
+import { GENDERS, ORIENTATIONS } from "../profiles/profile-options";
 import { SignUpService } from "./sign-up.service";
 
 const signInPhoneSchema = z.object({
@@ -48,7 +49,13 @@ const signUpSchema = z.object({
     .refine((s) => !Number.isNaN(new Date(s).getTime()), "dateOfBirth must be a real date")
     .refine((s) => new Date(s) <= eighteenYearsAgo(), "You must be 18 or older to join")
     .nullish(),
-  gender: z.string().trim().min(1).max(20).nullish(),
+  gender: z.string().transform(canonicalGender).pipe(z.enum(GENDERS)).nullish(),
+  genders: z
+    .array(z.string().transform(canonicalGender).pipe(z.enum(GENDERS)))
+    .min(1)
+    .max(5)
+    .refine((values) => new Set(values).size === values.length, "Choose distinct genders.")
+    .optional(),
   orientation: z.enum(ORIENTATIONS).nullish(),
   // Optional at signup; validate any supplied number using the Settings rule.
   phone: z
@@ -108,6 +115,7 @@ export class AuthExtController {
         city: about.city ?? null,
         dateOfBirth: about.dateOfBirth ?? null,
         gender: about.gender ?? null,
+        ...(about.genders !== undefined ? { genders: about.genders } : {}),
         orientation: about.orientation ?? null,
         phone: about.phone ?? null,
       },

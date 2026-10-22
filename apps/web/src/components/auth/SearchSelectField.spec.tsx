@@ -3,6 +3,37 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import SearchSelectField from "./SearchSelectField";
 afterEach(cleanup);
+it("lets scrolling reach and select the last town beyond the first 50 without searching", () => {
+  const change = vi.fn();
+  const options = Array.from({ length: 123 }, (_, i) => ({
+    value: `Town ${i}`,
+    label: `Town ${i}`,
+  }));
+  render(<SearchSelectField {...props} options={options} loadMoreOnScroll onChange={change} />);
+  fireEvent.click(screen.getByLabelText("State"));
+  expect(screen.getAllByRole("option")).toHaveLength(50);
+  fireEvent.scroll(screen.getByRole("listbox"));
+  expect(screen.getAllByRole("option")).toHaveLength(100);
+  fireEvent.scroll(screen.getByRole("listbox"));
+  expect(screen.getAllByRole("option")).toHaveLength(123);
+  fireEvent.click(screen.getByRole("option", { name: "Town 122" }));
+  expect(change).toHaveBeenCalledWith("Town 122");
+});
+
+it("resets the scroll batch for a new search and keeps later matches searchable", () => {
+  const options = Array.from({ length: 123 }, (_, i) => ({
+    value: `Town ${i}`,
+    label: `Town ${i}`,
+  }));
+  render(<SearchSelectField {...props} options={options} loadMoreOnScroll onChange={vi.fn()} />);
+  fireEvent.click(screen.getByLabelText("State"));
+  fireEvent.scroll(screen.getByRole("listbox"));
+  fireEvent.change(screen.getByRole("combobox"), { target: { value: "Town 122" } });
+  expect(screen.getAllByRole("option")).toHaveLength(1);
+  expect(screen.getByRole("option", { name: "Town 122" })).toBeTruthy();
+  fireEvent.change(screen.getByRole("combobox"), { target: { value: "" } });
+  expect(screen.getAllByRole("option")).toHaveLength(50);
+});
 const props = {
   label: "State",
   value: "",

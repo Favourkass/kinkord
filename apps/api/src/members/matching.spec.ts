@@ -21,6 +21,15 @@ import {
 } from "./matching";
 
 const now = new Date("2026-10-14T12:00:00Z");
+it("keeps discovery available for newly supported genders", () => {
+  for (const gender of ["Non-Binary", "Agender", "Trans Woman"]) {
+    expect(defaultShow(gender, "Straight")).toBe("all");
+    expect(resolveShow(undefined, gender, null)).toEqual({
+      show: "all",
+      options: ["all", "women", "men"],
+    });
+  }
+});
 const minutesAgo = (m: number) => new Date(now.getTime() - m * 60_000);
 const daysAgo = (d: number) => minutesAgo(d * 24 * 60);
 

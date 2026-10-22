@@ -16,7 +16,8 @@ export interface AboutDraft {
   dobDay: number | null;
   dobMonth: number | null;
   dobYear: number | null;
-  gender: "male" | "female" | null;
+  gender: string | null;
+  genders?: string[];
   orientation?: string | null;
 }
 
@@ -107,7 +108,7 @@ export function validateAbout(a: AboutDraft): { dob?: string; state?: string; ge
   if (!iso) errors.dob = "Select your full date of birth.";
   else if (!isAdult(iso)) errors.dob = "You must be 18 years or older to join.";
   if (!a.state.trim()) errors.state = "Select your state.";
-  if (!a.gender) errors.gender = "Select an option.";
+  if (!(a.genders ? a.genders.length : a.gender)) errors.gender = "Select an option.";
   return errors;
 }
 
