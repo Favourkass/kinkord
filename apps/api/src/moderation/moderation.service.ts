@@ -31,6 +31,12 @@ import { giveSilver, silverGiven, takeBackSilver } from "../subscriptions/given-
 import { founderAccount, isAdmin, isBanned, isSuperAdmin } from "./admins";
 import { normalizeEmail, normalizeIp, normalizePhone } from "./signup-rules";
 
+/**
+ * The organization "country" that is every country: its posts open For You
+ * for everyone, as Kinkord's own account's do. Stored as no country.
+ */
+export const EVERYWHERE = "ALL";
+
 const SEARCH_LIMIT = 30;
 const POSTS_LIMIT = 50;
 
@@ -372,17 +378,22 @@ export class ModerationService {
 
   /**
    * Makes the account an organization's, tied to one of the countries Kinkord
-   * serves, or a person's again. Only the founders may (the controller checks).
-   * Nothing else about the account changes: its posts, followers and sign-in stay.
+   * serves or to EVERYWHERE (no country), or a person's again. Only the
+   * founders may (the controller checks). Nothing else about the account
+   * changes: its posts, followers and sign-in stay.
    */
   async setOrganization(actorId: string, id: string, enabled: boolean, country: string | null) {
-    if (enabled && !AVAILABLE_COUNTRIES.some((c) => c.code === country)) {
+    const everywhere = country === EVERYWHERE;
+    if (enabled && !everywhere && !AVAILABLE_COUNTRIES.some((c) => c.code === country)) {
       throw new BadRequestException("Choose the organization's country.");
     }
     return this.db.transaction(async (tx) => {
       const [row] = await tx
         .update(profile)
-        .set({ accountType: enabled ? "organization" : "person", ...(enabled ? { country } : {}) })
+        .set({
+          accountType: enabled ? "organization" : "person",
+          ...(enabled ? { country: everywhere ? null : country } : {}),
+        })
         .where(eq(profile.userId, id))
         .returning({ accountType: profile.accountType, country: profile.country });
       if (!row) throw new NotFoundException("Member profile not found.");

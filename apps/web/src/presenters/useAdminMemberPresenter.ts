@@ -316,10 +316,13 @@ export function useAdminMemberPresenter(id: string) {
     teamBadgeLabels: copy.teamBadge,
     organizationAccount: {
       organization: Boolean(member?.organization),
-      countryName:
-        copy.organizationCountries.find((c) => c.value === member?.country)?.label ??
-        member?.country ??
-        null,
+      // An organization with no country speaks to every country.
+      countryName: !member?.organization
+        ? null
+        : !member.country
+          ? copy.organizationAccount.everyCountry
+          : (copy.organizationCountries.find((c) => c.value === member.country)?.label ??
+            member.country),
       canChange: access.isFounder,
       choices: copy.organizationCountries,
       selected: orgCountry,
