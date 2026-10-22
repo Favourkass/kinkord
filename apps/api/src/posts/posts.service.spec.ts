@@ -768,8 +768,9 @@ describe("the home feed's tabs", () => {
     const wheres: SQL[] = [];
     const db = makeDb([
       [mk("p2", 8), mk("org1", 7)], // the ranked page
+      [], // no organization speaks to every country
       [{ country: "NG" }], // the viewer's country
-      [mk("org1", 7)], // the pins
+      [mk("org1", 7)], // its organizations' pins
       ...decorated(),
     ]);
     const recorded = { ...db, select: vi.fn(() => recordWhere(db.select(), wheres)) };
@@ -778,26 +779,49 @@ describe("the home feed's tabs", () => {
 
     // Pinned first, and not shown again where the ranking put it.
     expect(page.items.map((i) => i.id)).toEqual(["org1", "p2"]);
-    const pins = new PgDialect().sqlToQuery(wheres[2]);
-    expect(pins.sql).toContain('"org_profile"."account_type" = \'organization\'');
-    expect(pins.sql).toContain('"org_profile"."country" =');
-    expect(pins.sql).toContain("interval '1 hour'");
-    expect(pins.sql).toContain('"member_block"');
-    expect(pins.params).toEqual(expect.arrayContaining([48, "public", "viewer-1", "NG"]));
+    const everywhere = new PgDialect().sqlToQuery(wheres[1]);
+    expect(everywhere.sql).toContain('"org_profile"."country" is null');
+    const local = new PgDialect().sqlToQuery(wheres[3]);
+    expect(local.sql).toContain(`"org_profile"."account_type" = 'organization'`);
+    expect(local.sql).toContain('"org_profile"."country" =');
+    expect(local.sql).toContain("interval '1 hour'");
+    expect(local.sql).toContain('"member_block"');
+    expect(local.params).toEqual(expect.arrayContaining([48, "public", "viewer-1", "NG"]));
   });
 
-  it("pins nothing past the first page, nor for a viewer with no country", async () => {
+  it("puts the organizations that speak to every country first, then the viewer's country's", async () => {
+    vi.mocked(rankedTabPage).mockResolvedValueOnce({ ids: ["p2"], nextCursor: null });
+    const db = makeDb([
+      [mk("p2", 8)],
+      [mk("kinkord", 9)], // every country
+      [{ country: "KE" }],
+      [mk("ke1", 6)], // Kenya's
+      ...decorated(),
+    ]);
+    const page = await service(db).feed("viewer-1", { tab: "for_you" });
+    expect(page.items.map((i) => i.id)).toEqual(["kinkord", "ke1", "p2"]);
+  });
+
+  it("asks nothing more once every-country posts fill the pins", async () => {
+    vi.mocked(rankedTabPage).mockResolvedValueOnce({ ids: [], nextCursor: null });
+    const db = makeDb([[mk("k1", 9), mk("k2", 8), mk("k3", 7)], ...decorated()]);
+    const page = await service(db).feed("viewer-1", { tab: "for_you" });
+    expect(page.items.map((i) => i.id)).toEqual(["k1", "k2", "k3"]);
+    // The pins, then the page's own reads: never the viewer's country.
+    expect(db.select).toHaveBeenCalledTimes(1 + 8 + 1);
+  });
+
+  it("pins nothing past the first page; a viewer with no country still gets every-country posts", async () => {
     vi.mocked(rankedTabPage).mockResolvedValueOnce({ ids: [], nextCursor: null });
     const later = makeDb();
     await service(later).feed("viewer-1", { tab: "for_you", cursor: "opaque" });
     expect(later.select).not.toHaveBeenCalled();
 
     vi.mocked(rankedTabPage).mockResolvedValueOnce({ ids: [], nextCursor: null });
-    const nowhere = makeDb([[{ country: null }]]);
+    const nowhere = makeDb([[mk("k1", 9)], [{ country: null }], ...decorated()]);
     await expect(service(nowhere).feed("viewer-1", { tab: "for_you" })).resolves.toMatchObject({
-      items: [],
+      items: [expect.objectContaining({ id: "k1" })],
     });
-    expect(nowhere.select).toHaveBeenCalledTimes(1);
   });
 
   it("Nearby says when the viewer has no location, reading no posts", async () => {
