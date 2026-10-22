@@ -294,9 +294,11 @@ export const MODERATION_COPY = {
   },
   organizationAccount: {
     title: "Organization account",
-    body: "For an organization, not a person: a yellow name and username, a square photo, and nothing individual (no age, location, roles or interests). About me reads About us. Its public posts open For You for every member in its country for 48 hours, with a Follow button. Founders only.",
+    body: "For an organization, not a person: a yellow name and username, a square photo, and nothing individual (no age, location, roles or interests). About me reads About us. Its public posts open For You for 48 hours, with a Follow button: for every member in its country, or for everyone when it speaks to every country, as Kinkord's own account does. Founders only.",
     person: "A person's account",
     organization: (country: string) => `Organization in ${country}`,
+    /** An organization tied to no country: it speaks to every country. */
+    everyCountry: "every country",
     country: "Country it speaks for",
     choose: "Choose…",
     make: "Make organization",
@@ -304,8 +306,12 @@ export const MODERATION_COPY = {
     foundersOnly: "Only the founders can make an account an organization's.",
     needsCountry: "Choose the organization's country first.",
   },
-  /** The countries Kinkord serves, as the API's AVAILABLE_COUNTRIES. */
+  /**
+   * Where an organization speaks: every country (the API's EVERYWHERE, for
+   * Kinkord's own account), or one of the countries Kinkord serves.
+   */
   organizationCountries: [
+    { value: "ALL", label: "Every country (like Kinkord Official)" },
     { value: "NG", label: "Nigeria" },
     { value: "KE", label: "Kenya" },
   ],

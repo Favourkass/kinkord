@@ -660,6 +660,19 @@ describe("ModerationService.setOrganization", () => {
     });
   });
 
+  it("makes one that speaks to every country, stored with no country", async () => {
+    const { service, after } = make([[{ accountType: "organization", country: null }], undefined]);
+    await expect(service.setOrganization("f1", "u1", true, "ALL")).resolves.toEqual({
+      organization: true,
+      country: null,
+    });
+    expect(after("update", profile, "set")).toEqual({ accountType: "organization", country: null });
+    expect(after("insert", moderationLog, "values")).toMatchObject({
+      action: "make-organization",
+      detail: "ALL",
+    });
+  });
+
   it("needs one of the countries Kinkord serves", async () => {
     for (const country of [null, "GB"]) {
       const { service, indexOf } = make([]);

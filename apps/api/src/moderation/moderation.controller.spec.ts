@@ -208,9 +208,11 @@ describe("organization accounts admin boundary", () => {
   it("reads the country however it's cased, and nothing else", async () => {
     const { controller, service } = make();
     await controller.organization(req, "u9", { enabled: true, country: " ng " });
+    await controller.organization(req, "u9", { enabled: true, country: "all" });
     await controller.organization(req, "u9", { enabled: false });
     expect(service.setOrganization.mock.calls).toEqual([
       ["u1", "u9", true, "NG"],
+      ["u1", "u9", true, "ALL"],
       ["u1", "u9", false, null],
     ]);
     for (const body of [

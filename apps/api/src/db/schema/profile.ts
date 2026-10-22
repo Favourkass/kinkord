@@ -10,7 +10,9 @@ export interface SocialLinks {
 /**
  * "organization": an account that speaks for an organization rather than a
  * person (founder, 2026-10-21). Set by the founders only, tied to `country`,
- * and shown with nothing individual: no age, place, roles or interests.
+ * and shown with nothing individual: no age, place, roles or interests. An
+ * organization with no country speaks to every country, as Kinkord's own does
+ * (founder, 2026-10-22).
  */
 export type AccountType = "person" | "organization";
 

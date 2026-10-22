@@ -128,6 +128,24 @@ describe("useAdminMemberPresenter", () => {
     expect(svc.setOrganization).toHaveBeenLastCalledWith("u9", false, null);
   });
 
+  it("makes one that speaks to every country, and says so", async () => {
+    svc.access.mockResolvedValue({ isAdmin: true, isFounder: true });
+    const hook = await ready();
+    await waitFor(() => expect(hook.result.current.organizationAccount.canChange).toBe(true));
+    expect(hook.result.current.organizationAccount.choices[0]).toEqual({
+      value: "ALL",
+      label: "Every country (like Kinkord Official)",
+    });
+    act(() => hook.result.current.organizationAccount.setSelected("ALL"));
+    act(() => hook.result.current.organizationAccount.onToggle());
+    svc.member.mockResolvedValue({ ...detail, organization: true, country: null });
+    await act(async () => hook.result.current.dialog?.confirm());
+    expect(svc.setOrganization).toHaveBeenCalledWith("u9", true, "ALL");
+    await waitFor(() =>
+      expect(hook.result.current.organizationAccount.countryName).toBe("every country"),
+    );
+  });
+
   it("shows a staff admin the kind of account without letting them change it", async () => {
     const hook = await ready();
     expect(hook.result.current.organizationAccount.canChange).toBe(false);
