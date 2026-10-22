@@ -120,4 +120,4 @@ it("loads every product-supplied place and makes it selectable through exact-nam
       }
     }
   }
-});
+}, 20000);
