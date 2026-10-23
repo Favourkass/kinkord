@@ -28,20 +28,22 @@ export interface SearchResult<T> {
 
 /**
  * A search over `options` (labels normalised once): labels containing the query,
- * those where a word starts with it first, at most `limit` of them.
+ * exact names first, then word-prefix matches, at most `limit` of them.
  */
 export function optionMatcher<T extends { label: string }>(options: readonly T[]) {
   const labels = options.map((option) => normalizeSearch(option.label));
   return (query: string, limit = SEARCH_RESULT_LIMIT): SearchResult<T> => {
     const q = normalizeSearch(query);
     if (!q) return { hits: options.slice(0, limit), more: options.length > limit };
+    const exact: T[] = [];
     const leading: T[] = [];
     const inner: T[] = [];
     labels.forEach((label, index) => {
-      if (label.startsWith(q) || label.includes(` ${q}`)) leading.push(options[index]);
+      if (label === q) exact.push(options[index]);
+      else if (label.startsWith(q) || label.includes(` ${q}`)) leading.push(options[index]);
       else if (label.includes(q)) inner.push(options[index]);
     });
-    const hits = [...leading, ...inner];
+    const hits = [...exact, ...leading, ...inner];
     return { hits: hits.slice(0, limit), more: hits.length > limit };
   };
 }

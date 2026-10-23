@@ -14,8 +14,8 @@ import {
   tidyPlace,
 } from "./build-location-files.mjs";
 
-const { places, curated } = readInputs();
-const built = buildLocations(places, curated);
+const { places, curated, requested } = readInputs();
+const built = buildLocations(places, curated, requested);
 const list = (country, state) => built.files[`${country}/${locationSlug(state)}`];
 
 test("the committed place lists are exactly what the generator builds", () => {
@@ -41,6 +41,7 @@ test("every list is sorted, deduplicated and free of junk", () => {
   // Curated and added names are kept as written ("Mile 2", "Life Camp").
   const chosen = new Set([
     ...Object.values(curated).flat(),
+    ...Object.values(requested).flatMap((byState) => Object.values(byState).flat()),
     ...Object.values(ADDED).flatMap((byState) => Object.values(byState).flat()),
   ]);
   for (const [file, names] of Object.entries(built.files)) {
@@ -94,4 +95,149 @@ test("tells places from facilities, stubs and addresses", () => {
   assert.equal(locationSlug("Akwa Ibom"), "akwa-ibom");
   assert.equal(locationSlug("Murang’a"), "muranga");
   assert.equal(placeKey("Buru Buru"), placeKey("Buruburu"));
+});
+
+test("includes all requested South Dakota and Tennessee towns", () => {
+  const requested = {
+    "South Dakota": [
+      "Aberdeen",
+      "Belle Fourche",
+      "Brandon",
+      "Brookings",
+      "Canton",
+      "Chamberlain",
+      "Dell Rapids",
+      "Harrisburg",
+      "Hot Springs",
+      "Huron",
+      "Lead",
+      "Madison",
+      "Milbank",
+      "Mitchell",
+      "Mobridge",
+      "North Sioux City",
+      "Pierre",
+      "Rapid City",
+      "Redfield",
+      "Sioux Falls",
+      "Spearfish",
+      "Sturgis",
+      "Tea",
+      "Vermillion",
+      "Watertown",
+      "Yankton",
+      "Winner",
+      "Box Elder",
+      "Fort Pierre",
+      "Gregory",
+      "Hill City",
+      "Kimball",
+      "Lennox",
+      "Miller",
+      "Parkston",
+      "Philip",
+      "Springfield",
+      "Summerset",
+      "Tyndall",
+      "Volga",
+    ],
+    Tennessee: [
+      "Alcoa",
+      "Athens",
+      "Bartlett",
+      "Brentwood",
+      "Bristol",
+      "Brownsville",
+      "Chattanooga",
+      "Clarksville",
+      "Cleveland",
+      "Collierville",
+      "Columbia",
+      "Cookeville",
+      "Dyersburg",
+      "Elizabethton",
+      "Farragut",
+      "Franklin",
+      "Gallatin",
+      "Germantown",
+      "Greeneville",
+      "Hendersonville",
+      "Jackson",
+      "Johnson City",
+      "Kingsport",
+      "Knoxville",
+      "La Vergne",
+      "Lebanon",
+      "Maryville",
+      "Memphis",
+      "Morristown",
+      "Mount Juliet",
+      "Murfreesboro",
+      "Oak Ridge",
+      "Paris",
+      "Sevierville",
+      "Shelbyville",
+      "Smyrna",
+      "Spring Hill",
+    ],
+  };
+  for (const [state, towns] of Object.entries(requested))
+    for (const town of towns) assert.ok(list("US", state).includes(town), `${state}: ${town}`);
+  assert.equal(built.states.GH.length, 16);
+  assert.equal(built.states.US.length, 51);
+  for (const state of [...built.states.GH, ...built.states.US]) assert.ok(state.length > 0);
+});
+
+test("preserves every supplied USA and Ghana name exactly in its requested group", () => {
+  assert.equal(Object.keys(requested.GH).length, 16);
+  assert.equal(Object.values(requested.GH).flat().length, 320);
+  assert.equal(Object.keys(requested.US).length, 31);
+  assert.equal(Object.values(requested.US).flat().length, 1233);
+  for (const [country, byState] of Object.entries(requested))
+    for (const [state, names] of Object.entries(byState))
+      for (const name of names)
+        assert.equal(
+          list(country, state).filter((value) => value === name).length,
+          1,
+          `${country}/${state}: ${name}`,
+        );
+});
+
+test("retains supplied short names, punctuation, capitalization and alternate groupings", () => {
+  for (const [country, state, name] of [
+    ["GH", "Upper West", "Wa"],
+    ["GH", "Upper West", "Ko"],
+    ["GH", "Volta", "Ho"],
+    ["GH", "Central", "Elmina"],
+    ["GH", "Ahafo", "Akwasiase"],
+    ["GH", "Greater Accra", "Kasoa"],
+    ["GH", "Central", "Kasoa"],
+    ["GH", "Bono", "Kintampo"],
+    ["GH", "Bono East", "Kintampo"],
+    ["US", "Alaska", "Barrow (Utqiagvik)"],
+    ["US", "Utah", "St. George"],
+    ["US", "New Mexico", "Española"],
+    ["US", "District of Columbia", "NoMa"],
+    ["US", "District of Columbia", "U Street"],
+  ])
+    assert.ok(list(country, state).includes(name), `${state}: ${name}`);
+});
+
+test("retains additional existing towns and leaves countries without overrides unchanged", () => {
+  const original = buildLocations(places, curated);
+  for (const [file, names] of Object.entries(original.files)) {
+    if (!file.startsWith("GH/") && !file.startsWith("US/")) {
+      assert.deepEqual(built.files[file], names);
+    } else {
+      const keys = new Set(built.files[file].map(placeKey));
+      for (const name of names) assert.ok(keys.has(placeKey(name)), `${file}: ${name}`);
+    }
+  }
+});
+
+test("rejects a misspelled requested region instead of silently dropping it", () => {
+  assert.throws(
+    () => buildLocations(places, curated, { GH: { Unknown: ["Town"] } }),
+    /unknown subdivision GH\/Unknown/,
+  );
 });

@@ -8,6 +8,7 @@ import {
 import { type Db } from "../db/db.module";
 import { type StorageService } from "../storage/storage.service";
 import type { SilverChecksService } from "../subscriptions/silver-checks.service";
+import { KINKS, KINK_ROLES, ORIENTATION_SELECTIONS } from "./profile-options";
 import {
   ProfilesService,
   lockMessage,
@@ -26,6 +27,43 @@ const responseOf = async (p: Promise<unknown>) => {
 };
 
 describe("updateProfileSchema", () => {
+  it("accepts all supplied interests and enforces 20 distinct selections while retaining legacy values", () => {
+    for (const interest of KINKS)
+      expect(updateProfileSchema.safeParse({ interests: [interest] }).success).toBe(true);
+    expect(updateProfileSchema.safeParse({ interests: KINKS.slice(0, 20) }).success).toBe(true);
+    expect(updateProfileSchema.safeParse({ interests: KINKS.slice(0, 21) }).success).toBe(false);
+    expect(updateProfileSchema.safeParse({ interests: ["Bondage", "Bondage"] }).success).toBe(
+      false,
+    );
+    expect(updateProfileSchema.parse({ interests: ["Latex", "Wax play"] }).interests).toEqual([
+      "Latex",
+      "Wax play",
+    ]);
+  });
+  it("accepts the supplied orientation labels separately from sexuality with at most five unique selections", () => {
+    for (const value of ORIENTATION_SELECTIONS)
+      expect(updateProfileSchema.safeParse({ orientationSelections: [value] }).success).toBe(true);
+    expect(
+      updateProfileSchema.parse({
+        orientation: "Straight",
+        orientationSelections: ["Asexual", "Queer"],
+      }),
+    ).toMatchObject({ orientation: "Straight", orientationSelections: ["Asexual", "Queer"] });
+    for (const values of [ORIENTATION_SELECTIONS.slice(0, 6), ["Unknown"], ["Queer", "Queer"]])
+      expect(updateProfileSchema.safeParse({ orientationSelections: values }).success).toBe(false);
+    expect(updateProfileSchema.safeParse({ roles: KINK_ROLES.slice(0, 5) }).success).toBe(true);
+    expect(updateProfileSchema.safeParse({ roles: KINK_ROLES.slice(0, 6) }).success).toBe(false);
+    expect(updateProfileSchema.safeParse({ roles: ["Dominant", "Dominant"] }).success).toBe(false);
+  });
+  it.each(["NG", "GH", "KE", "US"])("accepts every role for members in %s", (country) => {
+    for (const role of KINK_ROLES) {
+      expect(updateProfileSchema.safeParse({ country, roles: [role] }).success).toBe(true);
+    }
+    expect(
+      updateProfileSchema.safeParse({ country, roles: Array(11).fill("Dominant") }).success,
+    ).toBe(false);
+  });
+
   it("normalizes country to uppercase ISO alpha-2", () => {
     expect(updateProfileSchema.parse({ country: "ng" }).country).toBe("NG");
   });
@@ -94,18 +132,20 @@ describe("updateProfileSchema", () => {
     }
   });
 
-  it("canonicalises gender and only accepts Male/Female (CEO brief)", () => {
+  it("canonicalises supported genders and rejects unlisted values", () => {
     expect(updateProfileSchema.parse({ gender: "female" }).gender).toBe("Female");
     expect(updateProfileSchema.parse({ gender: " MALE " }).gender).toBe("Male");
     expect(updateProfileSchema.parse({ gender: null }).gender).toBeNull();
-    expect(updateProfileSchema.safeParse({ gender: "Non-binary" }).success).toBe(false);
+    expect(updateProfileSchema.parse({ gender: "Non-binary" }).gender).toBe("Non-Binary");
+    expect(updateProfileSchema.safeParse({ gender: "Not a listed gender" }).success).toBe(false);
   });
 
   it("only accepts listed statuses, kinks, roles, looking-for and languages", () => {
     const ok = (body: unknown) => updateProfileSchema.safeParse(body).success;
     expect(ok({ relationshipStatus: "Head of House" })).toBe(false);
     expect(ok({ interests: ["Rope bondage", "Wax play"] })).toBe(true);
-    expect(ok({ interests: ["Shibari"] })).toBe(false);
+    expect(ok({ interests: ["Shibari"] })).toBe(true);
+    expect(ok({ interests: ["Unknown interest"] })).toBe(false);
     expect(ok({ roles: ["Domme", "Rigger"] })).toBe(true);
     expect(ok({ roles: ["Overlord"] })).toBe(false);
     expect(ok({ lookingFor: ["Events", "Mentorship / Guidance"] })).toBe(true);
@@ -252,6 +292,25 @@ describe("ProfilesService", () => {
     createdAt: new Date("2026-09-01T00:00:00Z"),
   };
 
+  it("stores private orientation selections independently and blocks Nigeria", async () => {
+    const local = makeService({ selects: [[{ ...makeService().row, country: "NG" }]] });
+    await expect(
+      local.service.updateOwn("u1", { orientationSelections: ["Queer"] }, "Favour"),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(local.setCalls).toEqual([]);
+    const moving = makeService();
+    await expect(
+      moving.service.updateOwn("u1", { country: "NG", orientationSelections: ["Queer"] }, "Favour"),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    const other = makeService();
+    await other.service.updateOwn(
+      "u1",
+      { country: "GH", orientationSelections: ["Queer", "Asexual"] },
+      "Favour",
+    );
+    expect(other.setCalls[0]).toMatchObject({ orientationSelections: ["Queer", "Asexual"] });
+    expect(other.setCalls[0]).not.toHaveProperty("orientation");
+  });
   it("blocks sexuality selection for Nigeria, including a country change in the same request", async () => {
     const row = { ...makeService().row, country: "NG", orientation: "Bisexual" };
     const existing = makeService({ selects: [[row]] });
@@ -269,6 +328,29 @@ describe("ProfilesService", () => {
     const unchanged = makeService({ selects: [[row]] });
     await unchanged.service.updateOwn("u1", { bio: "Hello" }, "Favour");
     expect(unchanged.setCalls[0]).not.toHaveProperty("orientation");
+  });
+
+  it("enforces country-specific multiple genders and preserves the existing primary", async () => {
+    const old = { ...makeService().row, country: "GH", gender: "female", genders: ["Female"] };
+    const member = makeService({ selects: [[old]] });
+    await member.service.updateOwn("u1", { genders: ["Non-Binary", "Female"] }, "Favour");
+    expect(member.setCalls[0]).toMatchObject({
+      genders: ["Non-Binary", "Female"],
+      gender: "female",
+    });
+    const local = makeService({ selects: [[{ ...old, country: "NG" }]] });
+    await expect(
+      local.service.updateOwn("u1", { genders: ["Non-Binary"] }, "Favour"),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    const moving = makeService({
+      selects: [[{ ...old, genders: ["Non-Binary"], gender: "Non-Binary" }]],
+    });
+    await expect(
+      moving.service.updateOwn("u1", { country: "NG" }, "Favour"),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    const legacy = makeService({ selects: [[old]] });
+    await legacy.service.updateOwn("u1", { gender: "Male" }, "Favour");
+    expect(legacy.setCalls[0]).toMatchObject({ genders: ["Male"], gender: "Male" });
   });
 
   it("puts a Silver member's check on hold when their name or photo changes", async () => {

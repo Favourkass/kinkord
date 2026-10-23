@@ -1,9 +1,15 @@
+import { sexualOrientationSelections } from "./sexualOrientation.service";
 import type { EditorDraft, ProfileOptionsPM } from "@/domain/profile";
 import { ROW_ICONS } from "@/constants/profileEdit";
+import { canSelectSexuality } from "./profile-field-policy";
+import { DEFAULT_SIGNUP_COUNTRY } from "@/constants/onboarding";
 import { profileApi } from "./profile.service";
 
 export type SignupPreferenceKey = "interests" | "lookingFor" | "limits";
 export interface SignupPreferences {
+  country?: string | null;
+  orientation?: string | null;
+  orientationSelections?: string[];
   interests: string[];
   lookingFor: string[];
   limits: string;
@@ -17,8 +23,11 @@ export const EMPTY_SIGNUP_PREFERENCES: SignupPreferences = {
 export async function loadSignupPreferences() {
   const [profile, options] = await Promise.all([profileApi.own(), profileApi.options()]);
   return {
-    options,
+    options: { ...options, kinks: [...new Set([...options.kinks, ...(profile.interests ?? [])])] },
     preferences: {
+      country: profile.country ?? DEFAULT_SIGNUP_COUNTRY,
+      orientation: profile.orientation ?? null,
+      orientationSelections: sexualOrientationSelections(profile),
       interests: profile.interests ?? [],
       lookingFor: profile.lookingFor ?? [],
       limits: profile.limits ?? "",
@@ -61,6 +70,7 @@ export function signupPreferenceDraft(
 function validatePreferences(preferences: SignupPreferences, options: ProfileOptionsPM) {
   if (
     preferences.interests.length > 20 ||
+    new Set(preferences.interests).size !== preferences.interests.length ||
     preferences.interests.some((value) => !options.kinks.includes(value))
   )
     throw new Error("Choose up to 20 kinks and interests from the list.");
@@ -126,7 +136,17 @@ export async function saveSignupPreferences(
   options: ProfileOptionsPM,
 ) {
   validatePreferences(preferences, options);
+  const showSexuality = canSelectSexuality(preferences.country ?? DEFAULT_SIGNUP_COUNTRY);
+  const selections = preferences.orientationSelections ?? sexualOrientationSelections(preferences);
+  if (
+    showSexuality &&
+    (selections.length > 5 ||
+      new Set(selections).size !== selections.length ||
+      selections.some((value) => !(options.orientationSelections ?? []).includes(value)))
+  )
+    throw new Error("Choose up to 5 orientations from the list.");
   return profileApi.update({
+    ...(showSexuality ? { orientation: null, orientationSelections: selections } : {}),
     interests: preferences.interests,
     lookingFor: preferences.lookingFor,
     limits: preferences.limits.trim() || null,
@@ -136,4 +156,15 @@ export async function saveSignupPreferences(
 export function filterSignupRoles(options: readonly string[], query: string): string[] {
   const search = query.trim().toLowerCase();
   return options.filter((role) => role.toLowerCase().includes(search));
+}
+
+/** A full selection can still be removed, including legacy profiles with more than five roles. */
+export function toggleSignupSelection(
+  selected: readonly string[],
+  value: string,
+  options: readonly string[],
+): string[] {
+  if (selected.includes(value)) return selected.filter((item) => item !== value);
+  if (selected.length >= 5 || !options.includes(value)) return [...selected];
+  return [...selected, value];
 }

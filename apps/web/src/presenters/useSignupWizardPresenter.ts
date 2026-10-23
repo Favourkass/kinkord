@@ -1,5 +1,6 @@
 "use client";
 
+import { genderOptions, selectedGenders } from "@/services/genderSelection.service";
 import { canSelectSexuality } from "@/services/profile-field-policy";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -43,10 +44,16 @@ import {
   signupPreferenceDraft,
   signupPreferenceEditor,
   EMPTY_SIGNUP_PREFERENCES,
+  toggleSignupSelection,
   type SignupPreferences,
   type SignupPreferenceKey,
 } from "@/services/signupPreferences.service";
-import { DEFAULT_SIGNUP_COUNTRY, KINK_ROLES, SEXUALITY_FIELD } from "@/constants/onboarding";
+import {
+  DEFAULT_SIGNUP_COUNTRY,
+  KINK_ROLES,
+  SEXUALITY_FIELD,
+  ORIENTATION_SELECTIONS,
+} from "@/constants/onboarding";
 import { PHOTO_CONFIRMATION_COPY } from "@/constants/photoConfirmation";
 import { useVerification } from "./useVerification";
 
@@ -101,6 +108,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
     gender: null,
     orientation: null,
   });
+  const [genderSearch, setGenderSearch] = useState("");
   const [aboutErrors, setAboutErrors] = useState<ReturnType<typeof validateAbout>>({});
   const [customArea, setCustomArea] = useState(false);
   // Picking the current state or area again keeps the town typed under it.
@@ -151,12 +159,16 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
   }, [country, about.state, customArea, areasKey, loadedAreas, selectTypedArea]);
   const selectCountry = useCallback((value: string) => {
     setCountry(value);
+    setGenderSearch("");
     setCustomArea(false);
     setAbout((current) => ({
       ...current,
       state: "",
       city: "",
       orientation: canSelectSexuality(value) ? current.orientation : null,
+      genders: selectedGenders(current.genders, current.gender).filter((gender) =>
+        genderOptions(value).includes(gender),
+      ),
     }));
     setAboutErrors({});
   }, []);
@@ -167,6 +179,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
 
   // Step 4: preferences are saved separately from the final photo step.
   const [preferences, setPreferences] = useState<SignupPreferences>(EMPTY_SIGNUP_PREFERENCES);
+  const [orientationSearch, setOrientationSearch] = useState("");
   const [preferenceOptions, setPreferenceOptions] = useState<ProfileOptionsPM | null>(null);
   const [preferencesLoading, setPreferencesLoading] = useState(true);
   const [preferencesError, setPreferencesError] = useState<string | null>(null);
@@ -300,9 +313,9 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
         state: about.state,
         city: about.city.trim() || null,
         dateOfBirth: dobToIso(about),
-        gender: about.gender,
-        // "Prefer not to say" is the empty choice: nothing is stored.
-        orientation: canSelectSexuality(country) ? about.orientation || null : null,
+        genders: selectedGenders(about.genders, about.gender),
+        // Sexuality is selected later, with preferences after email verification.
+        orientation: null,
       });
       setStage("email");
     } catch (e) {
@@ -435,7 +448,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
 
   const toggleRole = useCallback((role: string) => {
     setRolesEdited(true);
-    setRoles((r) => (r.includes(role) ? r.filter((x) => x !== role) : [...r, role]));
+    setRoles((r) => toggleSignupSelection(r, role, KINK_ROLES));
   }, []);
 
   const [roleSearch, setRoleSearch] = useState("");
@@ -468,14 +481,14 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
     setBusy(true);
     setProfileError(null);
     try {
-      await api.patch("/profile", { roles });
+      await api.patch("/profile", initialStage === "profile" && !rolesEdited ? {} : { roles });
       setStage("welcome");
     } catch (e) {
       setProfileError(e instanceof Error ? e.message : "Could not save. Try again.");
     } finally {
       setBusy(false);
     }
-  }, [avatarUrl, coverUrl, photoConfirmed, roles]);
+  }, [avatarUrl, coverUrl, photoConfirmed, roles, rolesEdited, initialStage]);
 
   const finish = useCallback(() => router.push(Routes.appHome), [router]);
 
@@ -499,6 +512,19 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
       },
       accountStep: { draft: account, set: setAccount, errors: accountErrors },
       aboutStep: {
+        genders: selectedGenders(about.genders, about.gender),
+        genderOptions: filterSignupRoles(genderOptions(country), genderSearch),
+        genderSearch,
+        setGenderSearch,
+        toggleGender: (value: string) =>
+          setAbout((current) => {
+            const genders = toggleSignupSelection(
+              selectedGenders(current.genders, current.gender),
+              value,
+              genderOptions(country),
+            );
+            return { ...current, genders, gender: genders[0] ?? null };
+          }),
         draft: about,
         set: setAbout,
         errors: aboutErrors,
@@ -507,7 +533,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
         selectArea,
         areaValue: customArea ? OTHER_AREA : about.city,
         sexuality: SEXUALITY_FIELD,
-        showSexuality: canSelectSexuality(country),
+        showSexuality: false,
       },
       firstInvalid,
       submitCombinedStep,
@@ -517,6 +543,24 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
         nextStep: nextVerificationStep,
       },
       preferencesStep: {
+        orientationSelections: preferences.orientationSelections ?? [],
+        orientationOptions: filterSignupRoles(ORIENTATION_SELECTIONS, orientationSearch),
+        orientationSearch,
+        setOrientationSearch,
+        toggleOrientation: (value: string) =>
+          setPreferences((current) => ({
+            ...current,
+            orientationSelections: toggleSignupSelection(
+              current.orientationSelections ?? [],
+              value,
+              ORIENTATION_SELECTIONS,
+            ),
+          })),
+        sexuality: SEXUALITY_FIELD,
+        showSexuality:
+          !preferencesLoading &&
+          preferenceOptions !== null &&
+          canSelectSexuality(preferences.country ?? DEFAULT_SIGNUP_COUNTRY),
         rows: signupPreferenceRows(preferences, openPreference),
         loading: preferencesLoading,
         error: preferencesError,
@@ -602,12 +646,14 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
       submitCountry,
       account,
       accountErrors,
+      genderSearch,
       about,
       aboutErrors,
       firstInvalid,
       submitCombinedStep,
       backToCountry,
       preferences,
+      orientationSearch,
       preferenceOptions,
       preferencesLoading,
       preferencesError,
