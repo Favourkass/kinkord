@@ -229,7 +229,7 @@ function SignupWizard() {
               />
               {p.aboutStep.location.customArea && (
                 <TextField
-                  label="Region / City / Town name"
+                  label={p.aboutStep.location.customAreaLabel}
                   icon={MapPin}
                   placeholder="Enter your region, city or town"
                   value={p.aboutStep.draft.city}

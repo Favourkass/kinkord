@@ -60,19 +60,20 @@ it("uses county consistently for Kenyan location copy and validation", () => {
 });
 
 it.each([
-  ["NG", "Lagos", "Ikeja"],
-  ["KE", "Nairobi", "Westlands"],
-  ["GH", "Greater Accra", "Accra"],
-  ["US", "South Dakota", "Sioux Falls"],
-])("offers dependent towns and custom entry for %s", (country, parent, town) => {
+  ["NG", "Lagos", "Ikeja", "Region / City / Town"],
+  ["KE", "Nairobi", "Westlands", "Region / City / Town"],
+  // Ghana's regions are the level above, so its towns are just cities and towns.
+  ["GH", "Greater Accra", "Accra", "City / Town"],
+  ["US", "South Dakota", "Sioux Falls", "Region / City / Town"],
+])("offers dependent towns and custom entry for %s", (country, parent, town, area) => {
   const location = signupLocationFields(country, parent, false, { areas: [town], loading: false });
-  expect(location.areaLabel).toBe("Region / City / Town");
+  expect(location.areaLabel).toBe(area);
   expect(location.areaDisabled).toBe(false);
   expect(location.areas.map((area) => area.value)).toEqual([town]);
   // "Other" is pinned under every search rather than listed with the towns.
   expect(location.otherArea).toMatchObject({
     value: OTHER_AREA,
-    label: "Other region / city / town",
+    label: `Other ${area.toLowerCase()}`,
   });
   expect(location.otherArea?.typedLabel("Ikota")).toBe("Use “Ikota”");
   expect(location.areaMoreLabel).toBe("Keep typing to narrow it down");
@@ -163,4 +164,24 @@ it("matches every entry in the requested USA list, including Washington and Wash
   expect(options.find((option) => option.label === "Washington, D.C.")?.value).toBe(
     "District of Columbia",
   );
+});
+
+it("calls Ghana's places below a region cities and towns, never a second region", () => {
+  const location = signupLocationFields("GH", "Greater Accra");
+  expect(location).toMatchObject({
+    stateLabel: "Region",
+    areaLabel: "City / Town",
+    areaPlaceholder: "Select your city or town",
+    areaSearchPlaceholder: "Search cities / towns",
+    customAreaLabel: "City / Town name",
+  });
+  expect(location.helper).toBe(
+    "Your region and city / town help us show you local communities and events.",
+  );
+  expect(location.otherArea?.label).toBe("Other city / town");
+  // Nigeria reads as before.
+  expect(signupLocationFields("NG", "Lagos")).toMatchObject({
+    areaLabel: "Region / City / Town",
+    customAreaLabel: "Region / City / Town name",
+  });
 });
