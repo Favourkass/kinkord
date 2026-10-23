@@ -376,6 +376,7 @@ export class MembersService {
       city: organization ? null : p.city,
       age: organization ? null : ageFromDob(p.dateOfBirth),
       gender: organization ? null : p.gender,
+      genders: organization ? [] : p.genders?.length ? p.genders : p.gender ? [p.gender] : [],
       // Sexuality is private: only the member sees their own.
       orientation: isSelf ? p.orientation : null,
       relationshipStatus: personal(p.relationshipStatus, null),

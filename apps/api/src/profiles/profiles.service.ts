@@ -1,3 +1,4 @@
+import { canonicalGender, genderSelectionChanges } from "./gender-policy";
 import { canSelectSexuality } from "./profile-field-policy";
 import {
   BadRequestException,
@@ -24,11 +25,13 @@ import { SilverChecksService } from "../subscriptions/silver-checks.service";
 import {
   GENDERS,
   KINKS,
+  LEGACY_KINKS,
   KINK_ROLES,
   LANGUAGES,
   LOOKING_FOR,
   NAME_CHANGE_COOLDOWN_DAYS,
   ORIENTATIONS,
+  ORIENTATION_SELECTIONS,
   PROFILE_VISIBILITIES,
   RELATIONSHIP_STATUSES,
 } from "./profile-options";
@@ -44,10 +47,6 @@ const isoCountry = z
   .trim()
   .toUpperCase()
   .regex(/^[A-Z]{2}$/, "must be ISO 3166-1 alpha-2");
-
-/** "female" / " FEMALE " -> "Female"; anything else is left for the enum to reject. */
-const canonicalGender = (v: string) =>
-  GENDERS.find((g) => g.toLowerCase() === v.trim().toLowerCase()) ?? v.trim();
 
 /** Public https link; blank/null clears it. */
 const socialUrl = z
@@ -85,12 +84,33 @@ export const updateProfileSchema = z.object({
     .refine((s) => new Date(s) <= eighteenYearsAgo(), "You must be 18 or older to join")
     .optional(),
   gender: z.string().transform(canonicalGender).pipe(z.enum(GENDERS)).nullable().optional(),
-  roles: z.array(z.enum(KINK_ROLES)).max(10).optional(),
+  genders: z
+    .array(z.string().transform(canonicalGender).pipe(z.enum(GENDERS)))
+    .max(5)
+    .refine((values) => new Set(values).size === values.length, "Choose distinct genders.")
+    .optional(),
+  roles: z
+    .array(z.enum(KINK_ROLES))
+    .max(5)
+    .refine((values) => new Set(values).size === values.length, "Choose distinct roles.")
+    .optional(),
   relationshipStatus: z.enum(RELATIONSHIP_STATUSES).nullable().optional(),
   lookingFor: z.array(z.enum(LOOKING_FOR)).max(10).optional(),
-  interests: z.array(z.enum(KINKS)).max(20).optional(),
+  interests: z
+    .array(z.enum([...KINKS, ...LEGACY_KINKS]))
+    .max(20)
+    .refine(
+      (values) => new Set(values).size === values.length,
+      "Choose distinct kinks and interests.",
+    )
+    .optional(),
   /** Private to the member; null clears it. */
   orientation: z.enum(ORIENTATIONS).nullable().optional(),
+  orientationSelections: z
+    .array(z.enum(ORIENTATION_SELECTIONS))
+    .max(5)
+    .refine((values) => new Set(values).size === values.length, "Choose distinct orientations.")
+    .optional(),
   bodyType: z.string().trim().min(1).max(40).nullable().optional(),
   languages: z.array(z.enum(LANGUAGES)).max(10).optional(),
   location: z.string().trim().min(1).max(120).nullable().optional(),
@@ -189,6 +209,11 @@ export class ProfilesService {
         orientation: ["Sexuality selection is unavailable for this country."],
       });
     }
+    if (input.orientationSelections?.length && !canSelectSexuality(country)) {
+      throw new BadRequestException({
+        orientationSelections: ["Orientation selection is unavailable for this country."],
+      });
+    }
     // Photos can only be skipped at first sign-up, before the member has ever
     // had a profile photo: one who deletes theirs is asked for a new one.
     if (input.signupPhotosSkipped && !current.photoSkipAvailable) {
@@ -205,6 +230,28 @@ export class ProfilesService {
     }
     await this.verifyUploads(input);
     const changes: Partial<typeof profile.$inferInsert> = { ...input };
+    if (input.genders !== undefined || input.gender !== undefined || input.country !== undefined) {
+      const selected =
+        input.genders ??
+        (input.gender !== undefined
+          ? input.gender
+            ? [input.gender]
+            : []
+          : current.genders?.length
+            ? current.genders
+            : current.gender
+              ? [current.gender]
+              : []);
+      try {
+        const normalized = genderSelectionChanges(country, selected, current.gender);
+        if (input.genders !== undefined || input.gender !== undefined)
+          Object.assign(changes, normalized);
+      } catch (error) {
+        throw new BadRequestException({
+          genders: [error instanceof Error ? error.message : "Invalid gender selection."],
+        });
+      }
+    }
     if (input.displayName !== undefined && input.displayName !== current.displayName) {
       if (takesReservedName(input.displayName, current.displayName)) {
         throw new BadRequestException({ displayName: [NAME_RESERVED] });
@@ -429,11 +476,13 @@ export class ProfilesService {
       city: row.city,
       dateOfBirth: row.dateOfBirth,
       gender: row.gender,
+      genders: row.genders?.length ? row.genders : row.gender ? [canonicalGender(row.gender)] : [],
       roles: row.roles ?? [],
       relationshipStatus: row.relationshipStatus,
       lookingFor: row.lookingFor ?? [],
       interests: row.interests ?? [],
       orientation: row.orientation,
+      orientationSelections: row.orientationSelections ?? [],
       bodyType: row.bodyType,
       languages: row.languages ?? [],
       location: row.location,

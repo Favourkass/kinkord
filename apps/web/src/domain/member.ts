@@ -119,6 +119,7 @@ export function toMemberCardVM(pm: MemberCardPM, organization = false): MemberCa
 }
 
 export interface PublicProfilePM {
+  genders?: string[];
   coinBalance?: number;
   userId: string;
   username: string | null;
@@ -414,7 +415,7 @@ export function toPublicProfileVM(
     personal: {
       age: pm.age === null ? null : String(pm.age),
       dateOfBirth: longDate(pm.dateOfBirth),
-      gender: capitalize(pm.gender) || null,
+      gender: pm.genders?.length ? pm.genders.join(", ") : capitalize(pm.gender) || null,
       location: locationOf(pm.city, pm.state, pm.country),
       relationshipStatus: pm.relationshipStatus,
       nationality: countryName(pm.nationality),

@@ -77,6 +77,7 @@ const me: MePM = {
 const options: ProfileOptionsPM = {
   genders: ["Male", "Female"],
   orientations: ["Straight", "Bisexual"],
+  orientationSelections: ["Straight", "Bisexual"],
   relationshipStatuses: ["Single", "Married"],
   roles: ["Dominant", "Switch"],
   kinks: ["Bondage", "Latex"],
@@ -135,35 +136,42 @@ describe("useEditSectionPresenter", () => {
     expect(result.current.rows[2].subtitle).toBe("New bio");
   });
 
-  it("lets a Kenyan member set or clear their private sexuality", async () => {
+  it("lets a Kenyan member set or clear their private sexual orientation", async () => {
     const kenyanProfile = { ...profile, country: "KE" };
     serve(kenyanProfile);
-    apiPatch.mockResolvedValue({ ...kenyanProfile, orientation: "Bisexual" });
+    apiPatch.mockResolvedValue({
+      ...kenyanProfile,
+      orientation: null,
+      orientationSelections: ["Bisexual"],
+    });
     const { result } = renderHook(() => useEditSectionPresenter("basic"));
     await waitFor(() => expect(result.current.loading).toBe(false));
-    const row = () => result.current.rows.find((r) => r.key === "orientation")!;
+    const row = () => result.current.rows.find((r) => r.key === "orientationSelections")!;
     act(() => row().onClick?.());
-    expect(result.current.editor?.title).toBe("Sexuality");
+    expect(result.current.editor?.title).toBe("Sexual orientation");
     expect(result.current.editor?.help).toMatch(/^Only you can see this\./);
     const editor = result.current.editor?.editor;
-    if (editor?.kind !== "single") throw new Error("sexuality should be a single picker");
-    expect(editor.options.map((o) => o.label)).toEqual([
-      "Prefer not to say",
-      "Straight",
-      "Bisexual",
-    ]);
-    act(() => result.current.editor?.onDraft({ kind: "single", value: "Bisexual" }));
+    if (editor?.kind !== "multi") throw new Error("sexual orientation should be a multi picker");
+    expect(editor.max).toBe(5);
+    expect(editor.options.map((o) => o.label)).toEqual(["Straight", "Bisexual"]);
+    act(() => result.current.editor?.onDraft({ kind: "multi", value: ["Bisexual"] }));
     act(() => result.current.editor?.onSave());
     await waitFor(() => expect(result.current.editor).toBeNull());
-    expect(apiPatch).toHaveBeenCalledWith("/profile", { orientation: "Bisexual" });
+    expect(apiPatch).toHaveBeenCalledWith("/profile", {
+      orientation: null,
+      orientationSelections: ["Bisexual"],
+    });
     expect(row().subtitle).toBe("Bisexual");
 
-    apiPatch.mockResolvedValue({ ...kenyanProfile, orientation: null });
+    apiPatch.mockResolvedValue({ ...kenyanProfile, orientation: null, orientationSelections: [] });
     act(() => row().onClick?.());
-    act(() => result.current.editor?.onDraft({ kind: "single", value: "" }));
+    act(() => result.current.editor?.onDraft({ kind: "multi", value: [] }));
     act(() => result.current.editor?.onSave());
     await waitFor(() => expect(result.current.editor).toBeNull());
-    expect(apiPatch).toHaveBeenLastCalledWith("/profile", { orientation: null });
+    expect(apiPatch).toHaveBeenLastCalledWith("/profile", {
+      orientation: null,
+      orientationSelections: [],
+    });
     expect(row().subtitle).toBe("Not set");
   });
 

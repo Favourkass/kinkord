@@ -1,3 +1,4 @@
+import { genderSelectionIssue, selectedGenders } from "./genderSelection.service";
 import { validateAbout, type AboutDraft, type SignupField } from "@/domain/onboarding";
 import { LAUNCH_COUNTRIES, signupFixFieldsMessage } from "@/constants/onboarding";
 import { KEEP_TYPING, PLACE_NAMES_CREDIT, typedPlaceLabel } from "@/constants/location";
@@ -26,32 +27,53 @@ export function signupLocationFields(
 ) {
   const code = country?.toUpperCase() ?? "";
   const county = code === "KE";
-  const term = county ? "county" : "state";
+  const region = code === "GH";
+  const term = county ? "county" : region ? "region" : "state";
+  // Ghana's regions are the top level already, so below them are just cities and towns.
+  const areaTerm = region ? "city / town" : "region / city / town";
+  const areaTitle = region ? "City / Town" : "Region / City / Town";
   return {
-    stateLabel: county ? "County" : "State",
+    stateLabel: county ? "County" : region ? "Region" : "State",
     statePlaceholder: `Select your ${term}`,
-    helper: `Your ${term} and region / city / town help us show you local communities and events.`,
+    helper: `Your ${term} and ${areaTerm} help us show you local communities and events.`,
     credit: PLACE_NAMES_CREDIT,
-    stateSearchPlaceholder: `Search ${county ? "counties" : "states"}`,
-    states: statesForCountry(code).map((value) => ({ value, label: value })),
-    areaLabel: "Region / City / Town",
-    areaPlaceholder: !state ? `Select your ${term} first` : "Select your region, city or town",
-    areaSearchPlaceholder: "Search regions / cities / towns",
-    areaEmptyLabel: loaded.loading ? "Loading regions, cities and towns…" : "No matching areas",
+    stateSearchPlaceholder: `Search ${county ? "counties" : region ? "regions" : "states"}`,
+    states: statesForCountry(code)
+      .map((value) => ({
+        value,
+        label: code === "US" && value === "District of Columbia" ? "Washington, D.C." : value,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label)),
+    areaLabel: areaTitle,
+    areaPlaceholder: !state
+      ? `Select your ${term} first`
+      : region
+        ? "Select your city or town"
+        : "Select your region, city or town",
+    areaSearchPlaceholder: region ? "Search cities / towns" : "Search regions / cities / towns",
+    areaEmptyLabel: loaded.loading
+      ? region
+        ? "Loading cities and towns…"
+        : "Loading regions, cities and towns…"
+      : "No matching areas",
+    /** The box for a place the list doesn't have. */
+    customAreaLabel: `${areaTitle} name`,
     areaMoreLabel: KEEP_TYPING,
     areaDisabled: !state,
     customArea,
     areas: loaded.areas.map((value) => ({ value, label: value })),
     // Pinned under every search, so an unlisted town never blocks signup.
     otherArea:
-      (code === "NG" || county) && state
-        ? { value: OTHER_AREA, label: "Other region / city / town", typedLabel: typedPlaceLabel }
+      LAUNCH_COUNTRIES.some((country) => country.code === code) && state
+        ? { value: OTHER_AREA, label: `Other ${areaTerm}`, typedLabel: typedPlaceLabel }
         : null,
   };
 }
 
 export function validateSignupAbout(country: string | null, draft: AboutDraft) {
   const errors = validateAbout(draft);
+  const genderError = genderSelectionIssue(country, selectedGenders(draft.genders, draft.gender));
+  if (genderError) errors.gender = genderError;
   if (errors.state)
     errors.state = `${signupLocationFields(country, draft.state).statePlaceholder}.`;
   return errors;

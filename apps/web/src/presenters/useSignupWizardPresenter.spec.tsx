@@ -124,6 +124,36 @@ describe("useSignupWizardPresenter", () => {
     expect(result.current.aboutStep.location.states).toHaveLength(37);
   });
 
+  it("limits gender to five choices, restricts Nigeria and submits multiple genders", async () => {
+    const { result } = renderHook(() => useSignupWizardPresenter());
+    reachCombinedStep(result);
+    expect(result.current.aboutStep.genderOptions).toEqual(["Male", "Female"]);
+    act(() => result.current.stepOne.setCountry("GH"));
+    fillAccount(result);
+    fillAbout(result);
+    act(() =>
+      result.current.aboutStep.set({
+        ...result.current.aboutStep.draft,
+        state: "Greater Accra",
+        city: "Accra",
+        gender: null,
+        genders: [],
+      }),
+    );
+    const choices = result.current.aboutStep.genderOptions.slice(0, 6);
+    for (const value of choices) act(() => result.current.aboutStep.toggleGender(value));
+    expect(result.current.aboutStep.genders).toEqual(choices.slice(0, 5));
+    await act(() => result.current.submitCombinedStep());
+    expect(post).toHaveBeenCalledWith(
+      "/auth-ext/sign-up",
+      expect.objectContaining({ genders: choices.slice(0, 5) }),
+    );
+    act(() => result.current.stepOne.setCountry("NG"));
+    expect(result.current.aboutStep.genders).toEqual(["Male", "Female"]);
+    act(() => result.current.aboutStep.toggleGender("Agender"));
+    expect(result.current.aboutStep.genders).toEqual(["Male", "Female"]);
+  });
+
   it.each([
     ["NG", "Lagos", "Ikeja"],
     ["KE", "Nairobi", "Westlands"],
@@ -149,6 +179,9 @@ describe("useSignupWizardPresenter", () => {
   it.each([
     ["KE", "Nairobi", "Nairobi"],
     ["NG", "Lagos", "Ikeja"],
+    ["GH", "Greater Accra", "Accra"],
+    ["US", "South Dakota", "Sioux Falls"],
+    ["US", "Tennessee", "Spring Hill"],
   ])("submits the chosen country and region for %s", async (country, state, city) => {
     const { result } = renderHook(() => useSignupWizardPresenter());
     reachCombinedStep(result);
@@ -164,7 +197,7 @@ describe("useSignupWizardPresenter", () => {
     expect(result.current.stage).toBe("email");
   });
 
-  it("submits the selected sexuality with the profile details", async () => {
+  it("defers sexuality until after account creation and email verification", async () => {
     const { result } = renderHook(() => useSignupWizardPresenter());
     reachCombinedStep(result);
     fillAccount(result);
@@ -177,14 +210,14 @@ describe("useSignupWizardPresenter", () => {
         city: "Nairobi",
       }),
     );
-    expect(result.current.aboutStep.showSexuality).toBe(true);
+    expect(result.current.aboutStep.showSexuality).toBe(false);
     act(() =>
       result.current.aboutStep.set({ ...result.current.aboutStep.draft, orientation: "Bisexual" }),
     );
     await act(() => result.current.submitCombinedStep());
     expect(post).toHaveBeenCalledWith(
       "/auth-ext/sign-up",
-      expect.objectContaining({ orientation: "Bisexual" }),
+      expect.objectContaining({ orientation: null }),
     );
   });
 
@@ -241,6 +274,26 @@ describe("useSignupWizardPresenter", () => {
     ]);
     expect(result.current.profileStep.roles).toEqual(["Acolyte"]);
   });
+
+  it.each(["NG", "GH", "KE", "US"])(
+    "offers and saves supplied signup roles for %s",
+    async (country) => {
+      const { result } = renderHook(() => useSignupWizardPresenter("profile"));
+      await waitFor(() => expect(get).toHaveBeenCalledWith("/profile"));
+      act(() => result.current.stepOne.setCountry(country));
+      act(() => result.current.profileStep.setRoleSearch("charge master"));
+      expect(result.current.profileStep.roleOptions).toEqual(["Charge Master / Charge Mistress"]);
+      act(() => result.current.profileStep.toggleRole("Charge Master / Charge Mistress"));
+      act(() => result.current.profileStep.setRoleSearch("age regressor"));
+      expect(result.current.profileStep.roleOptions).toEqual(["Age Regressor"]);
+      expect(result.current.profileStep.roles).toEqual(["Charge Master / Charge Mistress"]);
+      await act(() => result.current.profileStep.skipPhotos());
+      expect(patch).toHaveBeenCalledWith("/profile", {
+        roles: ["Charge Master / Charge Mistress"],
+        signupPhotosSkipped: true,
+      });
+    },
+  );
 
   it("blocks step 1 until country + both confirmations are set", () => {
     const { result } = renderHook(() => useSignupWizardPresenter());
@@ -306,7 +359,7 @@ describe("useSignupWizardPresenter", () => {
         country: "NG",
         state: "Delta",
         dateOfBirth: "1999-08-04",
-        gender: "male",
+        genders: ["Male"],
       }),
     );
     expect(result.current.stage).toBe("email");
@@ -457,6 +510,33 @@ describe("useSignupWizardPresenter", () => {
   });
 
   describe("preferences step", () => {
+    it("restores the account country when resuming and saves sexuality before photos", async () => {
+      get.mockImplementation(async (path) =>
+        path === "/profile/options"
+          ? {
+              kinks: [],
+              lookingFor: [],
+              orientations: ["Straight", "Bisexual"],
+              orientationSelections: ["Straight", "Bisexual"],
+            }
+          : { country: "GH", orientation: "Straight", interests: [], lookingFor: [], limits: null },
+      );
+      const { result } = renderHook(() => useSignupWizardPresenter("preferences"));
+      await waitFor(() => expect(result.current.preferencesStep.canContinue).toBe(true));
+      expect(result.current.preferencesStep.showSexuality).toBe(true);
+      expect(result.current.preferencesStep.orientationSelections).toEqual(["Straight"]);
+      act(() => result.current.preferencesStep.toggleOrientation("Straight"));
+      act(() => result.current.preferencesStep.toggleOrientation("Bisexual"));
+      await act(() => result.current.preferencesStep.submit());
+      expect(patch).toHaveBeenCalledWith("/profile", {
+        interests: [],
+        lookingFor: [],
+        limits: null,
+        orientation: null,
+        orientationSelections: ["Bisexual"],
+      });
+      expect(result.current.stage).toBe("profile");
+    });
     it("edits and saves preferences before advancing to step 5", async () => {
       const { result } = renderHook(() => useSignupWizardPresenter("preferences"));
       await waitFor(() => expect(result.current.preferencesStep.canContinue).toBe(true));

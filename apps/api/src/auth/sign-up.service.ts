@@ -1,5 +1,7 @@
+import { genderSelectionChanges } from "../profiles/gender-policy";
 import { canSelectSexuality } from "../profiles/profile-field-policy";
 import {
+  BadRequestException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -24,6 +26,7 @@ export interface SignUpProfileFields {
   city: string | null;
   dateOfBirth: string | null;
   gender: string | null;
+  genders?: string[];
   orientation: string | null;
   phone: string | null;
 }
@@ -57,6 +60,18 @@ export class SignUpService {
     fields: SignUpProfileFields,
     headers: Headers,
   ): Promise<SignUpResult> {
+    let genderFields: ReturnType<typeof genderSelectionChanges>;
+    try {
+      genderFields = genderSelectionChanges(
+        fields.country,
+        fields.genders ?? (fields.gender ? [fields.gender] : []),
+        fields.gender,
+      );
+    } catch (error) {
+      throw new BadRequestException({
+        genders: [error instanceof Error ? error.message : "Invalid gender selection."],
+      });
+    }
     // Email, name and IP are checked where Better Auth creates the user, which
     // every sign-up route passes through. The phone only arrives on this route,
     // so it is checked here, before anything is created.
@@ -108,6 +123,7 @@ export class SignUpService {
         .update(profile)
         .set({
           ...fields,
+          ...genderFields,
           orientation: canSelectSexuality(fields.country) ? fields.orientation : null,
         })
         .where(eq(profile.userId, userId));

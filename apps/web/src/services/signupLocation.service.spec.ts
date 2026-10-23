@@ -8,12 +8,14 @@ import {
 } from "./signupLocation.service";
 
 describe("signup countries and locations", () => {
-  it("offers only Kenya and Nigeria alphabetically", () => {
-    expect(signupCountryOptions().map((option) => option.value)).toEqual(["KE", "NG"]);
+  it("offers Ghana, Kenya, Nigeria and USA alphabetically", () => {
+    expect(signupCountryOptions().map((option) => option.value)).toEqual(["GH", "KE", "NG", "US"]);
   });
   it.each([
     ["KE", 47, "Nairobi", "West Pokot"],
     ["NG", 37, "FCT Abuja", "Zamfara"],
+    ["GH", 16, "Greater Accra", "Western North"],
+    ["US", 51, "South Dakota", "Wyoming"],
   ])("includes all configured regions for %s", (code, count, capital, last) => {
     const location = signupLocationFields(String(code), "");
     const names = location.states.map((option) => option.value);
@@ -21,7 +23,8 @@ describe("signup countries and locations", () => {
     expect(new Set(names).size).toBe(Number(count));
     expect(names).toContain(capital);
     expect(names).toContain(last);
-    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
+    const labels = location.states.map((option) => option.label);
+    expect(labels).toEqual([...labels].sort((a, b) => a.localeCompare(b)));
   });
   it("offers searchable towns within the selected county or state", () => {
     expect(signupLocationFields("KE", "Nairobi")).toMatchObject({
@@ -29,12 +32,12 @@ describe("signup countries and locations", () => {
       stateSearchPlaceholder: "Search counties",
       areaLabel: "Region / City / Town",
     });
-    expect(signupLocationFields("US", "California").states).toEqual([]);
+    expect(signupLocationFields("US", "California").stateLabel).toBe("State");
     const delta = signupLocationFields("NG", "Delta", false, { areas: ["Abraka"], loading: false });
     expect(delta.areas).toEqual([{ value: "Abraka", label: "Abraka" }]);
   });
   it("does not substitute Nigerian states for an unknown country", () => {
-    expect(signupLocationFields("GH", "").states).toEqual([]);
+    expect(signupLocationFields("ZZ", "").states).toEqual([]);
   });
 });
 
@@ -57,17 +60,20 @@ it("uses county consistently for Kenyan location copy and validation", () => {
 });
 
 it.each([
-  ["NG", "Lagos", "Ikeja"],
-  ["KE", "Nairobi", "Westlands"],
-])("offers dependent towns and custom entry for %s", (country, parent, town) => {
+  ["NG", "Lagos", "Ikeja", "Region / City / Town"],
+  ["KE", "Nairobi", "Westlands", "Region / City / Town"],
+  // Ghana's regions are the level above, so its towns are just cities and towns.
+  ["GH", "Greater Accra", "Accra", "City / Town"],
+  ["US", "South Dakota", "Sioux Falls", "Region / City / Town"],
+])("offers dependent towns and custom entry for %s", (country, parent, town, area) => {
   const location = signupLocationFields(country, parent, false, { areas: [town], loading: false });
-  expect(location.areaLabel).toBe("Region / City / Town");
+  expect(location.areaLabel).toBe(area);
   expect(location.areaDisabled).toBe(false);
   expect(location.areas.map((area) => area.value)).toEqual([town]);
   // "Other" is pinned under every search rather than listed with the towns.
   expect(location.otherArea).toMatchObject({
     value: OTHER_AREA,
-    label: "Other region / city / town",
+    label: `Other ${area.toLowerCase()}`,
   });
   expect(location.otherArea?.typedLabel("Ikota")).toBe("Use “Ikota”");
   expect(location.areaMoreLabel).toBe("Keep typing to narrow it down");
@@ -85,5 +91,97 @@ it("says the towns are loading until they arrive, and credits GeoNames", () => {
     text: "Place names: GeoNames,",
     licence: "CC BY 4.0",
     href: "https://creativecommons.org/licenses/by/4.0/",
+  });
+});
+
+it("uses Region for Ghana throughout the signup field and error copy", () => {
+  expect(signupLocationFields("GH", "")).toMatchObject({
+    stateLabel: "Region",
+    statePlaceholder: "Select your region",
+    stateSearchPlaceholder: "Search regions",
+    areaPlaceholder: "Select your region first",
+  });
+  expect(signupLocationErrorMessage("GH", ["state"])).toBe("Check your region above.");
+});
+
+it("matches every entry in the requested USA list, including Washington and Washington, D.C.", () => {
+  const expected = [
+    "Alabama",
+    "Alaska",
+    "Arizona",
+    "Arkansas",
+    "California",
+    "Colorado",
+    "Connecticut",
+    "Delaware",
+    "Florida",
+    "Georgia",
+    "Hawaii",
+    "Idaho",
+    "Illinois",
+    "Indiana",
+    "Iowa",
+    "Kansas",
+    "Kentucky",
+    "Louisiana",
+    "Maine",
+    "Maryland",
+    "Massachusetts",
+    "Michigan",
+    "Minnesota",
+    "Mississippi",
+    "Missouri",
+    "Montana",
+    "Nebraska",
+    "Nevada",
+    "New Hampshire",
+    "New Jersey",
+    "New Mexico",
+    "New York",
+    "North Carolina",
+    "North Dakota",
+    "Ohio",
+    "Oklahoma",
+    "Oregon",
+    "Pennsylvania",
+    "Rhode Island",
+    "South Carolina",
+    "South Dakota",
+    "Tennessee",
+    "Texas",
+    "Utah",
+    "Vermont",
+    "Virginia",
+    "Washington",
+    "Washington, D.C.",
+    "West Virginia",
+    "Wisconsin",
+    "Wyoming",
+  ];
+  const options = signupLocationFields("US", "").states;
+  expect(options.map((option) => option.label)).toEqual(expected);
+  // Keep the stored value and its existing town-list path compatible.
+  expect(options.find((option) => option.label === "Washington, D.C.")?.value).toBe(
+    "District of Columbia",
+  );
+});
+
+it("calls Ghana's places below a region cities and towns, never a second region", () => {
+  const location = signupLocationFields("GH", "Greater Accra");
+  expect(location).toMatchObject({
+    stateLabel: "Region",
+    areaLabel: "City / Town",
+    areaPlaceholder: "Select your city or town",
+    areaSearchPlaceholder: "Search cities / towns",
+    customAreaLabel: "City / Town name",
+  });
+  expect(location.helper).toBe(
+    "Your region and city / town help us show you local communities and events.",
+  );
+  expect(location.otherArea?.label).toBe("Other city / town");
+  // Nigeria reads as before.
+  expect(signupLocationFields("NG", "Lagos")).toMatchObject({
+    areaLabel: "Region / City / Town",
+    customAreaLabel: "Region / City / Town name",
   });
 });

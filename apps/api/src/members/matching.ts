@@ -24,9 +24,6 @@ export function canonicalGender(value: string | null | undefined): Gender | null
   return GENDERS.find((g) => g.toLowerCase() === v) ?? null;
 }
 
-const SHOW_OF: Record<Gender, Exclude<Show, "all">> = { Female: "women", Male: "men" };
-const OTHER: Record<Gender, Gender> = { Female: "Male", Male: "Female" };
-
 /** The gender a "women" or "men" strip lists; null for "all". */
 export function genderShown(show: Show): Gender | null {
   if (show === "all") return null;
@@ -34,9 +31,11 @@ export function genderShown(show: Show): Gender | null {
 }
 
 /** Into the other gender. With no gender of their own to go by: everyone. */
-const otherGender = (own: Gender | null): Show => (own ? SHOW_OF[OTHER[own]] : "all");
+const otherGender = (own: Gender | null): Show =>
+  own === "Female" ? "men" : own === "Male" ? "women" : "all";
 /** Into their own gender: for "Gay"/"Lesbian", should ORIENTATIONS offer them. */
-export const sameGender = (own: Gender | null): Show => (own ? SHOW_OF[own] : "all");
+export const sameGender = (own: Gender | null): Show =>
+  own === "Female" ? "women" : own === "Male" ? "men" : "all";
 const everyone = (): Show => "all";
 
 /**
