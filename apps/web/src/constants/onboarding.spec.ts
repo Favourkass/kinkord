@@ -21,14 +21,14 @@ it("includes all 95 supplied genders with Male and Female first, matching the AP
   expect(JSON.parse(array!.replace(/,\s*\]/, "]"))).toEqual(GENDERS);
 });
 
-it("includes exactly the 101 supplied orientations and matches the backend", () => {
+it("includes exactly the 99 supplied orientations and matches the backend", () => {
   const requested = JSON.parse(
     readFileSync(
       resolve(process.cwd(), "../../scripts/data/requested-orientation-options.json"),
       "utf8",
     ),
   ) as string[];
-  expect(ORIENTATION_SELECTIONS).toHaveLength(101);
+  expect(ORIENTATION_SELECTIONS).toHaveLength(99);
   expect([...ORIENTATION_SELECTIONS].sort()).toEqual(requested.sort());
   const source = readFileSync(
     resolve(process.cwd(), "../api/src/profiles/profile-options.ts"),
