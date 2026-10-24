@@ -1,3 +1,5 @@
+import { notBanned } from "../moderation/admins";
+import { privacyAllows, privateProfileValue } from "../privacy/privacy-policy";
 import { teamBadge } from "../members/team-badge";
 import {
   BadRequestException,
@@ -350,7 +352,7 @@ export class PostsService {
     const names = mentionCandidates(text);
     if (!names.length) return;
     void (async () => {
-      const members = await knownHandles(this.db, names);
+      const members = await knownHandles(this.db, names, actorId);
       for (const name of membersToTell(mentionsIn(text, members))) {
         const id = members.get(name) as string;
         if (id === actorId || except.includes(id)) continue;
@@ -458,7 +460,11 @@ export class PostsService {
 
   /** One post, or null when it is missing, deleted or not visible to the viewer. */
   async byId(postId: string, viewerId: string): Promise<PostVM | null> {
-    const rows = await this.selectPosts(viewerId, [eq(post.id, postId)], 1);
+    const rows = await this.selectPosts(
+      viewerId,
+      [eq(post.id, postId), privacyAllows(viewerId, post.authorId, "sharedContent")],
+      1,
+    );
     if (!rows.length) return null;
     const [vm] = await this.decorate(rows, viewerId);
     return vm ?? null;
@@ -667,6 +673,7 @@ export class PostsService {
       and(isNull(post.deletedAt), isNull(post.archivedAt)),
       eq(post.authorId, authorId),
       inArray(postMedia.kind, kinds),
+      privacyAllows(viewerId, post.authorId, "media"),
       visibleTo(viewerId, viewerFollows, authorFollows),
     );
     const base = () =>
@@ -754,7 +761,7 @@ export class PostsService {
         repostOfId: post.repostOfId,
         username: user.username,
         displayName: profile.displayName,
-        avatarKey: profile.avatarKey,
+        avatarKey: privateProfileValue(viewerId, profile.userId, "profilePhoto", profile.avatarKey),
         teamMember: teamBadge(post.authorId),
         silver: silverCheck(post.authorId),
         subscribed: sql<boolean>`exists (select 1 from ${memberSubscription} where ${memberSubscription.userId} = ${post.authorId} and ${memberSubscription.currentPeriodEnd} > now())`,
@@ -802,7 +809,7 @@ export class PostsService {
         repostOfId: post.repostOfId,
         username: user.username,
         displayName: profile.displayName,
-        avatarKey: profile.avatarKey,
+        avatarKey: privateProfileValue(viewerId, profile.userId, "profilePhoto", profile.avatarKey),
         teamMember: teamBadge(post.authorId),
         silver: silverCheck(post.authorId),
         subscribed: sql<boolean>`exists (select 1 from ${memberSubscription} where ${memberSubscription.userId} = ${post.authorId} and ${memberSubscription.currentPeriodEnd} > now())`,
@@ -821,6 +828,9 @@ export class PostsService {
           inArray(post.id, ids),
           and(isNull(post.deletedAt), isNull(post.archivedAt)),
           eq(post.visibility, "public"),
+          privacyAllows(viewerId, post.authorId, "posts"),
+          privacyAllows(viewerId, post.authorId, "sharedContent"),
+          notBanned(post.authorId),
         ),
       );
     return new Map(rows.map((r) => [r.id, r]));
@@ -856,6 +866,8 @@ export class PostsService {
       this.db
         .select()
         .from(postMedia)
+        // A post's photos follow the post's own audience, so it never shows up without
+        // them; the Photos and Videos setting covers the profile's Media tab.
         .where(inArray(postMedia.postId, ids))
         .orderBy(postMedia.position),
       this.db

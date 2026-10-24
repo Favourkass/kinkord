@@ -382,11 +382,13 @@ describe("Nearby's pages", () => {
       // Original posts by members in the viewer's state, within their country; no gender filter.
       expect(sql).toContain('"post"."repost_of_id" is null');
       expect(sql).toContain(
-        'exists (select 1 from "profile" where "profile"."user_id" = "post"."author_id" and ("profile"."state" = $',
+        'exists (select 1 from "profile" where "profile"."user_id" = "post"."author_id" and (',
       );
+      expect(sql).toContain('"profile"."state" = $');
+      expect(params).toContain("location");
       expect(sql).toContain('"profile"."country" = $');
       expect(params).toEqual(expect.arrayContaining(["Lagos", "NG"]));
-      expect(sql).not.toContain("gender");
+      expect(sql).not.toContain('"profile"."gender" =');
     }
     expect(pool.limit).toBe(800);
     expect(render(pool.where!).params).toContain(iso(hoursAgo(14 * 24)));

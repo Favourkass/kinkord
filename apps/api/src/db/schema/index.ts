@@ -19,3 +19,5 @@ export * from "./wallet";
 
 export * from "./friendship";
 export * from "./relationship";
+
+export * from "./profile-privacy";

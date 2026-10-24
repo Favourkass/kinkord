@@ -1,4 +1,4 @@
-import type { EditRowKey, EditSectionKey, ProfileVisibility } from "@/domain/profile";
+import type { EditRowKey, EditSectionKey } from "@/domain/profile";
 
 /** Figma-exported glyphs for the Edit Profile hub rows (1542:30/164). */
 export const SECTION_ICONS: Record<EditSectionKey | "photos", string> = {
@@ -30,7 +30,6 @@ export const ROW_ICONS: Record<EditRowKey, string> = {
   occupation: "/app/profile/edit/row-occupation.svg",
   languages: "/app/profile/edit/row-languages.svg",
   socialLinks: "/app/profile/edit/row-social-links.svg",
-  profileVisibility: "/app/profile/edit/row-visibility.svg",
   verifiedBadge: "/app/profile/icon-verified.svg",
 };
 
@@ -57,7 +56,7 @@ export const PROFILE_EDIT_COPY = {
       },
       privacy: {
         title: "Privacy & Socials",
-        subtitle: "Manage your social links and privacy settings.",
+        subtitle: "Manage your social links and verified badge.",
       },
     },
   },
@@ -96,7 +95,8 @@ export const PROFILE_EDIT_COPY = {
     },
     privacy: {
       heading: "Privacy & Socials",
-      subtitle: "Manage your privacy and social connections",
+      subtitle:
+        "Manage your social links and badge. Who sees your profile is in Settings → Privacy.",
     },
   } satisfies Record<EditSectionKey, { heading: string; subtitle: string }>,
   rows: {
@@ -131,7 +131,6 @@ export const PROFILE_EDIT_COPY = {
     occupation: { title: "Occupation", help: null },
     languages: { title: "Language Spoken", help: "Pick up to 10." },
     socialLinks: { title: "Social Media Links", help: "Public links shown on your profile." },
-    profileVisibility: { title: "Profile Visibility", help: null },
     verifiedBadge: {
       title: "Verified Badge",
       help: "Members who can see your profile see only the badge, not your ID or selfie.",
@@ -141,13 +140,6 @@ export const PROFILE_EDIT_COPY = {
     show: { label: "Shown", help: "Members see that your identity is verified." },
     hide: { label: "Hidden", help: "Only you see your badge." },
   },
-  visibility: {
-    public: { label: "Public", help: "Every member can see your full profile." },
-    friends: {
-      label: "Friends only",
-      help: "Only friends (you follow each other) see your About details.",
-    },
-  } satisfies Record<ProfileVisibility, { label: string; help: string }>,
   links: {
     facebook: { label: "Facebook", placeholder: "https://facebook.com/yourname" },
     x: { label: "X", placeholder: "https://x.com/yourname" },

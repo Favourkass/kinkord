@@ -1,3 +1,4 @@
+import { privacyAllows } from "../privacy/privacy-policy";
 import { and, inArray } from "drizzle-orm";
 import type { Db } from "../db/db.module";
 import { user } from "../db/schema";
@@ -113,13 +114,23 @@ export function membersToTell(mentions: Mention[]): string[] {
 }
 
 /** Which of these usernames belong to members who can be shown, with their ids. No query for none. */
-export async function knownHandles(db: Db, names: string[]): Promise<Map<string, string>> {
+export async function knownHandles(
+  db: Db,
+  names: string[],
+  actorId?: string,
+): Promise<Map<string, string>> {
   const unique = [...new Set(names)];
   if (!unique.length) return new Map();
   const rows = await db
     .select({ username: user.username, id: user.id })
     .from(user)
-    .where(and(inArray(user.username, unique), notBanned(user.id)));
+    .where(
+      and(
+        inArray(user.username, unique),
+        notBanned(user.id),
+        actorId ? privacyAllows(actorId, user.id, "tagging") : undefined,
+      ),
+    );
   return new Map(
     rows
       .filter((r): r is { username: string; id: string } => Boolean(r.username))

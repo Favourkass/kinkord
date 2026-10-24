@@ -1,3 +1,4 @@
+import { privacyAllows, privateProfileValue } from "../privacy/privacy-policy";
 import { and, asc, desc, eq, ne, or, type SQL } from "drizzle-orm";
 import type { Db } from "../db/db.module";
 import { memberRelationship, profile, user, type RelationshipKind } from "../db/schema";
@@ -51,7 +52,7 @@ export async function relationshipRows(
       userId: user.id,
       username: user.username,
       displayName: profile.displayName,
-      avatarKey: profile.avatarKey,
+      avatarKey: privateProfileValue(viewerId, profile.userId, "profilePhoto", profile.avatarKey),
     })
     .from(memberRelationship)
     .innerJoin(
@@ -105,6 +106,10 @@ export function profileRelationships(
     storage,
     memberId,
     viewerId,
-    eq(memberRelationship.status, "accepted"),
+    and(
+      eq(memberRelationship.status, "accepted"),
+      privacyAllows(viewerId, memberId, "relationshipStatus"),
+      privacyAllows(viewerId, user.id, "relationshipStatus"),
+    ),
   );
 }
