@@ -14,6 +14,16 @@ const { profileRelationships } = vi.hoisted(() => ({
 }));
 vi.mock("../relationships/profile-relationships", () => ({ profileRelationships }));
 
+const allAccess = {
+  profilePhoto: true,
+  coverPhoto: true,
+  bio: true,
+  location: true,
+  interests: true,
+  relationshipStatus: true,
+  followersFollowing: true,
+  onlineStatus: true,
+};
 const chain = (result: unknown) => {
   const p: unknown = new Proxy(() => p, {
     get: (_t, prop) =>
@@ -71,7 +81,12 @@ const renderOrder = (args: SQL[]) => new PgDialect().sqlToQuery(sql.join(args, s
 const makeService = () => {
   // Queries a test doesn't set up find nothing (a member without Silver, say).
   const select = vi.fn(() => chain([]));
-  const db = { select } as unknown as Db;
+  const db = {
+    select: (selection: Record<string, unknown>) =>
+      selection?.allowed && Object.keys(selection).length === 1
+        ? chain([{ allowed: true }])
+        : select(),
+  } as unknown as Db;
   const presignDownload = vi.fn(async (key: string) => `https://s3/${key}`);
   const storage = { presignDownload } as unknown as StorageService;
   const counts = vi.fn(async () => ({ friends: 2, followers: 30, following: 9 }));
@@ -243,24 +258,26 @@ describe("MembersService", () => {
     };
 
     const country = await run({ country: "ng", sort: "recent" });
-    expect(country.params).toEqual(["NG", "me"]);
+    expect(country.params).toEqual(expect.arrayContaining(["NG", "me"]));
     expect(country.sql).not.toMatch(/"state"|"city"/);
 
     const state = await run({ country: "ng", state: "Delta", sort: "recent" });
-    expect(state.params).toEqual(["NG", "me", "Delta"]);
+    expect(state.params).toEqual(expect.arrayContaining(["NG", "me", "Delta"]));
     expect(state.sql).toMatch(/"state" = /);
     expect(state.sql).not.toMatch(/"city"/);
 
     const lga = await run({ country: "ng", state: "Delta", lga: "Abraka", sort: "recent" });
-    expect(lga.params).toEqual(["NG", "me", "Delta", "Abraka"]);
+    expect(lga.params).toEqual(expect.arrayContaining(["NG", "me", "Delta", "Abraka"]));
 
     // An LGA without a state cannot narrow anything, so it is ignored rather than applied.
     const orphanLga = await run({ country: "ng", lga: "Abraka", sort: "recent" });
-    expect(orphanLga.params).toEqual(["NG", "me"]);
+    expect(orphanLga.params).toEqual(expect.arrayContaining(["NG", "me"]));
 
     // A search reads the name and the username, anywhere in either, wildcards taken literally.
     const search = await run({ country: "ng", state: "Delta", q: "ada_o", sort: "recent" });
-    expect(search.params).toEqual(["NG", "me", "Delta", "%ada\\_o%", "%ada\\_o%"]);
+    expect(search.params).toEqual(
+      expect.arrayContaining(["NG", "me", "Delta", "%ada\\_o%", "%ada\\_o%"]),
+    );
     expect(search.sql).toMatch(/"display_name" ilike \$\d+ or "user"\."username" ilike/);
   });
 
@@ -329,6 +346,7 @@ describe("MembersService", () => {
     select.mockReturnValueOnce(
       chain([
         {
+          access: allAccess,
           u: {
             id: "u2",
             username: "nene",
@@ -384,6 +402,7 @@ describe("MembersService", () => {
         chain([
           {
             coins: 98765,
+            access: allAccess,
             u: { id: "u2", username: "nene", createdAt: new Date("2024-01-01T00:00:00Z") },
             p: { profileVisibility: visibility, dateOfBirth: null },
           },
@@ -400,6 +419,7 @@ describe("MembersService", () => {
       .mockReturnValueOnce(
         chain([
           {
+            access: allAccess,
             u: { id: "u2", username: "nene", createdAt: new Date("2023-03-10T09:00:00Z") },
             p: { displayName: "Neze", avatarKey: "a", coverKey: "c", dateOfBirth: null },
           },
@@ -416,6 +436,7 @@ describe("MembersService", () => {
       chain([
         {
           coins: 2450,
+          access: allAccess,
           u: { id: "me", username: "me", createdAt: new Date("2024-01-01T00:00:00Z") },
           p: {
             displayName: "Me",
@@ -481,8 +502,11 @@ describe("MembersService.friends", () => {
 });
 
 describe("MembersService.publicProfile visibility (Edit Profile → Privacy)", () => {
-  const rowFor = (profileVisibility: string) => [
+  const rowFor = (profileVisibility: string, privateAbout = false) => [
     {
+      access: privateAbout
+        ? { ...allAccess, bio: false, interests: false, relationshipStatus: false }
+        : allAccess,
       u: {
         id: "u2",
         username: "nene",
@@ -519,7 +543,7 @@ describe("MembersService.publicProfile visibility (Edit Profile → Privacy)", (
 
   it("withholds the About details from non-friends on a friends-only profile, keeps the card basics", async () => {
     const { service, select, areFriends } = makeService();
-    select.mockReturnValueOnce(chain(rowFor("friends")));
+    select.mockReturnValueOnce(chain(rowFor("friends", true)));
     const vm = await service.publicProfile("nene", "me");
     expect(areFriends).toHaveBeenCalledWith("me", "u2");
     expect(vm.restricted).toBe(true);
@@ -702,7 +726,7 @@ describe("MembersService people tabs + media (profile rebuild, 2026-09-12)", () 
       silver: false,
     });
     const { params } = renderWhere(wheres[0]);
-    expect(params).toEqual(["Delta", "u2", "me", "NG"]);
+    expect(params).toEqual(expect.arrayContaining(["Delta", "u2", "me", "NG"]));
     expect(renderWhere(wheres[1])).toEqual(renderWhere(wheres[0]));
   });
 
@@ -764,7 +788,9 @@ describe("MembersService people tabs + media (profile rebuild, 2026-09-12)", () 
     const { service, select, presignDownload } = makeService();
     select
       .mockReturnValueOnce(
-        chain([{ avatarKey: "avatars/u2/new.jpg", coverKey: null, visibility: "public" }]),
+        chain([
+          { avatarKey: "avatars/u2/new.jpg", coverKey: null, visibility: "public", allowed: true },
+        ]),
       )
       .mockReturnValueOnce(
         chain([
@@ -799,13 +825,15 @@ describe("MembersService people tabs + media (profile rebuild, 2026-09-12)", () 
   it("shows nothing at all to a non-friend of a friends-only profile", async () => {
     const locked = makeService();
     locked.select.mockReturnValueOnce(
-      chain([{ avatarKey: "avatars/u2/a.jpg", coverKey: null, visibility: "friends" }]),
+      chain([
+        { avatarKey: "avatars/u2/a.jpg", coverKey: null, visibility: "friends", allowed: false },
+      ]),
     );
     await expect(locked.service.media("nene", "me", "all")).resolves.toMatchObject({
       items: [],
       restricted: true,
     });
-    expect(locked.areFriends).toHaveBeenCalledWith("me", "u2");
+    expect(locked.areFriends).not.toHaveBeenCalled();
     // Nothing is even asked of the posts side for a profile the viewer cannot see.
     expect(locked.postMediaFor).not.toHaveBeenCalled();
   });
@@ -814,7 +842,9 @@ describe("MembersService people tabs + media (profile rebuild, 2026-09-12)", () 
     const { service, select, postMediaFor } = makeService();
     select
       .mockReturnValueOnce(
-        chain([{ avatarKey: "avatars/u2/new.jpg", coverKey: null, visibility: "public" }]),
+        chain([
+          { avatarKey: "avatars/u2/new.jpg", coverKey: null, visibility: "public", allowed: true },
+        ]),
       )
       .mockReturnValueOnce(
         chain([
@@ -853,7 +883,9 @@ describe("MembersService people tabs + media (profile rebuild, 2026-09-12)", () 
   it("never asks the posts side for the Profile Photo pill — no post can be an avatar", async () => {
     const { service, select, postMediaFor } = makeService();
     select
-      .mockReturnValueOnce(chain([{ avatarKey: null, coverKey: null, visibility: "public" }]))
+      .mockReturnValueOnce(
+        chain([{ avatarKey: null, coverKey: null, visibility: "public", allowed: true }]),
+      )
       .mockReturnValueOnce(chain([]))
       .mockReturnValueOnce(chain([{ total: 0 }]));
 

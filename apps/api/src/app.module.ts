@@ -1,3 +1,4 @@
+import { PrivacyModule } from "./privacy/privacy.module";
 import { WalletModule } from "./wallet/wallet.module";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
@@ -33,6 +34,7 @@ import { VerificationModule } from "./verification/verification.module";
     MessagingModule,
     StorageModule,
     ProfilesModule,
+    PrivacyModule,
     CommunityModule,
     MembersModule,
     RelationshipsModule,

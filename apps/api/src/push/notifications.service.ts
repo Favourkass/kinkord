@@ -1,3 +1,4 @@
+import { privateProfileValue } from "../privacy/privacy-policy";
 import { messageBadgeCount } from "../chat/inbox-badge";
 import { teamBadge } from "../members/team-badge";
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
@@ -425,7 +426,12 @@ export class NotificationsService {
         actorUsername: user.username,
         actorName: user.name,
         actorDisplayName: profile.displayName,
-        actorAvatarKey: profile.avatarKey,
+        actorAvatarKey: privateProfileValue(
+          userId,
+          profile.userId,
+          "profilePhoto",
+          profile.avatarKey,
+        ),
         actorSilver: silverCheck(notification.actorId),
         actorTeamMember: teamBadge(notification.actorId),
       })

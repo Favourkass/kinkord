@@ -44,6 +44,13 @@ export const Routes = {
   kinkcoinsWithdraw: "/kinkcoins/withdraw",
   settings: "/settings",
   /** Password + 2FA moved here from /profile (CEO, 2026-09-12: "we still need to keep the change password and co"). */
+  settingsPrivacy: "/settings/privacy",
+  settingsPrivacyProfile: "/settings/privacy/profile",
+  settingsPrivacyMessaging: "/settings/privacy/messaging",
+  settingsPrivacyActivity: "/settings/privacy/activity",
+  settingsPrivacyReceipts: "/settings/privacy/read-receipts",
+  settingsPrivacyTags: "/settings/privacy/tagging",
+  settingsPrivacySharing: "/settings/privacy/sharing",
   settingsSecurity: "/settings/security",
   settingsVerification: "/settings/verification",
   // Account-menu entries still being built: each opens a "coming soon" screen.

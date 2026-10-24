@@ -141,7 +141,7 @@ function drawerNavigation(): AppShellDrawerVM {
       {
         label: copy.groups.privacy,
         items: [
-          { key: "privacy", label: copy.privacy, href: Routes.profileEditPrivacy, icon: "privacy" },
+          { key: "privacy", label: copy.privacy, href: Routes.settingsPrivacy, icon: "privacy" },
           {
             key: "security",
             label: copy.security,

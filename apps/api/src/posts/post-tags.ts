@@ -1,3 +1,4 @@
+import { privacyAllows, privateProfileValue } from "../privacy/privacy-policy";
 import { BadRequestException } from "@nestjs/common";
 import { and, asc, eq, ilike, inArray, ne, or, sql, type AnyColumn } from "drizzle-orm";
 import type { Db } from "../db/db.module";
@@ -50,6 +51,7 @@ export async function taggableIds(
         notBanned(user.id),
         noBlockEitherWay(user.id, authorId),
         acceptedFriendship(user.id, authorId),
+        privacyAllows(authorId, user.id, "tagging"),
       ),
     );
   if (rows.length !== handles.length) throw new BadRequestException(TAG_FRIENDS_ONLY);
@@ -106,7 +108,7 @@ export async function tagSuggestions(db: Db, viewerId: string, query: string, li
       userId: user.id,
       username: user.username,
       displayName: profile.displayName,
-      avatarKey: profile.avatarKey,
+      avatarKey: privateProfileValue(viewerId, profile.userId, "profilePhoto", profile.avatarKey),
     })
     .from(user)
     .innerJoin(profile, eq(profile.userId, user.id))
@@ -115,6 +117,7 @@ export async function tagSuggestions(db: Db, viewerId: string, query: string, li
         ne(user.id, viewerId),
         eq(profile.accountType, "person"),
         acceptedFriendship(user.id, viewerId),
+        privacyAllows(viewerId, user.id, "tagging"),
         notBanned(user.id),
         noBlockEitherWay(user.id, viewerId),
         q ? or(ilike(user.username, pattern), ilike(profile.displayName, pattern)) : undefined,

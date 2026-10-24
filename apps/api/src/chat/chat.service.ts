@@ -1,3 +1,4 @@
+import { privacyAllows, privateProfileValue } from "../privacy/privacy-policy";
 import { messageBadgeCount } from "./inbox-badge";
 import { teamBadge } from "../members/team-badge";
 import { randomUUID } from "node:crypto";
@@ -664,6 +665,7 @@ export class ChatService {
           and(
             eq(inboxPeer.conversationId, conversation.id),
             ne(inboxPeer.userId, userId),
+            privacyAllows(userId, inboxPeer.userId, "onlineStatus"),
             sql`${inboxPeerProfile.lastSeenAt} > timezone('UTC', now()) - (${sql.raw(String(ONLINE_WINDOW_SECONDS))} * interval '1 second')`,
           ),
         ),
@@ -769,8 +771,8 @@ export class ChatService {
         username: user.username,
         name: user.name,
         displayName: profile.displayName,
-        avatarKey: profile.avatarKey,
-        lastSeenAt: profile.lastSeenAt,
+        avatarKey: privateProfileValue(userId, profile.userId, "profilePhoto", profile.avatarKey),
+        lastSeenAt: privateProfileValue(userId, profile.userId, "onlineStatus", profile.lastSeenAt),
         blockedByMe: blockedBy(userId, conversationParticipant.userId),
         silver: silverCheck(conversationParticipant.userId),
         teamMember: teamBadge(conversationParticipant.userId),
