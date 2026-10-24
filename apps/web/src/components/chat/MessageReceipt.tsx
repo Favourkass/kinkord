@@ -19,9 +19,9 @@ export default function MessageReceipt({ status }: MessageReceiptProps) {
       role="img"
       aria-label={label}
       title={label}
-      className={`inline-flex shrink-0 items-center rounded bg-black px-1 py-0.5 ${color}`}
+      className={`inline-flex shrink-0 items-center align-middle ${color}`}
     >
-      <Icon size={16} strokeWidth={3.25} aria-hidden="true" />
+      <Icon size={17} strokeWidth={2.6} aria-hidden="true" />
     </span>
   );
 }

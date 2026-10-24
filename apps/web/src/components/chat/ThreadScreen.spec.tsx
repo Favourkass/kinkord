@@ -13,6 +13,7 @@ afterEach(cleanup);
 const props: ThreadScreenProps = {
   peer: null,
   messages: [],
+  dayGroups: [],
   loading: false,
   error: null,
   sendError: null,

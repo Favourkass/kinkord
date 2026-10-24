@@ -57,6 +57,7 @@ export default function ThreadPage({ params }: { params: Promise<{ id: string }>
       <ThreadScreen
         peer={thread.peer}
         messages={thread.messages}
+        dayGroups={thread.dayGroups}
         loading={thread.loading}
         error={thread.error}
         sendError={thread.sendError}
@@ -76,6 +77,7 @@ export default function ThreadPage({ params }: { params: Promise<{ id: string }>
           onTyping,
           placeholder: CHAT_COPY.placeholder,
           sendLabel: CHAT_COPY.send,
+          emoji: CHAT_COPY.emoji,
           maxLength: MESSAGE_BODY_MAX,
           photo: {
             ...composerPhoto,
