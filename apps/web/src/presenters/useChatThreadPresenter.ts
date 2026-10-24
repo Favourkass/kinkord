@@ -389,8 +389,9 @@ export function useChatThreadPresenter(conversationId: string) {
   // Once the other member writes here, replying is free.
   const needsSilver =
     needsSilverIn === conversationId && !messages.some((m) => m.senderId !== viewerId);
-  // Header polling re-renders the screen, refreshing relative dates after midnight.
-  const today = new Date().toDateString();
+  // Header polling re-renders the screen, so Today and Yesterday move on after midnight.
+  const clock = new Date();
+  const today = new Date(clock.getFullYear(), clock.getMonth(), clock.getDate()).getTime();
   const bubbles = useMemo(() => {
     const now = new Date(today);
     return [

@@ -27,7 +27,14 @@ export interface MessageComposerProps {
   emoji?: { label: string; options: readonly string[] };
 }
 
-/** A growing message input. Enter adds a line; Ctrl/Cmd+Enter sends. */
+/** A phone's return key adds a line, as in its other messaging apps; Send sends. */
+const touchKeyboard = () =>
+  typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches === true;
+
+/**
+ * A growing message input. On a computer Enter sends and Shift+Enter adds a line,
+ * as before; on a phone Enter adds a line. Ctrl/Cmd+Enter sends on both.
+ */
 export default function MessageComposer({
   onSend,
   onTyping,
@@ -163,7 +170,8 @@ export default function MessageComposer({
             onBlur={() => onTyping?.(false)}
             onKeyDown={(e) => {
               if (e.key === "Escape") setEmojiOpen(false);
-              if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !e.nativeEvent.isComposing) {
+              if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+              if (e.ctrlKey || e.metaKey || (!e.shiftKey && !touchKeyboard())) {
                 e.preventDefault();
                 submit();
               }

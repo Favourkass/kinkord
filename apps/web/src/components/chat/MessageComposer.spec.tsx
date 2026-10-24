@@ -4,16 +4,46 @@ import { afterEach, expect, it, vi } from "vitest";
 import MessageComposer from "./MessageComposer";
 afterEach(cleanup);
 const base = { placeholder: "Message…", sendLabel: "Send", maxLength: 4000 };
-it("preserves multiline messages and sends only on explicit action", () => {
+const onPhone = (coarse: boolean) =>
+  vi.stubGlobal("matchMedia", (query: string) => ({ matches: coarse && query.includes("coarse") }));
+afterEach(() => vi.unstubAllGlobals());
+
+it("on a computer, Enter sends and Shift+Enter keeps writing", () => {
+  onPhone(false);
+  const send = vi.fn();
+  render(<MessageComposer {...base} onSend={send} />);
+  const input = screen.getByRole("textbox");
+  fireEvent.change(input, { target: { value: "Hello\nHow are you?" } });
+  fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
+  expect(send).not.toHaveBeenCalled();
+  fireEvent.keyDown(input, { key: "Enter" });
+  expect(send).toHaveBeenCalledWith("Hello\nHow are you?");
+  expect((input as HTMLTextAreaElement).value).toBe("");
+});
+
+it("on a phone, Enter adds a line and only Send or Ctrl/Cmd+Enter sends", () => {
+  onPhone(true);
   const send = vi.fn();
   render(<MessageComposer {...base} onSend={send} />);
   const input = screen.getByRole("textbox");
   fireEvent.change(input, { target: { value: "Hello\nHow are you?" } });
   fireEvent.keyDown(input, { key: "Enter" });
   expect(send).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  fireEvent.keyDown(input, { key: "Enter", metaKey: true });
   expect(send).toHaveBeenCalledWith("Hello\nHow are you?");
-  expect((input as HTMLTextAreaElement).value).toBe("");
+  fireEvent.change(input, { target: { value: "Again" } });
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  expect(send).toHaveBeenLastCalledWith("Again");
+});
+
+it("doesn't send while an input method is still composing", () => {
+  onPhone(false);
+  const send = vi.fn();
+  render(<MessageComposer {...base} onSend={send} />);
+  const input = screen.getByRole("textbox");
+  fireEvent.change(input, { target: { value: "こんにちは" } });
+  fireEvent.keyDown(input, { key: "Enter", isComposing: true });
+  expect(send).not.toHaveBeenCalled();
 });
 it("inserts emoji at the selection and respects the character limit", () => {
   render(
