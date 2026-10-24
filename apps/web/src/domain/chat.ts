@@ -2,7 +2,7 @@
  * Chat: what the API returns (PMs) and what the screens render (VMs). Routing
  * isn't known here, so presenters pass the href builders in.
  */
-import { bubbleTime, conversationTime } from "@/util/chatTime";
+import { bubbleTime, conversationTime, chatDay, type ChatDayVM } from "@/util/chatTime";
 
 /** Short-lived links to one chat photo, in the sizes the thread shows. */
 export interface ChatPhotoPM {
@@ -133,6 +133,7 @@ export interface ThreadMessageVM {
   body: string;
   photo: ThreadPhotoVM | null;
   time: string;
+  day: ChatDayVM;
   isOwn: boolean;
   status: "sending" | MessageReceiptStatus | "failed";
 }
@@ -232,6 +233,7 @@ export function toThreadMessageVM(
   viewerId: string | null,
   revealed: ReadonlySet<string> = new Set(),
   receipts?: ChatReceiptsPM,
+  now: Date = new Date(),
 ): ThreadMessageVM {
   const isOwn = viewerId !== null && pm.senderId === viewerId;
   return {
@@ -241,12 +243,17 @@ export function toThreadMessageVM(
     body: pm.body,
     photo: pm.photo ? toThreadPhotoVM(pm.photo, isOwn || revealed.has(pm.id)) : null,
     time: bubbleTime(pm.createdAt),
+    day: chatDay(pm.createdAt, now),
     isOwn,
     status: isOwn ? messageReceiptStatus(pm.createdAt, receipts) : "sent",
   };
 }
 
-export function toPendingMessageVM(p: PendingMessage, viewerId: string | null): ThreadMessageVM {
+export function toPendingMessageVM(
+  p: PendingMessage,
+  viewerId: string | null,
+  now: Date = new Date(),
+): ThreadMessageVM {
   return {
     id: p.clientId,
     clientId: p.clientId,
@@ -254,6 +261,7 @@ export function toPendingMessageVM(p: PendingMessage, viewerId: string | null): 
     body: p.body,
     photo: p.photo ? { src: p.photo.localUrl, fullSrc: null, hidden: false } : null,
     time: bubbleTime(p.createdAt),
+    day: chatDay(p.createdAt, now),
     isOwn: true,
     status: p.status,
   };
@@ -344,4 +352,20 @@ export interface ChatRuleSection {
   bullets?: string[];
   /** Paragraphs; only used on gift and warning sections. */
   paragraphs?: string[];
+}
+
+export interface ThreadDayGroupVM {
+  day: ChatDayVM;
+  messages: ThreadMessageVM[];
+}
+
+/** Keeps API history and pending bubbles in order, with one header per calendar day. */
+export function groupThreadDays(messages: ThreadMessageVM[]): ThreadDayGroupVM[] {
+  const groups: ThreadDayGroupVM[] = [];
+  for (const message of messages) {
+    const last = groups[groups.length - 1];
+    if (last?.day.key === message.day.key) last.messages.push(message);
+    else groups.push({ day: message.day, messages: [message] });
+  }
+  return groups;
 }

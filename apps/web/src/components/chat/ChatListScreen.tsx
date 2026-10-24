@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { MoreVertical, Search, X } from "lucide-react";
+import { MessageSquarePlus, MoreVertical, Search, X } from "lucide-react";
 import ConversationRow from "./ConversationRow";
 import type { ChatInboxFilter, ConversationRowVM } from "@/domain/chat";
 
@@ -67,9 +67,9 @@ export default function ChatListScreen(p: ChatListScreenProps) {
     };
   }, [menuOpen, onCloseMenu]);
   const tool =
-    "grid size-[34px] place-items-center rounded-full bg-app-input text-kink-gold-bright transition-colors hover:bg-app-line focus-visible:outline focus-visible:outline-2 focus-visible:outline-kink-gold-bright";
+    "grid size-[40px] place-items-center rounded-full text-kink-gold-bright transition-colors hover:bg-app-line focus-visible:outline focus-visible:outline-2 focus-visible:outline-kink-gold-bright";
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col bg-app-surface lg:mx-auto lg:max-w-[640px] lg:border-x lg:border-app-line">
+    <div className="relative flex min-h-0 w-full flex-1 flex-col bg-app-surface lg:mx-auto lg:max-w-[640px] lg:border-x lg:border-app-line">
       <header className="px-[18px] pb-[10px] pt-[16px]">
         <div className="flex items-center justify-between gap-[12px]">
           <h1 className="text-[28px] font-bold tracking-tight text-kink-gold-bright">
@@ -119,7 +119,7 @@ export default function ChatListScreen(p: ChatListScreenProps) {
             )}
           </div>
         </div>
-        <div className="mt-[12px] flex h-[38px] items-center gap-[8px] rounded-full bg-app-input px-[12px] text-app-muted">
+        <div className="mt-[12px] flex h-[46px] items-center gap-[8px] rounded-full bg-[#1b1b1b] px-[16px] text-app-muted">
           <Search size={16} aria-hidden="true" />
           <input
             ref={input}
@@ -145,7 +145,7 @@ export default function ChatListScreen(p: ChatListScreenProps) {
               aria-pressed={filter.active}
               aria-label={`${filter.label} ${filter.count}`}
               onClick={() => p.onFilter(filter.key)}
-              className={`flex min-w-0 flex-1 items-center justify-center gap-[5px] rounded-full border px-[7px] py-[7px] text-[12px] sm:text-[13px] ${filter.active ? "border-kink-gold-bright bg-kink-gold-bright font-bold text-kink-ink" : "border-app-line bg-app-surface text-app-text"}`}
+              className={`flex shrink-0 items-center justify-center gap-[5px] rounded-full border px-[14px] py-[7px] text-[13px] sm:text-[13px] ${filter.active ? "border-kink-gold-bright/20 bg-kink-gold-bright/15 font-semibold text-kink-gold-bright" : "border-app-line bg-app-surface text-app-text"}`}
             >
               {filter.key === "online" && (
                 <span
@@ -154,7 +154,7 @@ export default function ChatListScreen(p: ChatListScreenProps) {
                 />
               )}
               {filter.label}
-              <span className={filter.active ? "text-kink-ink" : "text-app-muted"}>
+              <span className={filter.active ? "text-kink-gold-bright" : "text-app-muted"}>
                 {filter.count}
               </span>
             </button>
@@ -178,7 +178,7 @@ export default function ChatListScreen(p: ChatListScreenProps) {
           <p className="pt-[6px] text-[14px] text-app-muted">{p.emptyBody}</p>
         </div>
       )}
-      <ul className="min-h-0 flex-1 overflow-y-auto px-[10px]">
+      <ul className="min-h-0 flex-1 overflow-y-auto pb-[90px]">
         {p.rows.map((row) => (
           <ConversationRow
             key={row.id}
@@ -191,6 +191,13 @@ export default function ChatListScreen(p: ChatListScreenProps) {
           />
         ))}
       </ul>
+      <Link
+        href={p.newChatHref}
+        aria-label={p.copy.newChat}
+        className="fixed bottom-[calc(88px+env(safe-area-inset-bottom))] right-[20px] z-10 grid size-[54px] place-items-center rounded-[17px] bg-kink-gold-bright text-kink-ink shadow-lg shadow-black/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-kink-gold-bright lg:absolute lg:bottom-[24px]"
+      >
+        <MessageSquarePlus size={25} strokeWidth={2} />
+      </Link>
     </div>
   );
 }
