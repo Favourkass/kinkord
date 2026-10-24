@@ -1,4 +1,5 @@
-import { and, eq, isNull, or } from "drizzle-orm";
+import { privacyAllows } from "../privacy/privacy-policy";
+import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { follow, post } from "../db/schema";
 import { acceptedFriendship } from "../members/friendship-policy";
@@ -14,6 +15,8 @@ export type FollowAlias = ReturnType<typeof alias<typeof follow, string>>;
  * Media tab all go through this, because several copies of it would eventually
  * disagree and leak somebody's friends-only post.
  */
+const privacyOriginal = alias(post, "privacy_original");
+
 export function visibleTo(
   viewerId: string,
   _viewerFollows: FollowAlias,
@@ -27,5 +30,11 @@ export function visibleTo(
       eq(post.authorId, viewerId),
       and(eq(post.visibility, "friends"), acceptedFriendship(viewerId, post.authorId)),
     ),
+    privacyAllows(viewerId, post.authorId, "posts"),
+    sql`(${post.repostOfId} is null or exists (select 1 from ${post} as "privacy_original" where ${privacyOriginal.id}=${post.repostOfId}
+      and ${privacyOriginal.visibility}='public' and ${privacyOriginal.deletedAt} is null and ${privacyOriginal.archivedAt} is null
+      and ${notBanned(privacyOriginal.authorId)}
+      and ${privacyAllows(viewerId, privacyOriginal.authorId, "posts")}
+      and ${privacyAllows(viewerId, privacyOriginal.authorId, "sharedContent")}))`,
   );
 }

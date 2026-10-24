@@ -1,3 +1,4 @@
+import { privateProfileValue } from "../privacy/privacy-policy";
 import { teamBadge } from "../members/team-badge";
 import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, count, desc, eq, isNull, lt } from "drizzle-orm";
@@ -127,7 +128,7 @@ export class PostInteractionsService {
         authorId: postComment.authorId,
         username: user.username,
         displayName: profile.displayName,
-        avatarKey: profile.avatarKey,
+        avatarKey: privateProfileValue(viewerId, profile.userId, "profilePhoto", profile.avatarKey),
         teamMember: teamBadge(postComment.authorId),
         silver: silverCheck(postComment.authorId),
       })

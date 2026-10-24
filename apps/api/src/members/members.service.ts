@@ -1,3 +1,4 @@
+import { privacyAllows, privateProfileValue } from "../privacy/privacy-policy";
 import { friendshipStateSql } from "./friendship-policy";
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import {
@@ -202,7 +203,13 @@ export class MembersService {
 
   async list(params: ListMembersParams, viewerId: string) {
     const { page, limit, offset } = normalizePaging(params.page, params.limit);
-    const conditions: SQL[] = [ne(profile.userId, viewerId), notBanned(profile.userId)];
+    const conditions: SQL[] = [
+      ne(profile.userId, viewerId),
+      notBanned(profile.userId),
+      privacyAllows(viewerId, profile.userId, params.q ? "search" : "directory"),
+    ];
+    if (params.country || params.state || params.lga)
+      conditions.push(privacyAllows(viewerId, profile.userId, "location"));
     if (params.country) conditions.unshift(eq(profile.country, params.country.toUpperCase()));
     if (params.state) conditions.push(eq(profile.state, params.state));
     if (params.state && params.lga) conditions.push(eq(profile.city, params.lga));
@@ -221,10 +228,10 @@ export class MembersService {
       .groupBy(follow.followingId)
       .as("follower_counts");
     const viewerFollow = alias(follow, "viewer_follow");
-    const followers = sql<number>`coalesce(${followerCounts.followers}, 0)`;
+    const followers = sql<number>`case when ${privacyAllows(viewerId, profile.userId, "followersFollowing")} then coalesce(${followerCounts.followers}, 0) else 0 end`;
     // Presence: active within the online window. Online members always list first.
     // last_seen_at holds UTC wall time (see PresenceService.touch), so "now" is UTC too.
-    const isOnline = sql<boolean>`coalesce(${profile.lastSeenAt} > timezone('UTC', now()) - (${sql.raw(
+    const isOnline = sql<boolean>`${privacyAllows(viewerId, profile.userId, "onlineStatus")} and coalesce(${profile.lastSeenAt} > timezone('UTC', now()) - (${sql.raw(
       String(ONLINE_WINDOW_SECONDS),
     )} * interval '1 second'), false)`;
 
@@ -247,14 +254,19 @@ export class MembersService {
         userId: profile.userId,
         username: user.username,
         displayName: profile.displayName,
-        avatarKey: profile.avatarKey,
+        avatarKey: privateProfileValue(viewerId, profile.userId, "profilePhoto", profile.avatarKey),
         dateOfBirth: profile.dateOfBirth,
         gender: profile.gender,
         roles: profile.roles,
-        city: profile.city,
-        state: profile.state,
-        country: profile.country,
-        lastSeenAt: profile.lastSeenAt,
+        city: privateProfileValue(viewerId, profile.userId, "location", profile.city),
+        state: privateProfileValue(viewerId, profile.userId, "location", profile.state),
+        country: privateProfileValue(viewerId, profile.userId, "location", profile.country),
+        lastSeenAt: privateProfileValue(
+          viewerId,
+          profile.userId,
+          "onlineStatus",
+          profile.lastSeenAt,
+        ),
         isOnline,
         followers,
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
@@ -319,6 +331,16 @@ export class MembersService {
       .select({
         u: user,
         p: profile,
+        access: {
+          profilePhoto: privacyAllows(viewerId, profile.userId, "profilePhoto"),
+          coverPhoto: privacyAllows(viewerId, profile.userId, "coverPhoto"),
+          bio: privacyAllows(viewerId, profile.userId, "bio"),
+          location: privacyAllows(viewerId, profile.userId, "location"),
+          interests: privacyAllows(viewerId, profile.userId, "interests"),
+          relationshipStatus: privacyAllows(viewerId, profile.userId, "relationshipStatus"),
+          followersFollowing: privacyAllows(viewerId, profile.userId, "followersFollowing"),
+          onlineStatus: privacyAllows(viewerId, profile.userId, "onlineStatus"),
+        },
         bronze: bronzeVerification,
         coins: sql<number>`coalesce((select ${walletBalance.available} from ${walletBalance} where ${walletBalance.userId}=${user.id} and ${user.id}=${viewerId} and ${walletBalance.currency}='coin'),0)`,
       })
@@ -329,35 +351,33 @@ export class MembersService {
       .limit(1);
     if (!row) throw new NotFoundException("Member not found.");
 
-    const { u, p } = row;
+    const { u, p, access } = row;
     const isSelf = u.id === viewerId;
-    const friendsOnly = p.profileVisibility === "friends" && !isSelf;
-    const [
-      followCounts,
-      mutualFriends,
-      isFollowing,
-      avatarUrl,
-      coverUrl,
-      isFriend,
-      silver,
-      relationships,
-    ] = await Promise.all([
-      this.follows.counts(u.id),
-      isSelf ? Promise.resolve(0) : this.follows.mutualFriendsCount(u.id, viewerId),
-      isSelf ? Promise.resolve(false) : this.follows.isFollowing(viewerId, u.id),
-      p.avatarKey ? this.storage.presignDownload(p.avatarKey, "md") : Promise.resolve(null),
-      // Covers are full-bleed, so they keep the original.
-      p.coverKey ? this.storage.presignDownload(p.coverKey) : Promise.resolve(null),
-      friendsOnly ? this.follows.areFriends(viewerId, u.id) : Promise.resolve(true),
-      silverSince(this.db, u.id),
-      profileRelationships(this.db, this.storage, u.id, viewerId),
-    ]);
-    const counts = { ...followCounts, mutualFriends };
+    const [followCounts, mutualFriends, isFollowing, avatarUrl, coverUrl, silver, relationships] =
+      await Promise.all([
+        this.follows.counts(u.id),
+        isSelf ? Promise.resolve(0) : this.follows.mutualFriendsCount(u.id, viewerId),
+        isSelf ? Promise.resolve(false) : this.follows.isFollowing(viewerId, u.id),
+        access.profilePhoto && p.avatarKey
+          ? this.storage.presignDownload(p.avatarKey, "md")
+          : Promise.resolve(null),
+        // Covers are full-bleed, so they keep the original.
+        access.coverPhoto && p.coverKey
+          ? this.storage.presignDownload(p.coverKey)
+          : Promise.resolve(null),
+        silverSince(this.db, u.id),
+        profileRelationships(this.db, this.storage, u.id, viewerId),
+      ]);
+    const counts = access.followersFollowing
+      ? { ...followCounts, mutualFriends }
+      : { friends: 0, followers: 0, following: 0, mutualFriends: 0 };
     const friendship = isSelf ? "none" : await this.follows.friendshipState(viewerId, u.id);
-    // Friends-only profile seen by a non-friend: what the directory card already shows
-    // stays (so they can still follow back), the About details are withheld.
-    const restricted = friendsOnly && !isFriend;
-    const hidden = <T>(value: T, empty: T) => (restricted ? empty : value);
+    // What the directory card already shows stays (so they can still follow back). The
+    // Bio/About setting covers the rest of the About details too; an older friends-only
+    // profile keeps them for friends until the member picks otherwise.
+    const hidden = <T>(value: T, empty: T) => (access.bio ? value : empty);
+    // Nothing for this viewer in the About tab.
+    const restricted = !access.bio && !access.interests && !access.relationshipStatus;
     // An organization's account shows nothing that only describes a person.
     const organization = p.accountType === "organization";
     const personal = <T>(value: T, empty: T) => (organization ? empty : hidden(value, empty));
@@ -369,31 +389,31 @@ export class MembersService {
       displayName: p.displayName,
       avatarUrl,
       coverUrl,
-      bio: hidden(p.bio, null),
+      bio: access.bio ? p.bio : null,
       accountType: p.accountType,
-      country: p.country,
-      state: organization ? null : p.state,
-      city: organization ? null : p.city,
+      country: access.location ? p.country : null,
+      state: organization || !access.location ? null : p.state,
+      city: organization || !access.location ? null : p.city,
       age: organization ? null : ageFromDob(p.dateOfBirth),
       gender: organization ? null : p.gender,
       genders: organization ? [] : p.genders?.length ? p.genders : p.gender ? [p.gender] : [],
       // Sexuality is private: only the member sees their own.
       orientation: isSelf ? p.orientation : null,
-      relationshipStatus: personal(p.relationshipStatus, null),
+      relationshipStatus: access.relationshipStatus && !organization ? p.relationshipStatus : null,
       // Linked D/s and other relationships, both members agreed: About details, so friends-only hides them.
-      relationships: personal(relationships, []),
+      relationships: access.relationshipStatus && !organization ? relationships : [],
       bodyType: personal(p.bodyType, null),
       roles: organization ? [] : (p.roles ?? []),
-      interests: personal(p.interests ?? [], []),
-      lookingFor: personal(p.lookingFor ?? [], []),
+      interests: access.interests && !organization ? (p.interests ?? []) : [],
+      lookingFor: access.interests && !organization ? (p.lookingFor ?? []) : [],
       languages: personal(p.languages ?? [], []),
       nationality: personal(p.nationality ?? null, null),
       occupation: personal(p.occupation ?? null, null),
       limits: personal(p.limits ?? null, null),
       socialLinks: hidden(p.socialLinks ?? {}, {}),
       joinedAt: u.createdAt.toISOString(),
-      lastSeenAt: p.lastSeenAt ? p.lastSeenAt.toISOString() : null,
-      isOnline: PresenceService.isOnline(p.lastSeenAt),
+      lastSeenAt: access.onlineStatus && p.lastSeenAt ? p.lastSeenAt.toISOString() : null,
+      isOnline: access.onlineStatus && PresenceService.isOnline(p.lastSeenAt),
       counts,
       friendship,
       isFollowing,
@@ -406,7 +426,7 @@ export class MembersService {
         phone: p.phoneVerified,
         // Only while the verified photo, birth date and gender are still the
         // profile's; others see it only if the member shows it and may see them.
-        ...(stillVerified(row.bronze, p) && (isSelf || (p.showVerifiedBadge && !restricted))
+        ...(stillVerified(row.bronze, p) && (isSelf || (p.showVerifiedBadge && access.bio))
           ? { identity: true as const }
           : {}),
       },
@@ -422,7 +442,11 @@ export class MembersService {
    */
   async suggested(targetId: string, viewerId: string, limit: number, offset: number) {
     const [target] = await this.db
-      .select({ country: profile.country, state: profile.state, city: profile.city })
+      .select({
+        country: privateProfileValue(viewerId, profile.userId, "location", profile.country),
+        state: privateProfileValue(viewerId, profile.userId, "location", profile.state),
+        city: profile.city,
+      })
       .from(profile)
       .where(eq(profile.userId, targetId));
     if (!target?.state) return { items: [], total: 0 };
@@ -431,6 +455,8 @@ export class MembersService {
       ne(profile.userId, targetId),
       ne(profile.userId, viewerId),
       notBanned(profile.userId),
+      privacyAllows(viewerId, profile.userId, "directory"),
+      privacyAllows(viewerId, profile.userId, "location"),
     ];
     if (target.country) conditions.push(eq(profile.country, target.country));
     const where = and(...conditions);
@@ -446,12 +472,12 @@ export class MembersService {
         userId: profile.userId,
         username: user.username,
         displayName: profile.displayName,
-        avatarKey: profile.avatarKey,
+        avatarKey: privateProfileValue(viewerId, profile.userId, "profilePhoto", profile.avatarKey),
         dateOfBirth: profile.dateOfBirth,
         gender: profile.gender,
-        city: profile.city,
-        state: profile.state,
-        country: profile.country,
+        city: privateProfileValue(viewerId, profile.userId, "location", profile.city),
+        state: privateProfileValue(viewerId, profile.userId, "location", profile.state),
+        country: privateProfileValue(viewerId, profile.userId, "location", profile.country),
         friendship: friendshipStateSql(viewerId, profile.userId),
         isFollowing: sql<boolean>`${viewerFollow.followerId} is not null`,
         teamMember: profile.teamMember,
@@ -510,6 +536,8 @@ export class MembersService {
       me.country ? eq(profile.country, me.country) : eq(profile.state, me.state as string),
       ne(profile.userId, viewerId),
       notBanned(profile.userId),
+      privacyAllows(viewerId, profile.userId, "directory"),
+      privacyAllows(viewerId, profile.userId, "location"),
       notBlocking(profile.userId, viewerId),
       sql`not ${blockedBy(viewerId, profile.userId)}`,
       sql`not exists (select 1 from ${follow} where ${follow.followerId} = ${viewerId} and ${follow.followingId} = ${profile.userId})`,
@@ -528,17 +556,21 @@ export class MembersService {
         userId: profile.userId,
         username: user.username,
         displayName: profile.displayName,
-        avatarKey: profile.avatarKey,
+        avatarKey: privateProfileValue(viewerId, profile.userId, "profilePhoto", profile.avatarKey),
         dateOfBirth: profile.dateOfBirth,
         gender: profile.gender,
-        country: profile.country,
-        state: profile.state,
-        city: profile.city,
+        country: privateProfileValue(viewerId, profile.userId, "location", profile.country),
+        state: privateProfileValue(viewerId, profile.userId, "location", profile.state),
+        city: privateProfileValue(viewerId, profile.userId, "location", profile.city),
         roles: profile.roles,
-        interests: profile.interests,
-        lookingFor: profile.lookingFor,
-        visibility: profile.profileVisibility,
-        lastSeenAt: profile.lastSeenAt,
+        interests: privateProfileValue(viewerId, profile.userId, "interests", profile.interests),
+        lookingFor: privateProfileValue(viewerId, profile.userId, "interests", profile.lookingFor),
+        lastSeenAt: privateProfileValue(
+          viewerId,
+          profile.userId,
+          "onlineStatus",
+          profile.lastSeenAt,
+        ),
         createdAt: user.createdAt,
         teamMember: profile.teamMember,
         silver: silverCheck(profile.userId),
@@ -557,19 +589,15 @@ export class MembersService {
       city: me.city,
       state: me.state,
     };
-    const candidates = rows.map((r) => {
-      // Followed members are never in the pool, so no one here is the viewer's
-      // friend: a friends-only profile's About details stay out of the card and
-      // the ranking, as on publicProfile.
-      const restricted = r.visibility === "friends";
-      return {
-        ...r,
-        roles: r.roles ?? [],
-        kinks: restricted ? [] : (r.interests ?? []),
-        lookingFor: restricted ? [] : (r.lookingFor ?? []),
-        hasPhoto: Boolean(r.avatarKey),
-      };
-    });
+    // Kinks and Looking For arrive empty when the member's Interests setting hides
+    // them from this viewer, so they stay out of the card and the ranking.
+    const candidates = rows.map((r) => ({
+      ...r,
+      roles: r.roles ?? [],
+      kinks: r.interests ?? [],
+      lookingFor: r.lookingFor ?? [],
+      hasPhoto: Boolean(r.avatarKey),
+    }));
     const wanted = wantedSide(viewer.roles);
     const best = rankCandidates(viewer, candidates, now).slice(0, limit);
     const items = await Promise.all(
@@ -629,16 +657,14 @@ export class MembersService {
     const { page, limit, offset } = normalizePaging(pageArg, limitArg);
     const [p] = await this.db
       .select({
-        avatarKey: profile.avatarKey,
+        avatarKey: privateProfileValue(viewerId, profile.userId, "profilePhoto", profile.avatarKey),
         coverKey: profile.coverKey,
-        visibility: profile.profileVisibility,
+        allowed: privacyAllows(viewerId, profile.userId, "media"),
       })
       .from(profile)
       .where(eq(profile.userId, targetId));
     if (!p) throw new NotFoundException("Member not found.");
-    const isSelf = targetId === viewerId;
-    const restricted =
-      p.visibility === "friends" && !isSelf && !(await this.follows.areFriends(viewerId, targetId));
+    const restricted = !p.allowed;
     const kinds = MEDIA_KINDS[filter];
     const postKinds = POST_MEDIA_KINDS[filter];
     if (restricted || (kinds.length === 0 && postKinds.length === 0)) {
@@ -650,7 +676,21 @@ export class MembersService {
     // are merged, which is exactly right for merging sorted lists and is bounded
     // because the page size is capped.
     const reach = offset + limit;
-    const where = and(eq(profileMedia.userId, targetId), inArray(profileMedia.kind, kinds));
+    const where = and(
+      eq(profileMedia.userId, targetId),
+      inArray(profileMedia.kind, kinds),
+      privacyAllows(viewerId, profileMedia.userId, "media"),
+      or(
+        and(
+          eq(profileMedia.kind, "avatar"),
+          privacyAllows(viewerId, profileMedia.userId, "profilePhoto"),
+        ),
+        and(
+          eq(profileMedia.kind, "cover"),
+          privacyAllows(viewerId, profileMedia.userId, "coverPhoto"),
+        ),
+      ),
+    );
     const [uploaded, uploadedTotal, fromPosts] = await Promise.all([
       kinds.length
         ? this.db
@@ -714,6 +754,11 @@ export class MembersService {
   ) {
     const targetId = await this.follows.resolveUserId(username);
     const { page, limit, offset } = normalizePaging(pageArg, limitArg);
+    const [access] = await this.db
+      .select({ allowed: privacyAllows(viewerId, profile.userId, "followersFollowing") })
+      .from(profile)
+      .where(eq(profile.userId, targetId));
+    if (!access?.allowed) return { items: [], total: 0, page, limit };
     const result =
       tab === "mutual"
         ? await this.follows.mutualFriends(targetId, viewerId, limit, offset)

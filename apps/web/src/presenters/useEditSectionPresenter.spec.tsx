@@ -227,25 +227,19 @@ describe("useEditSectionPresenter", () => {
     expect(result.current.editor?.saving).toBe(false);
   });
 
-  it("renders Privacy as cards with labelled visibility options", async () => {
+  it("renders Privacy as cards, without the old profile visibility switch", async () => {
     const { result } = renderHook(() => useEditSectionPresenter("privacy"));
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.variant).toBe("cards");
-    expect(result.current.rows.map((r) => r.subtitle)).toEqual(["Facebook", "Public"]);
-    act(() => result.current.rows[1].onClick?.());
-    const editor = result.current.editor?.editor;
-    expect(editor?.kind).toBe("single");
-    if (editor?.kind === "single") {
-      expect(editor.options.map((o) => o.label)).toEqual(["Public", "Friends only"]);
-    }
+    expect(result.current.rows.map((r) => r.subtitle)).toEqual(["Facebook"]);
   });
 
   it("lets a verified member show or hide their badge", async () => {
     serve({ ...profile, identityVerified: true, showVerifiedBadge: false });
     const { result } = renderHook(() => useEditSectionPresenter("privacy"));
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.rows.map((r) => r.subtitle)).toEqual(["Facebook", "Public", "Hidden"]);
-    act(() => result.current.rows[2].onClick?.());
+    expect(result.current.rows.map((r) => r.subtitle)).toEqual(["Facebook", "Hidden"]);
+    act(() => result.current.rows[1].onClick?.());
     const editor = result.current.editor?.editor;
     if (editor?.kind !== "single") throw new Error("expected a picker");
     expect(editor.options.map((o) => o.label)).toEqual(["Shown", "Hidden"]);

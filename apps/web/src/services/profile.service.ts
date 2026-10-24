@@ -15,7 +15,6 @@ import type {
   MePM,
   OwnProfilePM,
   ProfileOptionsPM,
-  ProfileVisibility,
   SocialLinks,
   UsernameChangePM,
 } from "@/domain/profile";
@@ -57,7 +56,6 @@ export interface ProfilePatch {
   occupation?: string | null;
   languages?: string[];
   socialLinks?: SocialLinks;
-  profileVisibility?: ProfileVisibility;
   showVerifiedBadge?: boolean;
   avatarKey?: string;
   coverKey?: string;
@@ -107,7 +105,7 @@ export const SECTION_ROWS: Record<EditSectionKey, EditRowKey[]> = {
   ],
   kinks: ["roles", "kinks", "lookingFor", "limits"],
   location: ["country", "state", "city", "occupation", "languages"],
-  privacy: ["socialLinks", "profileVisibility", "verifiedBadge"],
+  privacy: ["socialLinks", "verifiedBadge"],
 };
 
 /** Same rule as the API / Better Auth username plugin. */
@@ -339,12 +337,6 @@ export function buildEditRow(key: EditRowKey, ctx: EditRowsContext): EditRowPM {
         editor: { kind: "links", value: { facebook: links.facebook ?? "", x: links.x ?? "" } },
       };
     }
-    case "profileVisibility":
-      return {
-        key,
-        value: profile.profileVisibility,
-        editor: single(profile.profileVisibility, plain(options.visibilities)),
-      };
     case "verifiedBadge": {
       const value = profile.showVerifiedBadge ? "show" : "hide";
       return { key, value, editor: single(value, plain(["show", "hide"])) };
@@ -468,8 +460,6 @@ export function patchFor(key: EditRowKey, draft: EditorDraft, profile: OwnProfil
         socialLinks: { facebook: links.facebook.trim() || null, x: links.x.trim() || null },
       };
     }
-    case "profileVisibility":
-      return { profileVisibility: (t || "public") as ProfileVisibility };
     case "verifiedBadge":
       return { showVerifiedBadge: t !== "hide" };
   }

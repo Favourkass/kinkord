@@ -253,3 +253,37 @@ describe("isCrossCountryPremium", () => {
     expect(isCrossCountryPremium("CROSS_COUNTRY_PREMIUM")).toBe(false);
   });
 });
+
+describe("message receipt status", () => {
+  it("shows sent, then delivered, then seen from persisted peer timestamps", () => {
+    const pm = {
+      id: "m",
+      conversationId: "c",
+      senderId: "me",
+      body: "hi",
+      photo: null,
+      createdAt: "2026-10-23T10:00:00Z",
+      editedAt: null,
+    };
+    expect(toThreadMessageVM(pm, "me").status).toBe("sent");
+    expect(
+      toThreadMessageVM(pm, "me", new Set(), { deliveredAt: "2026-10-23T09:59:00Z", readAt: null })
+        .status,
+    ).toBe("sent");
+    expect(
+      toThreadMessageVM(pm, "me", new Set(), { deliveredAt: pm.createdAt, readAt: null }).status,
+    ).toBe("delivered");
+    expect(
+      toThreadMessageVM(pm, "me", new Set(), { deliveredAt: pm.createdAt, readAt: pm.createdAt })
+        .status,
+    ).toBe("seen");
+    // A privacy-restricted read pointer must fall back to delivered, never inferred from presence.
+    expect(
+      toThreadMessageVM(pm, "me", new Set(), { deliveredAt: pm.createdAt, readAt: null }).status,
+    ).toBe("delivered");
+    expect(
+      toThreadMessageVM(pm, "other", new Set(), { deliveredAt: pm.createdAt, readAt: pm.createdAt })
+        .status,
+    ).toBe("sent");
+  });
+});

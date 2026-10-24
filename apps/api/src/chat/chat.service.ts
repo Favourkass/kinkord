@@ -1,3 +1,5 @@
+import { deliveryAckSql } from "./receipts";
+import { privacyAllows, privateProfileValue } from "../privacy/privacy-policy";
 import { messageBadgeCount } from "./inbox-badge";
 import { teamBadge } from "../members/team-badge";
 import { randomUUID } from "node:crypto";
@@ -524,7 +526,7 @@ export class ChatService {
       .limit(1);
     if (!known) throw new BadRequestException("Unknown message.");
     const readAt = sql`(select "created_at" from "message" where "id" = ${messageId})`;
-    await this.db
+    const moved = await this.db
       .update(conversationParticipant)
       .set({ lastReadAt: readAt, lastReadMessageId: messageId })
       .where(
@@ -533,9 +535,47 @@ export class ChatService {
           eq(conversationParticipant.userId, userId),
           sql`(${conversationParticipant.lastReadAt} is null or ${conversationParticipant.lastReadAt} < ${readAt})`,
         ),
-      );
+      )
+      .returning({ conversationId: conversationParticipant.conversationId });
     this.push.chatRead(userId, conversationId, known.createdAt);
     void this.realtime.notify([userId], { type: "message", conversationId });
+    if (moved.length) void this.tellReceipt(conversationId, userId, true);
+  }
+
+  async markDelivered(userId: string, messageIds: string[]): Promise<void> {
+    const moved = await this.db.execute<{ conversation_id: string }>(
+      deliveryAckSql(userId, messageIds),
+    );
+    for (const row of moved?.rows ?? []) void this.tellReceipt(row.conversation_id, userId, false);
+  }
+
+  /**
+   * Tells the chat's other members that their messages were delivered or seen, so the
+   * ticks move without polling. A read is told only to someone who may see this member's
+   * read receipts; that setting works both ways, so it reads the same from either side.
+   */
+  private async tellReceipt(conversationId: string, userId: string, read: boolean) {
+    try {
+      const peers = await this.db
+        .select({ userId: conversationParticipant.userId })
+        .from(conversationParticipant)
+        .where(
+          and(
+            eq(conversationParticipant.conversationId, conversationId),
+            ne(conversationParticipant.userId, userId),
+            read
+              ? privacyAllows(userId, conversationParticipant.userId, "readReceipts")
+              : undefined,
+          ),
+        );
+      if (peers.length)
+        await this.realtime.notify(
+          peers.map((p) => p.userId),
+          { type: "receipt", conversationId },
+        );
+    } catch {
+      // The ticks still move on the sender's next refresh.
+    }
   }
 
   /** Seeing the inbox does not read any conversation. */
@@ -664,6 +704,7 @@ export class ChatService {
           and(
             eq(inboxPeer.conversationId, conversation.id),
             ne(inboxPeer.userId, userId),
+            privacyAllows(userId, inboxPeer.userId, "onlineStatus"),
             sql`${inboxPeerProfile.lastSeenAt} > timezone('UTC', now()) - (${sql.raw(String(ONLINE_WINDOW_SECONDS))} * interval '1 second')`,
           ),
         ),
@@ -769,11 +810,21 @@ export class ChatService {
         username: user.username,
         name: user.name,
         displayName: profile.displayName,
-        avatarKey: profile.avatarKey,
-        lastSeenAt: profile.lastSeenAt,
+        avatarKey: privateProfileValue(userId, profile.userId, "profilePhoto", profile.avatarKey),
+        lastSeenAt: privateProfileValue(userId, profile.userId, "onlineStatus", profile.lastSeenAt),
         blockedByMe: blockedBy(userId, conversationParticipant.userId),
         silver: silverCheck(conversationParticipant.userId),
         teamMember: teamBadge(conversationParticipant.userId),
+        deliveredAt:
+          sql<Date | null>`greatest(${conversationParticipant.lastDeliveredAt}, ${conversationParticipant.lastReadAt})`.mapWith(
+            conversationParticipant.lastReadAt,
+          ),
+        readAt: privateProfileValue(
+          userId,
+          conversationParticipant.userId,
+          "readReceipts",
+          conversationParticipant.lastReadAt,
+        ),
       })
       .from(conversationParticipant)
       .innerJoin(user, eq(user.id, conversationParticipant.userId))
@@ -853,6 +904,11 @@ export class ChatService {
         peer: peerByConv.get(c.id) ?? null,
         lastMessage: lastByConv.get(c.id) ?? null,
         unreadCount: unreadByConv.get(c.id) ?? 0,
+        receipts: {
+          deliveredAt:
+            peers.find((p) => p.conversationId === c.id)?.deliveredAt?.toISOString() ?? null,
+          readAt: peers.find((p) => p.conversationId === c.id)?.readAt?.toISOString() ?? null,
+        },
       },
       openedBy: c.createdBy,
     }));

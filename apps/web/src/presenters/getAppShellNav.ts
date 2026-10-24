@@ -141,7 +141,7 @@ function drawerNavigation(): AppShellDrawerVM {
       {
         label: copy.groups.privacy,
         items: [
-          { key: "privacy", label: copy.privacy, href: Routes.profileEditPrivacy, icon: "privacy" },
+          { key: "privacy", label: copy.privacy, href: Routes.settingsPrivacy, icon: "privacy" },
           {
             key: "security",
             label: copy.security,
@@ -228,7 +228,7 @@ export interface ShellSource {
 
 export function appShellProps(home: ShellSource, nav: ReturnType<typeof getAppShellNav>) {
   return {
-    brand: "KINKORD",
+    brand: "Kinkord",
     tagline: "THE WORLD'S KINK COMMUNITY",
     greeting: home.greeting,
     name: home.name,

@@ -1,3 +1,4 @@
+import { privacyAllows, privateProfileValue } from "../privacy/privacy-policy";
 import { acceptedFriendship } from "../members/friendship-policy";
 /**
  * The home feed's tabs, read from the database (docs/MATCHING.md, "Feed").
@@ -73,6 +74,8 @@ function originalReadable(viewerId: string) {
     isNull(original.archivedAt),
     eq(original.visibility, "public"),
     notBanned(original.authorId),
+    privacyAllows(viewerId, original.authorId, "posts"),
+    privacyAllows(viewerId, original.authorId, "sharedContent"),
     noBlockEitherWay(original.authorId, viewerId),
   );
 }
@@ -131,8 +134,9 @@ function atOrAfter(key: FeedKey): SQL {
  * country when they have one, so a state of the same name across a border
  * isn't "near".
  */
-function nearbyConditions(viewer: Place): SQL[] {
+function nearbyConditions(viewer: Place, viewerId: string): SQL[] {
   const place = and(
+    privacyAllows(viewerId, profile.userId, "location"),
     eq(profile.state, viewer.state ?? ""),
     ...(viewer.country ? [eq(profile.country, viewer.country)] : []),
   );
@@ -260,11 +264,11 @@ async function authorsOf(
       userId: profile.userId,
       gender: profile.gender,
       roles: profile.roles,
-      kinks: profile.interests,
-      lookingFor: profile.lookingFor,
-      city: profile.city,
-      state: profile.state,
-      country: profile.country,
+      kinks: privateProfileValue(viewerId, profile.userId, "interests", profile.interests),
+      lookingFor: privateProfileValue(viewerId, profile.userId, "interests", profile.lookingFor),
+      city: privateProfileValue(viewerId, profile.userId, "location", profile.city),
+      state: privateProfileValue(viewerId, profile.userId, "location", profile.state),
+      country: privateProfileValue(viewerId, profile.userId, "location", profile.country),
       profileVisibility: profile.profileVisibility,
       viewerFollows: followedAsOf(viewerId, profile.userId, asOf),
       followsViewer: followedAsOf(profile.userId, viewerId, asOf),
@@ -456,7 +460,7 @@ async function nearbyWindow(
     db,
     viewerId,
     asOf,
-    [gt(post.createdAt, floor), ...nearbyConditions(viewer)],
+    [gt(post.createdAt, floor), ...nearbyConditions(viewer, viewerId)],
     WINDOWS.nearbyLimit,
   );
   const candidates = pool.map(toCandidate);
@@ -492,7 +496,7 @@ function olderRows(
     asOf,
     [
       olderThan(before),
-      ...(tab === "nearby" ? nearbyConditions(viewer) : []),
+      ...(tab === "nearby" ? nearbyConditions(viewer, viewerId) : []),
       ...(skip
         ? [sql`not (${followedAsOf(viewerId, post.authorId, asOf)} and ${atOrAfter(skip)})`]
         : []),

@@ -1,3 +1,4 @@
+import { privateProfileValue } from "../privacy/privacy-policy";
 import {
   BadRequestException,
   ForbiddenException,
@@ -107,7 +108,7 @@ export class FriendshipsService {
         userId: user.id,
         username: user.username,
         displayName: profile.displayName,
-        avatarKey: profile.avatarKey,
+        avatarKey: privateProfileValue(viewerId, profile.userId, "profilePhoto", profile.avatarKey),
         createdAt: friendship.createdAt,
       })
       .from(friendship)

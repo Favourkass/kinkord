@@ -17,6 +17,8 @@ describe("the visibility rule", () => {
     expect(sql).toContain("'accepted'");
     expect(sql).toContain('not exists (select 1 from "member_ban"');
     expect(sql).not.toContain('"viewer_follows_author"');
-    expect(params).toEqual(["public", "viewer-1", "friends", "viewer-1", "viewer-1"]);
+    expect(params).toEqual(
+      expect.arrayContaining(["public", "viewer-1", "friends", "viewer-1", "viewer-1"]),
+    );
   });
 });

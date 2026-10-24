@@ -21,7 +21,7 @@ export default function AppMobileHeader({
   search,
 }: AppMobileHeaderProps) {
   return (
-    <header className="flex h-[80px] shrink-0 items-center gap-2 border-b border-mem-hairline bg-mem-header px-[18px]">
+    <header className="grid h-[80px] shrink-0 grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 border-b border-mem-hairline bg-mem-header px-[18px]">
       <button
         type="button"
         aria-label={menuLabel}
@@ -30,12 +30,14 @@ export default function AppMobileHeader({
       >
         <MaskIcon name="hamburger" width={35} />
       </button>
-      <p className="text-[30px] font-extrabold leading-none text-kink-gold-bright">{brand}</p>
+      <p className="text-center text-[30px] font-extrabold leading-none text-kink-gold-bright">
+        {brand}
+      </p>
       {search ? (
         <Link
           href={search.href}
           aria-label={search.label}
-          className="ml-auto grid size-[40px] place-items-center rounded-full bg-mem-card text-mem-icon"
+          className="justify-self-end grid size-[40px] place-items-center rounded-full bg-mem-card text-mem-icon"
         >
           <MaskIcon name="search" width={22} />
         </Link>
