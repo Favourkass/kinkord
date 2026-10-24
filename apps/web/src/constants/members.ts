@@ -4,8 +4,9 @@
  * the frames; behaviours that the frames don't show (online-first ordering,
  * infinite scroll, coming-soon search) follow the CEO briefs of 2026-09-08.
  */
+import { BRAND_NAME } from "./landing";
 export const MEMBERS_COPY = {
-  header: { brand: "Kinkord", menu: "Open menu" },
+  header: { brand: BRAND_NAME, menu: "Open menu" },
   common: {
     loading: "Loading…",
     error: "Something went wrong. Please try again.",
@@ -64,7 +65,7 @@ export const MEMBERS_COPY = {
     unknownState: "We don’t know that state yet.",
   },
   profile: {
-    brand: "Kinkord",
+    brand: BRAND_NAME,
     actions: { search: "Search", more: "More options", share: "Share profile" },
     tabs: { posts: "Posts", tagged: "Tagged", about: "About", media: "Media", people: "People" },
     follow: "Follow",

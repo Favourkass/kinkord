@@ -6,6 +6,7 @@ import ThreadScreen from "@/components/chat/ThreadScreen";
 import { CHAT_COPY } from "@/constants/chat";
 import { getAppShellNav } from "@/presenters/getAppShellNav";
 import { useChatThreadPresenter } from "@/presenters/useChatThreadPresenter";
+import { BRAND_NAME } from "@/constants/landing";
 
 /** Mirrors the API's limit, so the field stops where the server would refuse. */
 const MESSAGE_BODY_MAX = 4000;
@@ -33,7 +34,7 @@ export default function ThreadPage({ params }: { params: Promise<{ id: string }>
 
   return (
     <AppShell
-      brand="KINKORD"
+      brand={BRAND_NAME}
       tagline="THE WORLD'S KINK COMMUNITY"
       greeting={shell.greeting}
       name={shell.name}

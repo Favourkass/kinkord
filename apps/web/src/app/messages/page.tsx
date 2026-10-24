@@ -7,6 +7,7 @@ import { CHAT_COPY, INBOX_SEARCH_MAX } from "@/constants/chat";
 import { getAppShellNav } from "@/presenters/getAppShellNav";
 import { useChatListPresenter } from "@/presenters/useChatListPresenter";
 import { usePushPresenter } from "@/presenters/usePushPresenter";
+import { BRAND_NAME } from "@/constants/landing";
 
 export default function MessagesPage() {
   const { shell, list } = useChatListPresenter();
@@ -15,7 +16,7 @@ export default function MessagesPage() {
 
   return (
     <AppShell
-      brand="KINKORD"
+      brand={BRAND_NAME}
       mobileHeader={<></>}
       tagline="THE WORLD'S KINK COMMUNITY"
       greeting={shell.greeting}

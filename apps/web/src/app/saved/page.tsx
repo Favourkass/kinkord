@@ -6,6 +6,7 @@ import { getAppShellNav } from "@/presenters/getAppShellNav";
 import { getPostList } from "@/presenters/getPostList";
 import { useFeedPresenter } from "@/presenters/useFeedPresenter";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
+import { BRAND_NAME } from "@/constants/landing";
 
 /** The posts this member saved, newest save first. Private to them. */
 export default function SavedPage() {
@@ -16,7 +17,7 @@ export default function SavedPage() {
   return (
     <PostListScreen
       shell={{
-        brand: "KINKORD",
+        brand: BRAND_NAME,
         greeting: home.greeting,
         name: home.name,
         avatarUrl: home.avatarUrl,

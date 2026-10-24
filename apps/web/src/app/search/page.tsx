@@ -9,6 +9,7 @@ import { getPostList } from "@/presenters/getPostList";
 import { useFeedPresenter } from "@/presenters/useFeedPresenter";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
 import { useSearchPresenter } from "@/presenters/useSearchPresenter";
+import { BRAND_NAME } from "@/constants/landing";
 
 /** The app's search: people and posts, from the magnifier in every member screen's header. */
 function Search() {
@@ -26,7 +27,7 @@ function Search() {
   return (
     <SearchScreen
       shell={{
-        brand: "KINKORD",
+        brand: BRAND_NAME,
         greeting: home.greeting,
         name: home.name,
         avatarUrl: home.avatarUrl,
