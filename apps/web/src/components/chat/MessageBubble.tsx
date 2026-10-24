@@ -28,14 +28,14 @@ export default function MessageBubble({
   const own = message.isOwn;
   const photo = message.photo;
   return (
-    <li className={`flex ${own ? "justify-end" : "justify-start"} px-[20px] py-[3px]`}>
+    <li className={`flex ${own ? "justify-end" : "justify-start"} px-[16px] py-[3px]`}>
       <div
-        className={`max-w-[78%] rounded-[16px] text-[14px] leading-[20px] ${
-          photo ? "px-[4px] pb-[8px] pt-[4px]" : "px-[14px] py-[8px]"
+        className={`relative max-w-[85%] rounded-[9px] text-[15px] leading-[21px] shadow-sm after:absolute after:top-0 after:size-[9px] ${
+          photo ? "px-[4px] pb-[8px] pt-[4px]" : "px-[10px] py-[7px]"
         } ${
           own
-            ? "rounded-br-[4px] bg-kink-gold-bright text-kink-ink"
-            : "rounded-bl-[4px] bg-app-input text-app-text"
+            ? "rounded-tr-none bg-[#3b3019] text-[#fff8e7] after:-right-[7px] after:bg-[#3b3019] after:[clip-path:polygon(0_0,100%_0,0_100%)]"
+            : "rounded-tl-none bg-[#1b1b1b] text-app-text after:-left-[7px] after:bg-[#1b1b1b] after:[clip-path:polygon(0_0,100%_0,100%_100%)]"
         }`}
       >
         {photo && (
@@ -63,22 +63,18 @@ export default function MessageBubble({
             )}
           </button>
         )}
-        {message.body && (
-          <p className={`whitespace-pre-wrap break-words ${photo ? "px-[10px] pt-[6px]" : ""}`}>
-            {message.body}
-          </p>
-        )}
-        <p
-          className={`flex items-center justify-end gap-1 pt-[4px] text-right text-[10px] ${
-            own ? "text-kink-ink/60" : "text-app-muted"
-          } ${photo ? "px-[10px]" : ""}`}
-        >
-          {message.status === "sending" ? "sending…" : message.time}
-          {own &&
-            (message.status === "sent" ||
-              message.status === "delivered" ||
-              message.status === "seen") && <MessageReceipt status={message.status} />}
-        </p>
+        <div className={`flow-root ${photo ? "px-[6px] pt-[6px]" : ""}`}>
+          {message.body && (
+            <span className="whitespace-pre-wrap [overflow-wrap:anywhere]">{message.body}</span>
+          )}
+          <span className="float-right ml-[10px] mt-[5px] inline-flex items-center gap-[4px] text-[11px] leading-[16px] text-white/55">
+            {message.status === "sending" ? "sending…" : message.time}
+            {own &&
+              (message.status === "sent" ||
+                message.status === "delivered" ||
+                message.status === "seen") && <MessageReceipt status={message.status} />}
+          </span>
+        </div>
         {message.status === "failed" && (
           <button
             type="button"

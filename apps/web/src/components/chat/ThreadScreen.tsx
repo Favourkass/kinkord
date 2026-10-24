@@ -1,14 +1,14 @@
 "use client";
+import { ArrowLeft } from "lucide-react";
 import TeamBadge from "@/components/app/TeamBadge";
 
-import { useEffect, useRef, type CSSProperties } from "react";
+import { useLayoutEffect, useRef, type CSSProperties } from "react";
 import Link from "next/link";
 import AvatarCircle from "@/components/app/AvatarCircle";
-import MaskIcon from "@/components/app/MaskIcon";
 import OrganizationBadge from "@/components/organization/OrganizationBadge";
 import ConfirmDialog, { type ConfirmDialogProps } from "@/components/feed/ConfirmDialog";
 import MediaLightbox from "@/components/feed/MediaLightbox";
-import type { ThreadMessageVM, ThreadPeerVM } from "@/domain/chat";
+import type { ThreadDayGroupVM, ThreadMessageVM, ThreadPeerVM } from "@/domain/chat";
 import type { PostMediaVM } from "@/domain/post";
 import MessageBubble, { type MessageBubblePhotoLabels } from "./MessageBubble";
 import MessageComposer, { type MessageComposerProps } from "./MessageComposer";
@@ -20,6 +20,7 @@ import { useVisibleViewport } from "./useVisibleViewport";
 export interface ThreadScreenProps {
   peer: ThreadPeerVM | null;
   messages: ThreadMessageVM[];
+  dayGroups: ThreadDayGroupVM[];
   loading: boolean;
   error: string | null;
   sendError: string | null;
@@ -43,7 +44,7 @@ export interface ThreadScreenProps {
   onRetry: (clientId: string) => void;
   composer: Pick<
     MessageComposerProps,
-    "placeholder" | "sendLabel" | "maxLength" | "photo" | "onTyping"
+    "placeholder" | "sendLabel" | "maxLength" | "photo" | "onTyping" | "emoji"
   >;
   /** Why photos aren't open yet, after the member tried to add one. */
   photoNotice: string | null;
@@ -86,11 +87,23 @@ export default function ThreadScreen(p: ThreadScreenProps) {
   const count = p.messages.length;
   const viewport = useVisibleViewport();
 
-  // New messages, and the keyboard opening, both keep the newest one in view.
-  useEffect(() => {
+  const previous = useRef<{ first: string | undefined; height: number; top: number } | null>(null);
+  // Keep the same message in view when older history is prepended.
+  useLayoutEffect(() => {
     const el = scroller.current;
-    if (el && pinned.current) el.scrollTop = el.scrollHeight;
-  }, [count, viewport?.height]);
+    if (!el) return;
+    const first = p.messages[0]?.id;
+    const before = previous.current;
+    if (pinned.current) el.scrollTop = el.scrollHeight;
+    else if (
+      before?.first &&
+      first !== before.first &&
+      p.messages.some((m) => m.id === before.first)
+    ) {
+      el.scrollTop = before.top + el.scrollHeight - before.height;
+    }
+    previous.current = { first, height: el.scrollHeight, top: el.scrollTop };
+  }, [count, viewport?.height, p.messages]);
 
   // Who the thread is with. Tapping them opens their profile.
   const who = (
@@ -153,13 +166,13 @@ export default function ThreadScreen(p: ThreadScreenProps) {
         style={fit}
         className="fixed inset-x-0 top-0 z-30 flex h-[var(--thread-h,100dvh)] w-full translate-y-[var(--thread-top,0px)] flex-col bg-app-page pt-[env(safe-area-inset-top)] lg:static lg:z-auto lg:mx-auto lg:h-auto lg:min-h-0 lg:max-w-[640px] lg:flex-1 lg:translate-y-0 lg:border-x lg:border-app-line lg:bg-transparent lg:pt-0"
       >
-        <header className="flex items-center gap-[12px] border-b border-app-line bg-app-surface px-[16px] py-[10px]">
+        <header className="flex items-center gap-[6px] border-b border-white/5 bg-[#141414] px-[8px] py-[10px]">
           <Link
             href={p.backHref}
             aria-label={p.backLabel}
             className="grid size-[36px] place-items-center rounded-full text-app-text lg:hidden"
           >
-            <MaskIcon name="chevron-right" width={20} className="rotate-180" />
+            <ArrowLeft size={23} />
           </Link>
           {p.peer ? (
             // select-none: a long press opens the link's menu rather than
@@ -181,8 +194,9 @@ export default function ThreadScreen(p: ThreadScreenProps) {
           onScroll={(e) => {
             const el = e.currentTarget;
             pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+            if (previous.current) previous.current.top = el.scrollTop;
           }}
-          className="min-h-0 flex-1 overflow-y-auto bg-app-page"
+          className="min-h-0 flex-1 overflow-y-auto bg-[#080808] [overflow-anchor:none]"
         >
           {p.hasMore && (
             <div className="py-[10px] text-center">
@@ -209,19 +223,36 @@ export default function ThreadScreen(p: ThreadScreenProps) {
               {p.emptyText}
             </p>
           )}
-          <ul className="py-[10px]">
-            {p.messages.map((m) => (
-              <MessageBubble
-                key={m.clientId ?? m.id}
-                message={m}
-                retryLabel={p.retryLabel}
-                onRetry={p.onRetry}
-                photoLabels={p.photoLabels}
-                onRevealPhoto={p.onRevealPhoto}
-                onOpenPhoto={p.onOpenPhoto}
-              />
-            ))}
-          </ul>
+          {p.dayGroups.map((group) => (
+            <section
+              key={group.day.key}
+              aria-label={group.day.fullLabel}
+              className="relative pb-[8px]"
+            >
+              <div className="pointer-events-none sticky top-0 z-10 flex justify-center px-[16px] py-[10px]">
+                <time
+                  dateTime={group.day.key}
+                  title={group.day.fullLabel}
+                  className="rounded-[8px] border border-kink-gold-bright/10 bg-[#242018] px-[12px] py-[5px] text-[12px] font-medium text-[#e8d8af] shadow-md"
+                >
+                  {group.day.label}
+                </time>
+              </div>
+              <ul>
+                {group.messages.map((m) => (
+                  <MessageBubble
+                    key={m.clientId ?? m.id}
+                    message={m}
+                    retryLabel={p.retryLabel}
+                    onRetry={p.onRetry}
+                    photoLabels={p.photoLabels}
+                    onRevealPhoto={p.onRevealPhoto}
+                    onOpenPhoto={p.onOpenPhoto}
+                  />
+                ))}
+              </ul>
+            </section>
+          ))}
         </div>
 
         {(p.sendError || p.safetyError) && (

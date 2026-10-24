@@ -1,6 +1,6 @@
 "use client";
 
-import MaskIcon from "@/components/app/MaskIcon";
+import { MoreVertical } from "lucide-react";
 
 export interface ThreadMenuItem {
   key: "report" | "block" | "unblock";
@@ -29,7 +29,7 @@ export default function ThreadMenu(p: ThreadMenuProps) {
         aria-expanded={p.open}
         className="grid size-[36px] place-items-center rounded-full text-app-text hover:bg-app-input"
       >
-        <MaskIcon src="/app/feed/icon-dots.svg" width={20} />
+        <MoreVertical size={23} />
       </button>
       {p.open && (
         <>
