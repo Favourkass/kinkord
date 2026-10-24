@@ -73,7 +73,9 @@ it("renders unread counts and passes search and filter interactions to the scree
 });
 it("offers working navigation actions in the overflow menu", () => {
   render(<ChatListScreen {...props} menuOpen />);
-  expect(screen.getByRole("link", { name: "New message" }).getAttribute("href")).toBe("/search");
+  expect(
+    screen.getAllByRole("link", { name: "New message" }).map((link) => link.getAttribute("href")),
+  ).toEqual(["/search", "/search"]);
   fireEvent.click(screen.getByRole("button", { name: "Open menu" }));
   expect(props.onNavigation).toHaveBeenCalled();
 });
@@ -94,7 +96,7 @@ it("keeps the menu open for a tap inside it, though the shell mounts the screen 
 it("closes the menu on a tap outside it or Escape, but not on a tap inside", () => {
   const onCloseMenu = vi.fn();
   render(<ChatListScreen {...props} menuOpen onCloseMenu={onCloseMenu} />);
-  fireEvent.pointerDown(screen.getByRole("link", { name: "New message" }));
+  fireEvent.pointerDown(screen.getByText("New message"));
   expect(onCloseMenu).not.toHaveBeenCalled();
   fireEvent.pointerDown(document.body);
   expect(onCloseMenu).toHaveBeenCalledTimes(1);

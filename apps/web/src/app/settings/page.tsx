@@ -12,6 +12,7 @@ import { useHomePresenter } from "@/presenters/useHomePresenter";
 import { usePushPresenter } from "@/presenters/usePushPresenter";
 import { usePwaPresenter } from "@/presenters/usePwaPresenter";
 import { useVerificationAvailabilityPresenter } from "@/presenters/useVerificationAvailabilityPresenter";
+import { BRAND_NAME } from "@/constants/landing";
 
 export default function SettingsPage() {
   const vm = useHomePresenter();
@@ -22,7 +23,7 @@ export default function SettingsPage() {
   const verification = useVerificationAvailabilityPresenter();
   return (
     <AppShell
-      brand="KINKORD"
+      brand={BRAND_NAME}
       tagline="THE WORLD'S KINK COMMUNITY"
       greeting={vm.greeting}
       name={vm.name}

@@ -5,6 +5,7 @@ import FriendRequests from "@/components/profile/FriendRequests";
 import { getAppShellNav } from "@/presenters/getAppShellNav";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
 import { useFriendRequestsPresenter } from "@/presenters/useFriendRequestsPresenter";
+import { BRAND_NAME } from "@/constants/landing";
 
 export default function FriendRequestsPage() {
   const shell = useHomePresenter();
@@ -13,7 +14,7 @@ export default function FriendRequestsPage() {
 
   return (
     <AppShell
-      brand="KINKORD"
+      brand={BRAND_NAME}
       tagline="THE WORLD'S KINK COMMUNITY"
       greeting={shell.greeting}
       name={shell.name}

@@ -7,6 +7,7 @@ import RelationshipsScreen from "@/components/relationships/RelationshipsScreen"
 import { getAppShellNav } from "@/presenters/getAppShellNav";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
 import { useRelationshipsPresenter } from "@/presenters/useRelationshipsPresenter";
+import { BRAND_NAME } from "@/constants/landing";
 
 function Relationships() {
   const search = useSearchParams();
@@ -16,7 +17,7 @@ function Relationships() {
 
   return (
     <AppShell
-      brand="KINKORD"
+      brand={BRAND_NAME}
       tagline="THE WORLD'S KINK COMMUNITY"
       greeting={shell.greeting}
       name={shell.name}

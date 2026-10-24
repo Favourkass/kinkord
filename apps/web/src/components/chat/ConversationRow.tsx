@@ -27,14 +27,14 @@ export default function ConversationRow({
     <li>
       <Link
         href={row.href}
-        className={`flex items-center gap-[10px] border-b border-app-line/30 px-[10px] py-[10px] transition-colors hover:bg-app-input ${unread ? "rounded-xl bg-app-input/40" : ""}`}
+        className="flex items-center gap-[13px] px-[16px] py-[13px] transition-colors hover:bg-white/5"
       >
         <span className="relative shrink-0">
           <AvatarCircle
             silver={Boolean(row.silver)}
             src={row.avatarUrl}
             alt=""
-            size={48}
+            size={54}
             ringClassName="bg-app-line"
             shape={row.organization ? "square" : "circle"}
           />
@@ -49,7 +49,7 @@ export default function ConversationRow({
           <span className="flex items-baseline gap-[8px]">
             <span className="flex min-w-0 flex-1 items-center gap-[3px]">
               <span
-                className={`truncate text-[15px] font-bold ${row.organization ? "text-kink-gold-bright" : "text-app-text"}`}
+                className={`truncate text-[16px] font-semibold ${row.organization ? "text-kink-gold-bright" : "text-app-text"}`}
               >
                 {row.displayName}
               </span>
@@ -64,15 +64,20 @@ export default function ConversationRow({
                 />
               ) : null}
             </span>
-            <span className="shrink-0 text-[12px] text-app-muted">{row.time}</span>
-          </span>
-          <span className="flex items-center gap-[8px] pt-[2px]">
             <span
-              className={`min-w-0 flex-1 truncate text-[13px] ${
+              className={`shrink-0 text-[11px] ${unread ? "font-semibold text-kink-gold-bright" : "text-app-muted"}`}
+            >
+              {row.time}
+            </span>
+          </span>
+          <span className="flex items-center gap-[5px] pt-[5px]">
+            {row.sentByMe && !row.typing && <MessageReceipt status={row.receiptStatus ?? "sent"} />}
+            <span
+              className={`min-w-0 flex-1 truncate text-[14px] ${
                 row.typing
                   ? "font-semibold text-app-online"
                   : unread
-                    ? "font-semibold text-app-text"
+                    ? "text-app-text"
                     : "text-app-muted"
               }`}
             >
@@ -86,7 +91,6 @@ export default function ConversationRow({
                 {row.unread > 99 ? "99+" : row.unread}
               </span>
             )}
-            {!unread && row.sentByMe && <MessageReceipt status={row.receiptStatus ?? "sent"} />}
           </span>
         </span>
       </Link>

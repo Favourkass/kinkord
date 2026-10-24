@@ -7,6 +7,7 @@ import { getAppShellNav } from "@/presenters/getAppShellNav";
 import { getPostList } from "@/presenters/getPostList";
 import { useFeedPresenter } from "@/presenters/useFeedPresenter";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
+import { BRAND_NAME } from "@/constants/landing";
 
 /** One post on its own — where a shared link lands. */
 export default function PostPage() {
@@ -18,7 +19,7 @@ export default function PostPage() {
   return (
     <PostListScreen
       shell={{
-        brand: "KINKORD",
+        brand: BRAND_NAME,
         greeting: home.greeting,
         name: home.name,
         avatarUrl: home.avatarUrl,

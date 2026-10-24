@@ -6,6 +6,7 @@ import RegionList from "@/components/members/RegionList";
 import { getAppShellNav } from "@/presenters/getAppShellNav";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
 import { useMembersRegionPresenter } from "@/presenters/useMembersRegionPresenter";
+import { BRAND_NAME } from "@/constants/landing";
 
 /** /members/ng — everyone in the country; the dropdown narrows to a state (CEO, 2026-09-12). */
 export default function MembersCountryPage() {
@@ -16,7 +17,7 @@ export default function MembersCountryPage() {
 
   return (
     <AppShell
-      brand="KINKORD"
+      brand={BRAND_NAME}
       tagline="THE WORLD'S KINK COMMUNITY"
       greeting={shell.greeting}
       name={shell.name}

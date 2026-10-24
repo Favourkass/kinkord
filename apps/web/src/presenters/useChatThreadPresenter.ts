@@ -7,6 +7,7 @@ import {
   isCrossCountryPremium,
   isNewChatLimit,
   mergeMessages,
+  groupThreadDays,
   newChatNotice,
   toPendingMessageVM,
   toThreadMessageVM,
@@ -388,13 +389,17 @@ export function useChatThreadPresenter(conversationId: string) {
   // Once the other member writes here, replying is free.
   const needsSilver =
     needsSilverIn === conversationId && !messages.some((m) => m.senderId !== viewerId);
-  const bubbles = useMemo(
-    () => [
-      ...messages.map((m) => toThreadMessageVM(m, viewerId, revealed, summary?.receipts)),
-      ...pending.map((p) => toPendingMessageVM(p, viewerId)),
-    ],
-    [messages, pending, viewerId, revealed, summary?.receipts],
-  );
+  // Header polling re-renders the screen, so Today and Yesterday move on after midnight.
+  const clock = new Date();
+  const today = new Date(clock.getFullYear(), clock.getMonth(), clock.getDate()).getTime();
+  const bubbles = useMemo(() => {
+    const now = new Date(today);
+    return [
+      ...messages.map((m) => toThreadMessageVM(m, viewerId, revealed, summary?.receipts, now)),
+      ...pending.map((p) => toPendingMessageVM(p, viewerId, now)),
+    ];
+  }, [messages, pending, viewerId, revealed, summary?.receipts, today]);
+  const dayGroups = useMemo(() => groupThreadDays(bubbles), [bubbles]);
   const viewingPhoto: PostMediaVM | null = viewing
     ? { id: viewing, src: viewing, fullSrc: viewing, alt: CHAT_COPY.photoAlt }
     : null;
@@ -405,6 +410,7 @@ export function useChatThreadPresenter(conversationId: string) {
       conversationId,
       peer,
       messages: bubbles,
+      dayGroups,
       loading: loadedFor !== conversationId,
       error,
       sendError,
