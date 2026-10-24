@@ -7,6 +7,7 @@ import RegionList from "@/components/members/RegionList";
 import { getAppShellNav } from "@/presenters/getAppShellNav";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
 import { useMembersRegionPresenter } from "@/presenters/useMembersRegionPresenter";
+import { BRAND_NAME } from "@/constants/landing";
 
 function MembersRegion() {
   const params = useParams<{ country: string; state: string }>();
@@ -17,7 +18,7 @@ function MembersRegion() {
 
   return (
     <AppShell
-      brand="KINKORD"
+      brand={BRAND_NAME}
       tagline="THE WORLD'S KINK COMMUNITY"
       greeting={shell.greeting}
       name={shell.name}

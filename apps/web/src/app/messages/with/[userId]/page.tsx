@@ -7,6 +7,7 @@ import { CHAT_COPY } from "@/constants/chat";
 import { getAppShellNav } from "@/presenters/getAppShellNav";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
 import { useStartChatPresenter } from "@/presenters/useStartChatPresenter";
+import { BRAND_NAME } from "@/constants/landing";
 
 /** Where a profile's Message button lands: opens the thread, then moves on. */
 export default function StartChatPage({ params }: { params: Promise<{ userId: string }> }) {
@@ -17,7 +18,7 @@ export default function StartChatPage({ params }: { params: Promise<{ userId: st
 
   return (
     <AppShell
-      brand="KINKORD"
+      brand={BRAND_NAME}
       tagline="THE WORLD'S KINK COMMUNITY"
       greeting={shell.greeting}
       name={shell.name}

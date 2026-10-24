@@ -5,6 +5,7 @@ import CountrySelect from "@/components/members/CountrySelect";
 import { getAppShellNav } from "@/presenters/getAppShellNav";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
 import { useMembersCountryPresenter } from "@/presenters/useMembersCountryPresenter";
+import { BRAND_NAME } from "@/constants/landing";
 
 export default function MembersCountryPage() {
   const shell = useHomePresenter();
@@ -13,7 +14,7 @@ export default function MembersCountryPage() {
 
   return (
     <AppShell
-      brand="KINKORD"
+      brand={BRAND_NAME}
       tagline="THE WORLD'S KINK COMMUNITY"
       greeting={shell.greeting}
       name={shell.name}

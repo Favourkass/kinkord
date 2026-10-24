@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import AppShell from "@/components/app/AppShell";
 import { getAppShellNav } from "@/presenters/getAppShellNav";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
+import { BRAND_NAME } from "@/constants/landing";
 
 /** The normal app chrome around every admin screen; it stays mounted between them. */
 export default function ModerationLayout({ children }: { children: ReactNode }) {
@@ -11,7 +12,7 @@ export default function ModerationLayout({ children }: { children: ReactNode }) 
   const nav = getAppShellNav();
   return (
     <AppShell
-      brand="KINKORD"
+      brand={BRAND_NAME}
       tagline="THE WORLD'S KINK COMMUNITY"
       greeting={vm.greeting}
       name={vm.name}

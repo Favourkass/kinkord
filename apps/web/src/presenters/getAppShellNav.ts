@@ -1,3 +1,4 @@
+import { BRAND_NAME } from "@/constants/landing";
 import { MEMBERS_COPY } from "@/constants/members";
 import { Routes } from "@/constants/Routes";
 
@@ -228,7 +229,7 @@ export interface ShellSource {
 
 export function appShellProps(home: ShellSource, nav: ReturnType<typeof getAppShellNav>) {
   return {
-    brand: "Kinkord",
+    brand: BRAND_NAME,
     tagline: "THE WORLD'S KINK COMMUNITY",
     greeting: home.greeting,
     name: home.name,
