@@ -112,7 +112,6 @@ export type EditRowKey =
   | "occupation"
   | "languages"
   | "socialLinks"
-  | "profileVisibility"
   /** Show or hide the verified badge; only offered once the member is verified. */
   | "verifiedBadge";
 

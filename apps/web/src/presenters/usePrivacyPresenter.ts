@@ -3,12 +3,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   PRIVACY_AUDIENCES,
   PRIVACY_CATEGORIES,
+  PRIVACY_COPY,
   PRIVACY_FIELDS,
   READ_RECEIPTS_DESCRIPTION,
 } from "@/constants/privacy";
 import { Routes } from "@/constants/Routes";
 import type { PrivacyField, PrivacyPM } from "@/domain/privacy";
-import { loadPrivacy, savePrivacy } from "@/services/privacyService";
+import { loadPrivacy, savePrivacy, selectableAudiences } from "@/services/privacyService";
 
 export function usePrivacyPresenter(categoryKey: string) {
   const [model, setModel] = useState<PrivacyPM | null>(null);
@@ -93,21 +94,20 @@ export function usePrivacyPresenter(categoryKey: string) {
     description:
       categoryKey === "read-receipts"
         ? READ_RECEIPTS_DESCRIPTION
-        : fields.length
-          ? "Choose one audience for each setting. These rules work both ways: if you hide something from someone, you cannot see the same information from them. Verified members means identity-verified members. Existing post audiences and blocks still apply. The shared-content audience also applies when someone opens a post link."
-          : "Controls for this category are coming soon. Your current settings are unchanged.",
+        : categoryKey === "activity"
+          ? PRIVACY_COPY.activityDescription
+          : fields.length
+            ? PRIVACY_COPY.description
+            : PRIVACY_COPY.comingSoon,
     fields: fields.map((field) => ({
       ...field,
-      hint:
-        field.key === "tagging"
-          ? "Post tags are still limited to friends. This audience also controls who can send you mention notifications."
-          : null,
+      hint: PRIVACY_COPY.hints[field.key] ?? null,
       unavailable: "unavailable" in field && field.unavailable,
       audienceLabel:
         PRIVACY_AUDIENCES.find((item) => item.value === model?.settings[field.key])?.label ?? "",
       expanded: expanded === field.key,
       onToggle: () => setExpanded((current) => (current === field.key ? null : field.key)),
-      options: PRIVACY_AUDIENCES.map((option) => ({
+      options: selectableAudiences().map((option) => ({
         ...option,
         selected: model?.settings[field.key] === option.value,
         onSelect: () => {

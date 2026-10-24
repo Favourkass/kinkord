@@ -866,12 +866,9 @@ export class PostsService {
       this.db
         .select()
         .from(postMedia)
-        .where(
-          and(
-            inArray(postMedia.postId, ids),
-            sql`exists (select 1 from ${post} where ${post.id}=${postMedia.postId} and ${privacyAllows(viewerId, post.authorId, "media")})`,
-          ),
-        )
+        // A post's photos follow the post's own audience, so it never shows up without
+        // them; the Photos and Videos setting covers the profile's Media tab.
+        .where(inArray(postMedia.postId, ids))
         .orderBy(postMedia.position),
       this.db
         .select({ postId: postLike.postId, n: count() })

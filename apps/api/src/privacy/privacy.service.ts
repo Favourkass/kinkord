@@ -23,6 +23,9 @@ export class PrivacyService {
     // No stories or pinned-post features exist yet: do not claim to save effective controls for them.
     if (parsed.data.stories !== undefined || parsed.data.pinnedPosts !== undefined)
       throw new BadRequestException("This feature is not available yet.");
+    // Identity verification is switched off, so nobody could qualify: it would mean "Only me".
+    if (Object.values(parsed.data).includes("verified"))
+      throw new BadRequestException("Verified members isn't available yet.");
     await this.get(userId);
     const row = await this.repository.patch(userId, parsed.data);
     if (!row) throw new NotFoundException("Profile not found.");

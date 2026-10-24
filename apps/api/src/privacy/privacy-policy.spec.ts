@@ -13,6 +13,17 @@ describe("privacy policy", () => {
       directory: "members",
     });
   });
+  it("works both ways only for online status and read receipts", () => {
+    const lookups = (key: Parameters<typeof privacyAllows>[2]) =>
+      new PgDialect().sqlToQuery(privacyAllows("viewer", "owner", key)).sql.split("profile_privacy")
+        .length - 1;
+    // One-way: only the owner's own setting is read.
+    for (const key of ["bio", "profilePhoto", "posts", "media", "directory", "tagging"] as const)
+      expect(lookups(key)).toBe(1);
+    // Two-way: the viewer's setting for the same thing is read too.
+    expect(lookups("onlineStatus")).toBe(2);
+    expect(lookups("readReceipts")).toBe(2);
+  });
   it("binds user identifiers as values rather than SQL", () => {
     const viewer = "x' or true --";
     const query = new PgDialect().sqlToQuery(privacyAllows(viewer, "owner", "bio"));
