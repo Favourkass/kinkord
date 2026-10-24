@@ -138,7 +138,7 @@ export function useChatListPresenter() {
   const onRealtime = useCallback(
     (e: RealtimeEventPM) => {
       receiveTyping(e);
-      if (e.type === "message") void refresh();
+      if (e.type === "message" || e.type === "receipt") void refresh();
     },
     [refresh, receiveTyping],
   );
