@@ -8,7 +8,11 @@ const effectiveDefaults = Object.fromEntries(
 ) as PrivacyPM["settings"];
 import { usePrivacyPresenter } from "./usePrivacyPresenter";
 import { loadPrivacy, savePrivacy } from "@/services/privacyService";
-vi.mock("@/services/privacyService", () => ({ loadPrivacy: vi.fn(), savePrivacy: vi.fn() }));
+vi.mock("@/services/privacyService", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/services/privacyService")>()),
+  loadPrivacy: vi.fn(),
+  savePrivacy: vi.fn(),
+}));
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(loadPrivacy).mockResolvedValue({ settings: effectiveDefaults });
@@ -19,7 +23,24 @@ describe("privacy presenter", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.fields).toHaveLength(15);
     expect(result.current.fields[0].options.filter((x) => x.selected)).toHaveLength(1);
-    expect(result.current.fields[0].options.map((x) => x.label)).toContain("Verified members");
+    const labels = result.current.fields[0].options.map((x) => x.label);
+    expect(labels).toContain("Kinkordians");
+    expect(labels).toContain("Only me");
+    // Nobody can verify while identity verification is off.
+    expect(labels).not.toContain("Verified members");
+  });
+  it("explains that only online status works both ways", async () => {
+    const { result } = renderHook(() => usePrivacyPresenter("profile"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.description).not.toContain("both ways");
+    const hint = (key: string) => result.current.fields.find((x) => x.key === key)?.hint;
+    expect(hint("onlineStatus")).toContain("both ways");
+    expect(hint("bio")).toContain("body type");
+    expect(hint("media")).toContain("each post's own audience");
+    expect(hint("posts")).toBeNull();
+    const activity = renderHook(() => usePrivacyPresenter("activity")).result;
+    await waitFor(() => expect(activity.current.loading).toBe(false));
+    expect(activity.current.description).toContain("both ways");
   });
   it("shows a saved choice and reloads changes from another device on focus", async () => {
     const { result } = renderHook(() => usePrivacyPresenter("profile"));

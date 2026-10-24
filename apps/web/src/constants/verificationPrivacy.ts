@@ -58,7 +58,7 @@ export const VERIFICATION_PRIVACY_COPY = {
       paragraphs: [
         'A gold "Identity verified" badge on your profile, and "ID and selfie checked by Kinkord" in your About tab. Other members do not see your ID, ID number, selfie, scores or review notes. Authorized Kinkord reviewers may access verification evidence when a manual review is required.',
         "The badge only shows while your profile photo, date of birth and gender are the ones that were verified. Change any of them and it disappears until you verify again.",
-        "You can hide the badge in Edit profile → Privacy. If your profile is friends-only, only your friends see it.",
+        "You can hide the badge in Edit profile → Privacy. Members who can't see your About details don't see it either.",
       ],
     },
     {

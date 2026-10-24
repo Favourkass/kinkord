@@ -541,11 +541,12 @@ describe("MembersService.publicProfile visibility (Edit Profile → Privacy)", (
     },
   ];
 
-  it("withholds the About details from non-friends on a friends-only profile, keeps the card basics", async () => {
+  it("withholds the About details from a viewer the member's settings leave out, keeps the card basics", async () => {
     const { service, select, areFriends } = makeService();
     select.mockReturnValueOnce(chain(rowFor("friends", true)));
     const vm = await service.publicProfile("nene", "me");
-    expect(areFriends).toHaveBeenCalledWith("me", "u2");
+    // The database query decides access, an older friends-only profile included.
+    expect(areFriends).not.toHaveBeenCalled();
     expect(vm.restricted).toBe(true);
     expect(vm.bio).toBeNull();
     expect(vm.interests).toEqual([]);
@@ -557,6 +558,26 @@ describe("MembersService.publicProfile visibility (Edit Profile → Privacy)", (
     expect(vm.roles).toEqual(["Dominant"]);
     expect(vm.city).toBe("Abraka");
     expect(vm.counts.followers).toBe(30);
+  });
+
+  it("lets the Bio/About setting cover the rest of the About details", async () => {
+    const [row] = rowFor("public");
+    const { service, select } = makeService();
+    select.mockReturnValueOnce(chain([{ ...row, access: { ...allAccess, bio: false } }]));
+    const vm = await service.publicProfile("nene", "me");
+    expect(vm).toMatchObject({
+      bio: null,
+      bodyType: null,
+      languages: [],
+      nationality: null,
+      occupation: null,
+      limits: null,
+      socialLinks: {},
+      // Interests and relationship status have settings of their own.
+      interests: ["Bondage"],
+      relationshipStatus: "Single",
+      restricted: false,
+    });
   });
 
   it("shows nothing individual on an organization's profile", async () => {
@@ -1064,15 +1085,11 @@ describe("MembersService.suggestedForFeed (matching v1)", () => {
     expect(presignDownload).toHaveBeenCalledWith("avatars/ada.jpg", "md");
   });
 
-  it("keeps a friends-only member's kinks and looking-for out of the card and the ranking", async () => {
+  it("keeps kinks and looking-for that a member's Interests setting hides out of the card and the ranking", async () => {
+    // The query returns them empty for a viewer the setting leaves out.
     const { result } = await run(me, [
-      row({
-        userId: "fay",
-        visibility: "friends",
-        interests: ["Bondage"],
-        lookingFor: ["Friendship"],
-      }),
-      row({ userId: "gil", visibility: "public", interests: ["Bondage"] }),
+      row({ userId: "fay", interests: null, lookingFor: null }),
+      row({ userId: "gil", interests: ["Bondage"] }),
     ]);
     expect(result.items.map((i) => i.userId)).toEqual(["gil", "fay"]);
     expect(result.items[1]).toMatchObject({ userId: "fay", lookingFor: [] });

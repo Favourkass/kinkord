@@ -60,5 +60,23 @@ export const PRIVACY_AUDIENCES = [
   { value: "onlyMe", label: "Only me" },
 ] as const;
 
+export const PRIVACY_COPY = {
+  description:
+    "Choose who can see each part of your profile. Each post's own audience and your blocks still apply. Who can see your content when it is shared also covers anyone opening a link to your post.",
+  activityDescription:
+    "Choose who can see when you are online. This works both ways: if you hide your online status from someone, you cannot see theirs.",
+  comingSoon: "Controls for this category are coming soon. Your current settings are unchanged.",
+  hints: {
+    bio: "Also covers the rest of your About details: body type, languages, nationality, occupation, limits, social links and your verified badge.",
+    interests: "Covers your kinks and what you are looking for.",
+    media:
+      "Covers your Media tab. Photos and videos in your posts follow each post's own audience.",
+    onlineStatus:
+      "This works both ways: if you hide your online status from someone, you cannot see theirs.",
+    tagging:
+      "Post tags are still limited to friends. This audience also controls who can send you mention notifications.",
+  } as Partial<Record<string, string>>,
+} as const;
+
 export const READ_RECEIPTS_DESCRIPTION =
   "Choose who can see when you have read their messages. This works both ways: you only see their read receipts if you share yours with them. Only me hides read receipts in both directions. Sent and delivered indicators remain visible, and your unread counts still clear when you open a conversation.";

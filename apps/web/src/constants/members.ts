@@ -121,7 +121,7 @@ export const MEMBERS_COPY = {
       tagline: "More than a community... It's a lifestyle.",
       memberSince: (date: string) => `Member since ${date}`,
       notShared: "Not shared",
-      privateNotice: "This member only shares their details with friends.",
+      privateNotice: "This member keeps their About details private.",
     },
     people: {
       tabs: {

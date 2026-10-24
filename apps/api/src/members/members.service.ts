@@ -353,39 +353,31 @@ export class MembersService {
 
     const { u, p, access } = row;
     const isSelf = u.id === viewerId;
-    const friendsOnly = p.profileVisibility === "friends" && !isSelf;
-    const [
-      followCounts,
-      mutualFriends,
-      isFollowing,
-      avatarUrl,
-      coverUrl,
-      isFriend,
-      silver,
-      relationships,
-    ] = await Promise.all([
-      this.follows.counts(u.id),
-      isSelf ? Promise.resolve(0) : this.follows.mutualFriendsCount(u.id, viewerId),
-      isSelf ? Promise.resolve(false) : this.follows.isFollowing(viewerId, u.id),
-      access.profilePhoto && p.avatarKey
-        ? this.storage.presignDownload(p.avatarKey, "md")
-        : Promise.resolve(null),
-      // Covers are full-bleed, so they keep the original.
-      access.coverPhoto && p.coverKey
-        ? this.storage.presignDownload(p.coverKey)
-        : Promise.resolve(null),
-      friendsOnly ? this.follows.areFriends(viewerId, u.id) : Promise.resolve(true),
-      silverSince(this.db, u.id),
-      profileRelationships(this.db, this.storage, u.id, viewerId),
-    ]);
+    const [followCounts, mutualFriends, isFollowing, avatarUrl, coverUrl, silver, relationships] =
+      await Promise.all([
+        this.follows.counts(u.id),
+        isSelf ? Promise.resolve(0) : this.follows.mutualFriendsCount(u.id, viewerId),
+        isSelf ? Promise.resolve(false) : this.follows.isFollowing(viewerId, u.id),
+        access.profilePhoto && p.avatarKey
+          ? this.storage.presignDownload(p.avatarKey, "md")
+          : Promise.resolve(null),
+        // Covers are full-bleed, so they keep the original.
+        access.coverPhoto && p.coverKey
+          ? this.storage.presignDownload(p.coverKey)
+          : Promise.resolve(null),
+        silverSince(this.db, u.id),
+        profileRelationships(this.db, this.storage, u.id, viewerId),
+      ]);
     const counts = access.followersFollowing
       ? { ...followCounts, mutualFriends }
       : { friends: 0, followers: 0, following: 0, mutualFriends: 0 };
     const friendship = isSelf ? "none" : await this.follows.friendshipState(viewerId, u.id);
-    // Friends-only profile seen by a non-friend: what the directory card already shows
-    // stays (so they can still follow back), the About details are withheld.
-    const restricted = friendsOnly && !isFriend;
-    const hidden = <T>(value: T, empty: T) => (restricted ? empty : value);
+    // What the directory card already shows stays (so they can still follow back). The
+    // Bio/About setting covers the rest of the About details too; an older friends-only
+    // profile keeps them for friends until the member picks otherwise.
+    const hidden = <T>(value: T, empty: T) => (access.bio ? value : empty);
+    // Nothing for this viewer in the About tab.
+    const restricted = !access.bio && !access.interests && !access.relationshipStatus;
     // An organization's account shows nothing that only describes a person.
     const organization = p.accountType === "organization";
     const personal = <T>(value: T, empty: T) => (organization ? empty : hidden(value, empty));
@@ -426,7 +418,7 @@ export class MembersService {
       friendship,
       isFollowing,
       isSelf,
-      restricted: restricted && !access.bio && !access.interests && !access.relationshipStatus,
+      restricted,
       // Only you see your own birth date; everyone else gets the derived age.
       dateOfBirth: isSelf ? p.dateOfBirth : null,
       verification: {
@@ -434,7 +426,7 @@ export class MembersService {
         phone: p.phoneVerified,
         // Only while the verified photo, birth date and gender are still the
         // profile's; others see it only if the member shows it and may see them.
-        ...(stillVerified(row.bronze, p) && (isSelf || (p.showVerifiedBadge && !restricted))
+        ...(stillVerified(row.bronze, p) && (isSelf || (p.showVerifiedBadge && access.bio))
           ? { identity: true as const }
           : {}),
       },
@@ -573,7 +565,6 @@ export class MembersService {
         roles: profile.roles,
         interests: privateProfileValue(viewerId, profile.userId, "interests", profile.interests),
         lookingFor: privateProfileValue(viewerId, profile.userId, "interests", profile.lookingFor),
-        visibility: profile.profileVisibility,
         lastSeenAt: privateProfileValue(
           viewerId,
           profile.userId,
@@ -598,19 +589,15 @@ export class MembersService {
       city: me.city,
       state: me.state,
     };
-    const candidates = rows.map((r) => {
-      // Followed members are never in the pool, so no one here is the viewer's
-      // friend: a friends-only profile's About details stay out of the card and
-      // the ranking, as on publicProfile.
-      const restricted = r.visibility === "friends";
-      return {
-        ...r,
-        roles: r.roles ?? [],
-        kinks: restricted ? [] : (r.interests ?? []),
-        lookingFor: restricted ? [] : (r.lookingFor ?? []),
-        hasPhoto: Boolean(r.avatarKey),
-      };
-    });
+    // Kinks and Looking For arrive empty when the member's Interests setting hides
+    // them from this viewer, so they stay out of the card and the ranking.
+    const candidates = rows.map((r) => ({
+      ...r,
+      roles: r.roles ?? [],
+      kinks: r.interests ?? [],
+      lookingFor: r.lookingFor ?? [],
+      hasPhoto: Boolean(r.avatarKey),
+    }));
     const wanted = wantedSide(viewer.roles);
     const best = rankCandidates(viewer, candidates, now).slice(0, limit);
     const items = await Promise.all(
@@ -672,7 +659,6 @@ export class MembersService {
       .select({
         avatarKey: privateProfileValue(viewerId, profile.userId, "profilePhoto", profile.avatarKey),
         coverKey: profile.coverKey,
-        visibility: profile.profileVisibility,
         allowed: privacyAllows(viewerId, profile.userId, "media"),
       })
       .from(profile)

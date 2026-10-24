@@ -139,10 +139,8 @@ describe("buildEditRows", () => {
       "nationality",
       "relationshipStatus",
     ]);
-    expect(buildEditRows("privacy", ctx).map((r) => r.key)).toEqual([
-      "socialLinks",
-      "profileVisibility",
-    ]);
+    // Who sees the profile moved to Settings → Privacy.
+    expect(buildEditRows("privacy", ctx).map((r) => r.key)).toEqual(["socialLinks"]);
   });
 
   it("offers the verified badge switch only to a verified member", () => {
@@ -183,7 +181,7 @@ describe("buildEditRows", () => {
       occupation: null,
       languages: "English",
     });
-    expect(valuesOf("privacy")).toEqual({ socialLinks: "Facebook", profileVisibility: "public" });
+    expect(valuesOf("privacy")).toEqual({ socialLinks: "Facebook" });
   });
 
   it("carries the 30-day locks and the picker lists into the editors", () => {
@@ -333,9 +331,6 @@ describe("drafts", () => {
         profile,
       ),
     ).toEqual({ socialLinks: { facebook: null, x: "https://x.com/nene" } });
-    expect(patchFor("profileVisibility", { kind: "single", value: "friends" }, profile)).toEqual({
-      profileVisibility: "friends",
-    });
     expect(patchFor("gender", { kind: "multi", value: ["Male", "Female"] }, profile)).toEqual({
       genders: ["Male", "Female"],
     });

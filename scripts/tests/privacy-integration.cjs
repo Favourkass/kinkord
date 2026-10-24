@@ -9,6 +9,8 @@ const { sql, eq } = req("drizzle-orm");
 const { drizzle } = req("drizzle-orm/node-postgres");
 const { PgDialect } = req("drizzle-orm/pg-core");
 const { privacyAllows, privateProfileValue, PRIVACY_FIELDS } = req("./dist/privacy/privacy-policy");
+// Only these work both ways; every other setting only limits who sees the owner's own.
+const MUTUAL = new Set(["onlineStatus", "readReceipts"]);
 const { profile } = req("./dist/db/schema");
 const { deliveryAckSql } = req("./dist/chat/receipts");
 const connectionString = process.env.KINKORD_PRIVACY_TEST_DATABASE_URL;
@@ -126,13 +128,14 @@ async function audience(value, field = "bio") {
     await check("same", false);
     await client.query("truncate member_block, profile_privacy, follow, friendship");
     await client.query("update profile set profile_visibility='public'");
-    // A restrictive viewer cannot bypass reciprocity by querying a permissive owner.
+    // A restrictive viewer still sees a permissive owner's profile, except for the two-way
+    // settings: hiding your online status or read receipts hides theirs from you.
     for (const field of PRIVACY_FIELDS) {
       await client.query(
         "insert into profile_privacy values ('same',$1::jsonb) on conflict(user_id) do update set settings=excluded.settings",
         [JSON.stringify({ [field]: "onlyMe" })],
       );
-      await check("same", false, field);
+      await check("same", !MUTUAL.has(field), field);
       await check("owner", false, field, "same");
       await check("same", true, field, "same");
     }
@@ -147,26 +150,29 @@ async function audience(value, field = "bio") {
       ["onlyMe", false],
     ]) {
       await client.query("update profile_privacy set settings=$1::jsonb where user_id='same'", [
-        JSON.stringify({ profilePhoto: choice }),
+        JSON.stringify({ profilePhoto: choice, onlineStatus: choice }),
       ]);
-      await check("same", allowed, "profilePhoto");
+      await check("same", true, "profilePhoto");
       await check("owner", allowed, "profilePhoto", "same");
+      await check("same", allowed, "onlineStatus");
+      await check("owner", allowed, "onlineStatus", "same");
     }
     await client.query(
-      "update profile_privacy set settings='{\"profilePhoto\":\"followers\"}' where user_id='same'; insert into follow values ('owner','same')",
+      "update profile_privacy set settings='{\"onlineStatus\":\"followers\"}' where user_id='same'; insert into follow values ('owner','same')",
     );
-    await check("same", true, "profilePhoto");
-    await check("owner", true, "profilePhoto", "same");
+    await check("same", true, "onlineStatus");
+    await check("owner", true, "onlineStatus", "same");
     await client.query(
-      "update profile_privacy set settings='{\"profilePhoto\":\"following\"}' where user_id='same'",
+      "update profile_privacy set settings='{\"onlineStatus\":\"following\"}' where user_id='same'",
     );
-    await check("same", false, "profilePhoto");
+    await check("same", false, "onlineStatus");
+    await check("same", true, "profilePhoto");
     await client.query("insert into follow values ('same','owner')");
-    await check("same", true, "profilePhoto");
+    await check("same", true, "onlineStatus");
     await client.query(
-      "update profile_privacy set settings='{\"profilePhoto\":\"friends\"}' where user_id='same'; insert into friendship values ('owner','same','accepted')",
+      "update profile_privacy set settings='{\"onlineStatus\":\"friends\"}' where user_id='same'; insert into friendship values ('owner','same','accepted')",
     );
-    await check("same", true, "profilePhoto");
+    await check("same", true, "onlineStatus");
 
     // Delivery acknowledgements are recipient-scoped, durable and independent from unread state.
     await client.query(`create temp table conversation_participant(conversation_id uuid, user_id text, last_delivered_at timestamptz, last_read_at timestamptz);

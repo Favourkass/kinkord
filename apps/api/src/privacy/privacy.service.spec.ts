@@ -27,9 +27,9 @@ describe("PrivacyService", () => {
   });
   it("writes only touched fields for the authenticated member", async () => {
     const { service, patch } = setup();
-    const result = await service.update("self", { bio: "verified", location: "country" });
-    expect(patch).toHaveBeenCalledWith("self", { bio: "verified", location: "country" });
-    expect(result.settings.bio).toBe("verified");
+    const result = await service.update("self", { bio: "continent", location: "country" });
+    expect(patch).toHaveBeenCalledWith("self", { bio: "continent", location: "country" });
+    expect(result.settings.bio).toBe("continent");
   });
   it.each([
     { bio: ["friends", "followers"] },
@@ -38,6 +38,8 @@ describe("PrivacyService", () => {
     { unknown: "friends" },
     { stories: "friends" },
     { pinnedPosts: "country" },
+    // Nobody can verify while identity verification is off.
+    { profilePhoto: "verified" },
   ])("rejects invalid or unavailable settings: %j", async (body) => {
     const { service, patch } = setup();
     await expect(service.update("self", body)).rejects.toBeInstanceOf(BadRequestException);
