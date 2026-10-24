@@ -681,7 +681,8 @@ describe("ChatService.markRead", () => {
     const { service, after, push, realtime } = make([
       [{ userId: "u1" }],
       [{ id: "m2", createdAt: at }],
-      undefined,
+      [{ conversationId: "c1" }],
+      [{ userId: "u2" }],
     ]);
     await service.markRead("u1", "c1", "m2");
     expect(after("update", conversationParticipant, "set")).toMatchObject({
@@ -689,6 +690,44 @@ describe("ChatService.markRead", () => {
     });
     expect(push.chatRead).toHaveBeenCalledWith("u1", "c1", at);
     expect(realtime.notify).toHaveBeenCalledWith(["u1"], { type: "message", conversationId: "c1" });
+    // The sender's ticks move at once; the query only finds those who may see the read.
+    await vi.waitFor(() =>
+      expect(realtime.notify).toHaveBeenCalledWith(["u2"], {
+        type: "receipt",
+        conversationId: "c1",
+      }),
+    );
+  });
+
+  it("tells nobody when an older message is opened again", async () => {
+    const { service, realtime, left } = make([
+      [{ userId: "u1" }],
+      [{ id: "m1", createdAt: at }],
+      [],
+    ]);
+    await service.markRead("u1", "c1", "m1");
+    expect(left()).toBe(0);
+    expect(realtime.notify).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("ChatService.markDelivered", () => {
+  it("tells the sender at once when their message reaches the other member's app", async () => {
+    const { service, realtime } = make([{ rows: [{ conversation_id: "c1" }] }, [{ userId: "u2" }]]);
+    await service.markDelivered("u1", ["00000000-0000-4000-8000-000000000001"]);
+    await vi.waitFor(() =>
+      expect(realtime.notify).toHaveBeenCalledWith(["u2"], {
+        type: "receipt",
+        conversationId: "c1",
+      }),
+    );
+  });
+
+  it("stays quiet when nothing new was delivered", async () => {
+    const { service, realtime, left } = make([{ rows: [] }]);
+    await service.markDelivered("u1", ["00000000-0000-4000-8000-000000000001"]);
+    expect(left()).toBe(0);
+    expect(realtime.notify).not.toHaveBeenCalled();
   });
 });
 

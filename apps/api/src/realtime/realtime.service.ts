@@ -9,13 +9,14 @@ import { channelFor, REALTIME_TOKEN_TTL_SECONDS, signRealtimeToken } from "./tok
  * What an open app is told. Only that something changed: it fetches the change
  * from this API, where access is checked, so message text never passes
  * through AppSync. "notification": the member's inbox changed (something new,
- * or read on another device).
+ * or read on another device). "receipt": a chat's delivered or seen ticks moved.
  */
 export type RealtimeEvent =
   | { type: "message"; conversationId: string }
   | { type: "typing"; conversationId: string; typing: boolean }
   | { type: "notification" }
-  | { type: "inbox_seen" };
+  | { type: "inbox_seen" }
+  | { type: "receipt"; conversationId: string };
 
 /** What a signed-in member's app needs to open its live connection. */
 export type RealtimeConnection =

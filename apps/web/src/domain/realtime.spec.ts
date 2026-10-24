@@ -27,6 +27,16 @@ describe("eventsFromFrame", () => {
     ).toEqual([{ type: "notification" }]);
   });
 
+  it("reads a chat's ticks moving, and skips one that names no chat", () => {
+    const event = JSON.stringify({ type: "receipt", conversationId: "c1" });
+    expect(eventsFromFrame({ type: "data", event })).toEqual([
+      { type: "receipt", conversationId: "c1" },
+    ]);
+    expect(eventsFromFrame({ type: "data", event: JSON.stringify({ type: "receipt" }) })).toEqual(
+      [],
+    );
+  });
+
   it("ignores other frames, malformed events and unknown kinds", () => {
     expect(eventsFromFrame({ type: "ka" })).toEqual([]);
     expect(eventsFromFrame(null)).toEqual([]);

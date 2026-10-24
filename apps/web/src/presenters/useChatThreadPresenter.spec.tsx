@@ -8,6 +8,7 @@ import {
   THREAD_FALLBACK_POLL_MS,
   THREAD_POLL_MS,
   HEADER_POLL_MS,
+  HEADER_FALLBACK_POLL_MS,
   useChatThreadPresenter,
 } from "./useChatThreadPresenter";
 import { chatRulesStore } from "@/util/chatRules";
@@ -426,6 +427,21 @@ describe("useChatThreadPresenter", () => {
       await ready();
       expect(polls.has(THREAD_FALLBACK_POLL_MS)).toBe(true);
       expect(polls.has(THREAD_POLL_MS)).toBe(false);
+      // Ticks arrive as events, so the header no longer needs the quick poll.
+      expect(polls.has(HEADER_FALLBACK_POLL_MS)).toBe(true);
+      expect(polls.has(HEADER_POLL_MS)).toBe(false);
+    });
+
+    it("moves the ticks the moment a receipt event names this thread", async () => {
+      const { result } = await ready();
+      const own = result.current.thread.messages.find((m) => m.isOwn)!;
+      svc.conversation.mockResolvedValue(
+        header({ receipts: { deliveredAt: "2026-09-29T00:00:00Z", readAt: null } }),
+      );
+      await act(async () => live.hear?.({ type: "receipt", conversationId: "c9" }));
+      expect(result.current.thread.messages.find((m) => m.id === own.id)?.status).toBe("sent");
+      await act(async () => live.hear?.({ type: "receipt", conversationId: "c1" }));
+      expect(result.current.thread.messages.find((m) => m.id === own.id)?.status).toBe("delivered");
     });
   });
 

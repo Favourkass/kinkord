@@ -33,8 +33,10 @@ import { useRealtime } from "./useRealtime";
 export const THREAD_POLL_MS = 3_000;
 /** With one, polling is only a safety net for a missed event. */
 export const THREAD_FALLBACK_POLL_MS = 30_000;
-/** Refresh presence and persisted delivery/read receipts across devices. */
+/** How often the header (presence, delivered and seen ticks) refreshes without a live connection. */
 export const HEADER_POLL_MS = 5_000;
+/** With one, ticks arrive as events, so this only keeps presence fresh. */
+export const HEADER_FALLBACK_POLL_MS = 20_000;
 /** Matches the API's page size: a full page means there may be more before it. */
 const PAGE = 50;
 
@@ -179,21 +181,6 @@ export function useChatThreadPresenter(conversationId: string) {
       // A missed poll is caught up by the next one.
     }
   }, [conversationId, messages]);
-  // A live event for this thread fetches what's new at once.
-  const onRealtime = useCallback(
-    (e: RealtimeEventPM) => {
-      if (e.type === "message" && e.conversationId === conversationId) void pollNew();
-      if ((e.type === "typing" || e.type === "message") && e.conversationId === conversationId)
-        receiveTyping(e);
-    },
-    [conversationId, pollNew, receiveTyping],
-  );
-  const { live } = useRealtime(onRealtime);
-  useEffect(() => {
-    if (!live) clearTyping();
-  }, [live, clearTyping]);
-  usePolling(pollNew, live ? THREAD_FALLBACK_POLL_MS : THREAD_POLL_MS, loaded);
-
   const pollHeader = useCallback(async () => {
     try {
       setSummary(await chatService.conversation(conversationId));
@@ -201,7 +188,22 @@ export function useChatThreadPresenter(conversationId: string) {
       // Keep showing the last known header.
     }
   }, [conversationId]);
-  usePolling(pollHeader, HEADER_POLL_MS, loaded);
+  // A live event for this thread fetches what's new at once; a receipt moves the ticks.
+  const onRealtime = useCallback(
+    (e: RealtimeEventPM) => {
+      if (e.type === "message" && e.conversationId === conversationId) void pollNew();
+      if (e.type === "receipt" && e.conversationId === conversationId) void pollHeader();
+      if ((e.type === "typing" || e.type === "message") && e.conversationId === conversationId)
+        receiveTyping(e);
+    },
+    [conversationId, pollNew, pollHeader, receiveTyping],
+  );
+  const { live } = useRealtime(onRealtime);
+  useEffect(() => {
+    if (!live) clearTyping();
+  }, [live, clearTyping]);
+  usePolling(pollNew, live ? THREAD_FALLBACK_POLL_MS : THREAD_POLL_MS, loaded);
+  usePolling(pollHeader, live ? HEADER_FALLBACK_POLL_MS : HEADER_POLL_MS, loaded);
 
   // A block made or lifted changes the header and the composer: refetch it.
   const typingSentAt = useRef(0);
