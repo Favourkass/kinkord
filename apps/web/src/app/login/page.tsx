@@ -45,7 +45,7 @@ export default function LoginPage() {
             height={145}
             priority
             unoptimized
-            className="mx-auto mt-[47px] size-[145px] lg:mx-0 lg:mt-0 lg:size-[79px]"
+            className="mx-auto mt-[47px] size-[145px] lg:mt-0 lg:size-[79px]"
           />
         </div>
 
