@@ -65,7 +65,7 @@ export default function DesktopSidebar({
     }`;
   return (
     <aside className="sticky top-0 flex h-dvh w-[333px] shrink-0 flex-col bg-side-bg pb-[49px] pt-[37px]">
-      <p className="pl-[38px] text-[48px] font-extrabold leading-[47px] tracking-[4.8px] text-kink-gold-bright">
+      <p className="text-center text-[48px] font-extrabold leading-[47px] tracking-[4.8px] text-kink-gold-bright">
         {brand}
       </p>
       <nav className="mt-[46px] flex flex-col gap-[27px]">
