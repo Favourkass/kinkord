@@ -3,6 +3,7 @@ import {
   isCrossCountryPremium,
   isNewChatLimit,
   mergeMessages,
+  groupThreadDays,
   newChatNotice,
   previewOf,
   toConversationRowVM,
@@ -285,5 +286,44 @@ describe("message receipt status", () => {
       toThreadMessageVM(pm, "other", new Set(), { deliveredAt: pm.createdAt, readAt: pm.createdAt })
         .status,
     ).toBe("sent");
+  });
+});
+
+describe("daily thread grouping", () => {
+  it("groups consecutive messages and pending bubbles by local day without changing line breaks", () => {
+    const now = new Date(2026, 9, 24, 12);
+    const yesterday = toThreadMessageVM(
+      msg("old", {
+        createdAt: new Date(2026, 9, 23, 22).toISOString(),
+        body: "First line\n\nSecond paragraph",
+      }),
+      "u1",
+      new Set(),
+      undefined,
+      now,
+    );
+    const today = toThreadMessageVM(
+      msg("new", { createdAt: new Date(2026, 9, 24, 10).toISOString() }),
+      "u1",
+      new Set(),
+      undefined,
+      now,
+    );
+    const pending = toPendingMessageVM(
+      {
+        clientId: "pending",
+        body: "Draft",
+        photo: null,
+        createdAt: new Date(2026, 9, 24, 11).toISOString(),
+        status: "sending",
+      },
+      "u1",
+      now,
+    );
+    const groups = groupThreadDays([yesterday, today, pending]);
+    expect(groups.map((g) => g.day.label)).toEqual(["Yesterday", "Today"]);
+    expect(groups.map((g) => g.messages.map((m) => m.id))).toEqual([["old"], ["new", "pending"]]);
+    expect(groups[0].messages[0].body).toBe("First line\n\nSecond paragraph");
+    expect(groupThreadDays([])).toEqual([]);
   });
 });

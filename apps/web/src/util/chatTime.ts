@@ -22,3 +22,29 @@ export function conversationTime(iso: string, now: Date = new Date()): string {
 export function presenceLabel(online: boolean): string | null {
   return online ? "Online" : null;
 }
+
+/** Local calendar dates, so midnight and daylight-saving changes group correctly. */
+export interface ChatDayVM {
+  key: string;
+  label: string;
+  fullLabel: string;
+}
+
+export function chatDay(iso: string, now: Date = new Date()): ChatDayVM {
+  const date = new Date(iso);
+  const keyOf = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const key = keyOf(date);
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  const fullLabel = date.toLocaleDateString(undefined, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  return {
+    key,
+    label: key === keyOf(now) ? "Today" : key === keyOf(yesterday) ? "Yesterday" : fullLabel,
+    fullLabel,
+  };
+}
