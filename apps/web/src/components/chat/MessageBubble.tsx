@@ -1,3 +1,4 @@
+import MessageReceipt from "./MessageReceipt";
 import type { ThreadMessageVM } from "@/domain/chat";
 
 export interface MessageBubblePhotoLabels {
@@ -68,11 +69,15 @@ export default function MessageBubble({
           </p>
         )}
         <p
-          className={`pt-[4px] text-right text-[10px] ${
+          className={`flex items-center justify-end gap-1 pt-[4px] text-right text-[10px] ${
             own ? "text-kink-ink/60" : "text-app-muted"
           } ${photo ? "px-[10px]" : ""}`}
         >
           {message.status === "sending" ? "sending…" : message.time}
+          {own &&
+            (message.status === "sent" ||
+              message.status === "delivered" ||
+              message.status === "seen") && <MessageReceipt status={message.status} />}
         </p>
         {message.status === "failed" && (
           <button

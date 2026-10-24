@@ -52,6 +52,10 @@ export interface InboxCountsDto {
   online: number;
 }
 
+export const deliverySchema = z
+  .object({ messageIds: z.array(z.string().uuid()).min(1).max(100) })
+  .strict();
+
 export const markReadSchema = z.object({
   messageId: z.string().uuid(),
 });
@@ -108,6 +112,7 @@ export interface ConversationSummaryDto {
   peer: ChatPeerDto | null;
   lastMessage: MessageDto | null;
   unreadCount: number;
+  receipts?: { deliveredAt: string | null; readAt: string | null };
 }
 
 /** One open thread's header: the summary, plus what the composer may offer. */

@@ -16,6 +16,7 @@ import { RealtimeService } from "../realtime/realtime.service";
 import { ChatService } from "./chat.service";
 import {
   historyQuerySchema,
+  deliverySchema,
   markReadSchema,
   photoUploadSchema,
   sendMessageSchema,
@@ -44,6 +45,12 @@ export class ChatController {
     private readonly chat: ChatService,
     private readonly realtime: RealtimeService,
   ) {}
+
+  @Post("delivered")
+  async delivered(@Req() req: AuthedRequest, @Body() body: unknown) {
+    await this.chat.markDelivered(req.user.id, parse(deliverySchema, body).messageIds);
+    return { ok: true };
+  }
 
   @Post("inbox-seen")
   seeInbox(@Req() req: AuthedRequest) {
