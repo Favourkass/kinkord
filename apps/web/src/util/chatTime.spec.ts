@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { bubbleTime, conversationTime, presenceLabel, chatDay } from "./chatTime";
 
 describe("chatTime", () => {
@@ -27,8 +27,8 @@ describe("chatTime", () => {
   });
 });
 
+// Times are built in the runner's own zone: worker threads can't switch zones mid-run.
 describe("chat day headers", () => {
-  afterEach(() => vi.unstubAllEnvs());
   it("labels today, yesterday across a year boundary, and older full dates", () => {
     const now = new Date(2026, 0, 1, 10);
     expect(chatDay(new Date(2026, 0, 1, 0, 1).toISOString(), now).label).toBe("Today");
@@ -38,15 +38,20 @@ describe("chat day headers", () => {
     expect(older.label).toBe(older.fullLabel);
     expect(older.label).toContain("2025");
   });
-  it("uses the viewer's local day rather than the UTC date", () => {
-    vi.stubEnv("TZ", "Africa/Lagos");
-    expect(chatDay("2026-10-23T23:30:00Z", new Date("2026-10-24T10:00:00Z"))).toMatchObject({
+  it("groups by the viewer's local calendar day around midnight, not the UTC date", () => {
+    const now = new Date(2026, 9, 24, 10);
+    expect(chatDay(new Date(2026, 9, 24, 0, 30).toISOString(), now)).toMatchObject({
       key: "2026-10-24",
       label: "Today",
     });
+    expect(chatDay(new Date(2026, 9, 23, 23, 30).toISOString(), now)).toMatchObject({
+      key: "2026-10-23",
+      label: "Yesterday",
+    });
   });
+  // Counts calendar days, not 24-hour spans, so a zone with daylight saving (run with
+  // TZ=America/New_York) still finds yesterday on the mornings the clocks change.
   it("recognizes yesterday after daylight-saving clocks change", () => {
-    vi.stubEnv("TZ", "America/New_York");
     expect(chatDay(new Date(2026, 2, 8, 0, 15).toISOString(), new Date(2026, 2, 9, 10)).label).toBe(
       "Yesterday",
     );
