@@ -1,6 +1,6 @@
 import TeamBadge from "@/components/app/TeamBadge";
 import Link from "next/link";
-import { Check } from "lucide-react";
+import MessageReceipt from "./MessageReceipt";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import OrganizationBadge from "@/components/organization/OrganizationBadge";
 import type { ConversationRowVM } from "@/domain/chat";
@@ -18,7 +18,6 @@ export interface ConversationRowProps {
 export default function ConversationRow({
   row,
   onlineLabel,
-  sentLabel,
   unreadLabel,
   organizationLabel,
   verifiedOrganizationLabel,
@@ -87,9 +86,7 @@ export default function ConversationRow({
                 {row.unread > 99 ? "99+" : row.unread}
               </span>
             )}
-            {!unread && row.sentByMe && (
-              <Check size={16} className="shrink-0 text-kink-gold-bright" aria-label={sentLabel} />
-            )}
+            {!unread && row.sentByMe && <MessageReceipt status={row.receiptStatus ?? "sent"} />}
           </span>
         </span>
       </Link>

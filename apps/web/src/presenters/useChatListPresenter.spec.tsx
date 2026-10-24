@@ -113,6 +113,13 @@ describe("useChatListPresenter", () => {
     expect(list).toHaveBeenCalledTimes(1);
   });
 
+  it("re-reads the inbox when a chat's ticks move, so its row shows them", async () => {
+    renderHook(() => useChatListPresenter());
+    list.mockClear();
+    await act(async () => live.hear?.({ type: "receipt", conversationId: "c9" }));
+    expect(list).toHaveBeenCalledTimes(1);
+  });
+
   it("ignores inbox events, which never change the chat list", async () => {
     renderHook(() => useChatListPresenter());
     list.mockClear();

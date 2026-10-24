@@ -45,6 +45,22 @@ export interface ChatPeerPM {
   blockedByMe: boolean;
 }
 
+export interface ChatReceiptsPM {
+  deliveredAt: string | null;
+  readAt: string | null;
+}
+export type MessageReceiptStatus = "sent" | "delivered" | "seen";
+
+export function messageReceiptStatus(
+  createdAt: string,
+  receipts?: ChatReceiptsPM,
+): MessageReceiptStatus {
+  const at = Date.parse(createdAt);
+  if (receipts?.readAt && Date.parse(receipts.readAt) >= at) return "seen";
+  if (receipts?.deliveredAt && Date.parse(receipts.deliveredAt) >= at) return "delivered";
+  return "sent";
+}
+
 export interface ConversationSummaryPM {
   id: string;
   kind: "dm" | "group";
@@ -53,6 +69,7 @@ export interface ConversationSummaryPM {
   peer: ChatPeerPM | null;
   lastMessage: ChatMessagePM | null;
   unreadCount: number;
+  receipts?: ChatReceiptsPM;
 }
 
 /** One open thread's header: the summary, plus whether photos are open in it. */
@@ -96,6 +113,7 @@ export interface ConversationRowVM {
   time: string;
   unread: number;
   sentByMe?: boolean;
+  receiptStatus?: MessageReceiptStatus;
   isOnline: boolean;
 }
 
@@ -116,7 +134,7 @@ export interface ThreadMessageVM {
   photo: ThreadPhotoVM | null;
   time: string;
   isOwn: boolean;
-  status: "sending" | "sent" | "failed";
+  status: "sending" | MessageReceiptStatus | "failed";
 }
 
 export interface ThreadPeerVM {
@@ -169,6 +187,9 @@ export function toConversationRowVM(
     unread: summary.unreadCount,
     sentByMe:
       !!summary.lastMessage && viewerId !== null && summary.lastMessage.senderId === viewerId,
+    receiptStatus: summary.lastMessage
+      ? messageReceiptStatus(summary.lastMessage.createdAt, summary.receipts)
+      : undefined,
     isOnline: summary.peer?.online ?? false,
   };
 }
@@ -210,6 +231,7 @@ export function toThreadMessageVM(
   pm: ChatMessagePM,
   viewerId: string | null,
   revealed: ReadonlySet<string> = new Set(),
+  receipts?: ChatReceiptsPM,
 ): ThreadMessageVM {
   const isOwn = viewerId !== null && pm.senderId === viewerId;
   return {
@@ -220,7 +242,7 @@ export function toThreadMessageVM(
     photo: pm.photo ? toThreadPhotoVM(pm.photo, isOwn || revealed.has(pm.id)) : null,
     time: bubbleTime(pm.createdAt),
     isOwn,
-    status: "sent",
+    status: isOwn ? messageReceiptStatus(pm.createdAt, receipts) : "sent",
   };
 }
 

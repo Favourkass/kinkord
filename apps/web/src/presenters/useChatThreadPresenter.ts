@@ -33,8 +33,10 @@ import { useRealtime } from "./useRealtime";
 export const THREAD_POLL_MS = 3_000;
 /** With one, polling is only a safety net for a missed event. */
 export const THREAD_FALLBACK_POLL_MS = 30_000;
-/** How often it refreshes the header (is the other member still online?). */
-export const HEADER_POLL_MS = 20_000;
+/** How often the header (presence, delivered and seen ticks) refreshes without a live connection. */
+export const HEADER_POLL_MS = 5_000;
+/** With one, ticks arrive as events, so this only keeps presence fresh. */
+export const HEADER_FALLBACK_POLL_MS = 20_000;
 /** Matches the API's page size: a full page means there may be more before it. */
 const PAGE = 50;
 
@@ -179,21 +181,6 @@ export function useChatThreadPresenter(conversationId: string) {
       // A missed poll is caught up by the next one.
     }
   }, [conversationId, messages]);
-  // A live event for this thread fetches what's new at once.
-  const onRealtime = useCallback(
-    (e: RealtimeEventPM) => {
-      if (e.type === "message" && e.conversationId === conversationId) void pollNew();
-      if ((e.type === "typing" || e.type === "message") && e.conversationId === conversationId)
-        receiveTyping(e);
-    },
-    [conversationId, pollNew, receiveTyping],
-  );
-  const { live } = useRealtime(onRealtime);
-  useEffect(() => {
-    if (!live) clearTyping();
-  }, [live, clearTyping]);
-  usePolling(pollNew, live ? THREAD_FALLBACK_POLL_MS : THREAD_POLL_MS, loaded);
-
   const pollHeader = useCallback(async () => {
     try {
       setSummary(await chatService.conversation(conversationId));
@@ -201,7 +188,22 @@ export function useChatThreadPresenter(conversationId: string) {
       // Keep showing the last known header.
     }
   }, [conversationId]);
-  usePolling(pollHeader, HEADER_POLL_MS, loaded);
+  // A live event for this thread fetches what's new at once; a receipt moves the ticks.
+  const onRealtime = useCallback(
+    (e: RealtimeEventPM) => {
+      if (e.type === "message" && e.conversationId === conversationId) void pollNew();
+      if (e.type === "receipt" && e.conversationId === conversationId) void pollHeader();
+      if ((e.type === "typing" || e.type === "message") && e.conversationId === conversationId)
+        receiveTyping(e);
+    },
+    [conversationId, pollNew, pollHeader, receiveTyping],
+  );
+  const { live } = useRealtime(onRealtime);
+  useEffect(() => {
+    if (!live) clearTyping();
+  }, [live, clearTyping]);
+  usePolling(pollNew, live ? THREAD_FALLBACK_POLL_MS : THREAD_POLL_MS, loaded);
+  usePolling(pollHeader, live ? HEADER_FALLBACK_POLL_MS : HEADER_POLL_MS, loaded);
 
   // A block made or lifted changes the header and the composer: refetch it.
   const typingSentAt = useRef(0);
@@ -236,15 +238,24 @@ export function useChatThreadPresenter(conversationId: string) {
   const refreshHeader = useCallback(() => void pollHeader(), [pollHeader]);
   const safety = useChatSafety(conversationId, summary?.peer ?? null, refreshHeader);
 
-  // Tell the server what's been seen, so the inbox badge clears.
+  // Only a visible conversation can mark messages read. Delivery never clears unread counts.
   useEffect(() => {
-    const newest = messages[messages.length - 1];
-    if (!newest || !viewerId || newest.senderId === viewerId) return;
-    if (lastMarked.current === newest.id) return;
-    lastMarked.current = newest.id;
-    chatService.markRead(conversationId, newest.id).catch(() => {
-      lastMarked.current = null;
-    });
+    const markVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      const newest = [...messages].reverse().find((m) => m.senderId !== viewerId);
+      if (!newest || !viewerId || lastMarked.current === newest.id) return;
+      lastMarked.current = newest.id;
+      chatService.markRead(conversationId, newest.id).catch(() => {
+        lastMarked.current = null;
+      });
+    };
+    markVisible();
+    document.addEventListener("visibilitychange", markVisible);
+    window.addEventListener("focus", markVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", markVisible);
+      window.removeEventListener("focus", markVisible);
+    };
   }, [conversationId, messages, viewerId]);
 
   const deliver = useCallback(
@@ -379,10 +390,10 @@ export function useChatThreadPresenter(conversationId: string) {
     needsSilverIn === conversationId && !messages.some((m) => m.senderId !== viewerId);
   const bubbles = useMemo(
     () => [
-      ...messages.map((m) => toThreadMessageVM(m, viewerId, revealed)),
+      ...messages.map((m) => toThreadMessageVM(m, viewerId, revealed, summary?.receipts)),
       ...pending.map((p) => toPendingMessageVM(p, viewerId)),
     ],
-    [messages, pending, viewerId, revealed],
+    [messages, pending, viewerId, revealed, summary?.receipts],
   );
   const viewingPhoto: PostMediaVM | null = viewing
     ? { id: viewing, src: viewing, fullSrc: viewing, alt: CHAT_COPY.photoAlt }
