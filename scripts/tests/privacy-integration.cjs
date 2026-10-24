@@ -12,6 +12,7 @@ const { privacyAllows, privateProfileValue, PRIVACY_FIELDS } = req("./dist/priva
 // Only these work both ways; every other setting only limits who sees the owner's own.
 const MUTUAL = new Set(["onlineStatus", "readReceipts"]);
 const { profile } = req("./dist/db/schema");
+const { deliveryAckSql } = req("./dist/chat/receipts");
 const connectionString = process.env.KINKORD_PRIVACY_TEST_DATABASE_URL;
 if (!connectionString)
   throw new Error("Set KINKORD_PRIVACY_TEST_DATABASE_URL to a local test database.");
@@ -173,6 +174,36 @@ async function audience(value, field = "bio") {
     );
     await check("same", true, "onlineStatus");
 
+    // Delivery acknowledgements are recipient-scoped, durable and independent from unread state.
+    await client.query(`create temp table conversation_participant(conversation_id uuid, user_id text, last_delivered_at timestamptz, last_read_at timestamptz);
+      create temp table message(id uuid, conversation_id uuid, sender_id text, created_at timestamptz, deleted_at timestamptz);
+      insert into conversation_participant values
+        ('00000000-0000-4000-8000-000000000001','owner',null,null),
+        ('00000000-0000-4000-8000-000000000001','same',null,null);
+      insert into message values
+        ('00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000001','owner','2026-10-23T10:00:00Z',null),
+        ('00000000-0000-4000-8000-000000000003','00000000-0000-4000-8000-000000000001','owner','2026-10-23T11:00:00Z',null);`);
+    async function ack(viewer, suffix) {
+      const q = dialect.sqlToQuery(deliveryAckSql(viewer, [`00000000-0000-4000-8000-${suffix}`]));
+      await client.query(q.sql, q.params);
+    }
+    await ack("abroad", "000000000003");
+    await ack("owner", "000000000003");
+    assert(
+      (await client.query("select * from conversation_participant")).rows.every(
+        (r) => r.last_delivered_at === null,
+      ),
+    );
+    assertions++;
+    await ack("same", "000000000003");
+    await ack("same", "000000000002");
+    const delivered = (
+      await client.query("select * from conversation_participant where user_id='same'")
+    ).rows[0];
+    assert.equal(delivered.last_delivered_at.toISOString(), "2026-10-23T11:00:00.000Z");
+    assertions++;
+    assert.equal(delivered.last_read_at, null);
+    assertions++;
     console.log(`Privacy SQL integration: ${assertions} assertions passed; no persistent changes.`);
   } finally {
     await client.query("rollback");

@@ -295,6 +295,13 @@
       "when": 1792748361494,
       "tag": "0041_profile_privacy",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1792765309952,
+      "tag": "0042_chat_delivery_receipts",
+      "breakpoints": true
     }
   ]
 }
