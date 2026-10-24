@@ -98,3 +98,13 @@ it("requests a total unread count independently of the capped chat list", async 
   await expect(chatService.unreadCount()).resolves.toEqual({ count: 8 });
   expect(get).toHaveBeenLastCalledWith("/chat/unread-count");
 });
+
+it("acknowledges downloaded messages separately from marking a conversation read", async () => {
+  const message = { id: "delivered-message", conversationId: "c1" };
+  get.mockResolvedValueOnce([message]);
+  await chatService.history("c1");
+  await vi.waitFor(() =>
+    expect(post).toHaveBeenCalledWith("/chat/delivered", { messageIds: [message.id] }),
+  );
+  expect(post.mock.calls.some(([path]) => String(path).endsWith("/read"))).toBe(false);
+});

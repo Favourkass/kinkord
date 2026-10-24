@@ -23,6 +23,24 @@ interface PhotoUploadSlot {
   variantUploadUrls: Record<ImageVariant, string>;
 }
 
+/** Receipt delivery is separate from reading. A failed acknowledgement retries on a later fetch. */
+const pendingDelivery = new Set<string>();
+let acknowledging = false;
+async function acknowledgeDelivery(messages: ChatMessagePM[]): Promise<void> {
+  for (const message of messages) pendingDelivery.add(message.id);
+  if (acknowledging || !pendingDelivery.size) return;
+  const messageIds = [...pendingDelivery].slice(0, 100);
+  acknowledging = true;
+  try {
+    await api.post("/chat/delivered", { messageIds });
+    for (const id of messageIds) pendingDelivery.delete(id);
+  } catch {
+    // Keep received content usable; retry on the next inbox/history fetch.
+  } finally {
+    acknowledging = false;
+  }
+}
+
 const CHAT_READ_EVENT = "kinkord:chat-read";
 export function listenForChatRead(onRead: () => void): () => void {
   window.addEventListener(CHAT_READ_EVENT, onRead);
@@ -40,12 +58,16 @@ export const chatService = {
   },
   unreadCount: () => api.get<{ count: number }>("/chat/unread-count"),
   /** The inbox, newest first. A search or a tab looks through every chat, not just the latest. */
-  list: (view: { q?: string; filter?: ChatInboxFilter } = {}) => {
+  list: async (view: { q?: string; filter?: ChatInboxFilter } = {}) => {
     const params = new URLSearchParams();
     if (view.q?.trim()) params.set("q", view.q.trim());
     if (view.filter && view.filter !== "all") params.set("filter", view.filter);
     const query = params.toString();
-    return api.get<ConversationSummaryPM[]>(`/chat/conversations${query ? `?${query}` : ""}`);
+    const rows = await api.get<ConversationSummaryPM[]>(
+      `/chat/conversations${query ? `?${query}` : ""}`,
+    );
+    void acknowledgeDelivery(rows.flatMap((row) => (row.lastMessage ? [row.lastMessage] : [])));
+    return rows;
   },
 
   /** How many chats each tab holds, for a search or none. */
@@ -60,12 +82,16 @@ export const chatService = {
     api.post<{ conversationId: string }>("/chat/conversations", { userId }),
 
   /** `before` pages back through history; `after` fetches what's new. */
-  history: (id: string, cursor: { before?: string; after?: string } = {}) => {
+  history: async (id: string, cursor: { before?: string; after?: string } = {}) => {
     const params = new URLSearchParams();
     if (cursor.before) params.set("before", cursor.before);
     if (cursor.after) params.set("after", cursor.after);
     const query = params.toString();
-    return api.get<ChatMessagePM[]>(`${thread(id)}/messages${query ? `?${query}` : ""}`);
+    const messages = await api.get<ChatMessagePM[]>(
+      `${thread(id)}/messages${query ? `?${query}` : ""}`,
+    );
+    void acknowledgeDelivery(messages);
+    return messages;
   },
 
   /** Text, a photo by its uploaded key, or both: the text is then its caption. */

@@ -45,6 +45,8 @@ export const conversationParticipant = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     joinedAt: timestamp("joined_at", { withTimezone: true }).defaultNow().notNull(),
     /** Read receipts: pointer to the newest message this member has opened. */
+    /** Newest message acknowledged as received by this member's app; does not clear unread. */
+    lastDeliveredAt: timestamp("last_delivered_at", { withTimezone: true }),
     lastReadAt: timestamp("last_read_at", { withTimezone: true }),
     lastReadMessageId: uuid("last_read_message_id"),
   },

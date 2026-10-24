@@ -1,3 +1,4 @@
+import { deliveryAckSql } from "./receipts";
 import { privacyAllows, privateProfileValue } from "../privacy/privacy-policy";
 import { messageBadgeCount } from "./inbox-badge";
 import { teamBadge } from "../members/team-badge";
@@ -539,6 +540,10 @@ export class ChatService {
     void this.realtime.notify([userId], { type: "message", conversationId });
   }
 
+  async markDelivered(userId: string, messageIds: string[]): Promise<void> {
+    await this.db.execute(deliveryAckSql(userId, messageIds));
+  }
+
   /** Seeing the inbox does not read any conversation. */
   async unreadCount(userId: string): Promise<{ count: number }> {
     const [row] = await this.db
@@ -776,6 +781,16 @@ export class ChatService {
         blockedByMe: blockedBy(userId, conversationParticipant.userId),
         silver: silverCheck(conversationParticipant.userId),
         teamMember: teamBadge(conversationParticipant.userId),
+        deliveredAt:
+          sql<Date | null>`greatest(${conversationParticipant.lastDeliveredAt}, ${conversationParticipant.lastReadAt})`.mapWith(
+            conversationParticipant.lastReadAt,
+          ),
+        readAt: privateProfileValue(
+          userId,
+          conversationParticipant.userId,
+          "readReceipts",
+          conversationParticipant.lastReadAt,
+        ),
       })
       .from(conversationParticipant)
       .innerJoin(user, eq(user.id, conversationParticipant.userId))
@@ -855,6 +870,11 @@ export class ChatService {
         peer: peerByConv.get(c.id) ?? null,
         lastMessage: lastByConv.get(c.id) ?? null,
         unreadCount: unreadByConv.get(c.id) ?? 0,
+        receipts: {
+          deliveredAt:
+            peers.find((p) => p.conversationId === c.id)?.deliveredAt?.toISOString() ?? null,
+          readAt: peers.find((p) => p.conversationId === c.id)?.readAt?.toISOString() ?? null,
+        },
       },
       openedBy: c.createdBy,
     }));

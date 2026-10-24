@@ -7,6 +7,7 @@ import { ApiError } from "@/services/apiClient";
 import {
   THREAD_FALLBACK_POLL_MS,
   THREAD_POLL_MS,
+  HEADER_POLL_MS,
   useChatThreadPresenter,
 } from "./useChatThreadPresenter";
 import { chatRulesStore } from "@/util/chatRules";
@@ -98,6 +99,34 @@ async function ready() {
 }
 
 describe("useChatThreadPresenter", () => {
+  it("updates existing bubbles when peer receipts refresh, including hidden receipts", async () => {
+    const { result } = await ready();
+    const own = result.current.thread.messages.find((m) => m.isOwn)!;
+    expect(own.status).toBe("sent");
+    svc.conversation.mockResolvedValue(
+      header({ receipts: { deliveredAt: "2026-09-29T00:00:00Z", readAt: "2026-09-29T00:00:00Z" } }),
+    );
+    await act(async () => polls.get(HEADER_POLL_MS)?.tick());
+    expect(result.current.thread.messages.find((m) => m.id === own.id)?.status).toBe("seen");
+    svc.conversation.mockResolvedValue(
+      header({ receipts: { deliveredAt: "2026-09-29T00:00:00Z", readAt: null } }),
+    );
+    await act(async () => polls.get(HEADER_POLL_MS)?.tick());
+    expect(result.current.thread.messages.find((m) => m.id === own.id)?.status).toBe("delivered");
+  });
+  it("does not mark a hidden conversation read until it becomes visible", async () => {
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    try {
+      await ready();
+      expect(svc.markRead).not.toHaveBeenCalled();
+      visibility.mockReturnValue("visible");
+      act(() => document.dispatchEvent(new Event("visibilitychange")));
+      await waitFor(() => expect(svc.markRead).toHaveBeenCalled());
+    } finally {
+      visibility.mockRestore();
+    }
+  });
+
   beforeEach(() => {
     polls.clear();
     live.up = false;
