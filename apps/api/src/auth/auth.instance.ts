@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError } from "better-auth/api";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { twoFactor, username } from "better-auth/plugins";
 import { Db } from "../db/db.module";
 import * as schema from "../db/schema";
@@ -10,6 +10,7 @@ import { SIGNUP_REFUSED, SignupGuardService } from "../moderation/signup-guard.s
 import { clientIpFrom } from "../moderation/signup-rules";
 import { ACCOUNT_SUSPENDED, isBanned } from "../moderation/admins";
 import { NAME_RESERVED, takesReservedName } from "../profiles/reserved-names";
+import { countPasswordSignIn, guardPasswordSignIn } from "./sign-in-limits";
 
 export const AUTH = Symbol("AUTH");
 export type Auth = ReturnType<typeof buildAuth>;
@@ -74,6 +75,12 @@ export function buildAuth(db: Db, email: EmailService, signupGuard: SignupGuardS
       additionalFields: {
         ageAttested: { type: "boolean", required: true, input: true },
       },
+    },
+    hooks: {
+      // Wrong-password limits on every password sign-in. Phone sign-in calls
+      // /sign-in/email in-process, which Better Auth's own rate limit never sees.
+      before: createAuthMiddleware((ctx) => guardPasswordSignIn(db, ctx)),
+      after: createAuthMiddleware((ctx) => countPasswordSignIn(db, ctx)),
     },
     databaseHooks: {
       user: {
@@ -149,6 +156,9 @@ export function buildAuth(db: Db, email: EmailService, signupGuard: SignupGuardS
       // wizard needs answer until it's done. The phone is optional and only
       // gates "Basic verified".
       requireEmailVerification: false,
+      // A reset is how members take back an account someone else got into, so
+      // it signs out every device rather than leaving the intruder in.
+      revokeSessionsOnPasswordReset: true,
       sendResetPassword: async ({ user, url }) => {
         const t = resetPasswordEmail(url);
         await email.send({ to: user.email, ...t });

@@ -1,5 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { rejectReservedNames, rejectUsernameChanges } from "./auth.instance";
+import type { Db } from "../db/db.module";
+import type { EmailService } from "../email/email.service";
+import type { SignupGuardService } from "../moderation/signup-guard.service";
+import { buildAuth, rejectReservedNames, rejectUsernameChanges } from "./auth.instance";
+
+describe("buildAuth", () => {
+  const auth = buildAuth({} as Db, {} as EmailService, {} as SignupGuardService);
+
+  it("signs every device out when a password is reset, so an intruder can't stay in", () => {
+    expect(auth.options.emailAndPassword?.revokeSessionsOnPasswordReset).toBe(true);
+  });
+
+  it("limits wrong passwords through its hooks, which in-process sign-ins pass through too", () => {
+    expect(auth.options.hooks?.before).toBeTypeOf("function");
+    expect(auth.options.hooks?.after).toBeTypeOf("function");
+  });
+});
 
 describe("rejectUsernameChanges (Better Auth update-user hook)", () => {
   it("lets ordinary user updates through untouched", () => {

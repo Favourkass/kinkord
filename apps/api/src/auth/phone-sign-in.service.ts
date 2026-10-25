@@ -1,8 +1,21 @@
-import { Inject, Injectable, UnauthorizedException } from "@nestjs/common";
+import {
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  UnauthorizedException,
+} from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
 import { Db, DRIZZLE } from "../db/db.module";
 import { profile, user } from "../db/schema";
+import { clientIpFrom } from "../moderation/signup-rules";
 import { AUTH, Auth } from "./auth.instance";
+import {
+  networkKey,
+  recordSignInFailure,
+  signInBlocked,
+  TOO_MANY_ATTEMPTS,
+} from "./sign-in-limits";
 
 export interface PhoneSignInInput {
   phone: string;
@@ -29,6 +42,12 @@ export class PhoneSignInService {
   ) {}
 
   async signInWithPhone(input: PhoneSignInInput, headers: Headers): Promise<Response> {
+    // Numbers that match no account count against the network too, so they can't
+    // be tried endlessly; a matching one is limited per account by the auth hooks.
+    const network = { account: null, network: networkKey(clientIpFrom(headers)) };
+    if (await signInBlocked(this.db, network)) {
+      throw new HttpException(TOO_MANY_ATTEMPTS, HttpStatus.TOO_MANY_REQUESTS);
+    }
     const rows = await this.db
       .select({ email: user.email })
       .from(profile)
@@ -36,7 +55,10 @@ export class PhoneSignInService {
       .where(and(eq(profile.phone, input.phone), eq(profile.phoneVerified, true)))
       .limit(2);
 
-    if (rows.length !== 1) throw new UnauthorizedException(INVALID);
+    if (rows.length !== 1) {
+      await recordSignInFailure(this.db, network);
+      throw new UnauthorizedException(INVALID);
+    }
 
     return this.auth.api.signInEmail({
       body: { email: rows[0].email, password: input.password, rememberMe: input.rememberMe },
