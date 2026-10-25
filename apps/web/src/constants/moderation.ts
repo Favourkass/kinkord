@@ -1,3 +1,5 @@
+import { LAUNCH_COUNTRIES } from "./onboarding";
+
 /** Copy for the admin moderation screens. */
 export const MODERATION_COPY = {
   title: "Admin",
@@ -312,8 +314,7 @@ export const MODERATION_COPY = {
    */
   organizationCountries: [
     { value: "ALL", label: "Every country (like Kinkord Official)" },
-    { value: "NG", label: "Nigeria" },
-    { value: "KE", label: "Kenya" },
+    ...LAUNCH_COUNTRIES.map(({ code, name }) => ({ value: code, label: name })),
   ],
   dialogs: {
     makeOrganization: {

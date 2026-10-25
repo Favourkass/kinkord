@@ -105,8 +105,10 @@ export function matchRank(term: string): SQL<number> {
 
 /** Countries the directory serves today; the client renders the rest as "coming soon". */
 export const AVAILABLE_COUNTRIES = [
-  { code: "NG", name: "Nigeria" },
+  { code: "GH", name: "Ghana" },
   { code: "KE", name: "Kenya" },
+  { code: "NG", name: "Nigeria" },
+  { code: "US", name: "USA" },
 ] as const;
 
 const MAX_PAGE_SIZE = 50;
