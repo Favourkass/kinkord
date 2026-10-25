@@ -1,9 +1,27 @@
-import { describe, expect, it, vi } from "vitest";
-import { UnauthorizedException } from "@nestjs/common";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { HttpException, UnauthorizedException } from "@nestjs/common";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { type Db } from "../db/db.module";
 import { type Auth } from "./auth.instance";
 import { PhoneSignInService } from "./phone-sign-in.service";
+import {
+  networkKey,
+  recordSignInFailure,
+  signInBlocked,
+  TOO_MANY_ATTEMPTS,
+} from "./sign-in-limits";
+
+// The limits have their own tests; here, only how the phone route uses them.
+vi.mock("./sign-in-limits", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./sign-in-limits")>()),
+  signInBlocked: vi.fn(async () => false),
+  recordSignInFailure: vi.fn(async () => undefined),
+}));
+beforeEach(() => {
+  vi.mocked(signInBlocked).mockClear().mockResolvedValue(false);
+  vi.mocked(recordSignInFailure).mockClear();
+  vi.stubEnv("AUTH_SECRET", "test-secret");
+});
 
 const makeService = (rows: Array<{ email: string }>) => {
   const limit = vi.fn().mockResolvedValue(rows);
@@ -43,6 +61,29 @@ describe("PhoneSignInService", () => {
     await expect(service.signInWithPhone(input, new Headers())).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
+    expect(signInEmail).not.toHaveBeenCalled();
+  });
+
+  it("counts a number that matches no account against the network", async () => {
+    const { service } = makeService([]);
+    const headers = new Headers({ "x-forwarded-for": "102.89.4.7" });
+    await expect(service.signInWithPhone(input, headers)).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+    expect(recordSignInFailure).toHaveBeenCalledWith(expect.anything(), {
+      account: null,
+      network: networkKey("102.89.4.7"),
+    });
+  });
+
+  it("stops a network that has used up its wrong guesses before looking anything up", async () => {
+    vi.mocked(signInBlocked).mockResolvedValue(true);
+    const { service, signInEmail, where } = makeService([{ email: "tega@x.dev" }]);
+    const refusal = await service.signInWithPhone(input, new Headers()).catch((e: unknown) => e);
+    expect(refusal).toBeInstanceOf(HttpException);
+    expect((refusal as HttpException).getStatus()).toBe(429);
+    expect((refusal as HttpException).message).toBe(TOO_MANY_ATTEMPTS);
+    expect(where).not.toHaveBeenCalled();
     expect(signInEmail).not.toHaveBeenCalled();
   });
 

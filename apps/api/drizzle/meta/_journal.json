@@ -302,6 +302,13 @@
       "when": 1792765309952,
       "tag": "0042_chat_delivery_receipts",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1792935352134,
+      "tag": "0043_sign_in_failure",
+      "breakpoints": true
     }
   ]
 }
