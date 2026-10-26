@@ -7,10 +7,13 @@ import {
   count,
   desc,
   eq,
+  gt,
   ilike,
   inArray,
   isNotNull,
+  isNull,
   ne,
+  notInArray,
   or,
   sql,
   type SQL,
@@ -21,6 +24,10 @@ import { notBanned } from "../moderation/admins";
 import {
   bronzeVerification,
   follow,
+  friendship,
+  post,
+  postComment,
+  postLike,
   profile,
   profileMedia,
   suggestionDismissal,
@@ -41,11 +48,19 @@ import { FollowsService } from "./follows.service";
 import {
   cardRoles,
   genderShown,
-  rankCandidates,
   resolveShow,
+  shared as sharedCount,
   wantedSide,
   type Show,
 } from "./matching";
+import {
+  ExposureCounter,
+  NEWCOMER_DAYS,
+  REACTED_DAYS,
+  rankPeople,
+  reasonFor,
+  type SocialSignals,
+} from "./people-you-may-know";
 
 /** "match" ranks a search: exact name or username, then starts-with, then anywhere. */
 export type MembersSort = "recent" | "followers" | "name" | "match";
@@ -117,6 +132,27 @@ const DEFAULT_PAGE_SIZE = 20;
 export const SUGGESTION_POOL_SIZE = 300;
 /** A card shows this many roles and looking-for values. */
 const CARD_LIST_MAX = 3;
+/** The newest members in the pool, joined in the last NEWCOMER_DAYS. */
+const NEWCOMER_POOL_SIZE = 60;
+/** The most members each "known" source adds to the pool. */
+const KNOWN_SOURCE_MAX = 200;
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** Someone the viewer has no connection to. */
+const NOBODY_KNOWN: Omit<SocialSignals, "joinedAt"> = {
+  mutualFriends: 0,
+  followsYou: false,
+  followedByYourFollows: 0,
+  likedYourPosts: false,
+  commentedOnYourPosts: false,
+  youReacted: false,
+};
+/** How often each member was suggested lately, on this instance. */
+export const suggestionExposure = new ExposureCounter();
+
+/** For specs: start with nobody suggested yet. */
+export function forgetSuggestionExposure(): void {
+  suggestionExposure.clear();
+}
 
 /** Whole years from a YYYY-MM-DD birth date to `now`; null when unknown/invalid. */
 export function ageFromDob(dob: string | null | undefined, now = new Date()): number | null {
@@ -508,12 +544,15 @@ export class MembersService {
   }
 
   /**
-   * "Kinksters Near You" on the home feed, ranked by matching v1 (matching.ts,
+   * "Kinksters Near You" on the home feed: people you may know, ranked by
+   * matching v1 plus who the viewer knows (people-you-may-know.ts,
    * docs/MATCHING.md). The pool is the viewer's country (their state when they
    * have no country), of the gender `show` lists, leaving out the viewer,
-   * suspended members, anyone on either side of a block, and anyone the viewer
-   * already follows or removed. The nearest and most recently seen
-   * `SUGGESTION_POOL_SIZE` are scored here and the best `limit` returned.
+   * suspended members, anyone on either side of a block, anyone the viewer
+   * already follows, is friends with, has a friend request with, or removed.
+   * From it: the nearest and most recently seen `SUGGESTION_POOL_SIZE`, the
+   * members the viewer knows of, and the newest members. The best `limit` are
+   * returned, each with the reason it's there when the viewer may know it.
    */
   async suggestedForFeed(viewerId: string, limitArg?: number, requested?: Show) {
     const { limit } = normalizePaging(1, limitArg ?? 10);
@@ -534,6 +573,7 @@ export class MembersService {
     const { show, options } = resolveShow(requested, me?.gender, me?.orientation);
     if (!me || (!me.country && !me.state)) return { items: [], show, options };
 
+    const now = new Date();
     const conditions: SQL[] = [
       me.country ? eq(profile.country, me.country) : eq(profile.state, me.state as string),
       ne(profile.userId, viewerId),
@@ -544,6 +584,8 @@ export class MembersService {
       sql`not ${blockedBy(viewerId, profile.userId)}`,
       sql`not exists (select 1 from ${follow} where ${follow.followerId} = ${viewerId} and ${follow.followingId} = ${profile.userId})`,
       sql`not exists (select 1 from ${suggestionDismissal} where ${suggestionDismissal.userId} = ${viewerId} and ${suggestionDismissal.dismissedUserId} = ${profile.userId})`,
+      // Friends already, or a request either way: nothing to suggest.
+      sql`not exists (select 1 from ${friendship} where (${friendship.userA} = ${viewerId} and ${friendship.userB} = ${profile.userId}) or (${friendship.userA} = ${profile.userId} and ${friendship.userB} = ${viewerId}))`,
     ];
     const gender = genderShown(show);
     // Sign-up stored "female", Edit Profile "Female".
@@ -553,37 +595,66 @@ export class MembersService {
       ? [desc(sql<number>`case when ${profile.state} = ${me.state} then 1 else 0 end`)]
       : [];
 
-    const rows = await this.db
-      .select({
-        userId: profile.userId,
-        username: user.username,
-        displayName: profile.displayName,
-        avatarKey: privateProfileValue(viewerId, profile.userId, "profilePhoto", profile.avatarKey),
-        dateOfBirth: profile.dateOfBirth,
-        gender: profile.gender,
-        country: privateProfileValue(viewerId, profile.userId, "location", profile.country),
-        state: privateProfileValue(viewerId, profile.userId, "location", profile.state),
-        city: privateProfileValue(viewerId, profile.userId, "location", profile.city),
-        roles: profile.roles,
-        interests: privateProfileValue(viewerId, profile.userId, "interests", profile.interests),
-        lookingFor: privateProfileValue(viewerId, profile.userId, "interests", profile.lookingFor),
-        lastSeenAt: privateProfileValue(
-          viewerId,
-          profile.userId,
-          "onlineStatus",
-          profile.lastSeenAt,
-        ),
-        createdAt: user.createdAt,
-        teamMember: profile.teamMember,
-        silver: silverCheck(profile.userId),
-      })
-      .from(profile)
-      .innerJoin(user, eq(user.id, profile.userId))
-      .where(and(...conditions))
-      .orderBy(...sameStateFirst, sql`${profile.lastSeenAt} desc nulls last`)
-      .limit(SUGGESTION_POOL_SIZE);
+    const known = await this.knownPeople(viewerId, now);
+    const pool = (extra: SQL[], order: SQL[], max: number) =>
+      this.db
+        .select({
+          userId: profile.userId,
+          username: user.username,
+          displayName: profile.displayName,
+          avatarKey: privateProfileValue(
+            viewerId,
+            profile.userId,
+            "profilePhoto",
+            profile.avatarKey,
+          ),
+          dateOfBirth: profile.dateOfBirth,
+          gender: profile.gender,
+          country: privateProfileValue(viewerId, profile.userId, "location", profile.country),
+          state: privateProfileValue(viewerId, profile.userId, "location", profile.state),
+          city: privateProfileValue(viewerId, profile.userId, "location", profile.city),
+          roles: profile.roles,
+          interests: privateProfileValue(viewerId, profile.userId, "interests", profile.interests),
+          lookingFor: privateProfileValue(
+            viewerId,
+            profile.userId,
+            "interests",
+            profile.lookingFor,
+          ),
+          lastSeenAt: privateProfileValue(
+            viewerId,
+            profile.userId,
+            "onlineStatus",
+            profile.lastSeenAt,
+          ),
+          createdAt: user.createdAt,
+          teamMember: profile.teamMember,
+          silver: silverCheck(profile.userId),
+          // As on the profile: mutual friends show only to those who may see the connections.
+          connectionsVisible: privacyAllows(viewerId, profile.userId, "followersFollowing"),
+        })
+        .from(profile)
+        .innerJoin(user, eq(user.id, profile.userId))
+        .where(and(...conditions, ...extra))
+        .orderBy(...order)
+        .limit(max);
+    const recent = [...sameStateFirst, sql`${profile.lastSeenAt} desc nulls last`];
+    const knownIds = [...known.keys()];
+    const [nearby, acquainted, newest] = await Promise.all([
+      pool([], recent, SUGGESTION_POOL_SIZE),
+      knownIds.length
+        ? pool([inArray(profile.userId, knownIds)], recent, knownIds.length)
+        : Promise.resolve([]),
+      pool(
+        [gt(user.createdAt, new Date(now.getTime() - NEWCOMER_DAYS * DAY_MS))],
+        [desc(user.createdAt)],
+        NEWCOMER_POOL_SIZE,
+      ),
+    ]);
+    const rows = [
+      ...new Map([...nearby, ...acquainted, ...newest].map((r) => [r.userId, r])).values(),
+    ];
 
-    const now = new Date();
     const viewer = {
       roles: me.roles ?? [],
       kinks: me.interests ?? [],
@@ -600,8 +671,22 @@ export class MembersService {
       lookingFor: r.lookingFor ?? [],
       hasPhoto: Boolean(r.avatarKey),
     }));
+    const signalsOf = (c: { userId: string; createdAt: Date }): SocialSignals => ({
+      ...(known.get(c.userId) ?? NOBODY_KNOWN),
+      joinedAt: c.createdAt,
+    });
     const wanted = wantedSide(viewer.roles);
-    const best = rankCandidates(viewer, candidates, now).slice(0, limit);
+    const best = rankPeople(
+      viewer,
+      candidates,
+      signalsOf,
+      (c) => suggestionExposure.times(c.userId, now),
+      now,
+    ).slice(0, limit);
+    suggestionExposure.record(
+      best.map((r) => r.userId),
+      now,
+    );
     const items = await Promise.all(
       best.map(async (r) => ({
         userId: r.userId,
@@ -621,9 +706,138 @@ export class MembersService {
         teamMember: Boolean(r.teamMember),
         // Members the viewer follows are never in the pool.
         isFollowing: false,
+        reason: reasonFor(
+          {
+            ...signalsOf(r),
+            canSeeConnections: Boolean(r.connectionsVisible),
+            sharedKinks: sharedCount(viewer.kinks, r.kinks),
+          },
+          now,
+        ),
       })),
     );
     return { items, show, options };
+  }
+
+  /**
+   * Who the viewer knows of, and how: friends of their friends, who follows
+   * them, who the members they follow follow, who reacted to their posts and
+   * whose posts they reacted to lately. A few hundred at most from each.
+   */
+  private async knownPeople(
+    viewerId: string,
+    now: Date,
+  ): Promise<Map<string, Omit<SocialSignals, "joinedAt">>> {
+    const since = new Date(now.getTime() - REACTED_DAYS * DAY_MS);
+    const accepted = eq(friendship.status, "accepted");
+    const liveComment = isNull(postComment.deletedAt);
+    const [friendRows, followers, following, likers, commenters, liked, commented] =
+      await Promise.all([
+        this.db
+          .select({ a: friendship.userA, b: friendship.userB })
+          .from(friendship)
+          .where(and(accepted, or(eq(friendship.userA, viewerId), eq(friendship.userB, viewerId)))),
+        this.db
+          .select({ id: follow.followerId })
+          .from(follow)
+          .where(eq(follow.followingId, viewerId))
+          .orderBy(desc(follow.createdAt))
+          .limit(KNOWN_SOURCE_MAX),
+        this.db
+          .select({ id: follow.followingId })
+          .from(follow)
+          .where(eq(follow.followerId, viewerId)),
+        this.db
+          .select({ id: postLike.userId })
+          .from(postLike)
+          .innerJoin(post, eq(post.id, postLike.postId))
+          .where(and(eq(post.authorId, viewerId), gt(postLike.createdAt, since)))
+          .groupBy(postLike.userId)
+          .limit(KNOWN_SOURCE_MAX),
+        this.db
+          .select({ id: postComment.authorId })
+          .from(postComment)
+          .innerJoin(post, eq(post.id, postComment.postId))
+          .where(and(eq(post.authorId, viewerId), gt(postComment.createdAt, since), liveComment))
+          .groupBy(postComment.authorId)
+          .limit(KNOWN_SOURCE_MAX),
+        this.db
+          .select({ id: post.authorId })
+          .from(postLike)
+          .innerJoin(post, eq(post.id, postLike.postId))
+          .where(and(eq(postLike.userId, viewerId), gt(postLike.createdAt, since)))
+          .groupBy(post.authorId)
+          .limit(KNOWN_SOURCE_MAX),
+        this.db
+          .select({ id: post.authorId })
+          .from(postComment)
+          .innerJoin(post, eq(post.id, postComment.postId))
+          .where(
+            and(eq(postComment.authorId, viewerId), gt(postComment.createdAt, since), liveComment),
+          )
+          .groupBy(post.authorId)
+          .limit(KNOWN_SOURCE_MAX),
+      ]);
+    const friends = friendRows.map((r) => (r.a === viewerId ? r.b : r.a));
+    const followed = following.map((r) => r.id);
+    const [friendsOfFriends, followedByFollowed] = await Promise.all([
+      friends.length
+        ? this.db
+            .select({ a: friendship.userA, b: friendship.userB })
+            .from(friendship)
+            .where(
+              and(
+                accepted,
+                or(inArray(friendship.userA, friends), inArray(friendship.userB, friends)),
+              ),
+            )
+        : Promise.resolve([]),
+      followed.length
+        ? this.db
+            .select({ id: follow.followingId, n: count() })
+            .from(follow)
+            .where(
+              and(
+                inArray(follow.followerId, followed),
+                ne(follow.followingId, viewerId),
+                notInArray(follow.followingId, followed),
+              ),
+            )
+            .groupBy(follow.followingId)
+            .orderBy(desc(count()))
+            .limit(KNOWN_SOURCE_MAX)
+        : Promise.resolve([]),
+    ]);
+
+    const friendSet = new Set(friends);
+    const mutual = new Map<string, number>();
+    for (const { a, b } of friendsOfFriends) {
+      // A friend's friend: the other side of a friendship one of the viewer's friends is in.
+      if (friendSet.has(a)) mutual.set(b, (mutual.get(b) ?? 0) + 1);
+      if (friendSet.has(b)) mutual.set(a, (mutual.get(a) ?? 0) + 1);
+    }
+    const topMutual = [...mutual]
+      .filter(([id]) => id !== viewerId && !friendSet.has(id))
+      .sort(([x, m], [y, n]) => n - m || (x < y ? -1 : x > y ? 1 : 0))
+      .slice(0, KNOWN_SOURCE_MAX);
+
+    const out = new Map<string, Omit<SocialSignals, "joinedAt">>();
+    const entry = (id: string) => {
+      let e = out.get(id);
+      if (!e) {
+        e = { ...NOBODY_KNOWN };
+        out.set(id, e);
+      }
+      return e;
+    };
+    for (const [id, n] of topMutual) entry(id).mutualFriends = n;
+    for (const { id } of followers) entry(id).followsYou = true;
+    for (const { id, n } of followedByFollowed) entry(id).followedByYourFollows = Number(n);
+    for (const { id } of likers) entry(id).likedYourPosts = true;
+    for (const { id } of commenters) entry(id).commentedOnYourPosts = true;
+    for (const { id } of [...liked, ...commented]) entry(id).youReacted = true;
+    out.delete(viewerId);
+    return out;
   }
 
   /** Remove for good: the viewer is never suggested this member again. Doing it twice is the same as once. */

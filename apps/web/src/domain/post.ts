@@ -273,6 +273,50 @@ export interface FeedSuggestionPM {
   roles?: string[];
   lookingFor?: string[];
   online?: boolean;
+  /** Why they're suggested, when the viewer may know it; absent from an older API. */
+  reason?: SuggestionReasonPM | null;
+}
+
+/** Why a "Kinksters Near You" card is there, as the API says it. */
+export type SuggestionReasonPM =
+  | { kind: "mutualFriends"; count: number }
+  | { kind: "followsYou" }
+  | { kind: "likesYourPosts" }
+  | { kind: "commentsOnYourPosts" }
+  | { kind: "newcomer" }
+  | { kind: "sharedKinks"; count: number };
+
+/** The words for each reason, given by the screen. */
+export interface SuggestionReasonCopy {
+  mutualFriends: (count: number) => string;
+  followsYou: string;
+  likesYourPosts: string;
+  commentsOnYourPosts: string;
+  newcomer: string;
+  sharedKinks: (count: number) => string;
+}
+
+/** A reason in words; nothing for none, or for a kind a newer API sends that this app doesn't know. */
+export function suggestionReasonText(
+  reason: SuggestionReasonPM | null | undefined,
+  copy: SuggestionReasonCopy,
+): string | null {
+  switch (reason?.kind) {
+    case "mutualFriends":
+      return copy.mutualFriends(reason.count);
+    case "followsYou":
+      return copy.followsYou;
+    case "likesYourPosts":
+      return copy.likesYourPosts;
+    case "commentsOnYourPosts":
+      return copy.commentsOnYourPosts;
+    case "newcomer":
+      return copy.newcomer;
+    case "sharedKinks":
+      return copy.sharedKinks(reason.count);
+    default:
+      return null;
+  }
 }
 
 export interface FeedSuggestionsPM {
@@ -301,6 +345,8 @@ export interface FeedSuggestionVM {
   roles: string | null;
   /** "Friendship, Events, Vanilla dating"; null when none, and for the organization. */
   lookingFor: string | null;
+  /** "3 mutual friends", "Follows you"; null when there's nothing to say, and for the organization. */
+  reason: string | null;
   isFollowing: boolean;
   /** A follow request is in flight, so the button is held. */
   busy: boolean;
@@ -459,6 +505,7 @@ export function toFeedSuggestionVM(
   hrefFor: HrefFor,
   busy = false,
   organization = false,
+  reasons?: SuggestionReasonCopy,
 ): FeedSuggestionVM {
   const list = (values: string[] | undefined) =>
     organization ? null : (values ?? []).slice(0, SUGGESTION_LIST_MAX).join(", ") || null;
@@ -479,6 +526,7 @@ export function toFeedSuggestionVM(
     details: organization ? null : details || null,
     roles: list(pm.roles),
     lookingFor: list(pm.lookingFor),
+    reason: organization || !reasons ? null : suggestionReasonText(pm.reason, reasons),
     isFollowing: pm.isFollowing,
     busy,
     href: hrefFor(pm.username),

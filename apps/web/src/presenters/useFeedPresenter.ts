@@ -925,6 +925,7 @@ export function useFeedPresenter({
           memberHref,
           followBusy.includes(s.userId),
           isOrganization(s.userId, organizations),
+          FEED_COPY.peopleReasons,
         ),
       ),
     [suggestions, followBusy, organizations],

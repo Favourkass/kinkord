@@ -1,5 +1,5 @@
 /** Copy for the home feed (Figma "Hompage Light" 344:138 / dark 837:295). */
-import type { FeedTab, SuggestionShow } from "@/domain/post";
+import type { FeedTab, SuggestionReasonCopy, SuggestionShow } from "@/domain/post";
 
 export const FEED_COPY = {
   composerPlaceholder: "What's on your mind?",
@@ -80,6 +80,15 @@ export const FEED_COPY = {
   nearbyEmpty: "Nothing near you yet.",
   feedError: "Could not load the feed. Refresh to try again.",
   peopleHeading: "Kinksters Near You",
+  /** Why a card is there, under the name. */
+  peopleReasons: {
+    mutualFriends: (count: number) => (count === 1 ? "1 mutual friend" : `${count} mutual friends`),
+    followsYou: "Follows you",
+    likesYourPosts: "Likes your posts",
+    commentsOnYourPosts: "Comments on your posts",
+    newcomer: "New to Kinkord",
+    sharedKinks: (count: number) => `${count} kinks in common`,
+  } satisfies SuggestionReasonCopy,
   /** The sliders button: the members directory, where every filter is. */
   peopleBrowse: "Browse all kinksters",
   /** The Women | Men (| All) toggle. */
