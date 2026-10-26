@@ -171,15 +171,25 @@ describe("normalizePaging", () => {
 describe("MembersService", () => {
   it("lists available countries with their member counts (0 when nobody is there yet)", async () => {
     const { service, select } = makeService();
-    select.mockReturnValueOnce(chain([{ country: "NG", members: 42 }]));
+    select.mockReturnValueOnce(
+      chain([
+        { country: "NG", members: 42 },
+        { country: "GH", members: 3 },
+        { country: "US", members: 7 },
+      ]),
+    );
     await expect(service.countries()).resolves.toEqual([
-      { code: "NG", name: "Nigeria", membersCount: 42 },
+      { code: "GH", name: "Ghana", membersCount: 3 },
       { code: "KE", name: "Kenya", membersCount: 0 },
+      { code: "NG", name: "Nigeria", membersCount: 42 },
+      { code: "US", name: "USA", membersCount: 7 },
     ]);
     select.mockReturnValueOnce(chain([]));
     await expect(service.countries()).resolves.toEqual([
-      { code: "NG", name: "Nigeria", membersCount: 0 },
+      { code: "GH", name: "Ghana", membersCount: 0 },
       { code: "KE", name: "Kenya", membersCount: 0 },
+      { code: "NG", name: "Nigeria", membersCount: 0 },
+      { code: "US", name: "USA", membersCount: 0 },
     ]);
   });
 

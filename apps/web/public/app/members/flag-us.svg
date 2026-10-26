@@ -1,0 +1,32 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="24" height="15.0297" viewBox="0 0 24 15.0297" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="flag/US" clip-path="url(#clip0_us)">
+<path d="M0 0H24V15.0297H0V0Z" fill="white"/>
+<path d="M0 0H24V1.1561H0V0Z" fill="#B22234"/>
+<path d="M0 2.3123H24V3.4684H0V2.3123Z" fill="#B22234"/>
+<path d="M0 4.6245H24V5.7807H0V4.6245Z" fill="#B22234"/>
+<path d="M0 6.9368H24V8.0929H0V6.9368Z" fill="#B22234"/>
+<path d="M0 9.249H24V10.4052H0V9.249Z" fill="#B22234"/>
+<path d="M0 11.5613H24V12.7174H0V11.5613Z" fill="#B22234"/>
+<path d="M0 13.8736H24V15.0297H0V13.8736Z" fill="#B22234"/>
+<path d="M0 0H9.6V8.0929H0V0Z" fill="#3C3B6E"/>
+<circle cx="1.3" cy="1.15" r="0.42" fill="white"/>
+<circle cx="3.5" cy="1.15" r="0.42" fill="white"/>
+<circle cx="5.7" cy="1.15" r="0.42" fill="white"/>
+<circle cx="7.9" cy="1.15" r="0.42" fill="white"/>
+<circle cx="2.4" cy="3.1" r="0.42" fill="white"/>
+<circle cx="4.6" cy="3.1" r="0.42" fill="white"/>
+<circle cx="6.8" cy="3.1" r="0.42" fill="white"/>
+<circle cx="1.3" cy="5.05" r="0.42" fill="white"/>
+<circle cx="3.5" cy="5.05" r="0.42" fill="white"/>
+<circle cx="5.7" cy="5.05" r="0.42" fill="white"/>
+<circle cx="7.9" cy="5.05" r="0.42" fill="white"/>
+<circle cx="2.4" cy="7" r="0.42" fill="white"/>
+<circle cx="4.6" cy="7" r="0.42" fill="white"/>
+<circle cx="6.8" cy="7" r="0.42" fill="white"/>
+</g>
+<defs>
+<clipPath id="clip0_us">
+<rect width="24" height="15.0297" fill="white"/>
+</clipPath>
+</defs>
+</svg>

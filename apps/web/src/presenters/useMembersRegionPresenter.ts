@@ -99,7 +99,10 @@ export function useMembersRegionPresenter(
     () => optionMatcher(regions.map((name) => ({ value: name, label: name }))),
     [regions],
   );
-  const regionHits = useMemo(() => matchRegion(regionQuery), [matchRegion, regionQuery]);
+  const regionHits = useMemo(
+    () => matchRegion(regionQuery, countryMode ? regions.length : undefined),
+    [matchRegion, regionQuery, countryMode, regions.length],
+  );
   const [data, setData] = useState<RegionPage | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
