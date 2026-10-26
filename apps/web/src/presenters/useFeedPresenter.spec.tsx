@@ -572,6 +572,7 @@ describe("Kinksters Near You", () => {
           lookingFor: ["Friendship"],
           online: true,
           silver: true,
+          reason: { kind: "mutualFriends", count: 3 },
         },
       ]),
     );
@@ -580,6 +581,7 @@ describe("Kinksters Near You", () => {
       details: "26F • Lagos, Lagos State, Nigeria",
       roles: "Submissive, Switch",
       lookingFor: "Friendship",
+      reason: "3 mutual friends",
       online: true,
       silver: true,
       organization: false,

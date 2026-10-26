@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { sql, type SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
@@ -7,7 +7,13 @@ import { suggestionDismissal } from "../db/schema";
 import { type StorageService } from "../storage/storage.service";
 import { type PostsService } from "../posts/posts.service";
 import { type FollowsService } from "./follows.service";
-import { MembersService, ageFromDob, normalizePaging } from "./members.service";
+import {
+  MembersService,
+  ageFromDob,
+  forgetSuggestionExposure,
+  normalizePaging,
+  suggestionExposure,
+} from "./members.service";
 
 const { profileRelationships } = vi.hoisted(() => ({
   profileRelationships: vi.fn(async (..._args: unknown[]) => [] as unknown[]),
@@ -1005,20 +1011,61 @@ describe("MembersService.suggestedForFeed (matching v1)", () => {
     createdAt: new Date("2026-01-01T00:00:00Z"),
     teamMember: false,
     silver: false,
+    connectionsVisible: true,
     ...over,
   });
-  /** The viewer's profile, then the pool; returns what the pool query was asked. */
+  /** What `knownPeople` reads, in the order it asks. */
+  interface Known {
+    friends?: unknown[];
+    followers?: unknown[];
+    following?: unknown[];
+    likers?: unknown[];
+    commenters?: unknown[];
+    liked?: unknown[];
+    commented?: unknown[];
+    friendsOfFriends?: unknown[];
+    followedByFollowed?: unknown[];
+    /** The pool of the members known of. */
+    acquainted?: unknown[];
+  }
+  /**
+   * The viewer's profile, who they know, then the pools; returns what the
+   * nearby pool, the known pool and the newest pool were asked.
+   */
   const run = async (
     viewer: Record<string, unknown> | undefined,
     pool: unknown[],
     limit?: number,
     show?: "women" | "men" | "all",
+    known: Known = {},
+    newest: unknown[] = [],
   ) => {
     const { service, select, presignDownload } = makeService();
     const calls: Record<string, unknown[][]> = {};
-    select
-      .mockReturnValueOnce(chain(viewer ? [viewer] : []))
-      .mockReturnValueOnce(callRecordingChain(pool, calls));
+    const knownCalls: Record<string, unknown[][]> = {};
+    const newestCalls: Record<string, unknown[][]> = {};
+    select.mockReturnValueOnce(chain(viewer ? [viewer] : []));
+    if (viewer?.country || viewer?.state) {
+      for (const k of [
+        "friends",
+        "followers",
+        "following",
+        "likers",
+        "commenters",
+        "liked",
+        "commented",
+      ] as const) {
+        select.mockReturnValueOnce(chain(known[k] ?? []));
+      }
+      if (known.friends?.length) select.mockReturnValueOnce(chain(known.friendsOfFriends ?? []));
+      if (known.following?.length) {
+        select.mockReturnValueOnce(chain(known.followedByFollowed ?? []));
+      }
+      select.mockReturnValueOnce(callRecordingChain(pool, calls));
+      if (known.acquainted)
+        select.mockReturnValueOnce(callRecordingChain(known.acquainted, knownCalls));
+      select.mockReturnValueOnce(callRecordingChain(newest, newestCalls));
+    }
     const result = await service.suggestedForFeed("me", limit, show);
     const where = calls.where?.[0]?.[0] as SQL | undefined;
     return {
@@ -1026,9 +1073,12 @@ describe("MembersService.suggestedForFeed (matching v1)", () => {
       select,
       presignDownload,
       calls,
+      knownCalls,
+      newestCalls,
       where: where ? renderWhere(where) : null,
     };
   };
+  beforeEach(() => forgetSuggestionExposure());
 
   it("is empty, but names the segments, for a member who has no country or state yet", async () => {
     const { result, select } = await run({ ...me, country: null, state: null }, []);
@@ -1089,6 +1139,8 @@ describe("MembersService.suggestedForFeed (matching v1)", () => {
       teamMember: false,
       silver: true,
       isFollowing: false,
+      // One kink in common, and nobody they know: no reason to give.
+      reason: null,
     });
     expect(result.items[1]).toMatchObject({ userId: "cee", online: false, roles: ["Switch"] });
     // The tall card photo is the medium size.
@@ -1117,6 +1169,94 @@ describe("MembersService.suggestedForFeed (matching v1)", () => {
       /not exists \(select 1 from "follow" where "follow"\."follower_id" = \$\d+/,
     );
     expect(where?.sql).toContain(`not exists (select 1 from "suggestion_dismissal"`);
+    // Nor friends already, nor anyone with a friend request either way.
+    expect(where?.sql).toContain(
+      `not exists (select 1 from "friendship" where ("friendship"."user_a" = $`,
+    );
+  });
+
+  it("ranks the members the viewer knows first, saying how they know them", async () => {
+    const { result, knownCalls } = await run(
+      me,
+      // A Switch with a photo nearby: matching v1 alone scores them 7, the rest 3.
+      [row({ userId: "zed", roles: ["Switch"], avatarKey: "avatars/zed.jpg" })],
+      10,
+      undefined,
+      {
+        friends: [
+          { a: "f1", b: "me" },
+          { a: "me", b: "f2" },
+        ],
+        friendsOfFriends: [
+          { a: "f1", b: "kim" },
+          { a: "kim", b: "f2" },
+          // The viewer, and the viewer's friends, are no one to suggest.
+          { a: "f1", b: "me" },
+          { a: "f1", b: "f2" },
+        ],
+        followers: [{ id: "lee" }],
+        likers: [{ id: "max" }],
+        commenters: [{ id: "ned" }],
+        acquainted: [
+          row({ userId: "kim" }),
+          row({ userId: "lee" }),
+          row({ userId: "max" }),
+          row({ userId: "ned" }),
+        ],
+      },
+    );
+    expect(result.items.map((i) => [i.userId, i.reason])).toEqual([
+      ["kim", { kind: "mutualFriends", count: 2 }],
+      ["lee", { kind: "followsYou" }],
+      ["zed", null],
+      ["max", { kind: "likesYourPosts" }],
+      ["ned", { kind: "commentsOnYourPosts" }],
+    ]);
+    // The known pool keeps every rule of the nearby one, for exactly the members known of.
+    const knownWhere = renderWhere(knownCalls.where[0][0] as SQL);
+    expect(knownWhere.sql).toContain(`"profile"."user_id" in (`);
+    expect(knownWhere.params).toEqual(
+      expect.arrayContaining(["NG", "female", "kim", "lee", "max", "ned"]),
+    );
+    expect(knownWhere.params).not.toContain("f1");
+    expect(knownWhere.sql).toContain(`"member_block"`);
+  });
+
+  it("says nothing of mutual friends to a viewer who may not see the member's connections", async () => {
+    const { result } = await run(me, [], 10, undefined, {
+      friends: [{ a: "f1", b: "me" }],
+      friendsOfFriends: [{ a: "f1", b: "kim" }],
+      acquainted: [row({ userId: "kim", connectionsVisible: false })],
+    });
+    expect(result.items).toEqual([expect.objectContaining({ userId: "kim", reason: null })]);
+  });
+
+  it("reads who the viewer's follows follow, and whose posts the viewer reacted to", async () => {
+    const { result } = await run(me, [], 10, undefined, {
+      following: [{ id: "f9" }],
+      followedByFollowed: [{ id: "oli", n: 2 }],
+      liked: [{ id: "pat" }],
+      acquainted: [row({ userId: "oli" }), row({ userId: "pat" })],
+    });
+    expect(result.items.map((i) => i.userId).sort()).toEqual(["oli", "pat"]);
+  });
+
+  it("adds this week's newest members to the pool, and says they're new", async () => {
+    const { result, newestCalls } = await run(me, [], 10, undefined, {}, [
+      row({ userId: "new", createdAt: new Date(Date.now() - 2 * 86_400_000) }),
+    ]);
+    expect(result.items).toEqual([
+      expect.objectContaining({ userId: "new", reason: { kind: "newcomer" } }),
+    ]);
+    const where = renderWhere(newestCalls.where[0][0] as SQL);
+    expect(where.sql).toContain(`"user"."created_at" > $`);
+    expect(renderOrder(newestCalls.orderBy[0] as SQL[]).sql).toBe(`"user"."created_at" desc`);
+    expect(newestCalls.limit[0]).toEqual([60]);
+  });
+
+  it("counts each member it suggests, so the same faces don't fill every strip", async () => {
+    await run(me, [row({ userId: "ada" })]);
+    expect(suggestionExposure.times("ada")).toBe(1);
   });
 
   it("shows the segment asked for, and mixes both genders for All", async () => {

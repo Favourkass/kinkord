@@ -13,6 +13,7 @@ import {
   toPostVM,
   type CommentPM,
   type FeedSuggestionPM,
+  type SuggestionReasonCopy,
   type PostPM,
 } from "./post";
 
@@ -343,10 +344,34 @@ describe("toFeedSuggestionVM (Kinksters Near You)", () => {
       details: "26F • Lagos, Lagos State, Nigeria",
       roles: "Submissive, Switch, Brat",
       lookingFor: "Friendship, Dating & Relationship, Events",
+      reason: null,
       isFollowing: false,
       busy: false,
       href: "/u/lily",
     });
+  });
+
+  it("says why they're suggested, in the screen's words, never for the organization", () => {
+    const words: SuggestionReasonCopy = {
+      mutualFriends: (n) => `${n} mutual`,
+      followsYou: "follows",
+      likesYourPosts: "likes",
+      commentsOnYourPosts: "comments",
+      newcomer: "new",
+      sharedKinks: (n) => `${n} kinks`,
+    };
+    const reason = (r: FeedSuggestionPM["reason"], organization = false) =>
+      toFeedSuggestionVM(person({ reason: r }), href, false, organization, words).reason;
+    expect(reason({ kind: "mutualFriends", count: 3 })).toBe("3 mutual");
+    expect(reason({ kind: "followsYou" })).toBe("follows");
+    expect(reason({ kind: "likesYourPosts" })).toBe("likes");
+    expect(reason({ kind: "commentsOnYourPosts" })).toBe("comments");
+    expect(reason({ kind: "newcomer" })).toBe("new");
+    expect(reason({ kind: "sharedKinks", count: 2 })).toBe("2 kinks");
+    expect(reason(null)).toBeNull();
+    // A kind from a newer API this app doesn't know: nothing rather than a wrong line.
+    expect(reason({ kind: "somethingNew" } as never)).toBeNull();
+    expect(reason({ kind: "followsYou" }, true)).toBeNull();
   });
 
   it("names a Kenyan county as it is", () => {

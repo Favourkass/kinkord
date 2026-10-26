@@ -202,7 +202,7 @@ export function pairBonus(viewerRoles: readonly string[], candidateRoles: readon
 }
 
 /** How many different values the two lists share. */
-function shared(a: readonly string[], b: readonly string[]): number {
+export function shared(a: readonly string[], b: readonly string[]): number {
   const mine = new Set(a);
   return new Set(b.filter((x) => mine.has(x))).size;
 }

@@ -1,10 +1,11 @@
 # Matching v1
 
 How "Kinksters Near You" on the home feed picks and orders members. The rules
-live in one pure module, `apps/api/src/members/matching.ts` (unit-tested in
-`matching.spec.ts`), and the home feed's For You ranks by their kink parts
-(see [Feed](#feed)). `MembersService.suggestedForFeed` gathers the pool and
-returns the cards.
+live in two pure modules, `apps/api/src/members/matching.ts` (unit-tested in
+`matching.spec.ts`) and, for who the viewer knows,
+`people-you-may-know.ts` (`people-you-may-know.spec.ts`). The home feed's
+For You ranks by matching's kink parts (see [Feed](#feed)).
+`MembersService.suggestedForFeed` gathers the pool and returns the cards.
 
 ## Who is shown
 
@@ -32,10 +33,19 @@ genders with no gender ordering. Genders are compared case-insensitively
 
 Members in the viewer's country (their state if they have no country), of the
 gender shown, excluding: the viewer, suspended members, anyone on either side
-of a block, anyone the viewer follows, and anyone they removed
-(`suggestion_dismissal`, via `POST /members/suggested/:userId/dismiss`). The
-same state first, then most recently seen, up to 300; scored in TypeScript;
-the best `limit` (default 10, max 20) are returned.
+of a block, anyone the viewer follows, anyone they're friends with or have a
+friend request with (either way), and anyone they removed
+(`suggestion_dismissal`, via `POST /members/suggested/:userId/dismiss`).
+Location and directory privacy apply as before. From them:
+
+- the same state first, then most recently seen, up to 300;
+- the members the viewer **knows of**: friends of their friends, who follows
+  them, who the members they follow follow, who liked or commented on their
+  posts in the last 60 days, and whose posts they liked or commented on, up
+  to 200 from each;
+- the **newest** 60, who joined in the last 7 days.
+
+Scored in TypeScript; the best `limit` (default 10, max 20) are returned.
 
 ## The score
 
@@ -58,6 +68,24 @@ Switch (or someone on both sides) wants either; no side means no preference.
 | Online now, else seen in the last 7 days | +2, else +1                |
 | Has a profile photo                    | +2                           |
 
+**Who the viewer knows** adds to that (people you may know, the founder's
+plan of 2026-10-26):
+
+| Part                                                        | Points            |
+| ----------------------------------------------------------- | ----------------- |
+| Each accepted friend the two have in common                 | +3, up to +12     |
+| Follows the viewer (who doesn't follow them)                | +6                |
+| Each member the viewer follows who follows them             | +1, up to +3      |
+| Liked or commented on the viewer's posts in the last 60 days | +2               |
+| The viewer liked or commented on theirs                     | +2                |
+| Joined in the last 7 days                                   | +4                |
+
+**Exposure:** a member suggested more than 40 times in the last 6 hours has
+their score multiplied by 40 / that many times (80 times: × 0.5), so the same
+few faces don't fill every strip. It's counted in memory on each API instance
+and starts afresh on a deploy: approximate on purpose. A score below 0 isn't
+scaled. There is no Silver boost.
+
 Pairs: Dominant/Domme–Submissive, Master/Mistress–Slave, Top–Bottom,
 Sadist–Masochist, Owner/Handler–Pet, Brat Tamer–Brat, Rigger–Rope Bunny,
 Caregiver–Little/Adult Baby/ABDL, Exhibitionist–Voyeur.
@@ -66,9 +94,22 @@ Ties: most recently seen, then newest account, then user id.
 
 ## The card
 
-Name, Silver check, age and gender initial, city · state · country, the first
-three roles (those on the wanted side first), the first three looking-for
-values, Online, Follow/Following and Remove.
+Name, Silver check, **why they're suggested**, age and gender initial, city ·
+state · country, the first three roles (those on the wanted side first), the
+first three looking-for values, Online, Follow/Following and Remove.
+
+The reason is the first of these that applies, and only what the viewer may
+know (`reason` in the API, worded by the app):
+
+1. "3 mutual friends": only when the member lets the viewer see their
+   followers and following, as the count on their profile does;
+2. "Follows you";
+3. "Likes your posts", else "Comments on your posts";
+4. "New to Kinkord", in their first 7 days;
+5. "2 kinks in common" or more, among the kinks the viewer can read.
+
+What the viewer did themselves (liking their posts, following who follows
+them) is never given as a reason. Otherwise the card says nothing.
 
 ## Feed
 
