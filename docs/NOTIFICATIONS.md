@@ -45,11 +45,12 @@ country, Lagos.
   - **send:** pushes now, and records it in `push_sent`.
   - **hold:** sets `notification.push_pending`.
   - **drop:** does nothing more.
-- `PushDigestService` runs every 5 minutes, one API instance at a time under
-  an advisory lock. For each member and type with held rows it decides again.
+- `PushDigestService` runs every 5 minutes. It first claims the held rows in
+  one statement that skips rows already being claimed, so two API instances
+  never push the same rows. For each member and type it decides again.
   - **send:** one push for all of them, linking to the post or profile when
     there's just one, else to the Notifications list.
-  - **hold:** the rows wait for the next run.
+  - **hold:** the rows go back to waiting.
 - A held row that was read in the app, or is older than 48 hours, is let go
   without a push.
 - `push_sent` keeps two days of history.

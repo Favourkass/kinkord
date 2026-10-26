@@ -5,7 +5,7 @@ import {
   type OnModuleDestroy,
   type OnModuleInit,
 } from "@nestjs/common";
-import { eq, inArray, sql } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { DRIZZLE, type Db } from "../db/db.module";
 import { notification, profile, user, type NotificationType } from "../db/schema";
 import { notificationUrl } from "./notifications.service";
@@ -30,7 +30,7 @@ interface HeldRow {
 /**
  * Sends held pushes when they're due (push/push-policy.ts): a bundle of likes,
  * reposts or follows once its two hours are up, and what waited through quiet
- * hours in the morning. One instance at a time, under an advisory lock.
+ * hours in the morning.
  */
 @Injectable()
 export class PushDigestService implements OnModuleInit, OnModuleDestroy {
@@ -58,58 +58,63 @@ export class PushDigestService implements OnModuleInit, OnModuleDestroy {
 
   /** Sends whatever is due and returns how many pushes went out. */
   async run(now = new Date()): Promise<number> {
-    return this.db.transaction(async (tx) => {
-      const lock = await tx.execute<{ locked: boolean }>(
-        sql`select pg_try_advisory_xact_lock(hashtext('push-digest')) as locked`,
-      );
-      if (!lock.rows[0]?.locked) return 0;
-      const held: HeldRow[] = await tx
-        .select({
-          id: notification.id,
-          userId: notification.userId,
-          type: notification.type,
-          actorId: notification.actorId,
-          subjectId: notification.subjectId,
-          createdAt: notification.createdAt,
-          readAt: notification.readAt,
-        })
-        .from(notification)
-        .where(eq(notification.pushPending, true))
-        .orderBy(notification.createdAt)
-        .limit(BATCH);
-      const release = (ids: string[]) =>
-        ids.length
-          ? tx.update(notification).set({ pushPending: false }).where(inArray(notification.id, ids))
-          : Promise.resolve();
+    // Claim the oldest held rows in one statement, skipping any another instance
+    // is claiming, so two instances running at once never push the same rows.
+    const claimable = this.db
+      .select({ id: notification.id })
+      .from(notification)
+      .where(eq(notification.pushPending, true))
+      .orderBy(notification.createdAt)
+      .limit(BATCH)
+      .for("update", { skipLocked: true });
+    const held: HeldRow[] = await this.db
+      .update(notification)
+      .set({ pushPending: false })
+      .where(inArray(notification.id, claimable))
+      .returning({
+        id: notification.id,
+        userId: notification.userId,
+        type: notification.type,
+        actorId: notification.actorId,
+        subjectId: notification.subjectId,
+        createdAt: notification.createdAt,
+        readAt: notification.readAt,
+      });
+    // What still has to wait goes back to being held.
+    const holdAgain = (ids: string[]) =>
+      ids.length
+        ? this.db
+            .update(notification)
+            .set({ pushPending: true })
+            .where(inArray(notification.id, ids))
+        : Promise.resolve();
 
-      const groups = new Map<string, HeldRow[]>();
-      for (const row of held) {
-        const key = `${row.userId}\u0000${row.type}`;
-        groups.set(key, [...(groups.get(key) ?? []), row]);
+    const groups = new Map<string, HeldRow[]>();
+    for (const row of held) {
+      const key = `${row.userId}\u0000${row.type}`;
+      groups.set(key, [...(groups.get(key) ?? []), row]);
+    }
+    let sent = 0;
+    const expiry = now.getTime() - HOLD_EXPIRY_HOURS * 3_600_000;
+    for (const rows of groups.values()) {
+      const { userId, type } = rows[0];
+      // Read in the app already, or too old to be worth a push: the inbox has it.
+      const live = rows.filter((r) => !r.readAt && r.createdAt.getTime() > expiry);
+      if (live.length === 0) continue;
+      const decision = await this.schedule.decide(userId, type, now);
+      if (decision === "hold") {
+        await holdAgain(live.map((r) => r.id));
+        continue;
       }
-      let sent = 0;
-      const expiry = now.getTime() - HOLD_EXPIRY_HOURS * 3_600_000;
-      for (const rows of groups.values()) {
-        const { userId, type } = rows[0];
-        // Read in the app already, or too old to be worth a push: the inbox has it.
-        const live = rows.filter((r) => !r.readAt && r.createdAt.getTime() > expiry);
-        const done = rows.filter((r) => !live.includes(r)).map((r) => r.id);
-        const decision = live.length ? await this.schedule.decide(userId, type, now) : "drop";
-        if (decision === "hold") {
-          await release(done);
-          continue;
+      if (decision === "send") {
+        const delivered = await this.push.sendTo(userId, await this.message(type, live));
+        if (delivered > 0) {
+          await this.schedule.recordSent(userId, type);
+          sent += 1;
         }
-        if (decision === "send") {
-          const delivered = await this.push.sendTo(userId, await this.message(type, live));
-          if (delivered > 0) {
-            await this.schedule.recordSent(userId, type);
-            sent += 1;
-          }
-        }
-        await release(rows.map((r) => r.id));
       }
-      return sent;
-    });
+    }
+    return sent;
   }
 
   /** One push for a type's held rows: who (most recent first), never what. */

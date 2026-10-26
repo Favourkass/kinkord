@@ -1,12 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { inArray } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
-import { notification } from "../db/schema";
 import { PushDigestService } from "./push-digest.service";
 
 /**
  * Each `await` on the Drizzle chain takes the next queued answer and calls are
- * recorded; `transaction` runs its callback on the same chain.
+ * recorded.
  */
 function queuedDb(answers: unknown[]) {
   const queue = [...answers];
@@ -18,7 +16,6 @@ function queuedDb(answers: unknown[]) {
           const value = queue.shift();
           return (resolve: (v: unknown) => void) => resolve(value);
         }
-        if (prop === "transaction") return (fn: (tx: unknown) => unknown) => fn(root);
         return (...args: unknown[]) => {
           calls.push({ op: String(prop), args });
           return chain();
@@ -26,13 +23,15 @@ function queuedDb(answers: unknown[]) {
       },
     });
   const root: unknown = chain();
-  const released = () =>
-    calls
-      .filter((c) => c.op === "where")
-      .map((c) => new PgDialect().sqlToQuery(c.args[0] as never))
-      .filter((q) => q.sql.includes('"notification"."id" in'))
-      .flatMap((q) => q.params);
-  return { db: root as never, calls, released };
+  /** Ids put back on hold: the `where` that follows each `set({ pushPending: true })`. */
+  const heldAgain = () =>
+    calls.flatMap((c, i) => {
+      const value = c.args[0] as { pushPending?: boolean } | undefined;
+      if (c.op !== "set" || value?.pushPending !== true) return [];
+      const where = calls.slice(i + 1).find((n) => n.op === "where");
+      return new PgDialect().sqlToQuery(where?.args[0] as never).params;
+    });
+  return { db: root as never, calls, heldAgain };
 }
 
 const now = new Date("2026-10-26T13:00:00Z");
@@ -57,15 +56,16 @@ beforeEach(() => {
 });
 
 describe("PushDigestService.run", () => {
-  it("does nothing while another instance holds the lock", async () => {
-    const { db } = queuedDb([{ rows: [{ locked: false }] }]);
+  it("claims held rows in one statement that skips rows another instance is claiming", async () => {
+    const { db, calls } = queuedDb([[]]);
     await expect(service(db).run(now)).resolves.toBe(0);
+    expect(calls.find((c) => c.op === "for")?.args).toEqual(["update", { skipLocked: true }]);
+    expect(calls.find((c) => c.op === "set")?.args[0]).toEqual({ pushPending: false });
     expect(decide).not.toHaveBeenCalled();
   });
 
-  it("sends one bundle for a member's held likes, says who, then releases them", async () => {
-    const { db, released } = queuedDb([
-      { rows: [{ locked: true }] },
+  it("sends one bundle for a member's held likes, saying who", async () => {
+    const { db, heldAgain } = queuedDb([
       [
         row({ id: "n1", actorId: "a1", subjectId: "p1", createdAt: ago(90) }),
         row({ id: "n2", actorId: "a2", subjectId: "p2", createdAt: ago(30) }),
@@ -76,7 +76,6 @@ describe("PushDigestService.run", () => {
         { id: "a2", username: "tega", name: "Tega", displayName: null },
         { id: "a3", username: "kemi", name: "Kemi", displayName: "Kemi" },
       ],
-      undefined,
     ]);
     await expect(service(db).run(now)).resolves.toBe(1);
     expect(decide).toHaveBeenCalledWith("u1", "like", now);
@@ -87,13 +86,12 @@ describe("PushDigestService.run", () => {
       tag: "digest-like",
     });
     expect(recordSent).toHaveBeenCalledWith("u1", "like");
-    expect(released()).toEqual(["n1", "n2", "n3"]);
+    expect(heldAgain()).toEqual([]);
   });
 
-  it("keeps waiting rows held when it's not yet time, but lets go of read and stale ones", async () => {
+  it("holds waiting rows again when it's not yet time, but lets go of read and stale ones", async () => {
     decide.mockResolvedValue("hold");
-    const { db, released } = queuedDb([
-      { rows: [{ locked: true }] },
+    const { db, heldAgain } = queuedDb([
       [
         row({ id: "old", createdAt: ago(49 * 60) }),
         row({ id: "read", createdAt: ago(20), readAt: ago(5) }),
@@ -103,27 +101,27 @@ describe("PushDigestService.run", () => {
     ]);
     await expect(service(db).run(now)).resolves.toBe(0);
     expect(sendTo).not.toHaveBeenCalled();
-    expect(released()).toEqual(["old", "read"]);
+    expect(heldAgain()).toEqual(["live"]);
   });
 
   it("lets go without a push when the member turned the kind off since", async () => {
     decide.mockResolvedValue("drop");
-    const { db, released } = queuedDb([
-      { rows: [{ locked: true }] },
-      [row({ id: "n1", createdAt: ago(10) })],
-      undefined,
-    ]);
+    const { db, heldAgain } = queuedDb([[row({ id: "n1", createdAt: ago(10) })]]);
     await service(db).run(now);
     expect(sendTo).not.toHaveBeenCalled();
-    expect(released()).toEqual(["n1"]);
+    expect(heldAgain()).toEqual([]);
+  });
+
+  it("asks nothing about a member whose held rows were all read or stale", async () => {
+    const { db } = queuedDb([[row({ id: "read", createdAt: ago(20), readAt: ago(5) })]]);
+    await service(db).run(now);
+    expect(decide).not.toHaveBeenCalled();
   });
 
   it("links a single held push straight to what it's about", async () => {
     const { db } = queuedDb([
-      { rows: [{ locked: true }] },
       [row({ id: "n1", type: "comment", actorId: "a1", subjectId: "p9", createdAt: ago(300) })],
       [{ id: "a1", username: "ada", name: "Ada", displayName: "Ada" }],
-      undefined,
     ]);
     await service(db).run(now);
     expect(sendTo).toHaveBeenCalledWith("u1", {
@@ -134,9 +132,4 @@ describe("PushDigestService.run", () => {
       notificationId: "n1",
     });
   });
-});
-
-it("releases rows by id (the query the release helper builds)", () => {
-  const query = new PgDialect().sqlToQuery(inArray(notification.id, ["n1"]));
-  expect(query.sql).toContain('"notification"."id" in');
 });
