@@ -64,6 +64,8 @@ export const WINDOWS = {
   nearbyLimit: 800,
   /** How far back the viewer's own likes, saves, shares, comments and reposts are read. */
   interactionDays: 60,
+  /** How long a "Not interested" lowers its author's other posts. */
+  notInterestedDays: 60,
 } as const;
 
 /** The most rows a ranked list can hold: every For You pool full, or Nearby's. */
@@ -105,6 +107,12 @@ export const FOR_YOU = {
   sameCountry: 1,
   halfLifeHours: 36,
   alreadyReacted: 0.35,
+  /** Each time the feed showed the post before (`post_seen`), × this, but never below the floor. */
+  seen: 0.6,
+  seenFloor: 0.2,
+  /** Each "Not interested" in an author's posts lowers the rest × this, never below the floor. */
+  notInterested: 0.5,
+  notInterestedFloor: 0.1,
 } as const;
 
 /** Nearby: the viewer's own city first, then freshness, with engagement as a nudge. */
@@ -309,6 +317,10 @@ export interface ForYouParts {
   freshness: number;
   /** 0.35 for a post the viewer already reacted to, else 1. */
   reacted: number;
+  /** 0.6 for each time the feed showed it before, at least 0.2; 1 when unseen. */
+  seen: number;
+  /** 0.5 for each of the author's posts the viewer was not interested in, at least 0.1. */
+  lessOf: number;
   score: number;
 }
 
@@ -321,7 +333,15 @@ export interface ForYouSignals {
   engagement: ReadonlyMap<string, Engagement>;
   /** The viewer's own, over the interaction window. */
   interactions: readonly Interaction[];
+  /** By content id: how many visits of the feed showed it before `asOf`. */
+  seen?: ReadonlyMap<string, number>;
+  /** By author: their posts the viewer marked "Not interested" lately. */
+  notInterested?: ReadonlyMap<string, number>;
 }
+
+/** `factor` for each of `n` times, never below `floor`; 1 for none. */
+const repeated = (factor: number, n: number, floor: number) =>
+  n > 0 ? Math.max(floor, factor ** n) : 1;
 
 /** Scores For You candidates against one viewer's signals; what can be worked out once, is. */
 export function forYouScorer(s: ForYouSignals): (c: FeedCandidate) => ForYouParts {
@@ -372,6 +392,12 @@ export function forYouScorer(s: ForYouSignals): (c: FeedCandidate) => ForYouPart
       newcomer;
     const fresh = freshness(c.createdAt, s.asOf, FOR_YOU.halfLifeHours);
     const reactedPart = reacted.has(c.contentId) ? FOR_YOU.alreadyReacted : 1;
+    const seenPart = repeated(FOR_YOU.seen, s.seen?.get(c.contentId) ?? 0, FOR_YOU.seenFloor);
+    const lessOf = repeated(
+      FOR_YOU.notInterested,
+      s.notInterested?.get(c.contentAuthorId) ?? 0,
+      FOR_YOU.notInterestedFloor,
+    );
     return {
       follows,
       affinity: affinityPart,
@@ -384,7 +410,9 @@ export function forYouScorer(s: ForYouSignals): (c: FeedCandidate) => ForYouPart
       relevance,
       freshness: fresh,
       reacted: reactedPart,
-      score: relevance * fresh * reactedPart,
+      seen: seenPart,
+      lessOf,
+      score: relevance * fresh * reactedPart * seenPart * lessOf,
     };
   };
 }
@@ -398,7 +426,8 @@ export function rankForYou(
   );
   const lifted = withNewcomerSlot(ordered, (c) => {
     const author = s.authors.get(c.contentAuthorId);
-    if (!isNewcomer(author, s.asOf) || !author) return null;
+    // A post the viewer has already been shown isn't pushed up again.
+    if (!isNewcomer(author, s.asOf) || !author || s.seen?.has(c.contentId)) return null;
     const tier = placeTier(s.viewer, author);
     return tier === "city" || tier === "state" ? 0 : tier === "country" ? 1 : null;
   });

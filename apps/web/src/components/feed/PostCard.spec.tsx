@@ -30,6 +30,7 @@ const labels = {
   following: "Following",
   with: "with",
   removeTag: "Remove my tag",
+  notInterested: "Not interested",
 };
 
 function show(silver: boolean, subscribed: boolean) {
@@ -91,7 +92,10 @@ describe("post Silver badge and gift eligibility", () => {
   });
 });
 
-function menuOf(over: Partial<PostPM>) {
+function menuOf(
+  over: Partial<PostPM>,
+  extra: { onNotInterested?: () => void; onSeen?: () => void } = {},
+) {
   const pm: PostPM = {
     id: "p1",
     postId: "p1",
@@ -136,6 +140,7 @@ function menuOf(over: Partial<PostPM>) {
       onToggleAuthorFollow={noop}
       onOpenMedia={noop}
       onRemoveTag={on.removeTag}
+      {...extra}
     />,
   );
   return on;
@@ -189,6 +194,91 @@ describe("the post menu", () => {
     expect(undo).toHaveLength(1);
     fireEvent.click(undo[0]);
     expect(on.remove).toHaveBeenCalledOnce();
+  });
+});
+
+describe("Not interested", () => {
+  it("is in the menu of someone else's post where the list offers it, and closes the menu", () => {
+    const notInterested = vi.fn();
+    const on = menuOf({}, { onNotInterested: notInterested });
+    fireEvent.click(screen.getByRole("button", { name: "Not interested" }));
+    expect(on.close).toHaveBeenCalledOnce();
+    expect(notInterested).toHaveBeenCalledOnce();
+  });
+
+  it("isn't on the viewer's own post, nor where the list doesn't offer it", () => {
+    menuOf({ mine: true }, { onNotInterested: vi.fn() });
+    expect(screen.queryByRole("button", { name: "Not interested" })).toBeNull();
+    cleanup();
+    menuOf({});
+    expect(screen.queryByRole("button", { name: "Not interested" })).toBeNull();
+  });
+});
+
+describe("seen", () => {
+  /** An IntersectionObserver the test drives: `show(ratio)` reports the card's share on screen. */
+  function fakeObserver() {
+    let report: IntersectionObserverCallback = () => undefined;
+    const observer = {
+      observe: vi.fn(),
+      disconnect: vi.fn(),
+      show: (ratio: number) =>
+        report(
+          [
+            {
+              isIntersecting: ratio > 0,
+              intersectionRatio: ratio,
+              intersectionRect: { height: ratio * 400 },
+              rootBounds: { height: 800 },
+            } as unknown as IntersectionObserverEntry,
+          ],
+          observer as unknown as IntersectionObserver,
+        ),
+    };
+    vi.stubGlobal(
+      "IntersectionObserver",
+      vi.fn(function (cb: IntersectionObserverCallback) {
+        report = cb;
+        return observer;
+      }),
+    );
+    return observer;
+  }
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("counts a card once it has been half on screen for a second, and only once", () => {
+    vi.useFakeTimers();
+    const io = fakeObserver();
+    const seen = vi.fn();
+    menuOf({}, { onSeen: seen });
+    io.show(0.6);
+    vi.advanceTimersByTime(999);
+    expect(seen).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(seen).toHaveBeenCalledOnce();
+    expect(io.disconnect).toHaveBeenCalled();
+  });
+
+  it("doesn't count a card scrolled past within the second", () => {
+    vi.useFakeTimers();
+    const io = fakeObserver();
+    const seen = vi.fn();
+    menuOf({}, { onSeen: seen });
+    io.show(0.6);
+    vi.advanceTimersByTime(500);
+    io.show(0.1);
+    vi.advanceTimersByTime(2000);
+    expect(seen).not.toHaveBeenCalled();
+  });
+
+  it("watches nothing where nothing counts", () => {
+    fakeObserver();
+    menuOf({});
+    expect(IntersectionObserver).not.toHaveBeenCalled();
   });
 });
 
