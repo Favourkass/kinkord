@@ -23,6 +23,9 @@ import {
   toggleFollowOnFriend,
   toggleFollowOnProfile,
 } from "./members.service";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+import { AVAILABLE_COUNTRIES } from "@/constants/members";
 
 beforeEach(() => {
   apiGet.mockReset().mockResolvedValue({});
@@ -90,7 +93,13 @@ describe("searchCountries", () => {
 
   it("shows only launched countries (with counts) when there is no query", () => {
     expect(searchCountries("", counts)).toEqual([
-      { code: "GH", name: "Ghana", flag: null, membersCount: 0, available: true },
+      {
+        code: "GH",
+        name: "Ghana",
+        flag: "/app/members/flag-gh.svg",
+        membersCount: 0,
+        available: true,
+      },
       {
         code: "KE",
         name: "Kenya",
@@ -105,7 +114,13 @@ describe("searchCountries", () => {
         membersCount: 12_400,
         available: true,
       },
-      { code: "US", name: "USA", flag: null, membersCount: 0, available: true },
+      {
+        code: "US",
+        name: "USA",
+        flag: "/app/members/flag-us.svg",
+        membersCount: 0,
+        available: true,
+      },
     ]);
   });
 
@@ -223,4 +238,11 @@ describe("hasMore / decodeParam", () => {
     expect(decodeParam("Akwa Ibom")).toBe("Akwa Ibom");
     expect(decodeParam("%E0%A4%A")).toBe("%E0%A4%A");
   });
+});
+
+it("has a flag image for every country the directory serves", () => {
+  for (const country of AVAILABLE_COUNTRIES) {
+    expect(country.flag).toBe(`/app/members/flag-${country.code.toLowerCase()}.svg`);
+    expect(existsSync(resolve(process.cwd(), `public${country.flag}`))).toBe(true);
+  }
 });

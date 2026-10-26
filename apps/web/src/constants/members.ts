@@ -250,7 +250,7 @@ export const MEMBERS_COPY = {
 export const AVAILABLE_COUNTRIES = LAUNCH_COUNTRIES.map(({ code, name }) => ({
   code,
   name,
-  flag: code === "NG" || code === "KE" ? `/app/members/flag-${code.toLowerCase()}.svg` : null,
+  flag: `/app/members/flag-${code.toLowerCase()}.svg`,
 }));
 
 /** Page size for the infinite-scrolling members list. */
