@@ -1,3 +1,5 @@
+import { LAUNCH_COUNTRIES } from "./onboarding";
+
 /**
  * Display copy for the Members directory + public member profile.
  * Source of truth: Figma "Members 1" canvas (node 864:30) — copy is verbatim from
@@ -245,10 +247,11 @@ export const MEMBERS_COPY = {
 } as const;
 
 /** Countries the directory serves today; every other country is "Coming Soon". */
-export const AVAILABLE_COUNTRIES = [
-  { code: "NG", name: "Nigeria", flag: "/app/members/flag-ng.svg" },
-  { code: "KE", name: "Kenya", flag: "/app/members/flag-ke.svg" },
-] as const;
+export const AVAILABLE_COUNTRIES = LAUNCH_COUNTRIES.map(({ code, name }) => ({
+  code,
+  name,
+  flag: `/app/members/flag-${code.toLowerCase()}.svg`,
+}));
 
 /** Page size for the infinite-scrolling members list. */
 export const MEMBERS_PAGE_SIZE = 20;

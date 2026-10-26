@@ -5,6 +5,10 @@ import { getLandingVM } from "./getLandingVM";
 describe("getLandingVM", () => {
   const vm = getLandingVM();
 
+  it("counts all available countries on the landing page", () => {
+    expect(vm.membership.countries).toBe("4 countries");
+  });
+
   it("brands the splash with the Kinkord name and tagline", () => {
     expect(vm.brand).toBe("Kinkord");
     expect(vm.tagline).toContain("Where kinksters connect");

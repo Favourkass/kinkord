@@ -268,9 +268,23 @@ describe("useMembersRegionPresenter", () => {
     await waitFor(() => expect(empty.result.current.loading).toBe(false));
     expect(empty.result.current.empty).toBe("No members in Nigeria yet. Be the first.");
 
-    const unlaunched = renderHook(() => useMembersRegionPresenter("gh", null));
+    const unlaunched = renderHook(() => useMembersRegionPresenter("ca", null));
     expect(unlaunched.result.current.unknownState).toMatch(/coming soon/);
     expect(unlaunched.result.current.loading).toBe(false);
+  });
+
+  it.each([
+    ["gh", "Greater Accra", 17],
+    ["us", "Wyoming", 52],
+  ])("opens %s and exposes its complete region list", async (country, region, total) => {
+    const { result } = renderHook(() => useMembersRegionPresenter(country, null));
+    expect(result.current.unknownState).toBeNull();
+    expect(result.current.selector.options).toContain(region);
+    expect(result.current.selector.options).toHaveLength(total);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(apiGet).toHaveBeenCalledWith(
+      `/members?country=${country.toUpperCase()}&page=1&limit=20&sort=recent`,
+    );
   });
 
   it("handles unknown states, empty regions and expired sessions", async () => {

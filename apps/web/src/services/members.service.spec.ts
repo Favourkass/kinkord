@@ -23,6 +23,9 @@ import {
   toggleFollowOnFriend,
   toggleFollowOnProfile,
 } from "./members.service";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+import { AVAILABLE_COUNTRIES } from "@/constants/members";
 
 beforeEach(() => {
   apiGet.mockReset().mockResolvedValue({});
@@ -91,6 +94,20 @@ describe("searchCountries", () => {
   it("shows only launched countries (with counts) when there is no query", () => {
     expect(searchCountries("", counts)).toEqual([
       {
+        code: "GH",
+        name: "Ghana",
+        flag: "/app/members/flag-gh.svg",
+        membersCount: 0,
+        available: true,
+      },
+      {
+        code: "KE",
+        name: "Kenya",
+        flag: "/app/members/flag-ke.svg",
+        membersCount: 0,
+        available: true,
+      },
+      {
         code: "NG",
         name: "Nigeria",
         flag: "/app/members/flag-ng.svg",
@@ -98,10 +115,10 @@ describe("searchCountries", () => {
         available: true,
       },
       {
-        code: "KE",
-        name: "Kenya",
-        flag: "/app/members/flag-ke.svg",
-        membersCount: expect.anything(),
+        code: "US",
+        name: "USA",
+        flag: "/app/members/flag-us.svg",
+        membersCount: 0,
         available: true,
       },
     ]);
@@ -112,17 +129,26 @@ describe("searchCountries", () => {
   });
 
   it("surfaces unlaunched countries as coming soon only once searched", () => {
-    const hits = searchCountries("ghana", counts);
+    const hits = searchCountries("canada", counts);
     expect(hits).toEqual([
-      { code: "GH", name: "Ghana", flag: null, membersCount: null, available: false },
+      { code: "CA", name: "Canada", flag: null, membersCount: null, available: false },
     ]);
   });
 
   it("lists launched matches before coming-soon matches", () => {
     const hits = searchCountries("ni", counts);
     expect(hits[0]).toMatchObject({ code: "NG", available: true, membersCount: 12_400 });
-    expect(hits.slice(1).every((h) => !h.available)).toBe(true);
+    const firstUnavailable = hits.findIndex((h) => !h.available);
+    expect(firstUnavailable).toBeGreaterThan(0);
+    expect(hits.slice(0, firstUnavailable).every((h) => h.available)).toBe(true);
+    expect(hits.slice(firstUnavailable).every((h) => !h.available)).toBe(true);
     expect(hits.some((h) => h.code === "NI")).toBe(true); // Nicaragua
+  });
+
+  it.each(["USA", "United States", "US"])("finds the available USA using %s", (query) => {
+    expect(searchCountries(query, [{ code: "US", name: "USA", membersCount: 7 }])[0]).toMatchObject(
+      { code: "US", membersCount: 7, available: true },
+    );
   });
 
   it("returns nothing for a nonsense query", () => {
@@ -133,7 +159,9 @@ describe("searchCountries", () => {
 describe("directory countries", () => {
   it("serves launched countries only", () => {
     expect(isCountryAvailable("ng")).toBe(true);
-    expect(isCountryAvailable("GH")).toBe(false);
+    expect(isCountryAvailable("GH")).toBe(true);
+    expect(isCountryAvailable("us")).toBe(true);
+    expect(isCountryAvailable("CA")).toBe(false);
   });
 });
 
@@ -210,4 +238,11 @@ describe("hasMore / decodeParam", () => {
     expect(decodeParam("Akwa Ibom")).toBe("Akwa Ibom");
     expect(decodeParam("%E0%A4%A")).toBe("%E0%A4%A");
   });
+});
+
+it("has a flag image for every country the directory serves", () => {
+  for (const country of AVAILABLE_COUNTRIES) {
+    expect(country.flag).toBe(`/app/members/flag-${country.code.toLowerCase()}.svg`);
+    expect(existsSync(resolve(process.cwd(), `public${country.flag}`))).toBe(true);
+  }
 });

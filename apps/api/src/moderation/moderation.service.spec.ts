@@ -660,6 +660,15 @@ describe("ModerationService.setOrganization", () => {
     });
   });
 
+  it.each(["GH", "US"])("accepts an organization in %s", async (country) => {
+    const { service, after } = make([[{ accountType: "organization", country }], undefined]);
+    await expect(service.setOrganization("f1", "u7", true, country)).resolves.toEqual({
+      organization: true,
+      country,
+    });
+    expect(after("update", profile, "set")).toEqual({ accountType: "organization", country });
+  });
+
   it("makes one that speaks to every country, stored with no country", async () => {
     const { service, after } = make([[{ accountType: "organization", country: null }], undefined]);
     await expect(service.setOrganization("f1", "u1", true, "ALL")).resolves.toEqual({

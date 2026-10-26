@@ -122,7 +122,7 @@ export const membersApi = {
 export interface CountryOption {
   code: string;
   name: string;
-  /** Local asset for launched countries; null for "coming soon" ones (emoji flag instead). */
+  /** Local flag asset when available; otherwise render the country’s emoji flag. */
   flag: string | null;
   /** null while counts are still loading. */
   membersCount: number | null;
@@ -152,7 +152,9 @@ export function searchCountries(query: string, counts: CountryCountPM[] | null):
   }));
   if (!q) return launched;
   const matches = (name: string) => name.toLowerCase().includes(q);
-  const launchedHits = launched.filter((c) => matches(c.name));
+  const launchedHits = launched.filter(
+    (c) => matches(c.name) || matches(c.code) || matches(countryName(c.code) ?? ""),
+  );
   const comingSoon = ALL_COUNTRY_CODES.filter((code) => !isCountryAvailable(code))
     .map((code) => ({ code, name: countryName(code) ?? code }))
     .filter((c) => matches(c.name))

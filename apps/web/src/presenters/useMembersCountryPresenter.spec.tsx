@@ -29,16 +29,18 @@ describe("useMembersCountryPresenter", () => {
 
   it("lists only launched countries with an abbreviated live total (Figma 881:730)", async () => {
     const { result } = renderHook(() => useMembersCountryPresenter());
-    expect(result.current.rows[0]).toMatchObject({
+    expect(result.current.rows.find((r) => r.code === "NG")!).toMatchObject({
       code: "NG",
       membersLabel: null,
       comingSoon: false,
       href: "/members/ng",
     });
-    await waitFor(() => expect(result.current.rows[0].membersLabel).toBe("12.4K Members"));
-    // Nigeria and Kenya are both open.
-    expect(result.current.rows.map((r) => r.code)).toEqual(["NG", "KE"]);
-    expect(result.current.rows[0]).toMatchObject({
+    await waitFor(() =>
+      expect(result.current.rows.find((r) => r.code === "NG")!.membersLabel).toBe("12.4K Members"),
+    );
+    // Every signup country is open, even before its first member joins.
+    expect(result.current.rows.map((r) => r.code)).toEqual(["GH", "KE", "NG", "US"]);
+    expect(result.current.rows.find((r) => r.code === "NG")!).toMatchObject({
       name: "Nigeria",
       flag: "/app/members/flag-ng.svg",
       emoji: "🇳🇬",
@@ -54,22 +56,24 @@ describe("useMembersCountryPresenter", () => {
 
   it("reveals unlaunched countries as Coming Soon only when searched", async () => {
     const { result } = renderHook(() => useMembersCountryPresenter());
-    await waitFor(() => expect(result.current.rows[0].membersLabel).toBe("12.4K Members"));
-    act(() => result.current.search.onChange("ghana"));
+    await waitFor(() =>
+      expect(result.current.rows.find((r) => r.code === "NG")!.membersLabel).toBe("12.4K Members"),
+    );
+    act(() => result.current.search.onChange("canada"));
     expect(result.current.heading).toBe("RESULTS");
     expect(result.current.rows).toEqual([
       {
-        code: "GH",
-        name: "Ghana",
+        code: "CA",
+        name: "Canada",
         flag: null,
-        emoji: "🇬🇭",
+        emoji: "🇨🇦",
         membersLabel: null,
         comingSoon: true,
         href: null,
       },
     ]);
     act(() => result.current.search.onChange("nig"));
-    expect(result.current.rows[0]).toMatchObject({
+    expect(result.current.rows.find((r) => r.code === "NG")!).toMatchObject({
       code: "NG",
       href: "/members/ng",
       comingSoon: false,
@@ -78,6 +82,29 @@ describe("useMembersCountryPresenter", () => {
     expect(result.current.rows).toEqual([]);
     expect(result.current.noResults).toBe("No country matches that search.");
   });
+
+  it.each([
+    ["Ghana", "GH", "🇬🇭"],
+    ["United States", "US", "🇺🇸"],
+  ])(
+    "opens %s from search with a zero member count instead of Coming Soon",
+    async (query, code, emoji) => {
+      const { result } = renderHook(() => useMembersCountryPresenter());
+      await waitFor(() =>
+        expect(result.current.rows.find((r) => r.code === "NG")?.membersLabel).toBe(
+          "12.4K Members",
+        ),
+      );
+      act(() => result.current.search.onChange(query));
+      expect(result.current.rows[0]).toMatchObject({
+        code,
+        emoji,
+        comingSoon: false,
+        membersLabel: "0 Members",
+        href: `/members/${code.toLowerCase()}`,
+      });
+    },
+  );
 
   it("redirects to login when the session is gone and shows an error otherwise", async () => {
     const { ApiError } = await import("@/services/apiClient");
@@ -89,6 +116,9 @@ describe("useMembersCountryPresenter", () => {
     const { result } = renderHook(() => useMembersCountryPresenter());
     await waitFor(() => expect(result.current.error).toMatch(/went wrong/));
     // Nigeria still renders (without a count) so the page stays usable.
-    expect(result.current.rows[0]).toMatchObject({ code: "NG", membersLabel: null });
+    expect(result.current.rows.find((r) => r.code === "NG")!).toMatchObject({
+      code: "NG",
+      membersLabel: null,
+    });
   });
 });
