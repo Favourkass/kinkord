@@ -31,20 +31,52 @@ export type FeedHint = "no_follows" | "no_location";
 const HOUR_MS = 60 * 60 * 1000;
 export const DAY_MS = 24 * HOUR_MS;
 
-/** Which posts each ranked tab weighs, counted back from `asOf`. */
+/**
+ * Which posts each ranked tab weighs, counted back from `asOf`. For You draws
+ * from several pools, each newest first and capped, so no single one (and no
+ * busy hour) crowds the rest out as the app grows.
+ */
 export const WINDOWS = {
   /** For You: every visible post this recent, the newest this many... */
   recentDays: 7,
-  recentLimit: 600,
-  /** ...and the posts of members the viewer follows, this far back. */
+  recentLimit: 300,
+  /** ...the posts of members the viewer follows, this far back... */
   followedDays: 30,
   followedLimit: 400,
+  /** ...of their accepted friends, followed or not... */
+  friendsDays: 30,
+  friendsLimit: 200,
+  /** ...of the authors they interact with most... */
+  interactedDays: 30,
+  interactedLimit: 200,
+  interactedAuthors: 50,
+  /** ...of members in their state... */
+  nearPoolDays: 14,
+  nearPoolLimit: 200,
+  /** ...what's taking off in their country (the most liked and commented on lately)... */
+  trendingDays: 3,
+  trendingLimit: 200,
+  /** ...and the first posts of members who joined this week, in their country. */
+  newcomerDays: 7,
+  newcomerLimit: 60,
   /** Nearby: posts by members in the viewer's state. */
   nearbyDays: 14,
   nearbyLimit: 800,
   /** How far back the viewer's own likes, saves, shares, comments and reposts are read. */
   interactionDays: 60,
 } as const;
+
+/** The most rows a ranked list can hold: every For You pool full, or Nearby's. */
+export const MAX_RANKED = Math.max(
+  WINDOWS.recentLimit +
+    WINDOWS.followedLimit +
+    WINDOWS.friendsLimit +
+    WINDOWS.interactedLimit +
+    WINDOWS.nearPoolLimit +
+    WINDOWS.trendingLimit +
+    WINDOWS.newcomerLimit,
+  WINDOWS.nearbyLimit,
+);
 
 /** For You: every weight in one place. docs/MATCHING.md explains them; change both together. */
 export const FOR_YOU = {
@@ -59,6 +91,15 @@ export const FOR_YOU = {
   learnedKink: 0.5,
   learnedKinkCap: 2.5,
   engagement: 1.2,
+  /**
+   * Engagement counts as velocity: reactions per its age, slowed every this
+   * many hours, so a post taking off now beats one that gathered likes days ago.
+   */
+  velocityHours: 6,
+  /** A member in their first week (NEWCOMER_DAYS): their posts get a lift... */
+  newcomer: 2,
+  /** ...and the best one near the viewer is shown no lower than this index (the 4th card). */
+  newcomerSlot: 3,
   sameCity: 2,
   sameState: 1.5,
   sameCountry: 1,
@@ -76,6 +117,9 @@ export const NEARBY = {
 
 /** Never more than this many posts in a row from one member. */
 export const MAX_RUN = 2;
+
+/** How long a member counts as new, from when they joined. */
+export const NEWCOMER_DAYS = 7;
 
 export type InteractionKind = "like" | "save" | "share" | "comment" | "repost";
 
@@ -116,6 +160,8 @@ export interface FeedAuthor extends KinkProfile, Place {
   followsViewer: boolean;
   /** Explicit friendship, independent of either follow direction. */
   isFriend?: boolean;
+  /** When they joined, to know a newcomer. */
+  joinedAt?: Date | null;
 }
 
 /** One row a tab may show: a post, or somebody's repost of one. */
@@ -128,6 +174,8 @@ export interface FeedCandidate {
   contentAuthorId: string;
   /** The row's own time: a repost reaches the feed when it is made. */
   createdAt: Date;
+  /** When the post the card shows was made: the original's time for a repost. */
+  contentCreatedAt?: Date;
 }
 
 export interface Engagement {
@@ -155,6 +203,23 @@ export function engagementCount(e: Engagement | undefined): number {
   if (!e) return 0;
   const w = ENGAGEMENT_WEIGHTS;
   return e.likes * w.likes + e.comments * w.comments + e.reposts * w.reposts + e.shares * w.shares;
+}
+
+/**
+ * Engagement per its age: reactions slowed by `velocityHours`, so 10 reactions
+ * in 6 hours count as 5, and 30 over two days count about 3.
+ */
+export function velocity(count: number, createdAt: Date, asOf: Date): number {
+  const hours = Math.max(0, asOf.getTime() - createdAt.getTime()) / HOUR_MS;
+  return count / (1 + hours / FOR_YOU.velocityHours);
+}
+
+/** Joined within NEWCOMER_DAYS of `asOf`. */
+export function isNewcomer(author: FeedAuthor | undefined, asOf: Date): boolean {
+  const joined = author?.joinedAt;
+  if (!joined) return false;
+  const age = asOf.getTime() - joined.getTime();
+  return age >= 0 && age <= NEWCOMER_DAYS * DAY_MS;
 }
 
 /** "A": how much the viewer has interacted with each author's posts, capped. */
@@ -238,6 +303,7 @@ export interface ForYouParts {
   learned: number;
   engagement: number;
   place: number;
+  newcomer: number;
   /** 1 plus every part above. */
   relevance: number;
   freshness: number;
@@ -267,9 +333,12 @@ export function forYouScorer(s: ForYouSignals): (c: FeedCandidate) => ForYouPart
   return (c) => {
     const poster = s.authors.get(c.authorId);
     const author = s.authors.get(c.contentAuthorId);
-    const follows = poster?.viewerFollows
-      ? FOR_YOU.follows + (poster.followsViewer ? FOR_YOU.followsBack : 0)
-      : 0;
+    // A friend counts as a follow both ways, followed or not.
+    const follows = poster?.isFriend
+      ? FOR_YOU.follows + FOR_YOU.followsBack
+      : poster?.viewerFollows
+        ? FOR_YOU.follows + (poster.followsViewer ? FOR_YOU.followsBack : 0)
+        : 0;
     const affinityPart = FOR_YOU.affinity * Math.log1p(affinity.get(c.contentAuthorId) ?? 0);
     const readable = author ? readableKinks(author) : null;
     const k = readable ? kinkParts(s.viewer, readable) : null;
@@ -281,10 +350,26 @@ export function forYouScorer(s: ForYouSignals): (c: FeedCandidate) => ForYouPart
     const overlap = readable ? new Set(readable.kinks.filter((kink) => learned.has(kink))).size : 0;
     const learnedPart = Math.min(overlap * FOR_YOU.learnedKink, FOR_YOU.learnedKinkCap);
     const engagement =
-      FOR_YOU.engagement * Math.log1p(engagementCount(s.engagement.get(c.contentId)));
+      FOR_YOU.engagement *
+      Math.log1p(
+        velocity(
+          engagementCount(s.engagement.get(c.contentId)),
+          c.contentCreatedAt ?? c.createdAt,
+          s.asOf,
+        ),
+      );
     const place = author ? byTier(placeTier(s.viewer, author), FOR_YOU) : 0;
+    const newcomer = isNewcomer(author, s.asOf) ? FOR_YOU.newcomer : 0;
     const relevance =
-      FOR_YOU.base + follows + affinityPart + kinks + gender + learnedPart + engagement + place;
+      FOR_YOU.base +
+      follows +
+      affinityPart +
+      kinks +
+      gender +
+      learnedPart +
+      engagement +
+      place +
+      newcomer;
     const fresh = freshness(c.createdAt, s.asOf, FOR_YOU.halfLifeHours);
     const reactedPart = reacted.has(c.contentId) ? FOR_YOU.alreadyReacted : 1;
     return {
@@ -295,6 +380,7 @@ export function forYouScorer(s: ForYouSignals): (c: FeedCandidate) => ForYouPart
       learned: learnedPart,
       engagement,
       place,
+      newcomer,
       relevance,
       freshness: fresh,
       reacted: reactedPart,
@@ -307,7 +393,40 @@ export function rankForYou(
   s: ForYouSignals & { candidates: readonly FeedCandidate[] },
 ): FeedCandidate[] {
   const score = forYouScorer(s);
-  return arrange(s.candidates.map((candidate) => ({ candidate, score: score(candidate).score })));
+  const ordered = arrange(
+    s.candidates.map((candidate) => ({ candidate, score: score(candidate).score })),
+  );
+  const lifted = withNewcomerSlot(ordered, (c) => {
+    const author = s.authors.get(c.contentAuthorId);
+    if (!isNewcomer(author, s.asOf) || !author) return null;
+    const tier = placeTier(s.viewer, author);
+    return tier === "city" || tier === "state" ? 0 : tier === "country" ? 1 : null;
+  });
+  // Taking a row out can join two runs of one member's rows: spread them again.
+  return spreadAuthors(lifted, (c) => c.authorId);
+}
+
+/**
+ * A newcomer near the viewer gets seen: the best-ranked post by a member in
+ * their first week, from the viewer's state (else country), moves up to
+ * `newcomerSlot` when it ranked lower. `nearness` is 0 for the same state or
+ * city, 1 for the same country, null for anyone else.
+ */
+export function withNewcomerSlot(
+  ordered: readonly FeedCandidate[],
+  nearness: (c: FeedCandidate) => 0 | 1 | null,
+  slot: number = FOR_YOU.newcomerSlot,
+): FeedCandidate[] {
+  let pick = -1;
+  for (const tier of [0, 1] as const) {
+    pick = ordered.findIndex((c) => nearness(c) === tier);
+    if (pick >= 0) break;
+  }
+  if (pick <= slot) return [...ordered];
+  const out = [...ordered];
+  const [row] = out.splice(pick, 1);
+  out.splice(slot, 0, row);
+  return out;
 }
 
 /** Nearby's score: how close, times how fresh, nudged by engagement. */
@@ -410,9 +529,6 @@ export function spreadAuthors<T>(
 
 // ---- cursor -----------------------------------------------------------------
 
-/** A post's place in newest-first order: its time, and its id for posts made in the same instant. */
-const key = z.object({ t: z.number().int().nonnegative(), id: z.string().uuid() });
-
 const base = {
   v: z.literal(1),
   tab: z.enum(RANKED_TABS),
@@ -425,24 +541,26 @@ const cursorSchema = z.discriminatedUnion("at", [
   z.object({
     ...base,
     at: z.literal("ranked"),
-    offset: z
-      .number()
-      .int()
-      .min(0)
-      .max(WINDOWS.recentLimit + WINDOWS.followedLimit),
+    offset: z.number().int().min(0).max(MAX_RANKED),
   }),
-  /** Past it, newest first: posts before `before` (a null id means at or before `t`). */
+  /**
+   * Past it, newest first: posts before `before` (a null id means at or before
+   * `t`). A cursor from before the pools (with a `skip`) still reads: unknown
+   * keys are dropped.
+   */
   z.object({
     ...base,
     at: z.literal("older"),
     before: z.object({ t: z.number().int().nonnegative(), id: z.string().uuid().nullable() }),
-    /** For You: the followed members' posts at or after this were already in the ranked list. */
-    skip: key.nullable(),
   }),
 ]);
 
 export type FeedCursor = z.infer<typeof cursorSchema>;
-export type FeedKey = z.infer<typeof key>;
+/** A post's place in newest-first order: its time, and its id for posts made in the same instant. */
+export interface FeedKey {
+  t: number;
+  id: string;
+}
 export type OlderBound = Extract<FeedCursor, { at: "older" }>["before"];
 
 /** Opaque to the app: base64url JSON, versioned so its shape can change. */

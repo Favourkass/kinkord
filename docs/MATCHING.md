@@ -103,12 +103,28 @@ nobody: `hint: "no_follows"`, and the app invites them to browse members.
 
 ### For You
 
-Candidates, all made at or before `asOf` (below), never the viewer's own posts
-(they are in Following) nor a repost of one:
+Candidates come from several pools, each newest first and capped, so no one
+pool (and no busy hour) crowds the rest out as the community grows. All made
+at or before `asOf` (below), never the viewer's own posts (they are in
+Following) nor a repost of one. The founder set these on 2026-10-26.
 
-- every visible post and repost of the last 7 days, the newest 600, and
-- the posts and reposts of members the viewer followed at `asOf`, from the
-  last 30 days, the newest 400.
+| Pool | Posts and reposts | Newest |
+| --- | --- | --- |
+| Recent | everyone's, the last 7 days | 300 |
+| Followed | by members the viewer followed at `asOf`, the last 30 days | 400 |
+| Friends | by their accepted friends, followed or not, the last 30 days | 200 |
+| Interacted | by the 50 authors with the highest affinity A (below), the last 30 days | 200 |
+| Near | original posts by members in their state (within their country), the last 14 days, as Nearby reads them | 200 |
+| Trending | the posts with the most likes + 2 × comments in the last 3 days, by members in their country (anyone's, without one) | 200 |
+| Newcomers | by members who joined in the last 7 days, in their country | 60 |
+
+The near, trending and newcomer pools only count an author's place when their
+location is readable to the viewer. Near needs the viewer's state; newcomers
+need their country.
+
+What's trending is the same for every viewer, so it is read once every 5
+minutes (as of the start of those 5 minutes) and shared, by country; each
+viewer's trending pool then goes through the visibility rule like the rest.
 
 **score = relevance × 0.5^(age in hours / 36) × 0.35 if the viewer already
 liked, commented on, saved or reposted it.** The age is the row's: a repost is
@@ -117,22 +133,33 @@ new when it is made. relevance = 1 plus:
 | Part | Points |
 | --- | --- |
 | The viewer follows whoever put the row in the feed (its author, or who reposted it) | +6, and +2 more when they follow back |
+| They are friends with whoever put the row in the feed | +8, as a follow both ways, followed or not |
 | Affinity: A = the viewer's likes (1), saves (2), shares (2), comments (3) and reposts (3) of the card author's posts in the last 60 days, capped at 30 | 2.5 × ln(1 + A) |
 | Kink match: matching v1's kink parts (role side, pairs, shared kinks, shared looking-for; not place, presence or photo) | 0.4 × their sum, never below 0 |
 | The card author's gender is the one the viewer is shown by default (the same rule as the strip) | +3, none for "All" |
 | Learned kinks ("things I like"): the viewer's top 5 kinks among the authors they interacted with in 60 days, each author's kinks weighted by A | +0.5 per one the card author has, up to +2.5 |
-| Engagement: likes + 2 × comments + 3 × reposts + 2 × shares | 1.2 × ln(1 + that) |
+| Engagement velocity: likes + 2 × comments + 3 × reposts + 2 × shares, divided by 1 + (the post's age in hours / 6) | 1.2 × ln(1 + that) |
+| Newcomer: the card author joined in the last 7 days | +2 |
 | Place: the same city (and state), else the same state, else the same country | +2, else +1.5, else +1 |
 
 The card author is the original's author for a repost: affinity, kink match,
-gender, learned kinks, engagement and place are all about the post the card
-shows. States and cities only match within one country.
+gender, learned kinks, engagement, place and newcomer are all about the post
+the card shows (velocity is by the original's age). States and cities only
+match within one country.
+
+Velocity means a post taking off now beats one that gathered its likes days
+ago: 10 reactions in the last 6 hours count 5; 30 over two days count about 3.
 
 Then: **one row per post** (when an original and its reposts are all
 candidates, only the best-scoring row stays), ties to the newer row and then
 the larger id, and **never more than 2 rows in a row from one member** (the
 row's author, so a run of one member's reposts is broken up too): a greedy,
 deterministic reorder of the whole list before it is paged.
+
+**A newcomer near the viewer gets seen**: the best-ranked post by a member in
+their first 7 days, from the viewer's city or state (else their country), is
+moved up to the 4th card when it ranked lower, and the 2-in-a-row rule is
+applied again after the move.
 
 Privacy: only the viewer's own sexuality is read. An author's kinks and
 looking-for count, in the kink match and in learned kinks, only when their
@@ -161,13 +188,20 @@ interactions and counts are read as they stood at `asOf`, so a like, a follow
 from a card or a new post mid-scroll can't reshuffle the next page. The next
 first page ranks afresh.
 
+The ranked list (ids only) is kept in memory on the API instance for 10
+minutes, 200 lists at most, so later pages don't rank it again. An instance
+that doesn't have it (another instance, or later) ranks it again as of the
+same `asOf` and gets the same list.
+
 The cursor is opaque base64url JSON, versioned: `{ v: 1, tab, asOf, at:
-"ranked", offset }` inside the ranked list. When the list runs out, the page
-fills with older posts, newest first, and the cursor carries on as `{ at:
-"older", before, skip }`, so the feed never ends early: for For You, everything
-older than the week's pool, less the followed members' posts already ranked;
-for Nearby, the state's older posts. A cursor that isn't this tab's (garbage,
-another version, another tab) reads the first page.
+"ranked", offset }` inside the ranked list (offset up to 1,560, every pool
+full). When the list runs out, the page fills with older posts, newest first,
+and the cursor carries on as `{ at: "older", before }`, so the feed never ends
+early: for For You, everything older than the recent pool, less every row the
+ranked list had (its other pools reach further back; read from the remembered
+list, or by ranking it again); for Nearby, the state's older posts. A cursor
+from before the pools, with a `skip`, still reads. A cursor that isn't this
+tab's (garbage, another version, another tab) reads the first page.
 
 Known limits: an unlike, an unfollow, a deleted post or a new block between
 pages can still move a post across a page boundary (they delete rows, so they
@@ -178,7 +212,5 @@ can't be read as of `asOf`); the app drops a row it already shows.
 - Impressions: For You knows what the viewer reacted to, not what they
   scrolled past, so a post seen and ignored isn't lowered yet.
 - Negative feedback: "show me less of this", hiding a post, muting a member.
-- Keeping a ranked window between pages instead of reading it again per page.
 - Nearby by distance rather than the same city or state.
-- Widening the pools (600 recent, 400 followed, 800 nearby) once the
-  community outgrows them, and tuning the weights against real use.
+- Tuning the pools and weights against real use.

@@ -10,9 +10,10 @@ import { acceptedFriendship } from "../members/friendship-policy";
  * so the feed never runs dry early. Every query here goes through the one
  * visibility rule and leaves out both sides of a block.
  *
- * A handful of set-based queries per page, never one per post: the viewer,
- * the candidate pools, the viewer's interactions, then grouped counts and the
- * authors for every candidate at once.
+ * A handful of set-based queries per ranked list, never one per post: the
+ * viewer, the candidate pools, the viewer's interactions, then grouped counts
+ * and the authors for every candidate at once. The list is kept in memory for
+ * the pages after the first, and what's trending is shared by every viewer.
  */
 import {
   and,
@@ -24,6 +25,7 @@ import {
   isNull,
   lte,
   ne,
+  notInArray,
   or,
   sql,
   type AnyColumn,
@@ -31,12 +33,24 @@ import {
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "../db/db.module";
-import { follow, post, postComment, postLike, postSave, postShare, profile } from "../db/schema";
+import {
+  follow,
+  post,
+  postComment,
+  postLike,
+  postSave,
+  postShare,
+  profile,
+  user,
+} from "../db/schema";
 import { notBanned } from "../moderation/admins";
 import { noBlockEitherWay } from "../safety/blocks";
 import {
   DAY_MS,
+  ENGAGEMENT_WEIGHTS,
+  NEWCOMER_DAYS,
   WINDOWS,
+  affinityByAuthor,
   decodeFeedCursor,
   encodeFeedCursor,
   rankForYou,
@@ -125,10 +139,6 @@ function olderThan(before: OlderBound): SQL {
     : sql`${post.createdAt} <= ${at}::timestamptz`;
 }
 
-function atOrAfter(key: FeedKey): SQL {
-  return sql`(${post.createdAt}, ${post.id}) >= (${new Date(key.t).toISOString()}::timestamptz, ${key.id}::uuid)`;
-}
-
 /**
  * Nearby: original posts by members in the viewer's state, within their
  * country when they have one, so a state of the same name across a border
@@ -146,11 +156,32 @@ function nearbyConditions(viewer: Place, viewerId: string): SQL[] {
   ];
 }
 
+/**
+ * Posts by members in the viewer's country, where their location is readable
+ * to the viewer. Nothing to narrow by when the viewer has no country.
+ */
+function countryConditions(viewer: Place, viewerId: string): SQL[] {
+  if (!viewer.country) return [];
+  const place = and(
+    privacyAllows(viewerId, profile.userId, "location"),
+    eq(profile.country, viewer.country),
+  );
+  return [
+    sql`exists (select 1 from ${profile} where ${profile.userId} = ${post.authorId} and ${place})`,
+  ];
+}
+
+/** Posts by members who joined after `floor` (`user.created_at` is wall time, as `follow`'s). */
+function joinedSince(floor: Date): SQL {
+  return sql`exists (select 1 from ${user} where ${user.id} = ${post.authorId} and ${user.createdAt}::timestamptz > ${floor.toISOString()}::timestamptz)`;
+}
+
 interface Row {
   id: string;
   authorId: string;
   repostOfId: string | null;
   originalAuthorId: string | null;
+  originalCreatedAt: Date | null;
   createdAt: Date;
 }
 
@@ -174,6 +205,7 @@ function postRows(
       authorId: post.authorId,
       repostOfId: post.repostOfId,
       originalAuthorId: original.authorId,
+      originalCreatedAt: original.createdAt,
       createdAt: post.createdAt,
     })
     .from(post)
@@ -210,6 +242,7 @@ const toCandidate = (r: Row): FeedCandidate => ({
   contentId: r.repostOfId ?? r.id,
   contentAuthorId: r.originalAuthorId ?? r.authorId,
   createdAt: r.createdAt,
+  contentCreatedAt: r.originalCreatedAt ?? r.createdAt,
 });
 
 /** The oldest row of a newest-first pool. */
@@ -273,8 +306,10 @@ async function authorsOf(
       viewerFollows: followedAsOf(viewerId, profile.userId, asOf),
       followsViewer: followedAsOf(profile.userId, viewerId, asOf),
       isFriend: acceptedFriendship(viewerId, profile.userId),
+      joinedAt: user.createdAt,
     })
     .from(profile)
+    .innerJoin(user, eq(user.id, profile.userId))
     .where(inArray(profile.userId, ids));
   return new Map(
     rows.map((r) => [
@@ -398,17 +433,135 @@ function interactionsOf(db: Db, viewerId: string, asOf: Date): Promise<Interacti
   return likes.unionAll(saves).unionAll(shares).unionAll(comments).unionAll(reposts);
 }
 
-/** A ranked tab's window: its order, and where the older posts pick up after it. */
+/**
+ * A ranked tab's window: its order, where the older posts pick up after it,
+ * and every row it ranked, which the older posts must not repeat (For You's
+ * pools reach further back than the week's).
+ */
 interface RankedWindow {
-  ranked: FeedCandidate[];
+  /** Row ids, best first. */
+  ranked: string[];
   olderFrom: OlderBound;
-  /** For You: the followed members' pool, whose rows the older posts must not repeat. */
-  skip: FeedKey | null;
+  /** Every candidate row, shown or not. */
+  rows: FeedKey[];
 }
 
 /** Where older posts start: just past a pool's oldest row, or at its time floor when it is empty. */
 const olderFrom = (pool: Row[], floor: Date): OlderBound =>
   oldest(pool) ?? { t: floor.getTime(), id: null };
+
+const windowOf = (rows: Row[], ranked: FeedCandidate[], from: OlderBound): RankedWindow => ({
+  ranked: ranked.map((c) => c.id),
+  olderFrom: from,
+  rows: rows.map((r) => ({ t: r.createdAt.getTime(), id: r.id })),
+});
+
+/**
+ * The window's rows that posts before `before` could repeat. A row the older
+ * read returns is never newer than `before.t` (to the millisecond).
+ */
+const alreadyRanked = (window: RankedWindow, before: OlderBound): string[] =>
+  window.rows.filter((k) => k.t <= before.t).map((k) => k.id);
+
+/** A post taking off: its likes + 2 × comments in the trending window, and its author's country. */
+interface Hot {
+  postId: string;
+  country: string | null;
+  heat: number;
+}
+
+/** The trending window's posts, hottest first. Not per viewer: the visibility rule comes after. */
+async function hottest(db: Db, at: Date): Promise<Hot[]> {
+  const floor = daysBefore(at, WINDOWS.trendingDays);
+  const live = and(isNull(post.deletedAt), isNull(post.archivedAt));
+  const [likes, comments] = await Promise.all([
+    db
+      .select({ postId: postLike.postId, country: profile.country, n: count() })
+      .from(postLike)
+      .innerJoin(post, eq(post.id, postLike.postId))
+      .innerJoin(profile, eq(profile.userId, post.authorId))
+      .where(and(gt(postLike.createdAt, floor), lte(postLike.createdAt, at), live))
+      .groupBy(postLike.postId, profile.country)
+      .orderBy(desc(count()))
+      .limit(TRENDING_SCAN),
+    db
+      .select({ postId: postComment.postId, country: profile.country, n: count() })
+      .from(postComment)
+      .innerJoin(post, eq(post.id, postComment.postId))
+      .innerJoin(profile, eq(profile.userId, post.authorId))
+      .where(
+        and(
+          gt(postComment.createdAt, floor),
+          lte(postComment.createdAt, at),
+          isNull(postComment.deletedAt),
+          live,
+        ),
+      )
+      .groupBy(postComment.postId, profile.country)
+      .orderBy(desc(count()))
+      .limit(TRENDING_SCAN),
+  ]);
+  const hot = new Map<string, Hot>();
+  const add = (rows: Array<{ postId: string; country: string | null; n: number }>, w: number) => {
+    for (const r of rows) {
+      const h = hot.get(r.postId) ?? { postId: r.postId, country: r.country, heat: 0 };
+      h.heat += Number(r.n) * w;
+      hot.set(r.postId, h);
+    }
+  };
+  add(likes, ENGAGEMENT_WEIGHTS.likes);
+  add(comments, ENGAGEMENT_WEIGHTS.comments);
+  return [...hot.values()].sort(
+    (a, b) => b.heat - a.heat || (a.postId < b.postId ? -1 : a.postId > b.postId ? 1 : 0),
+  );
+}
+
+/**
+ * What's taking off is the same for every viewer, so it is read once per
+ * bucket of time, as of the bucket's start, and shared: one read every few
+ * minutes however many members open the app. Another instance reads the same.
+ */
+const TRENDING_BUCKET_MS = 5 * 60_000;
+const TRENDING_BUCKETS_KEPT = 3;
+/** The most posts a trending read counts, per kind: far more than any country's share. */
+const TRENDING_SCAN = 5000;
+const trending = new Map<number, Promise<Hot[]>>();
+
+function trendingAt(db: Db, asOf: Date): Promise<Hot[]> {
+  const bucket = asOf.getTime() - (asOf.getTime() % TRENDING_BUCKET_MS);
+  const known = trending.get(bucket);
+  if (known) return known;
+  const read = hottest(db, new Date(bucket));
+  // A failed read isn't kept: the next viewer reads again.
+  read.catch(() => trending.delete(bucket));
+  trending.set(bucket, read);
+  while (trending.size > TRENDING_BUCKETS_KEPT) trending.delete(Math.min(...trending.keys()));
+  return read;
+}
+
+/**
+ * What's taking off in the viewer's country (everywhere, when they have
+ * none), through the visibility rule and the authors' location privacy.
+ */
+async function trendingRows(
+  db: Db,
+  viewerId: string,
+  viewer: FeedViewer,
+  asOf: Date,
+): Promise<Row[]> {
+  const ids = (await trendingAt(db, asOf))
+    .filter((h) => !viewer.country || h.country === viewer.country)
+    .slice(0, WINDOWS.trendingLimit)
+    .map((h) => h.postId);
+  if (!ids.length) return [];
+  return postRows(
+    db,
+    viewerId,
+    asOf,
+    [inArray(post.id, ids), ...countryConditions(viewer, viewerId)],
+    WINDOWS.trendingLimit,
+  );
+}
 
 async function forYouWindow(
   db: Db,
@@ -417,23 +570,66 @@ async function forYouWindow(
   asOf: Date,
 ): Promise<RankedWindow> {
   const recentFloor = daysBefore(asOf, WINDOWS.recentDays);
-  const [recent, followed, interactions] = await Promise.all([
+  const since = (days: number) => gt(post.createdAt, daysBefore(asOf, days));
+  const none = Promise.resolve([] as Row[]);
+  const [recent, followed, friends, near, hot, newcomers, interactions] = await Promise.all([
     postRows(db, viewerId, asOf, [gt(post.createdAt, recentFloor)], WINDOWS.recentLimit),
     postRows(
       db,
       viewerId,
       asOf,
-      [
-        gt(post.createdAt, daysBefore(asOf, WINDOWS.followedDays)),
-        followedAsOf(viewerId, post.authorId, asOf),
-      ],
+      [since(WINDOWS.followedDays), followedAsOf(viewerId, post.authorId, asOf)],
       WINDOWS.followedLimit,
     ),
+    postRows(
+      db,
+      viewerId,
+      asOf,
+      [since(WINDOWS.friendsDays), acceptedFriendship(viewerId, post.authorId)],
+      WINDOWS.friendsLimit,
+    ),
+    viewer.state
+      ? postRows(
+          db,
+          viewerId,
+          asOf,
+          [since(WINDOWS.nearPoolDays), ...nearbyConditions(viewer, viewerId)],
+          WINDOWS.nearPoolLimit,
+        )
+      : none,
+    trendingRows(db, viewerId, viewer, asOf),
+    viewer.country
+      ? postRows(
+          db,
+          viewerId,
+          asOf,
+          [
+            since(WINDOWS.newcomerDays),
+            joinedSince(daysBefore(asOf, NEWCOMER_DAYS)),
+            ...countryConditions(viewer, viewerId),
+          ],
+          WINDOWS.newcomerLimit,
+        )
+      : none,
     interactionsOf(db, viewerId, asOf),
   ]);
-  const candidates = [...new Map([...recent, ...followed].map((r) => [r.id, r])).values()].map(
-    toCandidate,
-  );
+  // The authors the viewer interacts with most: their recent posts are a pool of their own.
+  const favourites = [...affinityByAuthor(interactions)]
+    .sort(([a, x], [b, y]) => y - x || (a < b ? -1 : a > b ? 1 : 0))
+    .slice(0, WINDOWS.interactedAuthors)
+    .map(([id]) => id);
+  const interacted = favourites.length
+    ? await postRows(
+        db,
+        viewerId,
+        asOf,
+        [since(WINDOWS.interactedDays), inArray(post.authorId, favourites)],
+        WINDOWS.interactedLimit,
+      )
+    : [];
+  const pools = [...recent, ...followed, ...friends, ...interacted, ...near, ...hot, ...newcomers];
+  const rows = [...new Map(pools.map((r) => [r.id, r])).values()];
+  const candidates = rows.map(toCandidate);
   const authorIds = new Set([
     ...candidates.flatMap((c) => [c.authorId, c.contentAuthorId]),
     ...interactions.map((i) => i.authorId),
@@ -442,11 +638,11 @@ async function forYouWindow(
     engagementOf(db, [...new Set(candidates.map((c) => c.contentId))], asOf),
     authorsOf(db, viewerId, [...authorIds], asOf),
   ]);
-  return {
-    ranked: rankForYou({ viewer, asOf, candidates, authors, engagement, interactions }),
-    olderFrom: olderFrom(recent, recentFloor),
-    skip: oldest(followed),
-  };
+  return windowOf(
+    rows,
+    rankForYou({ viewer, asOf, candidates, authors, engagement, interactions }),
+    olderFrom(recent, recentFloor),
+  );
 }
 
 async function nearbyWindow(
@@ -472,14 +668,14 @@ async function nearbyWindow(
     ),
     authorsOf(db, viewerId, [...new Set(candidates.map((c) => c.authorId))], asOf),
   ]);
-  return {
-    ranked: rankNearby({ viewer, asOf, candidates, authors, engagement }),
-    olderFrom: olderFrom(pool, floor),
-    skip: null,
-  };
+  return windowOf(
+    pool,
+    rankNearby({ viewer, asOf, candidates, authors, engagement }),
+    olderFrom(pool, floor),
+  );
 }
 
-/** Past the ranked list, newest first: For You's older posts skip the followed pool already ranked. */
+/** Past the ranked list, newest first, less the rows it already ranked. */
 function olderRows(
   db: Db,
   viewerId: string,
@@ -487,7 +683,7 @@ function olderRows(
   viewer: FeedViewer,
   asOf: Date,
   before: OlderBound,
-  skip: FeedKey | null,
+  ranked: string[],
   limit: number,
 ): Promise<Row[]> {
   return postRows(
@@ -497,12 +693,43 @@ function olderRows(
     [
       olderThan(before),
       ...(tab === "nearby" ? nearbyConditions(viewer, viewerId) : []),
-      ...(skip
-        ? [sql`not (${followedAsOf(viewerId, post.authorId, asOf)} and ${atOrAfter(skip)})`]
-        : []),
+      ...(ranked.length ? [notInArray(post.id, ranked)] : []),
     ],
     limit,
   );
+}
+
+/**
+ * A ranked list depends only on the viewer and its moment (`asOf`), so it is
+ * worked out once and later pages are read from memory, on this instance for
+ * a while. Another instance works it out again and gets the same list.
+ */
+const WINDOW_CACHE_MS = 10 * 60_000;
+const WINDOW_CACHE_MAX = 200;
+const windows = new Map<string, { at: number; window: RankedWindow }>();
+
+async function cachedWindow(
+  key: string,
+  build: () => Promise<RankedWindow>,
+): Promise<RankedWindow> {
+  const now = Date.now();
+  const hit = windows.get(key);
+  if (hit && now - hit.at < WINDOW_CACHE_MS) return hit.window;
+  const window = await build();
+  windows.delete(key);
+  windows.set(key, { at: now, window });
+  // Kept in the order they were made: drop stale ones, and the oldest beyond the cap.
+  for (const [k, v] of windows) {
+    if (windows.size <= WINDOW_CACHE_MAX && now - v.at < WINDOW_CACHE_MS) break;
+    windows.delete(k);
+  }
+  return window;
+}
+
+/** For specs: start with nothing remembered, neither ranked lists nor what's trending. */
+export function forgetFeedMemory(): void {
+  windows.clear();
+  trending.clear();
 }
 
 /**
@@ -525,41 +752,36 @@ export async function rankedTabPage(
     return { ids: [], nextCursor: null, hint: "no_location" };
   }
   const stamp = { v: 1, tab, asOf: asOf.getTime() } as const;
+  const rankedWindow = () =>
+    cachedWindow(`${tab}:${viewerId}:${asOf.getTime()}`, () =>
+      tab === "for_you"
+        ? forYouWindow(db, viewerId, viewer, asOf)
+        : nearbyWindow(db, viewerId, viewer, asOf),
+    );
   /** The cursor after `taken` of `rows` older posts, when there are more. */
-  const nextOlder = (rows: Row[], taken: number, before: OlderBound, skip: FeedKey | null) => {
+  const nextOlder = (rows: Row[], taken: number, before: OlderBound) => {
     if (rows.length <= taken) return null;
     const next: FeedCursor = {
       ...stamp,
       at: "older",
       before: oldest(rows.slice(0, taken)) ?? before,
-      skip,
     };
     return encodeFeedCursor(next);
   };
 
   if (cursor?.at === "older") {
-    const rows = await olderRows(
-      db,
-      viewerId,
-      tab,
-      viewer,
-      asOf,
-      cursor.before,
-      cursor.skip,
-      limit + 1,
-    );
+    // Nearby's one pool ends where its older posts begin; For You's other pools reach past it.
+    const ranked = tab === "for_you" ? alreadyRanked(await rankedWindow(), cursor.before) : [];
+    const rows = await olderRows(db, viewerId, tab, viewer, asOf, cursor.before, ranked, limit + 1);
     return {
       ids: rows.slice(0, limit).map((r) => r.id),
-      nextCursor: nextOlder(rows, limit, cursor.before, cursor.skip),
+      nextCursor: nextOlder(rows, limit, cursor.before),
     };
   }
 
-  const window =
-    tab === "for_you"
-      ? await forYouWindow(db, viewerId, viewer, asOf)
-      : await nearbyWindow(db, viewerId, viewer, asOf);
+  const window = await rankedWindow();
   const offset = cursor?.offset ?? 0;
-  const ranked = window.ranked.slice(offset, offset + limit).map((c) => c.id);
+  const ranked = window.ranked.slice(offset, offset + limit);
   if (offset + limit < window.ranked.length) {
     return {
       ids: ranked,
@@ -575,11 +797,11 @@ export async function rankedTabPage(
     viewer,
     asOf,
     window.olderFrom,
-    window.skip,
+    alreadyRanked(window, window.olderFrom),
     room + 1,
   );
   return {
     ids: [...ranked, ...older.slice(0, room).map((r) => r.id)],
-    nextCursor: nextOlder(older, room, window.olderFrom, window.skip),
+    nextCursor: nextOlder(older, room, window.olderFrom),
   };
 }
