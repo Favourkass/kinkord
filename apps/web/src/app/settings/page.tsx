@@ -55,6 +55,13 @@ export default function SettingsPage() {
           <ChevronRightIcon className="text-[#b8850f]" />
         </button>
         <PushSettingRow {...push.settings} />
+        <Link
+          href={Routes.settingsNotifications}
+          className="mt-[12px] flex h-[52px] items-center justify-between rounded-[16px] bg-app-members px-[18px] text-[18px] font-medium text-app-name"
+        >
+          Choose notifications
+          <ChevronRightIcon className="text-[#b8850f]" />
+        </Link>
         <p className="pt-[28px] pb-[8px] text-[14px] font-bold text-app-text">Account</p>
         <Link
           href={Routes.profileEdit}

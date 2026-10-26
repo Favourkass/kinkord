@@ -50,10 +50,23 @@ const sub = (id: string, endpoint = `https://fcm.googleapis.com/fcm/send/${id}`)
 // or a blocked sender, and nothing goes to their devices.
 const inboxRecord = vi.fn(async (): Promise<string | null> => "notification-1");
 const inboxReadConversation = vi.fn(async () => undefined);
-const inbox = () => ({ record: inboxRecord, readConversation: inboxReadConversation }) as never;
+const inboxHoldPush = vi.fn(async () => undefined);
+const inbox = () =>
+  ({
+    record: inboxRecord,
+    readConversation: inboxReadConversation,
+    holdPush: inboxHoldPush,
+  }) as never;
+// The schedule (push-policy.ts) has its own specs; by default it lets every push go now.
+const scheduleDecide = vi.fn(async (): Promise<"send" | "hold" | "drop"> => "send");
+const scheduleRecordSent = vi.fn(async () => undefined);
+const schedule = () => ({ decide: scheduleDecide, recordSent: scheduleRecordSent }) as never;
 beforeEach(() => {
   inboxRecord.mockClear();
   inboxReadConversation.mockClear();
+  inboxHoldPush.mockClear();
+  scheduleDecide.mockClear().mockResolvedValue("send");
+  scheduleRecordSent.mockClear();
 });
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
@@ -62,7 +75,7 @@ describe("PushService keys", () => {
 
   it("uses the stored key pair", async () => {
     const { db } = queuedDb([[KEYS]]);
-    await expect(new PushService(db, inbox()).publicKey()).resolves.toBe("PUB");
+    await expect(new PushService(db, inbox(), schedule()).publicKey()).resolves.toBe("PUB");
     expect(generateVAPIDKeys).not.toHaveBeenCalled();
   });
 
@@ -72,7 +85,7 @@ describe("PushService keys", () => {
       undefined, // insert ... on conflict do nothing
       [KEYS], // another instance got there first: read back what's stored
     ]);
-    await expect(new PushService(db, inbox()).publicKey()).resolves.toBe("PUB");
+    await expect(new PushService(db, inbox(), schedule()).publicKey()).resolves.toBe("PUB");
     expect(after("insert", pushVapidKey, "values")).toEqual({
       id: 1,
       publicKey: "PUB-new",
@@ -82,7 +95,7 @@ describe("PushService keys", () => {
 
   it("reads the keys once per process", async () => {
     const { db, left } = queuedDb([[KEYS]]);
-    const service = new PushService(db, inbox());
+    const service = new PushService(db, inbox(), schedule());
     await service.publicKey();
     await service.publicKey();
     expect(left()).toBe(0);
@@ -92,7 +105,7 @@ describe("PushService keys", () => {
 describe("PushService subscriptions", () => {
   it("remembers a device, moving it to whoever signs in on it", async () => {
     const { db, after, calls } = queuedDb([undefined]);
-    await new PushService(db, inbox()).subscribe(
+    await new PushService(db, inbox(), schedule()).subscribe(
       "u1",
       { endpoint: "https://push.example/abc", keys: { p256dh: "p", auth: "a" } },
       "Chrome",
@@ -119,7 +132,7 @@ describe("PushService sending", () => {
   it("sends to each of the member's devices with our VAPID keys", async () => {
     const { db } = queuedDb([[sub("s1"), sub("s2")], [KEYS]]);
     const message = { title: "Kinkord", body: "hi", url: "/home", tag: "t" };
-    await expect(new PushService(db, inbox()).sendTo("u2", message)).resolves.toBe(2);
+    await expect(new PushService(db, inbox(), schedule()).sendTo("u2", message)).resolves.toBe(2);
     expect(sendNotification).toHaveBeenCalledTimes(2);
     const [target, payload, options] = sendNotification.mock.calls[0];
     expect(target).toEqual({
@@ -139,7 +152,12 @@ describe("PushService sending", () => {
       .mockRejectedValueOnce(Object.assign(new Error("Server"), { statusCode: 500 }));
     const { db, calls } = queuedDb([[sub("s1"), sub("s2")], [KEYS], undefined]);
     await expect(
-      new PushService(db, inbox()).sendTo("u2", { title: "t", body: "b", url: "/", tag: "t" }),
+      new PushService(db, inbox(), schedule()).sendTo("u2", {
+        title: "t",
+        body: "b",
+        url: "/",
+        tag: "t",
+      }),
     ).resolves.toBe(0);
     expect(calls.filter((c) => c.op === "delete")).toHaveLength(1);
   });
@@ -147,7 +165,12 @@ describe("PushService sending", () => {
   it("asks nothing more when the member has no devices", async () => {
     const { db, left } = queuedDb([[]]);
     await expect(
-      new PushService(db, inbox()).sendTo("u2", { title: "t", body: "b", url: "/", tag: "t" }),
+      new PushService(db, inbox(), schedule()).sendTo("u2", {
+        title: "t",
+        body: "b",
+        url: "/",
+        tag: "t",
+      }),
     ).resolves.toBe(0);
     expect(left()).toBe(0);
     expect(sendNotification).not.toHaveBeenCalled();
@@ -158,13 +181,47 @@ describe("PushService notifications", () => {
   beforeEach(() => sendNotification.mockReset().mockResolvedValue({ statusCode: 201 }));
   const sent = () => JSON.parse(sendNotification.mock.calls[0][1]);
 
+  it("holds a push the schedule says should wait, keeping it in the inbox", async () => {
+    scheduleDecide.mockResolvedValueOnce("hold");
+    const { db } = queuedDb([[{ username: "ada", name: "Adaeze", displayName: "Ada" }]]);
+    new PushService(db, inbox(), schedule()).newLike("p1", "u2", "u1");
+    await flush();
+    expect(inboxRecord).toHaveBeenCalledOnce();
+    expect(scheduleDecide).toHaveBeenCalledWith("u2", "like");
+    expect(inboxHoldPush).toHaveBeenCalledWith("notification-1");
+    expect(sendNotification).not.toHaveBeenCalled();
+    expect(scheduleRecordSent).not.toHaveBeenCalled();
+  });
+
+  it("keeps a kind the member turned off out of their devices, but in the inbox", async () => {
+    scheduleDecide.mockResolvedValueOnce("drop");
+    const { db } = queuedDb([[{ username: "ada", name: "Adaeze", displayName: "Ada" }]]);
+    new PushService(db, inbox(), schedule()).newFollower("u1", "u2");
+    await flush();
+    expect(inboxRecord).toHaveBeenCalledOnce();
+    expect(inboxHoldPush).not.toHaveBeenCalled();
+    expect(sendNotification).not.toHaveBeenCalled();
+  });
+
+  it("counts a push that reached a device towards spacing and the daily cap", async () => {
+    const { db } = queuedDb([
+      [{ username: "ada", name: "Adaeze", displayName: "Ada" }],
+      [sub("s1")],
+      [KEYS],
+    ]);
+    new PushService(db, inbox(), schedule()).newLike("p1", "u2", "u1");
+    await flush();
+    expect(sendNotification).toHaveBeenCalledOnce();
+    expect(scheduleRecordSent).toHaveBeenCalledWith("u2", "like");
+  });
+
   it("says who messaged, never what they wrote", async () => {
     const { db } = queuedDb([
       [{ username: "ada", name: "Adaeze", displayName: "Ada" }],
       [sub("s1")],
       [KEYS],
     ]);
-    new PushService(db, inbox()).newMessage("u1", "u2", "c1");
+    new PushService(db, inbox(), schedule()).newMessage("u1", "u2", "c1");
     await flush();
     expect(sent()).toEqual({
       title: "Kinkord",
@@ -181,7 +238,7 @@ describe("PushService notifications", () => {
       [sub("s1")],
       [KEYS],
     ]);
-    new PushService(db, inbox()).newFollower("u1", "u2");
+    new PushService(db, inbox(), schedule()).newFollower("u1", "u2");
     await flush();
     expect(sent()).toMatchObject({ body: "raven followed you", url: "/u/raven" });
   });
@@ -192,7 +249,7 @@ describe("PushService notifications", () => {
       [sub("s1")],
       [KEYS],
     ]);
-    new PushService(db, inbox()).friendRequest("u1", "u2", "request-1");
+    new PushService(db, inbox(), schedule()).friendRequest("u1", "u2", "request-1");
     await flush();
     expect(inboxRecord).toHaveBeenCalledWith("u2", {
       type: "friend_request",
@@ -210,7 +267,7 @@ describe("PushService notifications", () => {
       [sub("s1")],
       [KEYS],
     ]);
-    new PushService(db, inbox()).friendAccepted("u1", "u2", "request-1");
+    new PushService(db, inbox(), schedule()).friendAccepted("u1", "u2", "request-1");
     await flush();
     expect(sent()).toMatchObject({ body: "raven accepted your friend request", url: "/u/raven" });
   });
@@ -221,7 +278,7 @@ describe("PushService notifications", () => {
       [sub("s1")],
       [KEYS],
     ]);
-    new PushService(db, inbox()).tagged("p1", "u2", "u1");
+    new PushService(db, inbox(), schedule()).tagged("p1", "u2", "u1");
     await flush();
     expect(inboxRecord).toHaveBeenCalledWith("u2", { type: "tag", actorId: "u1", subjectId: "p1" });
     expect(sent()).toMatchObject({ body: "raven tagged you in a post", url: "/p/p1" });
@@ -229,7 +286,7 @@ describe("PushService notifications", () => {
 
   it("never tells an author they tagged themselves", async () => {
     const own = queuedDb([]);
-    new PushService(own.db, inbox()).tagged("p1", "u1", "u1");
+    new PushService(own.db, inbox(), schedule()).tagged("p1", "u1", "u1");
     await flush();
     expect(own.calls).toHaveLength(0);
   });
@@ -240,7 +297,7 @@ describe("PushService notifications", () => {
       [sub("s1")],
       [KEYS],
     ]);
-    new PushService(db, inbox()).relationshipRequest("u1", "u2", "link-1");
+    new PushService(db, inbox(), schedule()).relationshipRequest("u1", "u2", "link-1");
     await flush();
     expect(inboxRecord).toHaveBeenCalledWith("u2", {
       type: "relationship_request",
@@ -259,7 +316,7 @@ describe("PushService notifications", () => {
       [sub("s1")],
       [KEYS],
     ]);
-    new PushService(db, inbox()).relationshipAccepted("u2", "u1", "link-1");
+    new PushService(db, inbox(), schedule()).relationshipAccepted("u2", "u1", "link-1");
     await flush();
     expect(sent()).toMatchObject({
       body: "raven accepted your relationship request",
@@ -269,7 +326,7 @@ describe("PushService notifications", () => {
 
   it("tells an author about a comment, but not about their own", async () => {
     const own = queuedDb([]);
-    new PushService(own.db, inbox()).newComment("p1", "u1", "u1");
+    new PushService(own.db, inbox(), schedule()).newComment("p1", "u1", "u1");
     await flush();
     expect(own.calls).toHaveLength(0);
 
@@ -278,14 +335,14 @@ describe("PushService notifications", () => {
       [sub("s1")],
       [KEYS],
     ]);
-    new PushService(db, inbox()).newComment("p1", "u2", "u1");
+    new PushService(db, inbox(), schedule()).newComment("p1", "u2", "u1");
     await flush();
     expect(sent()).toMatchObject({ body: "Ada commented on your post", url: "/p/p1" });
   });
 
   it("tells a member they were mentioned, who by, and never themselves", async () => {
     const own = queuedDb([]);
-    new PushService(own.db, inbox()).newMention("p1", "u1", "u1");
+    new PushService(own.db, inbox(), schedule()).newMention("p1", "u1", "u1");
     await flush();
     expect(own.calls).toHaveLength(0);
 
@@ -294,7 +351,7 @@ describe("PushService notifications", () => {
       [sub("s1")],
       [KEYS],
     ]);
-    new PushService(db, inbox()).newMention("p1", "u2", "u1");
+    new PushService(db, inbox(), schedule()).newMention("p1", "u2", "u1");
     await flush();
     expect(sent()).toMatchObject({ body: "Ada mentioned you", url: "/p/p1" });
   });
@@ -306,7 +363,7 @@ describe("PushService notifications", () => {
       [sub("s1")],
       [KEYS],
     ]);
-    new PushService(db, inbox()).newReport();
+    new PushService(db, inbox(), schedule()).newReport();
     await flush();
     expect(sendNotification).toHaveBeenCalledTimes(1);
     expect(sent()).toEqual({
@@ -320,7 +377,7 @@ describe("PushService notifications", () => {
 
   it("pings every admin about a payment to verify, saying nothing about whose", async () => {
     const { db } = queuedDb([[{ id: "f1" }], [], [sub("s1")], [KEYS]]);
-    new PushService(db, inbox()).newPayment();
+    new PushService(db, inbox(), schedule()).newPayment();
     await flush();
     expect(inboxRecord).toHaveBeenCalledWith("f1", { type: "payment" });
     expect(sent()).toEqual({
@@ -334,7 +391,7 @@ describe("PushService notifications", () => {
 
   it("asks the admins to look at a Silver check after a profile change", async () => {
     const { db } = queuedDb([[{ id: "f1" }], [], [sub("s1")], [KEYS]]);
-    new PushService(db, inbox()).silverCheckReview();
+    new PushService(db, inbox(), schedule()).silverCheckReview();
     await flush();
     expect(inboxRecord).toHaveBeenCalledWith("f1", { type: "silver_check" });
     expect(sent()).toMatchObject({
@@ -346,7 +403,7 @@ describe("PushService notifications", () => {
 
   it("tells a member their payment was confirmed, or wasn't", async () => {
     const verified = queuedDb([[sub("s1")], [KEYS]]);
-    new PushService(verified.db, inbox()).paymentVerified("u2", "pay1");
+    new PushService(verified.db, inbox(), schedule()).paymentVerified("u2", "pay1");
     await flush();
     expect(inboxRecord).toHaveBeenCalledWith("u2", {
       type: "payment_verified",
@@ -360,7 +417,7 @@ describe("PushService notifications", () => {
 
     sendNotification.mockClear();
     const rejected = queuedDb([[sub("s1")], [KEYS]]);
-    new PushService(rejected.db, inbox()).paymentRejected("u2", "pay2");
+    new PushService(rejected.db, inbox(), schedule()).paymentRejected("u2", "pay2");
     await flush();
     expect(sent()).toMatchObject({
       body: "We couldn't confirm your payment",
@@ -371,7 +428,7 @@ describe("PushService notifications", () => {
 
   it("pings every moderator about a verification waiting for them, saying nothing about whose", async () => {
     const { db } = queuedDb([[{ id: "f1" }], [], [sub("s1")], [KEYS]]);
-    new PushService(db, inbox()).newVerificationReview();
+    new PushService(db, inbox(), schedule()).newVerificationReview();
     await flush();
     expect(inboxRecord).toHaveBeenCalledWith("f1", { type: "verification" });
     expect(sent()).toEqual({
@@ -392,7 +449,9 @@ describe("PushService notifications", () => {
       [sub("s1")],
       [KEYS],
     ]);
-    expect(() => new PushService(db, inbox()).newMessage("u1", "u2", "c1")).not.toThrow();
+    expect(() =>
+      new PushService(db, inbox(), schedule()).newMessage("u1", "u2", "c1"),
+    ).not.toThrow();
     await flush();
   });
 });
@@ -404,7 +463,9 @@ describe("inbox and push delivery", () => {
 
   it("stores the event even when the recipient has no push devices", async () => {
     const { db } = queuedDb([[]]);
-    await expect(new PushService(db, inbox()).deliver("u2", follow, message)).resolves.toBe(0);
+    await expect(
+      new PushService(db, inbox(), schedule()).deliver("u2", follow, message),
+    ).resolves.toBe(0);
     expect(inboxRecord).toHaveBeenCalledWith("u2", follow);
     expect(sendNotification).not.toHaveBeenCalled();
   });
@@ -412,7 +473,9 @@ describe("inbox and push delivery", () => {
   it("sends nothing the inbox didn't store: a repeat, or a member they've blocked", async () => {
     inboxRecord.mockResolvedValueOnce(null);
     const { db, calls } = queuedDb([]);
-    await expect(new PushService(db, inbox()).deliver("u2", follow, message)).resolves.toBe(0);
+    await expect(
+      new PushService(db, inbox(), schedule()).deliver("u2", follow, message),
+    ).resolves.toBe(0);
     expect(calls).toHaveLength(0);
     expect(sendNotification).not.toHaveBeenCalled();
   });
@@ -422,7 +485,7 @@ describe("inbox and push delivery", () => {
       .mockRejectedValueOnce(new Error("offline"))
       .mockRejectedValueOnce(new Error("offline"));
     const { db } = queuedDb([[sub("s1"), sub("s2")], [KEYS]]);
-    await new PushService(db, inbox()).deliver("u2", follow, message);
+    await new PushService(db, inbox(), schedule()).deliver("u2", follow, message);
     expect(inboxRecord).toHaveBeenCalledTimes(1);
     expect(sendNotification).toHaveBeenCalledTimes(2);
   });
@@ -431,10 +494,10 @@ describe("inbox and push delivery", () => {
     "maps %s to the right inbox event and skips a member's own activity",
     async (method) => {
       const own = queuedDb([]);
-      new PushService(own.db, inbox())[method]("p1", "u1", "u1");
+      new PushService(own.db, inbox(), schedule())[method]("p1", "u1", "u1");
       expect(inboxRecord).not.toHaveBeenCalled();
       const { db } = queuedDb([[{ displayName: "Ada" }], []]);
-      new PushService(db, inbox())[method]("p1", "u2", "u1");
+      new PushService(db, inbox(), schedule())[method]("p1", "u2", "u1");
       await flush();
       expect(inboxRecord).toHaveBeenCalledWith("u2", {
         type: method === "newLike" ? "like" : "repost",
@@ -447,7 +510,7 @@ describe("inbox and push delivery", () => {
   it("files a message under its chat, at the message's own time", async () => {
     const sentAt = new Date("2026-10-03T10:00:00.000Z");
     const { db } = queuedDb([[{ displayName: "Ada" }], []]);
-    new PushService(db, inbox()).newMessage("u1", "u2", "c1", sentAt);
+    new PushService(db, inbox(), schedule()).newMessage("u1", "u2", "c1", sentAt);
     await flush();
     expect(inboxRecord).toHaveBeenCalledWith("u2", {
       type: "message",
@@ -460,7 +523,9 @@ describe("inbox and push delivery", () => {
   it("clears a chat's inbox row when the member reads it, without failing the read", async () => {
     inboxReadConversation.mockRejectedValueOnce(new Error("db down"));
     const at = new Date("2026-10-03T10:00:00.000Z");
-    expect(() => new PushService(queuedDb([]).db, inbox()).chatRead("u2", "c1", at)).not.toThrow();
+    expect(() =>
+      new PushService(queuedDb([]).db, inbox(), schedule()).chatRead("u2", "c1", at),
+    ).not.toThrow();
     await flush();
     expect(inboxReadConversation).toHaveBeenCalledWith("u2", "c1", at);
   });

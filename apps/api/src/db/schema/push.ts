@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, index, pgTable, smallint, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { check, index, jsonb, pgTable, smallint, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
 /**
@@ -40,4 +40,34 @@ export const pushVapidKey = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [check("push_vapid_key_single_row", sql`${t.id} = 1`)],
+);
+
+/**
+ * Which kinds of push the member has turned off in Settings → Notifications
+ * (groups from push/push-policy.ts). The inbox keeps everything either way;
+ * this only decides what reaches their devices.
+ */
+export const pushPreference = pgTable("push_preference", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  off: jsonb("off").$type<string[]>().notNull().default([]),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * Every push a member's devices were sent, by notification type. It spaces out
+ * bundled pushes and caps how many go out in a day (push/push-policy.ts).
+ */
+export const pushSent = pgTable(
+  "push_sent",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("push_sent_user_idx").on(t.userId, t.sentAt)],
 );

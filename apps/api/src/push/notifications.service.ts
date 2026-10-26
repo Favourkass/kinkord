@@ -246,6 +246,14 @@ export class NotificationsService {
     return id;
   }
 
+  /** Its push waits for the digest (push-digest.service.ts): bundled, or held through quiet hours. */
+  async holdPush(notificationId: string): Promise<void> {
+    await this.db
+      .update(notification)
+      .set({ pushPending: true })
+      .where(eq(notification.id, notificationId));
+  }
+
   async list(
     userId: string,
     query: InboxQuery = {},

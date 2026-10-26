@@ -1,4 +1,14 @@
-import { index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import {
+  boolean,
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
 export type NotificationType =
@@ -59,6 +69,11 @@ export const notification = pgTable(
     count: integer("count").notNull().default(1),
     createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).defaultNow().notNull(),
     readAt: timestamp("read_at", { withTimezone: true, precision: 3 }),
+    /**
+     * Its push is waiting: a like, repost or follow being bundled, or anything
+     * held through quiet hours. The digest job sends and clears it.
+     */
+    pushPending: boolean("push_pending").notNull().default(false),
   },
   (t) => [
     index("notification_user_created_idx").on(t.userId, t.createdAt, t.id),
@@ -67,5 +82,8 @@ export const notification = pgTable(
     uniqueIndex("notification_user_dedupe_idx").on(t.userId, t.dedupeKey),
     // Deleting a member clears what they did from everyone's inbox.
     index("notification_actor_idx").on(t.actorId),
+    index("notification_push_pending_idx")
+      .on(t.createdAt)
+      .where(sql`push_pending`),
   ],
 );

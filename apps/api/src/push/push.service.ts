@@ -5,6 +5,7 @@ import { DRIZZLE, type Db } from "../db/db.module";
 import { profile, pushSubscription, pushVapidKey, user } from "../db/schema";
 import { adminUserIds, notBanned } from "../moderation/admins";
 import { NotificationsService, notificationUrl, type InboxEvent } from "./notifications.service";
+import { PushScheduleService } from "./push-schedule.service";
 
 /**
  * What a notification says and where tapping it goes. Discreet on purpose: on
@@ -45,16 +46,26 @@ export class PushService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Db,
     private readonly inbox: NotificationsService,
+    private readonly schedule: PushScheduleService,
   ) {}
 
   /**
-   * Stores the event in the recipient's inbox, then tells their devices. What
-   * the inbox doesn't store (a repeat, or a member they've blocked) isn't sent.
+   * Stores the event in the recipient's inbox, then tells their devices now,
+   * later or not at all (push-policy.ts). What the inbox doesn't store (a
+   * repeat, or a member they've blocked) isn't sent.
    */
   async deliver(userId: string, event: InboxEvent, message: PushMessage): Promise<number> {
     const notificationId = await this.inbox.record(userId, event);
     if (!notificationId) return 0;
-    return this.sendTo(userId, { ...message, notificationId });
+    const decision = await this.schedule.decide(userId, event.type);
+    if (decision === "drop") return 0;
+    if (decision === "hold") {
+      await this.inbox.holdPush(notificationId);
+      return 0;
+    }
+    const sent = await this.sendTo(userId, { ...message, notificationId });
+    if (sent > 0) await this.schedule.recordSent(userId, event.type);
+    return sent;
   }
 
   /** The member read a chat up to `upTo`: its inbox row clears too. Never fails the read. */
