@@ -1,7 +1,18 @@
-import { BadRequestException, Body, Controller, Get, Post, Req, UseGuards } from "@nestjs/common";
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Header,
+  Patch,
+  Post,
+  Req,
+  UseGuards,
+} from "@nestjs/common";
 import type { z } from "zod";
 import { AllowDuringSignUp, AuthGuard, type AuthedRequest } from "../auth/auth.guard";
 import { endpointSchema, subscriptionSchema } from "./dto";
+import { PushPreferencesService } from "./push-preferences.service";
 import { PushService } from "./push.service";
 
 function parse<S extends z.ZodTypeAny>(schema: S, input: unknown): z.infer<S> {
@@ -16,7 +27,22 @@ function parse<S extends z.ZodTypeAny>(schema: S, input: unknown): z.infer<S> {
 @Controller("push")
 @UseGuards(AuthGuard)
 export class PushController {
-  constructor(private readonly push: PushService) {}
+  constructor(
+    private readonly push: PushService,
+    private readonly preferences: PushPreferencesService,
+  ) {}
+
+  /** Settings → Notifications: which kinds reach the member's devices. */
+  @Get("preferences")
+  @Header("Cache-Control", "no-store")
+  getPreferences(@Req() req: AuthedRequest) {
+    return this.preferences.get(req.user.id);
+  }
+
+  @Patch("preferences")
+  updatePreferences(@Req() req: AuthedRequest, @Body() body: unknown) {
+    return this.preferences.update(req.user.id, body);
+  }
 
   /** The key a browser subscribes with. */
   @Get("key")
