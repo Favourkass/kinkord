@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   FOR_YOU,
+  MAX_RANKED,
   MAX_RUN,
   affinityByAuthor,
   arrange,
@@ -9,6 +10,7 @@ import {
   engagementCount,
   forYouScorer,
   freshness,
+  isNewcomer,
   kinksReadable,
   learnedKinks,
   nearbyScore,
@@ -18,6 +20,8 @@ import {
   reactedTo,
   readableKinks,
   spreadAuthors,
+  velocity,
+  withNewcomerSlot,
   type FeedAuthor,
   type FeedCandidate,
   type FeedCursor,
@@ -338,12 +342,44 @@ describe("For You's score", () => {
     expect(score(repost)).toMatchObject({ follows: 6, gender: 3 });
   });
 
-  it("counts engagement as 1.2 × ln(1 + likes + 2·comments + 3·reposts + 2·shares)", () => {
+  it("gives a friend +8, as a follow both ways, followed or not", () => {
+    const score = forYouScorer(
+      signals({
+        authors: authors(
+          author("pal", { isFriend: true }),
+          author("both", { isFriend: true, viewerFollows: true }),
+        ),
+      }),
+    );
+    expect(score(post("p1", "pal")).follows).toBe(8);
+    expect(score(post("p2", "both")).follows).toBe(8);
+  });
+
+  it("counts engagement as 1.2 × ln(1 + its velocity)", () => {
     const engagement = new Map([["p1", { likes: 3, comments: 1, reposts: 1, shares: 1 }]]);
     const score = forYouScorer(signals({ engagement }));
-    expect(score(post("p1", "a")).engagement).toBeCloseTo(1.2 * Math.log(1 + 10));
-    // A repost's row counts the post it shows.
-    expect(score(post("r1", "b", { contentId: "p1" })).engagement).toBeCloseTo(1.2 * Math.log(11));
+    // likes + 2·comments + 3·reposts + 2·shares = 10, on a post 6 hours old: 5.
+    expect(score(post("p1", "a", { createdAt: hoursAgo(6) })).engagement).toBeCloseTo(
+      1.2 * Math.log(1 + 5),
+    );
+    // A repost's row counts the post it shows, as old as that post is.
+    const repost = post("r1", "b", {
+      contentId: "p1",
+      createdAt: hoursAgo(1),
+      contentCreatedAt: hoursAgo(6),
+    });
+    expect(score(repost).engagement).toBeCloseTo(1.2 * Math.log(6));
+  });
+
+  it("lets a post taking off now outrank one that gathered more likes days ago", () => {
+    const engagement = new Map([
+      ["now", { likes: 12, comments: 0, reposts: 0, shares: 0 }],
+      ["then", { likes: 40, comments: 0, reposts: 0, shares: 0 }],
+    ]);
+    const score = forYouScorer(signals({ engagement }));
+    const now = score(post("now", "a", { createdAt: hoursAgo(2) }));
+    const then = score(post("then", "b", { createdAt: hoursAgo(72) }));
+    expect(now.engagement).toBeGreaterThan(then.engagement);
   });
 
   it("multiplies relevance by freshness and the reacted factor", () => {
@@ -383,6 +419,92 @@ describe("For You's score", () => {
     const once = rankForYou({ ...s, candidates }).map((c) => c.id);
     const again = rankForYou({ ...s, candidates: [...candidates].reverse() }).map((c) => c.id);
     expect(again).toEqual(once);
+  });
+});
+
+describe("velocity", () => {
+  it("slows reactions by age: 10 in 6 hours count 5, 30 over two days about 3.3", () => {
+    expect(velocity(10, asOf, asOf)).toBe(10);
+    expect(velocity(10, hoursAgo(6), asOf)).toBeCloseTo(5);
+    expect(velocity(30, hoursAgo(48), asOf)).toBeCloseTo(30 / 9);
+  });
+
+  it("never rewards a post stamped after the moment ranked at", () => {
+    expect(velocity(10, new Date(asOf.getTime() + 3_600_000), asOf)).toBe(10);
+  });
+});
+
+describe("newcomers", () => {
+  const me = viewer({ city: "Ikeja", state: "Lagos", country: "NG" });
+  const newcomer = (userId: string, over: Partial<FeedAuthor> = {}) =>
+    author(userId, { state: "Lagos", country: "NG", joinedAt: hoursAgo(48), ...over });
+
+  it("are members in their first 7 days", () => {
+    expect(isNewcomer(newcomer("n"), asOf)).toBe(true);
+    expect(isNewcomer(newcomer("n", { joinedAt: hoursAgo(7 * 24) }), asOf)).toBe(true);
+    expect(isNewcomer(newcomer("n", { joinedAt: hoursAgo(7 * 24 + 1) }), asOf)).toBe(false);
+    expect(isNewcomer(newcomer("n", { joinedAt: null }), asOf)).toBe(false);
+    expect(isNewcomer(author("n"), asOf)).toBe(false);
+    // Joined after the moment ranked at: not counted until the next first page.
+    expect(isNewcomer(newcomer("n", { joinedAt: new Date(asOf.getTime() + 1) }), asOf)).toBe(false);
+  });
+
+  it("get +2 on the card they wrote, wherever they are", () => {
+    const score = forYouScorer(
+      signals({ authors: authors(newcomer("n", { state: null, country: "KE" }), author("old")) }),
+    );
+    expect(score(post("p1", "n")).newcomer).toBe(2);
+    expect(score(post("p2", "old")).newcomer).toBe(0);
+    // A repost of a newcomer's post: the card is theirs.
+    expect(score(post("r1", "old", { contentId: "p1", contentAuthorId: "n" })).newcomer).toBe(2);
+  });
+
+  it("move the best post by one near the viewer up to the 4th card, keeping runs of two", () => {
+    const ranked = rankForYou({
+      ...signals({
+        viewer: me,
+        authors: authors(
+          author("a", { viewerFollows: true }),
+          author("b"),
+          author("c"),
+          newcomer("n"),
+        ),
+      }),
+      candidates: [
+        ...[1, 2, 3, 4, 5].map((h) => post(`a${h}`, "a", { createdAt: hoursAgo(h) })),
+        post("b1", "b", { createdAt: hoursAgo(1) }),
+        post("n1", "n", { createdAt: hoursAgo(100) }),
+        post("c1", "c", { createdAt: hoursAgo(150) }),
+      ],
+    });
+    // Ranked a1 a2 b1 a3 a4 n1 a5 c1; n1 moves up, and c1 breaks the run it leaves behind.
+    expect(ranked.map((c) => c.id)).toEqual(["a1", "a2", "b1", "n1", "a3", "a4", "c1", "a5"]);
+  });
+
+  it("from the viewer's state or city first, else their country, else nobody", () => {
+    const ids = ["x0", "x1", "x2", "x3", "x4", "far", "country", "state"];
+    const rows = ids.map((id) => post(id, id));
+    const near = (c: FeedCandidate) => (c.id === "state" ? 0 : c.id === "country" ? 1 : null);
+    expect(withNewcomerSlot(rows, near).map((c) => c.id)).toEqual([
+      "x0",
+      "x1",
+      "x2",
+      "state",
+      "x3",
+      "x4",
+      "far",
+      "country",
+    ]);
+    const countryOnly = (c: FeedCandidate) => (c.id === "country" ? 1 : null);
+    expect(
+      withNewcomerSlot(rows, countryOnly)
+        .map((c) => c.id)
+        .indexOf("country"),
+    ).toBe(3);
+    expect(withNewcomerSlot(rows, () => null)).toEqual(rows);
+    // Already at or above the slot: left where it is.
+    const early = (c: FeedCandidate) => (c.id === "x1" ? 0 : null);
+    expect(withNewcomerSlot(rows, early)).toEqual(rows);
   });
 });
 
@@ -497,7 +619,6 @@ describe("the cursor", () => {
     asOf: asOf.getTime(),
     at: "older",
     before: { t: hoursAgo(400).getTime(), id: ID(7) },
-    skip: null,
   };
 
   it("round-trips, opaque to the app", () => {
@@ -505,8 +626,22 @@ describe("the cursor", () => {
     expect(raw).toMatch(/^[A-Za-z0-9_-]+$/);
     expect(decodeFeedCursor(raw, "for_you")).toEqual(ranked);
     expect(decodeFeedCursor(encodeFeedCursor(older), "nearby")).toEqual(older);
-    const fromTheFloor = { ...older, before: { t: 5, id: null }, skip: { t: 9, id: ID(1) } };
+    const fromTheFloor = { ...older, before: { t: 5, id: null } };
     expect(decodeFeedCursor(encodeFeedCursor(fromTheFloor), "nearby")).toEqual(fromTheFloor);
+  });
+
+  it("still reads an older-posts cursor from before the pools, dropping its skip", () => {
+    const b64 = (v: unknown) => Buffer.from(JSON.stringify(v)).toString("base64url");
+    expect(decodeFeedCursor(b64({ ...older, skip: { t: 9, id: ID(1) } }), "nearby")).toEqual(older);
+  });
+
+  it("reaches the end of the longest ranked list, and no further", () => {
+    const b64 = (v: unknown) => Buffer.from(JSON.stringify(v)).toString("base64url");
+    expect(decodeFeedCursor(b64({ ...ranked, offset: MAX_RANKED }), "for_you")).toMatchObject({
+      offset: MAX_RANKED,
+    });
+    expect(decodeFeedCursor(b64({ ...ranked, offset: MAX_RANKED + 1 }), "for_you")).toBeNull();
+    expect(MAX_RANKED).toBe(1560);
   });
 
   it("is nothing (the first page) when it isn't this tab's cursor", () => {
