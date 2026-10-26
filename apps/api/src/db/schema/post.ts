@@ -197,3 +197,51 @@ export const postTag = pgTable(
     index("post_tag_user_idx").on(t.userId, t.createdAt),
   ],
 );
+
+/**
+ * The posts a member's feed has shown them (a card on screen for a second):
+ * For You lowers a post each time it was seen, so a fresh list shows what's
+ * new. Rows unseen for 30 days are cleared.
+ */
+export const postSeen = pgTable(
+  "post_seen",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => post.id, { onDelete: "cascade" }),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).defaultNow().notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).defaultNow().notNull(),
+    /** Visits of the feed it was seen on. */
+    times: integer("times").notNull().default(1),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.postId] }),
+    // Clearing the rows past 30 days.
+    index("post_seen_last_seen_idx").on(t.lastSeenAt),
+  ],
+);
+
+/**
+ * "Not interested" in a post: it never shows in the member's For You or
+ * Nearby again, and its author's other posts rank lower there for a while.
+ */
+export const postNotInterested = pgTable(
+  "post_not_interested",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => post.id, { onDelete: "cascade" }),
+    /** Who wrote it, so their other posts can be lowered without a join. */
+    authorId: text("author_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.postId] })],
+);

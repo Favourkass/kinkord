@@ -32,6 +32,11 @@ export const FEED_COPY = {
   star: "Star",
   crown: "Crown",
   shareCopied: "Link copied",
+  /** For You and Nearby: a post the member doesn't want shown, and what the toast says. */
+  notInterested: "Not interested",
+  notInterestedDone: "Got it. You'll see fewer posts like this.",
+  notInterestedFailed: "Couldn't do that. Try again.",
+  undo: "Undo",
   postHeading: "Post",
   postGone: "This post is no longer available.",
   savedHeading: "Saved",
@@ -144,6 +149,7 @@ export const POST_CARD_LABELS = {
   following: FEED_COPY.following,
   with: FEED_COPY.taggedWith,
   removeTag: FEED_COPY.removeTag,
+  notInterested: FEED_COPY.notInterested,
 } as const;
 
 /** Display-ready controls for the post editor. */

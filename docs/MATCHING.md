@@ -126,9 +126,17 @@ What's trending is the same for every viewer, so it is read once every 5
 minutes (as of the start of those 5 minutes) and shared, by country; each
 viewer's trending pool then goes through the visibility rule like the rest.
 
-**score = relevance × 0.5^(age in hours / 36) × 0.35 if the viewer already
-liked, commented on, saved or reposted it.** The age is the row's: a repost is
-new when it is made. relevance = 1 plus:
+**score = relevance × 0.5^(age in hours / 36) × reacted × seen × less of**,
+where:
+
+- **reacted** is 0.35 if the viewer already liked, commented on, saved or
+  reposted it, else 1;
+- **seen** is 0.6 for each visit of the feed that already showed the viewer
+  the post, never below 0.2 (1 for a post not yet seen);
+- **less of** is 0.5 for each post by the card's author the viewer marked
+  "Not interested" in the last 60 days, never below 0.1.
+
+The age is the row's: a repost is new when it is made. relevance = 1 plus:
 
 | Part | Points |
 | --- | --- |
@@ -159,7 +167,25 @@ deterministic reorder of the whole list before it is paged.
 **A newcomer near the viewer gets seen**: the best-ranked post by a member in
 their first 7 days, from the viewer's city or state (else their country), is
 moved up to the 4th card when it ranked lower, and the 2-in-a-row rule is
-applied again after the move.
+applied again after the move. A post the viewer has already been shown isn't
+moved up again.
+
+**Seen.** A card counts as seen once at least half of it (or half the screen,
+for a very tall card) has been on screen for a second. The app reports each
+post once per visit of the home feed, in batches of up to 50: every 10
+seconds, and when the page is hidden or left (`POST /posts/seen`). The API
+keeps, per member and post, when it was first and last seen and how many
+visits showed it, in `post_seen`, and clears rows not seen for 30 days.
+Only the first sighting up to `asOf` counts, so cards seen mid-scroll lower
+nothing until the next first page. It is never shown to anyone.
+
+**Not interested.** For You and Nearby put "Not interested" in the menu of
+someone else's post (`POST /posts/:id/not-interested`; a repost counts as the
+post it shows). The post's cards leave the list at once, and a note offers
+Undo for 5 seconds (`DELETE`). The post never shows in the viewer's For You
+or Nearby again, nor does a repost of it, older posts included. Its author's
+other posts get the **less of** factor above for 60 days. Following is the
+member's own choice of people, so it is left as it is.
 
 Privacy: only the viewer's own sexuality is read. An author's kinks and
 looking-for count, in the kink match and in learned kinks, only when their
@@ -209,8 +235,6 @@ can't be read as of `asOf`); the app drops a row it already shows.
 
 ### Not yet
 
-- Impressions: For You knows what the viewer reacted to, not what they
-  scrolled past, so a post seen and ignored isn't lowered yet.
-- Negative feedback: "show me less of this", hiding a post, muting a member.
+- Muting a member, and "Not interested" in Following.
 - Nearby by distance rather than the same city or state.
 - Tuning the pools and weights against real use.

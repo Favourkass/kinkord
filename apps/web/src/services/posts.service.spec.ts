@@ -35,6 +35,7 @@ const {
   withAuthorFollow,
   withCommentDelta,
   withSuggestionFollow,
+  withRowsRestored,
   withSuggestionRestored,
   withTagsLeft,
 } = await import("./posts.service");
@@ -232,6 +233,34 @@ describe("postsApi", () => {
   it("removes a suggestion by member id", async () => {
     await postsApi.dismissSuggestion("u/2");
     expect(post).toHaveBeenCalledWith("/members/suggested/u%2F2/dismiss", {});
+  });
+
+  it("reports the posts the feed showed, finishing even as the page is left", async () => {
+    await postsApi.markSeen(["p1", "p2"]);
+    expect(post).toHaveBeenCalledWith("/posts/seen", { ids: ["p1", "p2"] }, { keepalive: true });
+  });
+
+  it("marks a post not interested, and takes it back", async () => {
+    await postsApi.notInterested("a/b");
+    expect(post).toHaveBeenCalledWith("/posts/a%2Fb/not-interested", {});
+    await postsApi.undoNotInterested("a/b");
+    expect(del).toHaveBeenCalledWith("/posts/a%2Fb/not-interested");
+  });
+});
+
+describe("rows put back", () => {
+  it("each where it was, once, around what's in the list now", () => {
+    const shown = [pm({ id: "a" }), pm({ id: "d" })];
+    const removed = [
+      { row: pm({ id: "c", postId: "x" }), index: 2 },
+      { row: pm({ id: "b", postId: "x" }), index: 1 },
+    ];
+    expect(withRowsRestored(shown, removed).map((p) => p.id)).toEqual(["a", "b", "c", "d"]);
+    // Already back (or never gone): not twice.
+    const back = withRowsRestored(shown, removed);
+    expect(withRowsRestored(back, removed).map((p) => p.id)).toEqual(["a", "b", "c", "d"]);
+    // The list got shorter meanwhile: at its end.
+    expect(withRowsRestored([], removed).map((p) => p.id)).toEqual(["b", "c"]);
   });
 });
 

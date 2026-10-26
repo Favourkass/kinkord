@@ -135,6 +135,8 @@ interface World {
   pools?: Partial<Record<Pool, unknown[]>>;
   hot?: unknown[];
   interactions?: unknown[];
+  seen?: unknown[];
+  notInterested?: unknown[];
 }
 
 function forYouDb({
@@ -143,6 +145,8 @@ function forYouDb({
   pools = {},
   hot = [],
   interactions = [],
+  seen = [],
+  notInterested = [],
 }: World = {}) {
   const answers: Partial<Record<Pool, unknown[]>> = { recent, followed, older, ...pools };
   return fakeDb((q) => {
@@ -156,6 +160,8 @@ function forYouDb({
     if (isRows(q)) return answers[poolOf(q)] ?? [];
     if (isHot(q)) return table(q) === "post_like" ? hot : [];
     if (q.unions.length) return interactions;
+    if (table(q) === "post_seen") return seen;
+    if (table(q) === "post_not_interested") return notInterested;
     return [];
   });
 }
@@ -363,9 +369,39 @@ describe("For You's pages", () => {
       expect(sql).toContain('"feed_original"."visibility" = $');
       expect(sql).toContain('"feed_original"."author_id" <> $');
       expect(sql).toContain('"member_block"."blocked_id" = "feed_original"."author_id"');
+      // Never a post the viewer said they're not interested in, nor a repost of one.
+      expect(sql).toContain(
+        'not exists (select 1 from "post_not_interested" where "post_not_interested"."user_id" = $',
+      );
+      expect(sql).toContain(
+        '"post_not_interested"."post_id" = coalesce("post"."repost_of_id", "post"."id"))',
+      );
       expect(params).toContain("me");
       expect(params).toContain(iso(NOW));
     }
+  });
+
+  it("lowers what the feed has shown the viewer before, and the authors they're not interested in", async () => {
+    const db = forYouDb({
+      seen: [{ postId: ID(2), times: 3 }],
+      notInterested: [{ authorId: "bea", n: 1 }],
+    });
+    const first = await page(db, null, 5);
+    // ada's fresh p2, seen three times, drops below her older p4; bea's p1 below cal's p3.
+    expect(first.ids).toEqual([ID(4), ID(2), ID(3), ID(1), ID(5)]);
+
+    const seenQuery = db.queries.find((q) => table(q) === "post_seen")!;
+    const s = render(seenQuery.where!);
+    expect(s.sql).toContain('"post_seen"."user_id" = $');
+    expect(s.sql).toContain('"post_seen"."post_id" in ($');
+    // First shown by the moment ranked at: a card seen mid-scroll waits for the next first page.
+    expect(s.sql).toContain('"post_seen"."first_seen_at" <= $');
+    expect(s.params).toEqual(expect.arrayContaining(["me", ID(1), ID(5), iso(NOW)]));
+
+    const marks = db.queries.find((q) => table(q) === "post_not_interested")!;
+    const m = render(marks.where!);
+    expect(m.params).toEqual(expect.arrayContaining(["me", iso(hoursAgo(60 * 24)), iso(NOW)]));
+    expect(marks.groupBy).toBeDefined();
   });
 
   it("learns from the viewer's own likes, saves, shares, comments and reposts of the last 60 days", async () => {
@@ -393,7 +429,9 @@ describe("For You's pages", () => {
   it("counts engagement and reads the authors for every candidate at once, never anyone's sexuality", async () => {
     const db = forYouDb();
     await page(db, null);
-    const counts = db.queries.filter((q) => q.groupBy && !isHot(q));
+    const counts = db.queries.filter(
+      (q) => q.groupBy && !isHot(q) && table(q) !== "post_not_interested",
+    );
     expect(counts.map(table)).toEqual(["post_like", "post_comment", "post", "post_share"]);
     for (const q of counts) expect(render(q.where!).params).toContain(iso(NOW));
     const [authors] = db.queries.filter(isAuthors);

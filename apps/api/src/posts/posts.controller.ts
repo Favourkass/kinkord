@@ -13,6 +13,7 @@ import {
 } from "@nestjs/common";
 import { z } from "zod";
 import { AuthGuard, AuthedRequest } from "../auth/auth.guard";
+import { FeedFeedbackService, seenSchema } from "./feed-feedback.service";
 import { FEED_TABS } from "./feed-ranking";
 import { createCommentSchema, PostInteractionsService } from "./post-interactions.service";
 import { createPostSchema, PostsService, uploadUrlSchema } from "./posts.service";
@@ -48,6 +49,7 @@ export class PostsController {
   constructor(
     private readonly posts: PostsService,
     private readonly interactions: PostInteractionsService,
+    private readonly feedback: FeedFeedbackService,
   ) {}
 
   /** The viewer's saved posts. Declared before ":id" so "saved" is not read as an id. */
@@ -73,6 +75,14 @@ export class PostsController {
       q: parsed.data.q,
       tab: parsed.data.tab,
     });
+  }
+
+  /** The posts the feed has shown the viewer, a batch at a time. */
+  @HttpPost("seen")
+  seen(@Req() req: AuthedRequest, @Body() body: unknown) {
+    const parsed = seenSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException(parsed.error.flatten().fieldErrors);
+    return this.feedback.seen(req.user.id, parsed.data.ids);
   }
 
   /** Friends to tag in a new post, by name or username. Declared before ":id". */
@@ -150,6 +160,17 @@ export class PostsController {
   @Delete(":id/save")
   unsave(@Req() req: AuthedRequest, @Param("id") id: string) {
     return this.interactions.unsave(parseId(id), req.user.id);
+  }
+
+  /** "Not interested": out of the viewer's For You and Nearby, and its author lowered there. */
+  @HttpPost(":id/not-interested")
+  notInterested(@Req() req: AuthedRequest, @Param("id") id: string) {
+    return this.feedback.notInterested(req.user.id, parseId(id));
+  }
+
+  @Delete(":id/not-interested")
+  undoNotInterested(@Req() req: AuthedRequest, @Param("id") id: string) {
+    return this.feedback.undoNotInterested(req.user.id, parseId(id));
   }
 
   @Get(":id/comments")

@@ -38,7 +38,9 @@ import {
   post,
   postComment,
   postLike,
+  postNotInterested,
   postSave,
+  postSeen,
   postShare,
   profile,
   user,
@@ -229,6 +231,7 @@ function postRows(
           isNull(post.repostOfId),
           and(ne(original.authorId, viewerId), originalReadable(viewerId)),
         ),
+        notMarkedNotInterested(viewerId),
         ...extra,
       ),
     )
@@ -378,6 +381,48 @@ async function engagementOf(db: Db, ids: string[], asOf: Date): Promise<Map<stri
   add(reposts, "reposts");
   add(shares, "shares");
   return out;
+}
+
+/** Not a post the viewer said they're not interested in, nor a repost of one. */
+function notMarkedNotInterested(viewerId: string): SQL {
+  return sql`not exists (select 1 from ${postNotInterested} where ${postNotInterested.userId} = ${viewerId} and ${postNotInterested.postId} = coalesce(${post.repostOfId}, ${post.id}))`;
+}
+
+/** How many visits of the feed showed each of these posts, of those first shown by `asOf`. */
+async function seenOf(
+  db: Db,
+  viewerId: string,
+  ids: string[],
+  asOf: Date,
+): Promise<Map<string, number>> {
+  if (!ids.length) return new Map();
+  const rows = await db
+    .select({ postId: postSeen.postId, times: postSeen.times })
+    .from(postSeen)
+    .where(
+      and(
+        eq(postSeen.userId, viewerId),
+        inArray(postSeen.postId, ids),
+        lte(postSeen.firstSeenAt, asOf),
+      ),
+    );
+  return new Map(rows.map((r) => [r.postId, r.times]));
+}
+
+/** The authors of the posts the viewer was "Not interested" in lately, and how many each. */
+async function notInterestedOf(db: Db, viewerId: string, asOf: Date): Promise<Map<string, number>> {
+  const rows = await db
+    .select({ authorId: postNotInterested.authorId, n: count() })
+    .from(postNotInterested)
+    .where(
+      and(
+        eq(postNotInterested.userId, viewerId),
+        gt(postNotInterested.createdAt, daysBefore(asOf, WINDOWS.notInterestedDays)),
+        lte(postNotInterested.createdAt, asOf),
+      ),
+    )
+    .groupBy(postNotInterested.authorId);
+  return new Map(rows.map((r) => [r.authorId, Number(r.n)]));
 }
 
 /**
@@ -572,47 +617,50 @@ async function forYouWindow(
   const recentFloor = daysBefore(asOf, WINDOWS.recentDays);
   const since = (days: number) => gt(post.createdAt, daysBefore(asOf, days));
   const none = Promise.resolve([] as Row[]);
-  const [recent, followed, friends, near, hot, newcomers, interactions] = await Promise.all([
-    postRows(db, viewerId, asOf, [gt(post.createdAt, recentFloor)], WINDOWS.recentLimit),
-    postRows(
-      db,
-      viewerId,
-      asOf,
-      [since(WINDOWS.followedDays), followedAsOf(viewerId, post.authorId, asOf)],
-      WINDOWS.followedLimit,
-    ),
-    postRows(
-      db,
-      viewerId,
-      asOf,
-      [since(WINDOWS.friendsDays), acceptedFriendship(viewerId, post.authorId)],
-      WINDOWS.friendsLimit,
-    ),
-    viewer.state
-      ? postRows(
-          db,
-          viewerId,
-          asOf,
-          [since(WINDOWS.nearPoolDays), ...nearbyConditions(viewer, viewerId)],
-          WINDOWS.nearPoolLimit,
-        )
-      : none,
-    trendingRows(db, viewerId, viewer, asOf),
-    viewer.country
-      ? postRows(
-          db,
-          viewerId,
-          asOf,
-          [
-            since(WINDOWS.newcomerDays),
-            joinedSince(daysBefore(asOf, NEWCOMER_DAYS)),
-            ...countryConditions(viewer, viewerId),
-          ],
-          WINDOWS.newcomerLimit,
-        )
-      : none,
-    interactionsOf(db, viewerId, asOf),
-  ]);
+  const [recent, followed, friends, near, hot, newcomers, interactions, lessOf] = await Promise.all(
+    [
+      postRows(db, viewerId, asOf, [gt(post.createdAt, recentFloor)], WINDOWS.recentLimit),
+      postRows(
+        db,
+        viewerId,
+        asOf,
+        [since(WINDOWS.followedDays), followedAsOf(viewerId, post.authorId, asOf)],
+        WINDOWS.followedLimit,
+      ),
+      postRows(
+        db,
+        viewerId,
+        asOf,
+        [since(WINDOWS.friendsDays), acceptedFriendship(viewerId, post.authorId)],
+        WINDOWS.friendsLimit,
+      ),
+      viewer.state
+        ? postRows(
+            db,
+            viewerId,
+            asOf,
+            [since(WINDOWS.nearPoolDays), ...nearbyConditions(viewer, viewerId)],
+            WINDOWS.nearPoolLimit,
+          )
+        : none,
+      trendingRows(db, viewerId, viewer, asOf),
+      viewer.country
+        ? postRows(
+            db,
+            viewerId,
+            asOf,
+            [
+              since(WINDOWS.newcomerDays),
+              joinedSince(daysBefore(asOf, NEWCOMER_DAYS)),
+              ...countryConditions(viewer, viewerId),
+            ],
+            WINDOWS.newcomerLimit,
+          )
+        : none,
+      interactionsOf(db, viewerId, asOf),
+      notInterestedOf(db, viewerId, asOf),
+    ],
+  );
   // The authors the viewer interacts with most: their recent posts are a pool of their own.
   const favourites = [...affinityByAuthor(interactions)]
     .sort(([a, x], [b, y]) => y - x || (a < b ? -1 : a > b ? 1 : 0))
@@ -634,13 +682,24 @@ async function forYouWindow(
     ...candidates.flatMap((c) => [c.authorId, c.contentAuthorId]),
     ...interactions.map((i) => i.authorId),
   ]);
-  const [engagement, authors] = await Promise.all([
-    engagementOf(db, [...new Set(candidates.map((c) => c.contentId))], asOf),
+  const contentIds = [...new Set(candidates.map((c) => c.contentId))];
+  const [engagement, authors, seen] = await Promise.all([
+    engagementOf(db, contentIds, asOf),
     authorsOf(db, viewerId, [...authorIds], asOf),
+    seenOf(db, viewerId, contentIds, asOf),
   ]);
   return windowOf(
     rows,
-    rankForYou({ viewer, asOf, candidates, authors, engagement, interactions }),
+    rankForYou({
+      viewer,
+      asOf,
+      candidates,
+      authors,
+      engagement,
+      interactions,
+      seen,
+      notInterested: lessOf,
+    }),
     olderFrom(recent, recentFloor),
   );
 }

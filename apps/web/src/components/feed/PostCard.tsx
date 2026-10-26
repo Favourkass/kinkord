@@ -1,5 +1,8 @@
+"use client";
+
 import TeamBadge from "@/components/app/TeamBadge";
 import Link from "next/link";
+import { useRef } from "react";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import MaskIcon from "@/components/app/MaskIcon";
 import OrganizationBadge from "@/components/organization/OrganizationBadge";
@@ -7,6 +10,7 @@ import type { PostMediaVM, PostVM } from "@/domain/post";
 import PostActions, { type PostActionLabels } from "./PostActions";
 import PostMediaGrid from "./PostMediaGrid";
 import BodyText from "./BodyText";
+import { useSeenOnScreen } from "./useSeenOnScreen";
 
 export interface PostCardProps {
   post: PostVM;
@@ -24,6 +28,7 @@ export interface PostCardProps {
     /** "with", before who the post tags. */
     with: string;
     removeTag: string;
+    notInterested: string;
   };
   /** Open when this card's overflow menu is showing. */
   menuOpen: boolean;
@@ -41,6 +46,10 @@ export interface PostCardProps {
   onOpenMedia: (media: PostMediaVM) => void;
   /** The viewer takes their tag off; absent where a list can't. */
   onRemoveTag?: () => void;
+  /** "Not interested", on someone else's post; absent where a list doesn't rank. */
+  onNotInterested?: () => void;
+  /** The card has been on screen long enough to count as seen; absent where nothing counts. */
+  onSeen?: () => void;
 }
 
 /**
@@ -64,8 +73,12 @@ export default function PostCard({
   onGift,
   onToggleAuthorFollow,
   onRemoveTag,
+  onNotInterested,
+  onSeen,
   onOpenMedia,
 }: PostCardProps) {
+  const card = useRef<HTMLElement>(null);
+  useSeenOnScreen(card, onSeen);
   const name = (
     <span
       className={`inline-flex items-center gap-[3px] text-[14px] font-bold leading-[17px] ${post.authorOrganization ? "text-kink-gold-bright" : "text-feed-text"}`}
@@ -83,7 +96,10 @@ export default function PostCard({
     </span>
   );
   return (
-    <article className="mx-2 mb-3 rounded-[20px] border border-kink-gold-bright/15 px-4 py-[18px]">
+    <article
+      ref={card}
+      className="mx-2 mb-3 rounded-[20px] border border-kink-gold-bright/15 px-4 py-[18px]"
+    >
       {post.repostedByName && (
         <p className="flex items-center gap-[8px] pb-[10px] pl-[2px] text-[12px] font-medium text-feed-muted">
           <MaskIcon src="/app/feed/icon-repost.svg" width={14} />
@@ -197,6 +213,18 @@ export default function PostCard({
                   className="block w-full px-[14px] py-[10px] text-left text-[13px] font-medium text-feed-text"
                 >
                   {labels.removeTag}
+                </button>
+              )}
+              {!post.mine && onNotInterested && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onCloseMenu();
+                    onNotInterested();
+                  }}
+                  className="block w-full px-[14px] py-[10px] text-left text-[13px] font-medium text-feed-text"
+                >
+                  {labels.notInterested}
                 </button>
               )}
               {post.mine && (
