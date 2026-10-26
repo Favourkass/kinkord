@@ -40,6 +40,10 @@ export interface FeedScreenProps {
   onTogglePostAuthorFollow: (userId: string) => void;
   /** The viewer takes their tag off a post. */
   onRemoveTag?: (postId: string) => void;
+  /** "Not interested" in a post; absent on a tab that doesn't rank (Following). */
+  onNotInterested?: (postId: string) => void;
+  /** A card stayed on screen long enough to count as seen. */
+  onSeen?: (postId: string) => void;
   hasMore: boolean;
   loadingMore: boolean;
   onLoadMore: () => void;
@@ -92,6 +96,8 @@ export default function FeedScreen(p: FeedScreenProps) {
       onOpenMedia={p.onOpenMedia}
       onToggleAuthorFollow={p.onTogglePostAuthorFollow}
       onRemoveTag={p.onRemoveTag ? () => p.onRemoveTag?.(post.postId) : undefined}
+      onNotInterested={p.onNotInterested ? () => p.onNotInterested?.(post.postId) : undefined}
+      onSeen={p.onSeen ? () => p.onSeen?.(post.postId) : undefined}
     />
   );
 

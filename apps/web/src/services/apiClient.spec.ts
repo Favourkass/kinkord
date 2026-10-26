@@ -29,6 +29,18 @@ describe("api.request", () => {
     await expect(api.get("/me")).rejects.toMatchObject({ status: 401 });
   });
 
+  it("lets a small POST finish while the page is left (keepalive)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(okJson({ seen: 1 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await api.post("/posts/seen", { ids: ["a"] }, { keepalive: true });
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({
+      method: "POST",
+      body: JSON.stringify({ ids: ["a"] }),
+      keepalive: true,
+      credentials: "include",
+    });
+  });
+
   it("sends DELETE for api.del", async () => {
     const fetchMock = vi.fn().mockResolvedValue(okJson({ ok: true }));
     vi.stubGlobal("fetch", fetchMock);

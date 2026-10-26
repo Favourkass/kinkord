@@ -91,6 +91,14 @@ export const postsApi = {
   repost: (id: string) => api.post<RepostPM>(`/posts/${encodeURIComponent(id)}/repost`, {}),
   unrepost: (id: string) => api.del<RepostPM>(`/posts/${encodeURIComponent(id)}/repost`),
   save: (id: string) => api.post<SavePM>(`/posts/${encodeURIComponent(id)}/save`, {}),
+  /** The posts the feed showed, so For You can lower them next time. */
+  markSeen: (ids: string[]) =>
+    api.post<{ seen: number }>("/posts/seen", { ids }, { keepalive: true }),
+  /** "Not interested": out of For You and Nearby, and its author lowered there. */
+  notInterested: (id: string) =>
+    api.post<{ postId: string }>(`/posts/${encodeURIComponent(id)}/not-interested`, {}),
+  undoNotInterested: (id: string) =>
+    api.del<{ postId: string }>(`/posts/${encodeURIComponent(id)}/not-interested`),
   unsave: (id: string) => api.del<SavePM>(`/posts/${encodeURIComponent(id)}/save`),
   saved: (cursor?: string | null, limit?: number) => {
     const qs = new URLSearchParams();
@@ -157,6 +165,19 @@ export const feedTabMemory = {
 export function appendNewRows(shown: PostPM[], next: PostPM[]): PostPM[] {
   const ids = new Set(shown.map((p) => p.id));
   return [...shown, ...next.filter((p) => !ids.has(p.id))];
+}
+
+/** Rows taken off the list put back, each where it was and once (an undone "Not interested"). */
+export function withRowsRestored(
+  shown: PostPM[],
+  removed: ReadonlyArray<{ row: PostPM; index: number }>,
+): PostPM[] {
+  const out = [...shown];
+  for (const { row, index } of [...removed].sort((a, b) => a.index - b.index)) {
+    if (out.some((p) => p.id === row.id)) continue;
+    out.splice(Math.min(Math.max(0, index), out.length), 0, row);
+  }
+  return out;
 }
 
 /**

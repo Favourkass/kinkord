@@ -1,5 +1,5 @@
 /** Copy for the home feed (Figma "Hompage Light" 344:138 / dark 837:295). */
-import type { FeedTab, SuggestionShow } from "@/domain/post";
+import type { FeedTab, SuggestionReasonCopy, SuggestionShow } from "@/domain/post";
 
 export const FEED_COPY = {
   composerPlaceholder: "What's on your mind?",
@@ -32,6 +32,11 @@ export const FEED_COPY = {
   star: "Star",
   crown: "Crown",
   shareCopied: "Link copied",
+  /** For You and Nearby: a post the member doesn't want shown, and what the toast says. */
+  notInterested: "Not interested",
+  notInterestedDone: "Got it. You'll see fewer posts like this.",
+  notInterestedFailed: "Couldn't do that. Try again.",
+  undo: "Undo",
   postHeading: "Post",
   postGone: "This post is no longer available.",
   savedHeading: "Saved",
@@ -75,6 +80,15 @@ export const FEED_COPY = {
   nearbyEmpty: "Nothing near you yet.",
   feedError: "Could not load the feed. Refresh to try again.",
   peopleHeading: "Kinksters Near You",
+  /** Why a card is there, under the name. */
+  peopleReasons: {
+    mutualFriends: (count: number) => (count === 1 ? "1 mutual friend" : `${count} mutual friends`),
+    followsYou: "Follows you",
+    likesYourPosts: "Likes your posts",
+    commentsOnYourPosts: "Comments on your posts",
+    newcomer: "New to Kinkord",
+    sharedKinks: (count: number) => `${count} kinks in common`,
+  } satisfies SuggestionReasonCopy,
   /** The sliders button: the members directory, where every filter is. */
   peopleBrowse: "Browse all kinksters",
   /** The Women | Men (| All) toggle. */
@@ -144,6 +158,7 @@ export const POST_CARD_LABELS = {
   following: FEED_COPY.following,
   with: FEED_COPY.taggedWith,
   removeTag: FEED_COPY.removeTag,
+  notInterested: FEED_COPY.notInterested,
 } as const;
 
 /** Display-ready controls for the post editor. */

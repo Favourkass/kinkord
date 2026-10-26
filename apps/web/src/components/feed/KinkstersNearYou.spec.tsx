@@ -28,6 +28,7 @@ const card = (over: Partial<FeedSuggestionVM> = {}): FeedSuggestionVM => ({
   details: "26F • Lagos, Lagos State, Nigeria",
   roles: "Submissive, Switch, Brat",
   lookingFor: "Friendship, Events",
+  reason: null,
   isFollowing: false,
   busy: false,
   href: "/u/lily",
@@ -73,6 +74,18 @@ describe("Kinksters Near You", () => {
     expect(within(lily).getByText("Submissive, Switch, Brat")).toBeTruthy();
     expect(within(lily).getByText("Looking for")).toBeTruthy();
     expect(within(lily).getByText("Friendship, Events")).toBeTruthy();
+  });
+
+  it("says why a member is suggested, under their name, when there's a reason", () => {
+    show({
+      people: [
+        card({ userId: "u1", reason: "3 mutual friends" }),
+        card({ userId: "u2", displayName: "Nyla", reason: null }),
+      ],
+    });
+    const [lily, nyla] = screen.getAllByRole("listitem");
+    expect(within(lily).getByText("3 mutual friends")).toBeTruthy();
+    expect(within(nyla).queryByText(/mutual/)).toBeNull();
   });
 
   it("follows and removes the member on the card", () => {

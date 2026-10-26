@@ -139,6 +139,9 @@ export default function KinkstersNearYou({
                     />
                   ) : null}
                 </p>
+                {person.reason && (
+                  <p className="font-semibold text-kink-gold-bright">{person.reason}</p>
+                )}
                 {person.details && <p className="text-feed-muted">{person.details}</p>}
                 {person.roles && (
                   <p className="flex items-start gap-[6px] text-feed-text">

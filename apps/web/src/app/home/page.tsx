@@ -56,6 +56,8 @@ export default function HomePage() {
       onOpenMedia={feed.openMedia}
       onTogglePostAuthorFollow={feed.toggleFollow}
       onRemoveTag={feed.removeTag}
+      onNotInterested={feed.notInterested}
+      onSeen={feed.markSeen}
       hasMore={feed.hasMore}
       loadingMore={feed.loadingMore}
       onLoadMore={feed.loadMore}
@@ -179,7 +181,11 @@ export default function HomePage() {
         onConfirm: feed.confirmDeletePost,
         onCancel: feed.cancelDelete,
       }}
-      toast={{ message: feed.shareNote, onDismiss: feed.dismissShareNote }}
+      toast={{
+        message: feed.shareNote,
+        onDismiss: feed.dismissShareNote,
+        action: feed.shareNoteAction,
+      }}
       copy={{
         loading: FEED_COPY.loading,
         loadMore: FEED_COPY.loadMore,

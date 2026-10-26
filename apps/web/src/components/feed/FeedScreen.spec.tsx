@@ -16,7 +16,21 @@ vi.mock("./FeedShell", () => ({
   ),
 }));
 vi.mock("./PostCard", () => ({
-  default: ({ post }: { post: PostVM }) => <article>{post.id}</article>,
+  default: ({
+    post,
+    onNotInterested,
+    onSeen,
+  }: {
+    post: PostVM;
+    onNotInterested?: () => void;
+    onSeen?: () => void;
+  }) => (
+    <article>
+      {post.id}
+      {onNotInterested && <button onClick={onNotInterested}>{`not interested ${post.id}`}</button>}
+      {onSeen && <button onClick={onSeen}>{`seen ${post.id}`}</button>}
+    </article>
+  ),
 }));
 vi.mock("./KinkstersNearYou", () => ({
   default: ({ layout = "row" }: { layout?: string }) => (
@@ -100,6 +114,24 @@ describe("FeedScreen", () => {
     expect(within(panel).getByRole("link", { name: "Browse kinksters" }).getAttribute("href")).toBe(
       "/members",
     );
+  });
+
+  it("hands Not interested and seen the post a card shows, a repost's original", () => {
+    const onNotInterested = vi.fn();
+    const onSeen = vi.fn();
+    show({
+      posts: [{ id: "r1", postId: "p1" } as PostVM],
+      onNotInterested,
+      onSeen,
+      people: null,
+    });
+    act(() => screen.getByRole("button", { name: "not interested r1" }).click());
+    act(() => screen.getByRole("button", { name: "seen r1" }).click());
+    expect(onNotInterested).toHaveBeenCalledWith("p1");
+    expect(onSeen).toHaveBeenCalledWith("p1");
+    cleanup();
+    show({ posts: [{ id: "r1", postId: "p1" } as PostVM], people: null });
+    expect(screen.queryByRole("button")).toBeNull();
   });
 
   it("keeps a quiet tab to one line, and says nothing of emptiness while loading", () => {

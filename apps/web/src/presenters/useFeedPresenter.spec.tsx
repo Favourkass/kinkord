@@ -33,6 +33,9 @@ const unfollow = vi.fn();
 const uploadPostPhoto = vi.fn();
 const removeTag = vi.fn();
 const tagSuggestions = vi.fn();
+const markSeen = vi.fn();
+const notInterestedApi = vi.fn();
+const undoNotInterested = vi.fn();
 
 vi.mock("@/services/posts.service", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/posts.service")>()),
@@ -58,6 +61,9 @@ vi.mock("@/services/posts.service", async (importOriginal) => ({
     unfollow: (...a: unknown[]) => unfollow(...a),
     removeTag: (...a: unknown[]) => removeTag(...a),
     tagSuggestions: (...a: unknown[]) => tagSuggestions(...a),
+    markSeen: (...a: unknown[]) => markSeen(...a),
+    notInterested: (...a: unknown[]) => notInterestedApi(...a),
+    undoNotInterested: (...a: unknown[]) => undoNotInterested(...a),
   },
   uploadPostPhoto: (...a: unknown[]) => uploadPostPhoto(...a),
 }));
@@ -141,6 +147,9 @@ beforeEach(() => {
   follow.mockReset().mockResolvedValue({});
   unfollow.mockReset().mockResolvedValue({});
   uploadPostPhoto.mockReset().mockResolvedValue("posts/u1/a.jpg");
+  markSeen.mockReset().mockResolvedValue({ seen: 1 });
+  notInterestedApi.mockReset().mockResolvedValue({ postId: "p2" });
+  undoNotInterested.mockReset().mockResolvedValue({ postId: "p2" });
   globalThis.URL.createObjectURL = vi.fn(() => "blob:preview");
   globalThis.URL.revokeObjectURL = vi.fn();
 });
@@ -572,6 +581,7 @@ describe("Kinksters Near You", () => {
           lookingFor: ["Friendship"],
           online: true,
           silver: true,
+          reason: { kind: "mutualFriends", count: 3 },
         },
       ]),
     );
@@ -580,6 +590,7 @@ describe("Kinksters Near You", () => {
       details: "26F • Lagos, Lagos State, Nigeria",
       roles: "Submissive, Switch",
       lookingFor: "Friendship",
+      reason: "3 mutual friends",
       online: true,
       silver: true,
       organization: false,
@@ -1977,5 +1988,82 @@ describe("taking your tag off", () => {
       ["r1", false, 0],
     ]);
     expect(result.current.menuFor).toBeNull();
+  });
+});
+
+describe("what the home feed has shown, and Not interested", () => {
+  beforeEach(() => sessionStorage.clear());
+  afterEach(() => {
+    sessionStorage.clear();
+    Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
+  });
+  const hide = () => {
+    Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+  };
+
+  it("reports each card shown once, when the page is hidden and when the feed is left", async () => {
+    const { result, unmount } = await loaded();
+    act(() => {
+      result.current.markSeen?.("p1");
+      result.current.markSeen?.("p1");
+    });
+    expect(markSeen).not.toHaveBeenCalled();
+    hide();
+    expect(markSeen).toHaveBeenCalledExactlyOnceWith(["p1"]);
+    act(() => result.current.markSeen?.("p2"));
+    unmount();
+    expect(markSeen).toHaveBeenLastCalledWith(["p2"]);
+  });
+
+  it("counts nothing on a profile's posts", async () => {
+    const { result } = renderHook(() => useFeedPresenter({ author: "tega" }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.markSeen).toBeUndefined();
+    expect(result.current.notInterested).toBeUndefined();
+  });
+
+  const rows = () => [
+    pm({ id: "p1" }),
+    pm({ id: "p2", postId: "p2" }),
+    pm({ id: "p3", postId: "p3" }),
+    pm({ id: "r2", postId: "p2" }),
+  ];
+  const ids = (r: { current: { posts: { id: string }[] } }) => r.current.posts.map((p) => p.id);
+
+  it("takes every card of the post off at once, and Undo puts them back where they were", async () => {
+    feed.mockResolvedValueOnce({ items: rows(), nextCursor: null });
+    const { result } = await loaded();
+    await act(() => result.current.notInterested!("p2"));
+    expect(ids(result)).toEqual(["p1", "p3"]);
+    expect(notInterestedApi).toHaveBeenCalledWith("p2");
+    expect(result.current.shareNote).toBe("Got it. You'll see fewer posts like this.");
+    expect(result.current.shareNoteAction?.label).toBe("Undo");
+
+    act(() => result.current.shareNoteAction!.onClick());
+    expect(ids(result)).toEqual(["p1", "p2", "p3", "r2"]);
+    expect(undoNotInterested).toHaveBeenCalledWith("p2");
+  });
+
+  it("puts the cards back and says so when the API refuses", async () => {
+    feed.mockResolvedValueOnce({ items: rows(), nextCursor: null });
+    notInterestedApi.mockRejectedValueOnce(new Error("down"));
+    const { result } = await loaded();
+    await act(() => result.current.notInterested!("p2"));
+    expect(ids(result)).toEqual(["p1", "p2", "p3", "r2"]);
+    expect(result.current.shareNote).toBe("Couldn't do that. Try again.");
+    // Undo belongs to the note it came with, not this one.
+    expect(result.current.shareNoteAction).toBeNull();
+  });
+
+  it("is offered on For You and Nearby, which rank, not on Following", async () => {
+    const { result } = await loaded();
+    expect(result.current.notInterested).toBeDefined();
+    act(() => result.current.selectTab("following"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.notInterested).toBeUndefined();
+    act(() => result.current.selectTab("nearby"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.notInterested).toBeDefined();
   });
 });

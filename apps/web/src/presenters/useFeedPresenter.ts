@@ -64,10 +64,12 @@ import {
   withAuthorFollow,
   withCommentDelta,
   withSuggestionFollow,
+  withRowsRestored,
   withSuggestionRestored,
   withTagsLeft,
 } from "@/services/posts.service";
 import { useTagPicker } from "./useTagPicker";
+import { createSeenBatcher, SEEN_FLUSH_MS, type SeenBatcher } from "@/services/seenBatcher";
 
 /** Profile link for an author; null for a member who has no username yet. */
 const memberHref = (username: string | null) => (username ? Routes.member(username) : null);
@@ -280,6 +282,12 @@ export function useFeedPresenter({
   const [lightbox, setLightbox] = useState<PostMediaVM | null>(null);
   /** Brief confirmation after a share; there is nothing else to show for it. */
   const [shareNote, setShareNote] = useState<string | null>(null);
+  /** A button for one note (Undo), kept with the note it belongs to so no other note shows it. */
+  const [noteAction, setNoteAction] = useState<{
+    note: string;
+    label: string;
+    onClick: () => void;
+  } | null>(null);
 
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -371,6 +379,27 @@ export function useFeedPresenter({
       cancelled = true;
     };
   }, [author, tagged, postId, saved, search, ready, suggestionsAsked]);
+
+  // The home feed's cards on screen, reported a batch at a time, so For You can
+  // lower what this member has already seen when it next ranks.
+  const seenBatcher = useRef<SeenBatcher | null>(null);
+  useEffect(() => {
+    if (!home) return;
+    const batcher = createSeenBatcher(postsApi.markSeen);
+    seenBatcher.current = batcher;
+    const timer = setInterval(batcher.flush, SEEN_FLUSH_MS);
+    const onHide = () => {
+      if (document.visibilityState === "hidden") batcher.flush();
+    };
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onHide);
+      batcher.flush();
+      seenBatcher.current = null;
+    };
+  }, [home]);
+  const markSeen = useCallback((postId: string) => seenBatcher.current?.add(postId), []);
 
   // Revoke every preview on unmount so a long session doesn't leak blobs.
   useEffect(
@@ -759,6 +788,42 @@ export function useFeedPresenter({
     }
   }, [confirmDelete, deleting, commentsFor, closeComments, onUnauthorized]);
 
+  /**
+   * "Not interested": the post's cards go at once, and the note offers Undo,
+   * which puts them back where they were. If the API refuses, they come back.
+   * Back on a list it no longer shows (another tab), Undo only tells the API.
+   */
+  const notInterested = useCallback(
+    async (postId: string) => {
+      const removed = posts.flatMap((row, index) =>
+        row.postId === postId ? [{ row, index }] : [],
+      );
+      if (!removed.length) return;
+      const listRound = shownRound.current;
+      const putBack = () => {
+        if (shownRound.current === listRound) setPosts((prev) => withRowsRestored(prev, removed));
+      };
+      setPosts((prev) => prev.filter((row) => row.postId !== postId));
+      setShareNote(FEED_COPY.notInterestedDone);
+      setNoteAction({
+        note: FEED_COPY.notInterestedDone,
+        label: FEED_COPY.undo,
+        onClick: () => {
+          putBack();
+          void postsApi.undoNotInterested(postId).catch(() => undefined);
+        },
+      });
+      try {
+        await postsApi.notInterested(postId);
+      } catch (e) {
+        if (onUnauthorized(e)) return;
+        putBack();
+        setShareNote(FEED_COPY.notInterestedFailed);
+      }
+    },
+    [posts, onUnauthorized],
+  );
+
   // ---- following --------------------------------------------------------
 
   /** A segment of the toggle: its list replaces this one, and is asked for. */
@@ -860,6 +925,7 @@ export function useFeedPresenter({
           memberHref,
           followBusy.includes(s.userId),
           isOrganization(s.userId, organizations),
+          FEED_COPY.peopleReasons,
         ),
       ),
     [suggestions, followBusy, organizations],
@@ -1229,7 +1295,16 @@ export function useFeedPresenter({
     toggleSave,
     share,
     shareNote,
+    /** Undo, beside the note it belongs to. */
+    shareNoteAction:
+      noteAction && noteAction.note === shareNote
+        ? { label: noteAction.label, onClick: noteAction.onClick }
+        : null,
     dismissShareNote,
+    /** The home feed counts the cards it shows; nothing else does. */
+    markSeen: home ? markSeen : undefined,
+    /** For You and Nearby rank, so "Not interested" means something there. */
+    notInterested: tab === "for_you" || tab === "nearby" ? notInterested : undefined,
 
     commentsFor,
     comments: commentVMs,

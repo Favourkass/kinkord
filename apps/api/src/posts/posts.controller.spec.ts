@@ -27,8 +27,14 @@ const interactions = () => ({
   unsave: vi.fn(async () => ({ postId: ID, savedByMe: false })),
 });
 
-const controller = (posts = postsService(), inter = interactions()) =>
-  new PostsController(posts as never, inter as never);
+const feedback = () => ({
+  seen: vi.fn(async () => ({ seen: 1 })),
+  notInterested: vi.fn(async () => ({ postId: ID })),
+  undoNotInterested: vi.fn(async () => ({ postId: ID })),
+});
+
+const controller = (posts = postsService(), inter = interactions(), fb = feedback()) =>
+  new PostsController(posts as never, inter as never, fb as never);
 
 describe("PostsController", () => {
   it("reads the feed as the caller, never as an id from the query", async () => {
@@ -173,6 +179,26 @@ describe("PostsController", () => {
 
     expect(p.repost).toHaveBeenCalledWith(ID, "u1");
     expect(p.unrepost).toHaveBeenCalledWith(ID, "u1");
+  });
+
+  it("takes the posts the feed showed as the caller, 50 at most and only post ids", async () => {
+    const fb = feedback();
+    await controller(undefined, undefined, fb).seen(req("u1"), { ids: [ID] });
+    expect(fb.seen).toHaveBeenCalledWith("u1", [ID]);
+    const c = controller(undefined, undefined, fb);
+    expect(() => c.seen(req("u1"), { ids: [] })).toThrow();
+    expect(() => c.seen(req("u1"), { ids: ["nope"] })).toThrow();
+    expect(() => c.seen(req("u1"), { ids: Array.from({ length: 51 }, () => ID) })).toThrow();
+    expect(() => c.seen(req("u1"), { ids: [ID], userId: "u2" })).toThrow();
+  });
+
+  it("marks a post not interested, and undoes it, as the caller", async () => {
+    const fb = feedback();
+    await controller(undefined, undefined, fb).notInterested(req("u1"), ID);
+    await controller(undefined, undefined, fb).undoNotInterested(req("u1"), ID);
+    expect(fb.notInterested).toHaveBeenCalledWith("u1", ID);
+    expect(fb.undoNotInterested).toHaveBeenCalledWith("u1", ID);
+    expect(() => controller().notInterested(req("u1"), "nope")).toThrow();
   });
 
   it("saves and unsaves as the caller", async () => {

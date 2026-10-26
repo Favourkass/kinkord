@@ -395,6 +395,36 @@ describe("For You's score", () => {
     expect(parts.score).toBeCloseTo(7 * 0.5 * 0.35);
   });
 
+  it("lowers a post × 0.6 each time the feed showed it before, to no less than 0.2", () => {
+    const seen = new Map([
+      ["once", 1],
+      ["twice", 2],
+      ["often", 9],
+    ]);
+    const score = forYouScorer(signals({ seen }));
+    expect(score(post("new", "a")).seen).toBe(1);
+    expect(score(post("once", "a")).seen).toBeCloseTo(0.6);
+    expect(score(post("twice", "a")).seen).toBeCloseTo(0.36);
+    expect(score(post("often", "a")).seen).toBe(0.2);
+    // A repost's row counts the post it shows; the factor multiplies the score.
+    const repost = score(post("r1", "b", { contentId: "once" }));
+    expect(repost.seen).toBeCloseTo(0.6);
+    expect(repost.score).toBeCloseTo(repost.relevance * repost.freshness * 0.6);
+  });
+
+  it("lowers an author's posts × 0.5 for each one the viewer was not interested in, to no less than 0.1", () => {
+    const notInterested = new Map([
+      ["meh", 1],
+      ["nope", 5],
+    ]);
+    const score = forYouScorer(signals({ notInterested }));
+    expect(score(post("p1", "fine")).lessOf).toBe(1);
+    expect(score(post("p2", "meh")).lessOf).toBe(0.5);
+    expect(score(post("p3", "nope")).lessOf).toBe(0.1);
+    // The card's author: someone else's repost of their post is lowered too.
+    expect(score(post("r1", "fine", { contentId: "p2", contentAuthorId: "meh" })).lessOf).toBe(0.5);
+  });
+
   it("lets a followed member's post outrank a stranger's for about four days, then decay below it", () => {
     // 7 × 0.5^(t/36) passes a fresh stranger's 1 until t ≈ 101 hours.
     const ranked = rankForYou({
@@ -479,6 +509,22 @@ describe("newcomers", () => {
     });
     // Ranked a1 a2 b1 a3 a4 n1 a5 c1; n1 moves up, and c1 breaks the run it leaves behind.
     expect(ranked.map((c) => c.id)).toEqual(["a1", "a2", "b1", "n1", "a3", "a4", "c1", "a5"]);
+  });
+
+  it("aren't moved up again once the viewer has been shown that post", () => {
+    const ranked = rankForYou({
+      ...signals({
+        viewer: me,
+        authors: authors(author("a", { viewerFollows: true }), author("b"), newcomer("n")),
+        seen: new Map([["n1", 1]]),
+      }),
+      candidates: [
+        ...[1, 2, 3, 4].map((h) => post(`a${h}`, "a", { createdAt: hoursAgo(h) })),
+        ...[1, 2].map((h) => post(`b${h}`, "b", { createdAt: hoursAgo(h) })),
+        post("n1", "n", { createdAt: hoursAgo(100) }),
+      ],
+    });
+    expect(ranked.map((c) => c.id).indexOf("n1")).toBe(6);
   });
 
   it("from the viewer's state or city first, else their country, else nobody", () => {
