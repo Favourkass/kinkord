@@ -176,6 +176,15 @@ describe("NotificationsService.record", () => {
   });
 });
 
+describe("NotificationsService.holdPush", () => {
+  it("marks just that row's push as waiting for the digest", async () => {
+    const { service, arg, sqlOf } = make([undefined]);
+    await service.holdPush("n1");
+    expect(arg("update", "set")).toEqual({ pushPending: true });
+    expect(sqlOf(arg("update", "where")).params).toEqual(["n1"]);
+  });
+});
+
 describe("NotificationsService.list", () => {
   it("shows who did it as they are now, with a signed small avatar and a live link", async () => {
     const t = make([[row({ type: "follow", subjectId: null })]]);

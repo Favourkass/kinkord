@@ -2,6 +2,7 @@ import { BadRequestException } from "@nestjs/common";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthedRequest } from "../auth/auth.guard";
 import { PushController } from "./push.controller";
+import type { PushPreferencesService } from "./push-preferences.service";
 import type { PushService } from "./push.service";
 
 const req = {
@@ -21,10 +22,29 @@ function make() {
     unsubscribe: vi.fn(async () => undefined),
     deliver: vi.fn(async () => 2),
   };
-  return { controller: new PushController(push as unknown as PushService), push };
+  const preferences = {
+    get: vi.fn(async () => ({ settings: { likes: true } })),
+    update: vi.fn(async () => ({ settings: { likes: false } })),
+  };
+  return {
+    controller: new PushController(
+      push as unknown as PushService,
+      preferences as unknown as PushPreferencesService,
+    ),
+    push,
+    preferences,
+  };
 }
 
 describe("PushController", () => {
+  it("reads and changes this member's own notification switches", async () => {
+    const { controller, preferences } = make();
+    await expect(controller.getPreferences(req)).resolves.toEqual({ settings: { likes: true } });
+    expect(preferences.get).toHaveBeenCalledWith("u1");
+    await controller.updatePreferences(req, { likes: false });
+    expect(preferences.update).toHaveBeenCalledWith("u1", { likes: false });
+  });
+
   it("hands out the key browsers subscribe with", async () => {
     await expect(make().controller.key()).resolves.toEqual({ publicKey: "PUB" });
   });
