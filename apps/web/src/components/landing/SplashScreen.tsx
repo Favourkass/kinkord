@@ -1,3 +1,4 @@
+import AnimatedWordmark from "@/components/app/AnimatedWordmark";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -480,6 +481,16 @@ export default function SplashScreen({
       {/* Only the photo portion remains; the poster’s lower copy and buttons are live UI. */}
       <div className="flex min-h-dvh flex-col bg-black lg:hidden">
         <h1 className="sr-only">{brand}</h1>
+        <div className="flex h-[72px] items-center justify-between gap-3 px-3">
+          <AnimatedWordmark image={wordmark} className="w-[200px] max-w-[calc(100%-48px)]" />
+          <span
+            role="img"
+            aria-label="Adults only, 18 plus"
+            className={`${brandStyles.emoji} text-[7vw] leading-none sm:text-[44px]`}
+          >
+            🔞
+          </span>
+        </div>
         <div className="relative aspect-[720/900] w-full overflow-hidden">
           <Image
             src={mobileHero?.src ?? hero.src}
@@ -491,24 +502,6 @@ export default function SplashScreen({
             sizes="100vw"
             className="block h-auto w-full"
           />
-          <div className="absolute inset-x-0 top-0 flex h-[12%] -translate-y-1 items-center justify-between px-3">
-            <Image
-              src={wordmark.src}
-              alt={wordmark.alt}
-              width={wordmark.width}
-              height={wordmark.height}
-              unoptimized
-              preload
-              className={`${brandStyles.wordmarkImage} h-[9vw] max-h-14 w-auto shrink-0`}
-            />
-            <span
-              role="img"
-              aria-label="Adults only, 18 plus"
-              className={`${brandStyles.emoji} text-[7vw] leading-none sm:text-[44px]`}
-            >
-              🔞
-            </span>
-          </div>
         </div>
         <div className="flex flex-col items-center gap-4 px-5 pb-8 pt-2 sm:px-7">
           <div className="flex w-full max-w-[300px] flex-col gap-2.5">
@@ -559,17 +552,8 @@ export default function SplashScreen({
               className="object-cover object-bottom"
             />
           </div>
-          <div className="relative z-10 flex items-start justify-between pl-[94px] pr-[93px] pt-[37px]">
-            <div className="flex items-center gap-4">
-              <Image
-                src={wordmark.src}
-                alt={wordmark.alt}
-                width={wordmark.width}
-                height={wordmark.height}
-                unoptimized
-                className={`${brandStyles.wordmarkImage} h-[64px] w-auto`}
-              />
-            </div>
+          <div className="relative z-10 flex items-center justify-between px-[94px] pt-[24px]">
+            <AnimatedWordmark image={wordmark} className="w-[260px]" />
             <span
               role="img"
               aria-label="Adults only, 18 plus"
