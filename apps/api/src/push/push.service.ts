@@ -364,6 +364,24 @@ export class PushService {
     this.toMember(userId, "payment_verified", paymentId, "Your Silver Premium is active");
   }
 
+  /** A member gave another a Kink Ring: a month of Silver. The push says who, as every push does. */
+  kinkRingGiven(giverId: string, receiverId: string, ringId: string): void {
+    if (giverId === receiverId) return;
+    this.notify(async () => {
+      const who = await this.member(giverId);
+      return {
+        to: receiverId,
+        event: { type: "kink_ring", actorId: giverId, subjectId: ringId },
+        message: {
+          title: "Kinkord",
+          body: `${who.name} gave you a Kink Ring: a month of Silver`,
+          url: notificationUrl("kink_ring", ringId, who.username),
+          tag: `kink_ring-${ringId}`,
+        },
+      };
+    });
+  }
+
   /** An admin couldn't match the transfer; the subscription screen says why. */
   paymentRejected(userId: string, paymentId: string): void {
     this.toMember(userId, "payment_rejected", paymentId, "We couldn't confirm your payment");

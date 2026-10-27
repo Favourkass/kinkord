@@ -18,7 +18,8 @@ export type NotificationKind =
   | "verification"
   | "verification_update"
   | "verification_underage"
-  | "silver_check";
+  | "silver_check"
+  | "kink_ring";
 
 /**
  * GET /notifications item. Who did it is looked up when the inbox loads, so a
@@ -143,6 +144,11 @@ const KINDS: Record<
     category: "Moderation",
     icon: "shield",
     action: () => "A member's ID shows they may be under 18.",
+  },
+  kink_ring: {
+    category: "Kink Ring",
+    icon: "bell",
+    action: () => "gave you a Kink Ring: a month of Silver.",
   },
   test: {
     category: "Notifications enabled",

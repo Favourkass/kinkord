@@ -3,6 +3,7 @@ import { PgDialect } from "drizzle-orm/pg-core";
 import type { SQL } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  kinkRing,
   memberSubscription,
   moderationLog,
   paymentSettings,
@@ -182,9 +183,19 @@ describe("PaymentsService.verify", () => {
     expect(left()).toBe(0);
   });
 
-  it("runs a renewal on from the end of the current period", async () => {
+  it("brings one Kink Ring with a month, expiring in 30 days, and never twice", async () => {
+    const { service, after, calls } = make([[payment()], [{ id: "u1" }], [], undefined, undefined]);
+    await service.verify("a1", ID);
+    expect(after("insert", kinkRing, "values")).toEqual([
+      { ownerId: "u1", paymentId: ID, seq: 1, expiresAt: new Date("2026-11-05T12:00:00Z") },
+    ]);
+    const ringInsert = calls.findIndex((c) => c.op === "insert" && c.args[0] === kinkRing);
+    expect(calls.slice(ringInsert).some((c) => c.op === "onConflictDoNothing")).toBe(true);
+  });
+
+  it("runs a renewal on from the end of the current period, and a year brings twelve rings", async () => {
     const end = new Date("2026-10-20T08:00:00Z");
-    const { service } = make([
+    const { service, after } = make([
       [payment({ period: "yearly" })],
       [{ id: "u1" }],
       [{ end }],
@@ -194,6 +205,12 @@ describe("PaymentsService.verify", () => {
     await expect(service.verify("a1", ID)).resolves.toMatchObject({
       silverUntil: "2027-10-20T08:00:00.000Z",
     });
+    const rings = after("insert", kinkRing, "values") as Array<{ seq: number; expiresAt: Date }>;
+    expect(rings).toHaveLength(12);
+    // 30 days for the first, 60 for the second, and on to 360, from when it's confirmed.
+    expect(rings[0]).toMatchObject({ seq: 1, expiresAt: new Date("2026-11-05T12:00:00Z") });
+    expect(rings[1]).toMatchObject({ seq: 2, expiresAt: new Date("2026-12-05T12:00:00Z") });
+    expect(rings[11]).toMatchObject({ seq: 12, expiresAt: new Date("2027-10-01T12:00:00Z") });
   });
 
   it("keeps a running member's start date, so their \"since\" doesn't move", async () => {
@@ -231,6 +248,8 @@ describe("PaymentsService.verify", () => {
       updatedAt: NOW,
     });
     expect(calls.some((c) => c.op === "insert" && c.args[0] === memberSubscription)).toBe(false);
+    // They paid, so the rings come all the same.
+    expect(after("insert", kinkRing, "values")).toHaveLength(1);
     expect(left()).toBe(0);
   });
 

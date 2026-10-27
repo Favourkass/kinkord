@@ -321,6 +321,7 @@ describe("notification links and search words", () => {
     expect(notificationUrl("relationship_accepted", "link-1", "ada")).toBe("/u/ada");
     expect(notificationUrl("follow", null, "ada x")).toBe("/u/ada%20x");
     expect(notificationUrl("follow", null, null)).toBe("/notifications");
+    expect(notificationUrl("kink_ring", "ring-1", "ada")).toBe("/u/ada");
     expect(notificationUrl("like", "p1", "ada")).toBe("/p/p1");
     expect(notificationUrl("report", null, null)).toBe("/moderation/reports");
     expect(notificationUrl("verification", null, null)).toBe("/moderation/verification");
@@ -341,7 +342,9 @@ describe("notification links and search words", () => {
       "payment_verified",
       "payment_rejected",
       "silver_check",
+      "kink_ring",
     ]);
+    expect(typesMatching("ring")).toEqual(["kink_ring"]);
   });
 });
 

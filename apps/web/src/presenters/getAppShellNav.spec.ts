@@ -27,6 +27,7 @@ describe("getAppShellNav", () => {
       saved: "Saved",
       kinkcoins: "KinkCoins & Payment",
       subscription: "Silver Premium",
+      kinkRings: "Kink Rings",
       logout: "Log Out",
     });
   });
@@ -40,6 +41,7 @@ describe("the account menu", () => {
     );
 
   it("keeps Philip's order, with Silver Premium and KinkCoins live", () => {
+    // Kink Rings follows Silver Premium (founders, 2026-10-27).
     expect(drawer.primary.map((i) => i.label)).toEqual([
       "Members",
       "Saved",
@@ -47,8 +49,10 @@ describe("the account menu", () => {
       "Verification",
       "KinkCoins & Payment",
       "Silver Premium",
+      "Kink Rings",
       "Marketplace",
     ]);
+    expect(byKey("kink-rings")).toMatchObject({ href: "/kink-rings", icon: "rings" });
     expect(byKey("silver")).toMatchObject({ href: "/subscription" });
     expect(byKey("silver")?.soon).toBeUndefined();
     expect(byKey("kinkcoins")).toMatchObject({ href: "/kinkcoins", nav: "kinkcoins" });

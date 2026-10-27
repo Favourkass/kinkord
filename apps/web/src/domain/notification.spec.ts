@@ -83,6 +83,12 @@ describe("notification presentation", () => {
     expect(toNotificationVM({ ...item, count: 3 }).body).toBe("Ada sent you 3 messages.");
   });
 
+  it("says who gave the member a Kink Ring, as a member's own act", () => {
+    const vm = toNotificationVM({ ...item, type: "kink_ring" });
+    expect(vm).toMatchObject({ official: false, category: "Kink Ring" });
+    expect(vm.body).toBe("Ada gave you a Kink Ring: a month of Silver.");
+  });
+
   it("shows Kinkord's own notices with the brand mark, not a member", () => {
     const vm = toNotificationVM({ ...item, type: "report", actor: null });
     expect(vm).toMatchObject({ official: true, actorName: null, avatarUrl: null });
