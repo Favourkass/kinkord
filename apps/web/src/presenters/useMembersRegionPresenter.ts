@@ -32,6 +32,7 @@ interface RegionPage {
   key: string;
   items: MemberCardPM[];
   total: number;
+  memberCount?: number;
   page: number;
   error: string | null;
 }
@@ -130,7 +131,15 @@ export function useMembersRegionPresenter(
     void membersApi
       .page({ country, state, region, q: search, page: 1, limit: MEMBERS_PAGE_SIZE, sort })
       .then((res) => {
-        if (!cancelled) setData({ key, items: res.items, total: res.total, page: 1, error: null });
+        if (!cancelled)
+          setData({
+            key,
+            items: res.items,
+            total: res.total,
+            memberCount: res.memberCount,
+            page: 1,
+            error: null,
+          });
       })
       .catch((e: unknown) => {
         if (cancelled) return;
@@ -156,7 +165,13 @@ export function useMembersRegionPresenter(
       .then((res) =>
         setData((prev) =>
           prev && prev.key === key
-            ? { ...prev, items: [...prev.items, ...res.items], total: res.total, page: next }
+            ? {
+                ...prev,
+                items: [...prev.items, ...res.items],
+                total: res.total,
+                memberCount: res.memberCount ?? prev.memberCount,
+                page: next,
+              }
             : prev,
         ),
       )
@@ -276,8 +291,8 @@ export function useMembersRegionPresenter(
       closeLabel: copy.closeSheet,
       searchByRegionLabel: countryMode ? copy.searchByState : copy.searchByRegion,
     },
-    count: total.toLocaleString("en-US"),
-    foundLabel: copy.found,
+    count: (search ? total : (current?.memberCount ?? total)).toLocaleString("en-US"),
+    foundLabel: search ? copy.found : copy.totalLabel,
     sort,
     sortLabel: copy.sort,
     sortAria: copy.sortLabel(copy.sortModes[sort]),
@@ -301,7 +316,9 @@ export function useMembersRegionPresenter(
       !loading && !error && knownState && items.length === 0
         ? search
           ? copy.noMatch(search, region ?? placeName)
-          : copy.empty(region ?? placeName)
+          : (current?.memberCount ?? 0) > 0
+            ? copy.noVisible
+            : copy.empty(region ?? placeName)
         : null,
     loadingMoreText: copy.loadingMore,
     // "Everyone here" isn't true of a search's results.
