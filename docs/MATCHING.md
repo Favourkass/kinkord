@@ -31,14 +31,17 @@ genders with no gender ordering. Genders are compared case-insensitively
 
 ## The pool
 
-Members in the viewer's country (their state if they have no country), of the
+Members in the viewer's **state** (within their country, when they have one,
+as Nearby: a state of the same name across a border isn't near), of the
 gender shown, excluding: the viewer, suspended members, anyone on either side
 of a block, anyone the viewer follows, anyone they're friends with or have a
 friend request with (either way), and anyone they removed
 (`suggestion_dismissal`, via `POST /members/suggested/:userId/dismiss`).
-Location and directory privacy apply as before. From them:
+Location and directory privacy apply as before. A member without a state is
+suggested nobody. (The founder narrowed the strip from the country to the
+state on 2026-10-27, to match Nearby.) From them:
 
-- the same state first, then most recently seen, up to 300;
+- the same city first, then most recently seen, up to 300;
 - the members the viewer **knows of**: friends of their friends, who follows
   them, who the members they follow follow, who liked or commented on their
   posts in the last 60 days, and whose posts they liked or commented on, up
