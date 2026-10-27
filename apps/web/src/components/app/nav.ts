@@ -49,6 +49,7 @@ export type DrawerIcon =
   | "verification"
   | "coins"
   | "subscription"
+  | "rings"
   | "marketplace"
   | "account"
   | "data"

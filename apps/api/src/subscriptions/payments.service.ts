@@ -2,7 +2,7 @@ import { ConflictException, Inject, Injectable, NotFoundException } from "@nestj
 import { and, asc, desc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
 import { DRIZZLE, type Db } from "../db/db.module";
 import {
-  memberSubscription,
+  kinkRing,
   moderationLog,
   paymentSettings,
   profile,
@@ -14,8 +14,8 @@ import { containsPattern } from "../push/notifications.service";
 import { PushService } from "../push/push.service";
 import { StorageService } from "../storage/storage.service";
 import type { AdminPaymentDto, PaymentSettingsDto, PaymentSettingsInput } from "./dto";
-import { silverGiven } from "./given-silver";
-import { addPeriod } from "./plans";
+import { ringsFor } from "./kink-rings";
+import { addSilverTime } from "./silver-time";
 import { expireAbandoned, readSettings, toPaymentDto } from "./subscriptions.service";
 
 const LIST_LIMIT = 100;
@@ -116,48 +116,25 @@ export class PaymentsService {
         .where(eq(user.id, row.userId))
         .limit(1);
       if (!member) throw new NotFoundException("This member's account no longer exists.");
-      const [current] = await tx
-        .select({
-          end: memberSubscription.currentPeriodEnd,
-          grantedBy: memberSubscription.grantedBy,
-          paidUntil: memberSubscription.paidUntil,
-        })
-        .from(memberSubscription)
-        .where(eq(memberSubscription.userId, row.userId))
-        .for("update")
-        .limit(1);
       const now = new Date();
-      const running = Boolean(current && current.end > now);
-      let until: Date;
-      if (current && running && silverGiven(current)) {
-        // Silver the founders gave runs on. The payment adds to the member's
-        // own time, set aside for them if the gift is ever taken back.
-        const paid = current.paidUntil && current.paidUntil > now ? current.paidUntil : now;
-        await tx
-          .update(memberSubscription)
-          .set({ paidUntil: addPeriod(paid, row.period), updatedAt: now })
-          .where(eq(memberSubscription.userId, row.userId));
-        until = current.end;
-      } else {
-        const from = running && current ? current.end : now;
-        until = addPeriod(from, row.period);
-        // Verifying is an admin looking at the member as they are now, so a check
-        // held after a name or photo change shows again. A lapsed run starts over.
-        await tx
-          .insert(memberSubscription)
-          .values({ userId: row.userId, plan: row.plan, currentPeriodEnd: until, startedAt: now })
-          .onConflictDoUpdate({
-            target: memberSubscription.userId,
-            set: {
-              plan: row.plan,
-              currentPeriodEnd: until,
-              checkHeldAt: null,
-              checkHoldReason: null,
-              updatedAt: now,
-              ...(running ? {} : { startedAt: now }),
-            },
-          });
-      }
+      // Silver the founders gave runs on: the payment then adds to the member's
+      // own time. Verifying is an admin looking at the member as they are now,
+      // so a check held after a name or photo change shows again.
+      const until = await addSilverTime(tx, row.userId, row.plan, row.period, now, {
+        clearHeldCheck: true,
+      });
+      // Kink Rings to give away: one for a month, twelve for a year.
+      await tx
+        .insert(kinkRing)
+        .values(
+          ringsFor(row.period, now).map((r) => ({
+            ownerId: row.userId,
+            paymentId: row.id,
+            seq: r.seq,
+            expiresAt: r.expiresAt,
+          })),
+        )
+        .onConflictDoNothing();
       await tx.insert(moderationLog).values({
         actorId,
         action: "payment_verified",

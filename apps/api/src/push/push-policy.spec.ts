@@ -128,6 +128,16 @@ describe("digestBody", () => {
     expect(digestBody("follow", ["Ada", "Tega", "Kemi", "Obi"], 4, 1)).toBe(
       "Ada and 3 others followed you",
     );
+    expect(digestBody("kink_ring", ["Ada"], 1, 1)).toBe("Ada gave you a Kink Ring");
+    expect(digestBody("kink_ring", ["Ada", "Tega"], 2, 2)).toBe(
+      "Ada and 1 other gave you Kink Rings",
+    );
+  });
+
+  it("pushes a Kink Ring at once, with no switch to turn it off, but not at night", () => {
+    expect(groupOf("kink_ring")).toBeNull();
+    expect(decidePush(ctx({ type: "kink_ring" }))).toBe("send");
+    expect(decidePush(ctx({ type: "kink_ring", now: night }))).toBe("hold");
   });
 
   it("agrees the verb with more than one person", () => {
