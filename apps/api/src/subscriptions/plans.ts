@@ -24,8 +24,8 @@ export const PROOF_GRACE_MS = 24 * 60 * 60 * 1000;
 
 /** Silver's posts, against POST_BODY_MAX for everyone else. */
 export const SILVER_POST_BODY_MAX = 25_000;
-/** New chats a Silver member may start a day, against the free allowance of one. */
-export const SILVER_NEW_CHATS_PER_DAY = 10;
+/** New conversations a Premium member may start each Lagos calendar day. */
+export const SILVER_NEW_CHATS_PER_DAY = 50;
 
 const LAGOS_UTC_OFFSET_MS = 60 * 60 * 1000;
 const pad = (n: number) => String(n).padStart(2, "0");
