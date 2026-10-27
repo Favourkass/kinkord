@@ -1,5 +1,12 @@
 export const BRAND_NAME = "Kinkord";
 
+export const HEADER_WORDMARK = {
+  src: "/brand/kinkord-header.gif",
+  alt: BRAND_NAME,
+  width: 1280,
+  height: 720,
+} as const;
+
 export const BRAND_TAGLINE =
   "Where kinksters connect, explore their interests, build meaningful relationships, and find a community where they truly belong.";
 

@@ -1,3 +1,4 @@
+import type { WordmarkImage } from "@/components/app/AnimatedWordmark";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import AppMobileHeader from "@/components/app/AppMobileHeader";
@@ -19,6 +20,7 @@ export interface FeedShellProps {
   /** The desktop sidebar's current page; the feed's own by default. */
   active?: AppNav;
   brand: string;
+  brandImage?: WordmarkImage;
   greeting: string;
   name: string;
   avatarUrl: string | null;
@@ -56,6 +58,7 @@ export default function FeedShell({
   activeTab,
   active = "home",
   brand,
+  brandImage,
   greeting,
   name,
   avatarUrl,
@@ -79,6 +82,7 @@ export default function FeedShell({
       <div className="lg:hidden">
         <AppMobileHeader
           brand={brand}
+          brandImage={brandImage}
           onMenu={onMenu}
           search={{ href: links.search, label: labels.search }}
         />
@@ -88,6 +92,7 @@ export default function FeedShell({
         <div className="hidden lg:block">
           <DesktopSidebar
             brand={brand}
+            brandImage={brandImage}
             active={active}
             notificationsUnread={notificationsUnread}
             notificationsCount={notificationsCount}
