@@ -49,6 +49,8 @@ export const MEMBERS_COPY = {
     noRegionMatch: "No matching regions",
     closeSheet: "Close",
     found: "Members Found",
+    totalLabel: "Members",
+    noVisible: "No profiles to show here.",
     sort: "Sort",
     sortLabel: (mode: string) => `Sort: ${mode}`,
     sortModes: { recent: "Newest", followers: "Most followed", name: "Name" },
