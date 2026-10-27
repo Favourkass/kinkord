@@ -36,9 +36,9 @@ export function PwaInstallBanner({
         disabled={isInstalling}
         aria-label="Install Kinkord App"
         aria-busy={isInstalling}
-        className="flex h-full w-full items-center justify-center px-4 pb-[max(24px,env(safe-area-inset-bottom))] pt-[max(72px,calc(56px+env(safe-area-inset-top)))] focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-kink-gold-bright disabled:cursor-wait"
+        className="flex h-full w-full items-center justify-center px-4 pb-[max(72px,calc(56px+env(safe-area-inset-bottom)))] pt-[max(72px,calc(56px+env(safe-area-inset-top)))] focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-kink-gold-bright disabled:cursor-wait"
       >
-        <span className="block w-[min(100%,calc((100dvh-120px)*41/48))]">
+        <span className="block w-[min(100%,calc((100dvh-160px)*41/48))]">
           <PwaInstallArtwork artwork={artwork} />
         </span>
       </button>
@@ -50,13 +50,22 @@ export function PwaInstallBanner({
       >
         <X className="size-5" />
       </button>
-      {isInstalling && (
+      {isInstalling ? (
         <p
           role="status"
           className="absolute inset-x-4 bottom-[max(16px,env(safe-area-inset-bottom))] rounded-lg bg-black/95 p-2 text-center text-sm text-kink-gold-bright"
         >
           Opening installer…
         </p>
+      ) : (
+        // Put it off for a week, as the close button does.
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="absolute inset-x-0 bottom-[max(16px,env(safe-area-inset-bottom))] mx-auto w-fit px-5 py-2 text-sm font-semibold text-white/70 hover:text-white"
+        >
+          Not now
+        </button>
       )}
     </section>
   );
