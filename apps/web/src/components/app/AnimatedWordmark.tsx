@@ -1,13 +1,16 @@
-import Image from "next/image";
-
 export interface WordmarkImage {
   src: string;
+  /** One frame of the animation, for members whose device asks for reduced motion. */
+  still?: string;
   alt: string;
   width: number;
   height: number;
 }
 
-/** Frames the supplied 1280×720 animation around its central wordmark without changing the GIF. */
+/**
+ * The animated wordmark, already cropped to what shows. A member who has asked
+ * their device for reduced motion sees a still frame instead.
+ */
 export default function AnimatedWordmark({
   image,
   className = "",
@@ -16,14 +19,18 @@ export default function AnimatedWordmark({
   className?: string;
 }) {
   return (
-    <span className={`relative block aspect-[19/6] overflow-hidden ${className}`}>
-      <Image
-        {...image}
+    <picture className={`block ${className}`}>
+      {image.still ? (
+        <source media="(prefers-reduced-motion: reduce)" srcSet={image.still} />
+      ) : null}
+      <img
+        src={image.src}
         alt={image.alt}
-        unoptimized
-        loading="eager"
-        className="absolute left-1/2 top-1/2 h-auto w-[210.5263%] max-w-none -translate-x-1/2 -translate-y-1/2"
+        width={image.width}
+        height={image.height}
+        decoding="async"
+        className="block h-auto w-full"
       />
-    </span>
+    </picture>
   );
 }
