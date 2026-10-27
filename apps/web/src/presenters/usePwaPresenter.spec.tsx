@@ -57,7 +57,8 @@ describe("usePwaPresenter", () => {
     expect(triggerSpy).toHaveBeenCalledWith(mockEvent);
   });
 
-  it("dismisses prompt and persists dismissed state", () => {
+  it("dismisses only the current visit, ignoring the previous permanent dismissal", () => {
+    localStorage.setItem("kinkord_pwa_install_dismissed", "true");
     pwaService.setDeferredPrompt({} as BeforeInstallPromptEvent);
 
     const { result } = renderHook(() => usePwaPresenter());
@@ -68,7 +69,8 @@ describe("usePwaPresenter", () => {
     });
 
     expect(result.current.isInstallable).toBe(false);
-    expect(localStorage.getItem("kinkord_pwa_install_dismissed")).toBe("true");
+    const nextVisit = renderHook(() => usePwaPresenter());
+    expect(nextVisit.result.current.isInstallable).toBe(true);
   });
 
   it("recognizes iOS installable state when not standalone and not dismissed", () => {
@@ -163,5 +165,15 @@ describe("usePwaPresenter", () => {
     });
 
     expect(result.current.showInstallGuide).toBe(true);
+    act(() => result.current.closeInstallGuide());
+    expect(result.current.isInstallable).toBe(false);
+  });
+
+  it("never offers installation inside the installed app", () => {
+    vi.spyOn(pwaService, "isStandalone").mockReturnValue(true);
+    vi.spyOn(pwaService, "isIosDevice").mockReturnValue(true);
+    pwaService.setDeferredPrompt({} as BeforeInstallPromptEvent);
+    const { result } = renderHook(() => usePwaPresenter());
+    expect(result.current.isInstallable).toBe(false);
   });
 });
