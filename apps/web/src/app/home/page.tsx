@@ -7,7 +7,7 @@ import { COMMENT_BODY_MAX, postBodyMax } from "@/domain/post";
 import { getAppShellNav } from "@/presenters/getAppShellNav";
 import { useFeedPresenter } from "@/presenters/useFeedPresenter";
 import { useHomePresenter } from "@/presenters/useHomePresenter";
-import { BRAND_NAME } from "@/constants/landing";
+import { BRAND_NAME, HEADER_WORDMARK } from "@/constants/landing";
 
 /** Post-login home: the feed (Figma "Hompage Light" 344:138 / dark 837:295). */
 export default function HomePage() {
@@ -20,6 +20,7 @@ export default function HomePage() {
       shell={{
         activeTab: "home",
         brand: BRAND_NAME,
+        brandImage: HEADER_WORDMARK,
         greeting: home.greeting,
         name: home.name,
         avatarUrl: home.avatarUrl,

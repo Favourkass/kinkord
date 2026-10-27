@@ -1,8 +1,10 @@
+import AnimatedWordmark, { type WordmarkImage } from "./AnimatedWordmark";
 import Link from "next/link";
 import MaskIcon from "./MaskIcon";
 
 export interface AppMobileHeaderProps {
   brand: string;
+  brandImage?: WordmarkImage;
   onMenu: () => void;
   menuLabel?: string;
   /** The app's search, at the right of the bar, as Facebook has it. */
@@ -16,6 +18,7 @@ export interface AppMobileHeaderProps {
  */
 export default function AppMobileHeader({
   brand,
+  brandImage,
   onMenu,
   menuLabel = "Open menu",
   search,
@@ -30,9 +33,13 @@ export default function AppMobileHeader({
       >
         <MaskIcon name="hamburger" width={35} />
       </button>
-      <p className="text-center text-[30px] font-extrabold leading-none text-kink-gold-bright">
-        {brand}
-      </p>
+      {brandImage ? (
+        <AnimatedWordmark image={brandImage} className="mx-auto w-full max-w-[220px]" />
+      ) : (
+        <p className="text-center text-[30px] font-extrabold leading-none text-kink-gold-bright">
+          {brand}
+        </p>
+      )}
       {search ? (
         <Link
           href={search.href}

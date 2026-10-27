@@ -5,6 +5,7 @@ import {
   AGE_GATE_MODAL,
   ALL_RIGHTS_RESERVED,
   BRAND_NAME,
+  HEADER_WORDMARK,
   BRAND_TAGLINE,
   COPYRIGHT_LINE,
   JOIN_AGE_DISCLAIMER,
@@ -26,7 +27,7 @@ export function getLandingVM() {
   const downloadCta: SplashAction = { label: "Download Kinkord", href: Routes.signup };
   return {
     logo: { src: "/brand/logo-badge.png", alt: "Kinkord" },
-    wordmark: { src: "/brand/kinkord-mask-wordmark.png", alt: "Kinkord", width: 720, height: 232 },
+    wordmark: HEADER_WORDMARK,
     hero: {
       src: "/brand/hero-trio.jpg",
       alt: "Three community members in black satin against a dark satin backdrop",

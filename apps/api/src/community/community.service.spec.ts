@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { type Db } from "../db/db.module";
+import { user } from "../db/schema";
 import { CommunityService } from "./community.service";
 
 const makeDb = (rows: Array<{ members: number }>) => {
@@ -10,9 +11,11 @@ const makeDb = (rows: Array<{ members: number }>) => {
 
 describe("CommunityService", () => {
   it("returns the registered member count", async () => {
-    const { db } = makeDb([{ members: 128 }]);
+    const { db, from } = makeDb([{ members: 128 }]);
     const service = new CommunityService(db);
     await expect(service.stats()).resolves.toEqual({ members: 128 });
+    // Home/landing totals count accounts directly: no presence or privacy joins/filters.
+    expect(from).toHaveBeenCalledWith(user);
   });
 
   it("returns zero when the user table is empty", async () => {

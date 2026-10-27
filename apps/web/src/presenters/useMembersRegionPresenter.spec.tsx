@@ -90,7 +90,7 @@ describe("useMembersRegionPresenter", () => {
       "/members?country=NG&state=Delta&page=1&limit=20&sort=recent",
     );
     expect(result.current.count).toBe("3");
-    expect(result.current.foundLabel).toBe("Members Found");
+    expect(result.current.foundLabel).toBe("Members");
     expect(result.current.sortLabel).toBe("Sort");
     expect(result.current.rows).toHaveLength(2);
     expect(result.current.rows[0].card).toMatchObject({
@@ -232,6 +232,42 @@ describe("useMembersRegionPresenter", () => {
     expect(result.current.rows[1].card.isFollowing).toBe(true);
     await waitFor(() => expect(result.current.rows[1].card.isFollowing).toBe(false));
     expect(result.current.rows[1].card.followers).toBe("10");
+  });
+
+  it("includes hidden members in the headline without requesting invisible pages", async () => {
+    apiGet.mockResolvedValue({
+      items: [member(1)],
+      total: 1,
+      memberCount: 307,
+      page: 1,
+      limit: 20,
+    });
+    const { result } = renderHook(() => useMembersRegionPresenter("ng", null));
+    await waitFor(() => expect(result.current.count).toBe("307"));
+    expect(result.current.foundLabel).toBe("Members");
+    expect(result.current.rows).toHaveLength(1);
+    expect(result.current.hasMore).toBe(false);
+    act(() => result.current.loadMore());
+    expect(apiGet).toHaveBeenCalledTimes(1);
+  });
+
+  it("retains the population when all profiles are hidden and search only counts visible matches", async () => {
+    apiGet.mockImplementation((path: string) =>
+      Promise.resolve(
+        new URL(`http://x${path}`).searchParams.get("q")
+          ? { items: [], total: 0, page: 1, limit: 20 }
+          : { items: [], total: 0, memberCount: 307, page: 1, limit: 20 },
+      ),
+    );
+    const { result } = renderHook(() => useMembersRegionPresenter("ng", null));
+    await waitFor(() => expect(result.current.count).toBe("307"));
+    expect(result.current.hasMore).toBe(false);
+    expect(result.current.empty).toBe("No profiles to show here.");
+    act(() => result.current.search.onChange("private person"));
+    await waitFor(() => expect(result.current.foundLabel).toBe("Members Found"));
+    expect(result.current.count).toBe("0");
+    act(() => result.current.search.onChange(""));
+    await waitFor(() => expect(result.current.count).toBe("307"));
   });
 
   it("lists the whole country when no state is given, and a tapped state opens its list", async () => {

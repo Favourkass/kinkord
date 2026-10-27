@@ -1,5 +1,6 @@
 "use client";
 
+import { PwaInstallArtwork, type InstallArtwork } from "./PwaInstallArtwork";
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import {
@@ -14,6 +15,8 @@ import {
 } from "lucide-react";
 
 export interface PwaInstallModalProps {
+  artwork: InstallArtwork;
+  isInstalling: boolean;
   open: boolean;
   onClose: () => void;
   isIos: boolean;
@@ -26,6 +29,8 @@ export interface PwaInstallModalProps {
 type PlatformTab = "ios" | "android" | "desktop";
 
 export function PwaInstallModal({
+  artwork,
+  isInstalling,
   open,
   onClose,
   isIos,
@@ -115,10 +120,12 @@ export function PwaInstallModal({
                 <button
                   type="button"
                   onClick={onInstallDirectly}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#AA7C11] py-3 text-sm font-bold text-[#0a0a0a] shadow-lg shadow-[#D4AF37]/20 hover:brightness-110 active:scale-[0.98] transition cursor-pointer"
+                  disabled={isInstalling}
+                  aria-busy={isInstalling}
+                  aria-label="Install Kinkord App"
+                  className="mx-auto block w-full max-w-[230px] rounded-2xl focus-visible:outline-2 focus-visible:outline-kink-gold-bright disabled:cursor-wait"
                 >
-                  <Download className="h-4 w-4" />
-                  <span>Install Kinkord Now</span>
+                  <PwaInstallArtwork artwork={artwork} />
                 </button>
                 <div className="my-4 flex items-center gap-3">
                   <div className="h-px flex-1 bg-white/10" />

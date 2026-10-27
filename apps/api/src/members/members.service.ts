@@ -128,6 +128,11 @@ export const AVAILABLE_COUNTRIES = [
 
 const MAX_PAGE_SIZE = 50;
 const DEFAULT_PAGE_SIZE = 20;
+/**
+ * The fewest members a place must have before the directory shows its total
+ * (founder, 2026-10-27): below it, a count could point at someone hidden.
+ */
+export const MEMBER_COUNT_MIN = 10;
 /** How many nearby members "Kinksters Near You" ranks; the best of them are shown. */
 export const SUGGESTION_POOL_SIZE = 300;
 /** A card shows this many roles and looking-for values. */
@@ -330,6 +335,24 @@ export class MembersService {
       .innerJoin(user, eq(user.id, profile.userId))
       .where(where);
 
+    // Population totals are anonymous and do not depend on the viewer's privacy
+    // access. Keep `total` above as the visible-card count for pagination/search.
+    // A place with only a few members gets no total: "2 members" beside no
+    // profiles would tell anyone that someone hidden lives there.
+    let memberCount: number | undefined;
+    if (!params.q) {
+      const location: SQL[] = [notBanned(profile.userId)];
+      if (params.country) location.push(eq(profile.country, params.country.toUpperCase()));
+      if (params.state) location.push(eq(profile.state, params.state));
+      if (params.state && params.lga) location.push(eq(profile.city, params.lga));
+      const [population] = await this.db
+        .select({ members: count() })
+        .from(profile)
+        .where(and(...location));
+      const members = Number(population?.members ?? 0);
+      if (members >= MEMBER_COUNT_MIN) memberCount = members;
+    }
+
     // One grouped query for the page rather than a count per card.
     const postCounts = await this.posts.postCountsFor(
       rows.map((r) => r.userId),
@@ -359,7 +382,13 @@ export class MembersService {
       })),
     );
 
-    return { items, total: Number(totalRow?.total ?? 0), page, limit };
+    return {
+      items,
+      total: Number(totalRow?.total ?? 0),
+      ...(memberCount === undefined ? {} : { memberCount }),
+      page,
+      limit,
+    };
   }
 
   /** Another member's public profile. Age is derived here so the birth date never leaves the API. */

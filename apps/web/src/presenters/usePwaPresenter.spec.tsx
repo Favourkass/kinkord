@@ -1,13 +1,26 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, renderHook } from "@testing-library/react";
-import { usePwaPresenter } from "./usePwaPresenter";
-import { BeforeInstallPromptEvent, pwaService } from "@/services/pwa.service";
+import { act, renderHook, waitFor } from "@testing-library/react";
+
+let pathname = "/home";
+vi.mock("next/navigation", () => ({ usePathname: () => pathname }));
+const getSession = vi.fn();
+vi.mock("@/services/authClient", () => ({
+  authClient: { getSession: (...a: unknown[]) => getSession(...a) },
+}));
+
+const { usePwaPresenter } = await import("./usePwaPresenter");
+const { pwaService } = await import("@/services/pwa.service");
+type BeforeInstallPromptEvent = import("@/services/pwa.service").BeforeInstallPromptEvent;
+
+const signedIn = { data: { user: { id: "u1" } } };
 
 describe("usePwaPresenter", () => {
   beforeEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
+    pathname = "/home";
+    getSession.mockReset().mockResolvedValue(signedIn);
     pwaService.setDeferredPrompt(null);
     pwaService.closeInstallGuide();
     vi.spyOn(pwaService, "registerServiceWorker").mockResolvedValue(null);
@@ -27,15 +40,29 @@ describe("usePwaPresenter", () => {
     expect(result.current.isInstallable).toBe(false);
   });
 
-  it("marks as installable when beforeinstallprompt event is received", () => {
+  it("marks as installable when beforeinstallprompt event is received", async () => {
     const { result } = renderHook(() => usePwaPresenter());
 
     act(() => {
       pwaService.setDeferredPrompt({} as BeforeInstallPromptEvent);
     });
 
-    expect(result.current.isInstallable).toBe(true);
+    await waitFor(() => expect(result.current.isInstallable).toBe(true));
     expect(result.current.canPromptDirectly).toBe(true);
+  });
+
+  it("never covers a page for a signed-out visitor, and offers once they sign in", async () => {
+    getSession.mockResolvedValue({ data: null });
+    pathname = "/";
+    pwaService.setDeferredPrompt({} as BeforeInstallPromptEvent);
+    const { result, rerender } = renderHook(() => usePwaPresenter());
+    await waitFor(() => expect(getSession).toHaveBeenCalled());
+    expect(result.current.isInstallable).toBe(false);
+
+    getSession.mockResolvedValue(signedIn);
+    pathname = "/home";
+    rerender();
+    await waitFor(() => expect(result.current.isInstallable).toBe(true));
   });
 
   it("handles promptInstall trigger and updates isInstalled when accepted", async () => {
@@ -57,28 +84,34 @@ describe("usePwaPresenter", () => {
     expect(triggerSpy).toHaveBeenCalledWith(mockEvent);
   });
 
-  it("dismisses prompt and persists dismissed state", () => {
+  it("puts the prompt off for a week across visits, not the old banner's for good", async () => {
+    localStorage.setItem("kinkord_pwa_install_dismissed", "true");
     pwaService.setDeferredPrompt({} as BeforeInstallPromptEvent);
 
     const { result } = renderHook(() => usePwaPresenter());
-    expect(result.current.isInstallable).toBe(true);
+    await waitFor(() => expect(result.current.isInstallable).toBe(true));
 
     act(() => {
       result.current.dismissPrompt();
     });
 
     expect(result.current.isInstallable).toBe(false);
-    expect(localStorage.getItem("kinkord_pwa_install_dismissed")).toBe("true");
+    const nextVisit = renderHook(() => usePwaPresenter());
+    await waitFor(() => expect(getSession).toHaveBeenCalled());
+    expect(nextVisit.result.current.isInstallable).toBe(false);
+    expect(Number(localStorage.getItem("kinkord_pwa_install_snoozed_until"))).toBeGreaterThan(
+      Date.now() + 6 * 86_400_000,
+    );
   });
 
-  it("recognizes iOS installable state when not standalone and not dismissed", () => {
+  it("recognizes iOS installable state when not standalone and not dismissed", async () => {
     vi.spyOn(pwaService, "isIosDevice").mockReturnValue(true);
     vi.spyOn(pwaService, "isStandalone").mockReturnValue(false);
 
     const { result } = renderHook(() => usePwaPresenter());
 
     expect(result.current.isIos).toBe(true);
-    expect(result.current.isInstallable).toBe(true);
+    await waitFor(() => expect(result.current.isInstallable).toBe(true));
   });
 
   it("tracks offline/online state changes", () => {
@@ -163,5 +196,15 @@ describe("usePwaPresenter", () => {
     });
 
     expect(result.current.showInstallGuide).toBe(true);
+    act(() => result.current.closeInstallGuide());
+    expect(result.current.isInstallable).toBe(false);
+  });
+
+  it("never offers installation inside the installed app", () => {
+    vi.spyOn(pwaService, "isStandalone").mockReturnValue(true);
+    vi.spyOn(pwaService, "isIosDevice").mockReturnValue(true);
+    pwaService.setDeferredPrompt({} as BeforeInstallPromptEvent);
+    const { result } = renderHook(() => usePwaPresenter());
+    expect(result.current.isInstallable).toBe(false);
   });
 });

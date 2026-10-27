@@ -48,7 +48,11 @@ export const SUBSCRIPTION_COPY = {
     tagline: "Unlock the full Kinkord experience with Silver.",
     features: [
       { icon: "pencil", title: "Long-form posts", body: "Up to 25,000 characters" },
-      { icon: "chat", title: "More conversations", body: "Send & receive more messages daily" },
+      {
+        icon: "chat",
+        title: "More conversations",
+        body: "Start 50 new conversations daily, with unlimited replies",
+      },
       { icon: "gift", title: "Receive & send gifts", body: "Kinkcoins, virtual gifts & more" },
       { icon: "shield", title: "Verified-only messages", body: "Choose who can message you" },
       { icon: "globe", title: "International messaging", body: "Connect globally" },

@@ -1,11 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { usePathname } from "next/navigation";
+import { PWA_INSTALL_ARTWORK } from "@/constants/pwa";
+import { authClient } from "@/services/authClient";
+import { installPromptMemory } from "@/services/installPromptMemory";
 import { BeforeInstallPromptEvent, pwaService } from "@/services/pwa.service";
 
-const DISMISSED_STORAGE_KEY = "kinkord_pwa_install_dismissed";
-
 export interface PwaVM {
+  installArtwork: typeof PWA_INSTALL_ARTWORK;
   isInstallable: boolean;
   isInstalled: boolean;
   isInstalling: boolean;
@@ -24,14 +27,13 @@ export interface PwaVM {
 const emptySubscribe = () => () => {};
 
 export function usePwaPresenter(): PwaVM {
-  const [dismissed, setDismissed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    try {
-      return localStorage.getItem(DISMISSED_STORAGE_KEY) === "true";
-    } catch {
-      return false;
-    }
-  });
+  // Put off for a week by "Not now", the close button or tapping install (the
+  // browser takes it from there). Read on the client; the server offers nothing.
+  const [dismissed, setDismissed] = useState(() =>
+    typeof window === "undefined" ? false : installPromptMemory.isSnoozed(),
+  );
+  const [signedIn, setSignedIn] = useState(false);
+  const pathname = usePathname();
 
   const deferredPrompt = useSyncExternalStore(
     (onStoreChange) => pwaService.subscribePrompt(onStoreChange),
@@ -110,22 +112,39 @@ export function usePwaPresenter(): PwaVM {
   }, []);
 
   const downloadApp = useCallback(async () => {
+    setDismissed(true);
+    installPromptMemory.snooze();
     await pwaService.downloadApp();
   }, []);
 
   const dismissPrompt = useCallback(() => {
     setDismissed(true);
-    try {
-      localStorage.setItem(DISMISSED_STORAGE_KEY, "true");
-    } catch {
-      // Ignore storage errors
-    }
+    installPromptMemory.snooze();
   }, []);
 
-  const isInstallable =
-    !isInstalled && !dismissed && (Boolean(deferredPrompt) || (isIos && !isInstalled));
+  const wouldOffer = !isInstalled && !dismissed && (Boolean(deferredPrompt) || isIos);
+  // Signed-in members only: never over the landing page, the age gate or sign-up.
+  // Asked again on each page, so it appears once someone signs in, and goes on sign-out.
+  useEffect(() => {
+    if (!wouldOffer) return;
+    let live = true;
+    authClient.getSession().then(
+      ({ data }) => {
+        if (live) setSignedIn(Boolean(data?.user));
+      },
+      () => {
+        if (live) setSignedIn(false);
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [pathname, wouldOffer]);
+
+  const isInstallable = wouldOffer && signedIn;
 
   return {
+    installArtwork: PWA_INSTALL_ARTWORK,
     isInstallable,
     isInstalled,
     isInstalling,
