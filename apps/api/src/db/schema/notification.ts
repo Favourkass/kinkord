@@ -39,7 +39,9 @@ export type NotificationType =
   // The member's own identity verification moved on: finished, decided, revoked or reopened.
   | "verification_update"
   // A member's ID says they may be under 18, for the admins to look at.
-  | "verification_underage";
+  | "verification_underage"
+  // Someone gave the member a Kink Ring: a month of Silver.
+  | "kink_ring";
 
 /**
  * Member inbox, independent of whether any device has enabled browser push.

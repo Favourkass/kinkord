@@ -46,6 +46,7 @@ describe("SidebarDrawer", () => {
       "Verification",
       "KinkCoins & Payment",
       "Silver Premium",
+      "Kink Rings",
       "Marketplace",
     ]);
     expect(screen.queryByText("Account Settings")).toBeNull();
@@ -54,7 +55,7 @@ describe("SidebarDrawer", () => {
   it("leaves Verification out while it isn't open to the member", () => {
     renderDrawer();
     expect(entries()).not.toContain("Verification");
-    expect(entries()).toHaveLength(6);
+    expect(entries()).toHaveLength(7);
   });
 
   it("marks only the unfinished entries as Soon, and the current page", () => {

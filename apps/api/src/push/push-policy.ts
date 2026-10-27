@@ -159,6 +159,7 @@ const SAYS: Partial<Record<NotificationType, [one: string, many: string]>> = {
     "accepted your relationship request",
     "accepted your relationship requests",
   ],
+  kink_ring: ["gave you a Kink Ring", "gave you Kink Rings"],
 };
 /** Account notices have no actor; held through the night, they say what they always say. */
 const ACCOUNT_SAYS: Partial<Record<NotificationType, string>> = {

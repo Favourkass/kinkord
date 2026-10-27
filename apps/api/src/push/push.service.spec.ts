@@ -272,6 +272,25 @@ describe("PushService notifications", () => {
     expect(sent()).toMatchObject({ body: "raven accepted your friend request", url: "/u/raven" });
   });
 
+  it("tells a member who gave them a Kink Ring, linking to the giver", async () => {
+    const { db } = queuedDb([
+      [{ username: "raven", name: "Raven", displayName: null }],
+      [sub("s1")],
+      [KEYS],
+    ]);
+    new PushService(db, inbox(), schedule()).kinkRingGiven("u1", "u2", "ring-1");
+    await flush();
+    expect(inboxRecord).toHaveBeenCalledWith("u2", {
+      type: "kink_ring",
+      actorId: "u1",
+      subjectId: "ring-1",
+    });
+    expect(sent()).toMatchObject({
+      body: "raven gave you a Kink Ring: a month of Silver",
+      url: "/u/raven",
+    });
+  });
+
   it("says who tagged a member, never what the post says", async () => {
     const { db } = queuedDb([
       [{ username: "raven", name: "Raven", displayName: null }],

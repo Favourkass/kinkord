@@ -139,6 +139,7 @@ const SEARCH_WORDS: Record<NotificationType, readonly string[]> = {
   payment_verified: ["payment", "silver", "premium", "subscription"],
   payment_rejected: ["payment", "silver", "premium", "subscription"],
   silver_check: ["silver", "check", "review"],
+  kink_ring: ["kink", "ring", "rings", "gift", "silver"],
 };
 
 const cursorSchema = z.object({ at: z.string().datetime(), id: z.string().uuid() });
@@ -159,6 +160,7 @@ export function notificationUrl(
     case "friend_accepted":
     case "relationship_accepted":
     case "follow":
+    case "kink_ring":
       return actorUsername ? `/u/${encodeURIComponent(actorUsername)}` : "/notifications";
     case "report":
       return "/moderation/reports";

@@ -9,6 +9,7 @@ type AppShellDrawerIcon =
   | "verification"
   | "coins"
   | "subscription"
+  | "rings"
   | "marketplace"
   | "account"
   | "data"
@@ -110,6 +111,7 @@ function drawerNavigation(): AppShellDrawerVM {
         nav: "kinkcoins",
       },
       { key: "silver", label: nav.subscription, href: Routes.subscription, icon: "subscription" },
+      { key: "kink-rings", label: nav.kinkRings, href: Routes.kinkRings, icon: "rings" },
       {
         key: "marketplace",
         label: copy.marketplace,

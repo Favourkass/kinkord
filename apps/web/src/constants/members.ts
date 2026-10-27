@@ -211,6 +211,7 @@ export const MEMBERS_COPY = {
     saved: "Saved",
     kinkcoins: "KinkCoins & Payment",
     subscription: "Silver Premium",
+    kinkRings: "Kink Rings",
     logout: "Log Out",
   },
   /** The phone drawer's account menu (Philip's design): live entries, then Settings & Privacy. */
