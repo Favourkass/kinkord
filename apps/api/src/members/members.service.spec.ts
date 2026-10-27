@@ -1045,7 +1045,7 @@ describe("MembersService.suggestedForFeed (matching v1)", () => {
     const knownCalls: Record<string, unknown[][]> = {};
     const newestCalls: Record<string, unknown[][]> = {};
     select.mockReturnValueOnce(chain(viewer ? [viewer] : []));
-    if (viewer?.country || viewer?.state) {
+    if (viewer?.state) {
       for (const k of [
         "friends",
         "followers",
@@ -1157,10 +1157,11 @@ describe("MembersService.suggestedForFeed (matching v1)", () => {
     expect(result.items[1]).toMatchObject({ userId: "fay", lookingFor: [] });
   });
 
-  it("looks in the member's country for the gender shown, leaving out the member, anyone followed, removed, blocked or suspended", async () => {
+  it("looks in the member's state, within their country, for the gender shown, leaving out the member, anyone followed, removed, blocked or suspended", async () => {
     const { where } = await run(me, []);
-    expect(where?.params).toEqual(expect.arrayContaining(["NG", "me", "female"]));
-    expect(where?.sql).toContain(`"profile"."country" = $1`);
+    expect(where?.params).toEqual(expect.arrayContaining(["Lagos", "NG", "me", "female"]));
+    expect(where?.sql).toContain(`"profile"."state" = $1`);
+    expect(where?.sql).toContain(`"profile"."country" = $2`);
     expect(where?.sql).toContain(`lower("profile"."gender") = $`);
     expect(where?.sql).toContain(`"profile"."user_id" <> $`);
     expect(where?.sql).toContain(`"member_ban"`);
@@ -1276,21 +1277,27 @@ describe("MembersService.suggestedForFeed (matching v1)", () => {
     expect(where?.sql).not.toContain(`"profile"."country"`);
   });
 
-  it("takes the nearest, most recently seen 300 into the pool", async () => {
+  it("takes the state's most recently seen 300 into the pool, the member's city first", async () => {
     const { calls } = await run(me, []);
     expect(renderOrder(calls.orderBy[0] as SQL[])).toMatchObject({
-      sql: `case when "profile"."state" = $1 then 1 else 0 end desc, "profile"."last_seen_at" desc nulls last`,
-      params: ["Lagos"],
+      sql: `case when "profile"."city" = $1 then 1 else 0 end desc, "profile"."last_seen_at" desc nulls last`,
+      params: ["Ikeja"],
     });
     expect(calls.limit[0]).toEqual([300]);
   });
 
-  it("orders by last seen alone for a member with a country but no state — never `order by 0`", async () => {
-    const { calls } = await run({ ...me, state: null, city: null }, []);
+  it("orders by last seen alone for a member with no city — never `order by 0`", async () => {
+    const { calls } = await run({ ...me, city: null }, []);
     expect(renderOrder(calls.orderBy[0] as SQL[])).toEqual({
       sql: `"profile"."last_seen_at" desc nulls last`,
       params: [],
     });
+  });
+
+  it("suggests nobody to a member with a country but no state: the strip is their state", async () => {
+    const { result, select } = await run({ ...me, state: null, city: null }, []);
+    expect(result.items).toEqual([]);
+    expect(select).toHaveBeenCalledTimes(1);
   });
 });
 
