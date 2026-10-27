@@ -546,11 +546,12 @@ export class MembersService {
   /**
    * "Kinksters Near You" on the home feed: people you may know, ranked by
    * matching v1 plus who the viewer knows (people-you-may-know.ts,
-   * docs/MATCHING.md). The pool is the viewer's country (their state when they
-   * have no country), of the gender `show` lists, leaving out the viewer,
+   * docs/MATCHING.md). The pool is the viewer's state, within their country
+   * when they have one (founder, 2026-10-27; nobody without a state), of the
+   * gender `show` lists, leaving out the viewer,
    * suspended members, anyone on either side of a block, anyone the viewer
    * already follows, is friends with, has a friend request with, or removed.
-   * From it: the nearest and most recently seen `SUGGESTION_POOL_SIZE`, the
+   * From it: the most recently seen `SUGGESTION_POOL_SIZE`, their city first, the
    * members the viewer knows of, and the newest members. The best `limit` are
    * returned, each with the reason it's there when the viewer may know it.
    */
@@ -571,11 +572,14 @@ export class MembersService {
       .where(eq(profile.userId, viewerId));
     // The viewer's own sexuality, never anyone else's.
     const { show, options } = resolveShow(requested, me?.gender, me?.orientation);
-    if (!me || (!me.country && !me.state)) return { items: [], show, options };
+    // People in the viewer's state, so nobody without one.
+    if (!me?.state) return { items: [], show, options };
 
     const now = new Date();
     const conditions: SQL[] = [
-      me.country ? eq(profile.country, me.country) : eq(profile.state, me.state as string),
+      // Within the viewer's country, as Nearby: a state of the same name across a border isn't near.
+      eq(profile.state, me.state),
+      ...(me.country ? [eq(profile.country, me.country)] : []),
       ne(profile.userId, viewerId),
       notBanned(profile.userId),
       privacyAllows(viewerId, profile.userId, "directory"),
@@ -590,9 +594,9 @@ export class MembersService {
     const gender = genderShown(show);
     // Sign-up stored "female", Edit Profile "Female".
     if (gender) conditions.push(sql`lower(${profile.gender}) = ${gender.toLowerCase()}`);
-    // Without a state there is no "same state" to put first (and a constant would be `order by 0`).
-    const sameStateFirst = me.state
-      ? [desc(sql<number>`case when ${profile.state} = ${me.state} then 1 else 0 end`)]
+    // Without a city there is no "same city" to put first (and a constant would be `order by 0`).
+    const sameCityFirst = me.city
+      ? [desc(sql<number>`case when ${profile.city} = ${me.city} then 1 else 0 end`)]
       : [];
 
     const known = await this.knownPeople(viewerId, now);
@@ -638,7 +642,7 @@ export class MembersService {
         .where(and(...conditions, ...extra))
         .orderBy(...order)
         .limit(max);
-    const recent = [...sameStateFirst, sql`${profile.lastSeenAt} desc nulls last`];
+    const recent = [...sameCityFirst, sql`${profile.lastSeenAt} desc nulls last`];
     const knownIds = [...known.keys()];
     const [nearby, acquainted, newest] = await Promise.all([
       pool([], recent, SUGGESTION_POOL_SIZE),
