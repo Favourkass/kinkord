@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { PWA_INSTALL_ARTWORK } from "@/constants/pwa";
 import { BeforeInstallPromptEvent, pwaService } from "@/services/pwa.service";
 
-const DISMISSED_STORAGE_KEY = "kinkord_pwa_install_dismissed";
-
 export interface PwaVM {
+  installArtwork: typeof PWA_INSTALL_ARTWORK;
   isInstallable: boolean;
   isInstalled: boolean;
   isInstalling: boolean;
@@ -24,14 +24,9 @@ export interface PwaVM {
 const emptySubscribe = () => () => {};
 
 export function usePwaPresenter(): PwaVM {
-  const [dismissed, setDismissed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    try {
-      return localStorage.getItem(DISMISSED_STORAGE_KEY) === "true";
-    } catch {
-      return false;
-    }
-  });
+  // PwaWrapper stays mounted during navigation. Dismiss only this visit;
+  // a fresh document may offer installation again when the browser supports it.
+  const [dismissed, setDismissed] = useState(false);
 
   const deferredPrompt = useSyncExternalStore(
     (onStoreChange) => pwaService.subscribePrompt(onStoreChange),
@@ -110,22 +105,19 @@ export function usePwaPresenter(): PwaVM {
   }, []);
 
   const downloadApp = useCallback(async () => {
+    setDismissed(true);
     await pwaService.downloadApp();
   }, []);
 
   const dismissPrompt = useCallback(() => {
     setDismissed(true);
-    try {
-      localStorage.setItem(DISMISSED_STORAGE_KEY, "true");
-    } catch {
-      // Ignore storage errors
-    }
   }, []);
 
   const isInstallable =
     !isInstalled && !dismissed && (Boolean(deferredPrompt) || (isIos && !isInstalled));
 
   return {
+    installArtwork: PWA_INSTALL_ARTWORK,
     isInstallable,
     isInstalled,
     isInstalling,

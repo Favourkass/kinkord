@@ -10,12 +10,15 @@ export function PwaWrapper() {
   return (
     <>
       <PwaInstallBanner
-        isInstallable={pwa.isInstallable}
-        isIos={pwa.isIos}
-        onInstall={pwa.promptInstall}
+        isInstallable={pwa.isInstallable && !pwa.showInstallGuide}
+        isInstalling={pwa.isInstalling}
+        artwork={pwa.installArtwork}
+        onInstall={pwa.downloadApp}
         onDismiss={pwa.dismissPrompt}
       />
       <PwaInstallModal
+        artwork={pwa.installArtwork}
+        isInstalling={pwa.isInstalling}
         open={pwa.showInstallGuide}
         onClose={pwa.closeInstallGuide}
         isIos={pwa.isIos}

@@ -1,92 +1,63 @@
 "use client";
 
-import Image from "next/image";
-import { Download, Share, X } from "lucide-react";
+import { X } from "lucide-react";
+import { PwaInstallArtwork, type InstallArtwork } from "./PwaInstallArtwork";
 
 export interface PwaInstallBannerProps {
   isInstallable: boolean;
-  isIos: boolean;
+  isInstalling: boolean;
+  artwork: InstallArtwork;
   onInstall: () => void;
   onDismiss: () => void;
 }
 
 export function PwaInstallBanner({
   isInstallable,
-  isIos,
+  isInstalling,
+  artwork,
   onInstall,
   onDismiss,
 }: PwaInstallBannerProps) {
-  if (!isInstallable) {
-    return null;
-  }
+  if (!isInstallable) return null;
 
   return (
-    <aside
-      aria-label="Install App"
-      className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-md z-50 animate-in fade-in slide-in-from-bottom-5 duration-300"
+    <section
+      role="dialog"
+      aria-modal="true"
+      aria-label="Install Kinkord App"
+      onKeyDown={(event) => {
+        if (event.key === "Escape") onDismiss();
+      }}
+      className="fixed inset-0 z-50 h-dvh w-full overflow-hidden bg-black"
     >
-      <div className="bg-[#121212]/95 backdrop-blur-md border border-[#D4AF37]/40 rounded-2xl p-4 shadow-2xl shadow-black/80 flex items-start gap-3.5">
-        <div className="w-12 h-12 rounded-xl overflow-hidden border border-[#D4AF37]/40 flex-shrink-0 shadow-md shadow-black/80 bg-[#0a0a0a]">
-          <Image
-            src="/icons/icon-192x192.png"
-            alt="Kinkord"
-            width={48}
-            height={48}
-            className="w-full h-full object-cover"
-          />
-        </div>
-
-        <div className="flex-1 min-w-0 pr-1">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-[#f5f5f0] tracking-tight">
-              Install Kinkord App
-            </h2>
-            <button
-              type="button"
-              onClick={onDismiss}
-              aria-label="Close install prompt"
-              className="text-[#a3a3a3] hover:text-[#f5f5f0] p-1 -mr-1 rounded-lg transition"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          {isIos ? (
-            <div className="mt-1 text-xs text-[#a3a3a3] leading-relaxed">
-              <span>To install: tap </span>
-              <Share className="w-3.5 h-3.5 inline text-[#D4AF37] mx-0.5 align-text-bottom" />
-              <span> Share, then select </span>
-              <strong className="text-[#f5f5f0] font-medium">&quot;Add to Home Screen&quot;</strong>
-              .
-            </div>
-          ) : (
-            <p className="mt-1 text-xs text-[#a3a3a3] leading-relaxed">
-              Add Kinkord to your home screen for full-screen view, faster load times, and instant
-              notifications.
-            </p>
-          )}
-
-          {!isIos && (
-            <div className="mt-3 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onInstall}
-                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-[#D4AF37] to-[#AA7C11] text-[#0a0a0a] text-xs font-semibold hover:brightness-110 active:scale-95 transition cursor-pointer shadow-md shadow-[#D4AF37]/20"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Install</span>
-              </button>
-              <button
-                type="button"
-                onClick={onDismiss}
-                className="px-3 py-1.5 rounded-lg text-xs text-[#a3a3a3] hover:text-[#f5f5f0] transition"
-              >
-                Not now
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </aside>
+      <button
+        type="button"
+        onClick={onInstall}
+        disabled={isInstalling}
+        aria-label="Install Kinkord App"
+        aria-busy={isInstalling}
+        className="flex h-full w-full items-center justify-center px-4 pb-[max(24px,env(safe-area-inset-bottom))] pt-[max(72px,calc(56px+env(safe-area-inset-top)))] focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-kink-gold-bright disabled:cursor-wait"
+      >
+        <span className="block w-[min(100%,calc((100dvh-120px)*41/48))]">
+          <PwaInstallArtwork artwork={artwork} />
+        </span>
+      </button>
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Close install prompt"
+        className="absolute right-4 top-[max(16px,env(safe-area-inset-top))] grid size-11 place-items-center rounded-full border border-kink-gold-bright/40 bg-black text-kink-gold-bright hover:bg-zinc-900"
+      >
+        <X className="size-5" />
+      </button>
+      {isInstalling && (
+        <p
+          role="status"
+          className="absolute inset-x-4 bottom-[max(16px,env(safe-area-inset-bottom))] rounded-lg bg-black/95 p-2 text-center text-sm text-kink-gold-bright"
+        >
+          Opening installer…
+        </p>
+      )}
+    </section>
   );
 }
