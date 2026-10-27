@@ -68,10 +68,10 @@ import type {
 } from "./dto";
 
 /**
- * Threads a member may open per day, written in or not. The new-chat allowance
- * is what limits reaching out; this only stops empty threads piling up.
+ * Empty threads a member may open within a day. Conversations with messages
+ * use the separate new-chat allowance, so this guard cannot cap Premium at 30.
  */
-export const MAX_NEW_CONVERSATIONS_PER_DAY = 30;
+export const MAX_EMPTY_CONVERSATIONS_PER_DAY = 30;
 /** Messages a member may send per minute, across all their threads. */
 export const MAX_MESSAGES_PER_MINUTE = 30;
 const LIST_LIMIT = 50;
@@ -204,9 +204,10 @@ export class ChatService {
         and(
           eq(conversation.createdBy, selfId),
           gt(conversation.createdAt, sql`now() - interval '1 day'`),
+          sql`not exists (select 1 from "message" as "opened_message" where "opened_message"."conversation_id" = ${conversation.id})`,
         ),
       );
-    if (Number(row?.n ?? 0) >= MAX_NEW_CONVERSATIONS_PER_DAY) {
+    if (Number(row?.n ?? 0) >= MAX_EMPTY_CONVERSATIONS_PER_DAY) {
       throw new HttpException(
         "You've started a lot of new conversations today. Try again tomorrow.",
         HttpStatus.TOO_MANY_REQUESTS,

@@ -19,7 +19,7 @@ import {
   CHAT_PHOTO_MAX_MB,
   ChatService,
   MAX_MESSAGES_PER_MINUTE,
-  MAX_NEW_CONVERSATIONS_PER_DAY,
+  MAX_EMPTY_CONVERSATIONS_PER_DAY,
   PHOTOS_LOCKED,
   YOU_BLOCKED,
 } from "./chat.service";
@@ -146,7 +146,7 @@ describe("ChatService.startDm", () => {
   });
 
   it("opens a new thread, recording who started it", async () => {
-    const { service, after } = make([
+    const { service, after, calls } = make([
       [{ id: "u2" }], // target
       [], // no thread yet
       nigerians, // the same country
@@ -155,6 +155,13 @@ describe("ChatService.startDm", () => {
       undefined, // members added
     ]);
     await expect(service.startDm(member("u2"), "u1")).resolves.toBe("c9");
+    const emptyCount = calls
+      .filter((c) => c.op === "where")
+      .map((c) => new PgDialect().sqlToQuery(c.args[0] as SQL).sql)
+      .find((query) => query.includes('"conversation"."created_by"'));
+    expect(emptyCount).toContain('not exists (select 1 from "message" as "opened_message"');
+    // Even deleted messages make a thread non-empty; the daily message allowance still counts them.
+    expect(emptyCount).not.toContain("deleted_at");
     expect(after("insert", conversation, "values")).toEqual({
       kind: "dm",
       dmKey: "u1:u2",
@@ -162,12 +169,12 @@ describe("ChatService.startDm", () => {
     });
   });
 
-  it("stops someone opening too many new threads in a day", async () => {
+  it("stops someone opening too many empty threads in a day", async () => {
     const { service } = make([
       [{ id: "u2" }],
       [],
       nigerians,
-      [{ n: MAX_NEW_CONVERSATIONS_PER_DAY }],
+      [{ n: MAX_EMPTY_CONVERSATIONS_PER_DAY }],
     ]);
     const err = await service.startDm(member("u1"), "u2").catch((e: unknown) => e);
     expect(err).toBeInstanceOf(HttpException);
@@ -385,7 +392,7 @@ describe("ChatService.sendMessage", () => {
       else await expect(result).resolves.toMatchObject({ id: "m1" });
     });
 
-    it("lets a Silver member start more new chats a day", async () => {
+    it("lets a Premium member start their 50th new conversation", async () => {
       const saved = row("m1", { senderId: "u1", body: "hi" });
       const { service, left } = make([
         [{ userId: "u1" }],
@@ -395,7 +402,7 @@ describe("ChatService.sendMessage", () => {
         [], // an empty thread
         onSilver,
         undefined, // lock
-        [{ n: SILVER_NEW_CHATS_PER_DAY - 1 }], // one left today
+        [{ n: 49 }], // one left today
         [saved],
         undefined,
       ]);
@@ -403,6 +410,23 @@ describe("ChatService.sendMessage", () => {
         id: "m1",
       });
       expect(left()).toBe(0);
+    });
+
+    it("refuses Premium's 51st new conversation until the daily reset", async () => {
+      const { service, after } = make([
+        [{ userId: "u1" }],
+        [{ userId: "u2" }],
+        [{ n: 0 }],
+        nigerians,
+        [],
+        onSilver,
+        undefined,
+        [{ n: 50 }],
+      ]);
+      await expect(service.sendMessage(member("u1"), "c1", { body: "hi" })).rejects.toMatchObject({
+        response: { code: NEW_CHAT_LIMIT, resetsAt: expect.stringMatching(/T23:00:00\.000Z$/) },
+      });
+      expect(after("insert", message, "values")).toBeUndefined();
     });
 
     it("doesn't limit the super admins", async () => {
