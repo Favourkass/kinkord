@@ -1,4 +1,4 @@
-export const INVEST_WHATSAPP_NUMBER = "2349031219057";
+export const INVEST_WHATSAPP_NUMBER = "2349127883266";
 
 export const INVEST_WHATSAPP_MESSAGE = "I want to invest in Kinkord please send me the details.";
 
