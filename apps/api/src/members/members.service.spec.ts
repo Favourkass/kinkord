@@ -8,6 +8,7 @@ import { type StorageService } from "../storage/storage.service";
 import { type PostsService } from "../posts/posts.service";
 import { type FollowsService } from "./follows.service";
 import {
+  MEMBER_COUNT_MIN,
   MembersService,
   ageFromDob,
   forgetSuggestionExposure,
@@ -272,11 +273,30 @@ describe("MembersService", () => {
       // The listing and pagination count still enforce the same privacy rules.
       expect(renderWhere(wheres[0])).toEqual(renderWhere(wheres[1]));
       expect(renderWhere(wheres[0]).sql).toContain("profile_privacy");
-      // The aggregate returns no identities and applies only the selected location.
+      // The aggregate returns no identities and applies only the selected location,
+      // less suspended accounts.
       const population = renderWhere(wheres[2]);
       expect(population.params).toEqual(["NG", "Delta", "Abraka"]);
-      expect(population.sql).not.toMatch(/privacy|user_id|last_seen|banned/);
+      expect(population.sql).not.toMatch(/privacy|last_seen/);
+      expect(population.sql).toContain('not exists (select 1 from "member_ban"');
     }
+  });
+
+  it("gives no total for a place with fewer than 10 members, which could point at someone hidden", async () => {
+    const { service, select } = makeService();
+    for (const [members, shown] of [
+      [9, undefined],
+      [10, 10],
+    ] as const) {
+      select
+        .mockReturnValueOnce(chain(undefined))
+        .mockReturnValueOnce(chain([]))
+        .mockReturnValueOnce(chain([{ total: 0 }]))
+        .mockReturnValueOnce(chain([{ members }]));
+      const result = await service.list({ country: "ng", state: "Delta", lga: "Abraka" }, "viewer");
+      expect(result.memberCount).toBe(shown);
+    }
+    expect(MEMBER_COUNT_MIN).toBe(10);
   });
 
   it("does not expose hidden matches through a name-search count", async () => {
