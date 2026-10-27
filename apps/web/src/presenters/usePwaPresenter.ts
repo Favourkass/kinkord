@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { usePathname } from "next/navigation";
 import { PWA_INSTALL_ARTWORK } from "@/constants/pwa";
+import { authClient } from "@/services/authClient";
+import { installPromptMemory } from "@/services/installPromptMemory";
 import { BeforeInstallPromptEvent, pwaService } from "@/services/pwa.service";
 
 export interface PwaVM {
@@ -24,9 +27,13 @@ export interface PwaVM {
 const emptySubscribe = () => () => {};
 
 export function usePwaPresenter(): PwaVM {
-  // PwaWrapper stays mounted during navigation. Dismiss only this visit;
-  // a fresh document may offer installation again when the browser supports it.
-  const [dismissed, setDismissed] = useState(false);
+  // Put off for a week by "Not now", the close button or tapping install (the
+  // browser takes it from there). Read on the client; the server offers nothing.
+  const [dismissed, setDismissed] = useState(() =>
+    typeof window === "undefined" ? false : installPromptMemory.isSnoozed(),
+  );
+  const [signedIn, setSignedIn] = useState(false);
+  const pathname = usePathname();
 
   const deferredPrompt = useSyncExternalStore(
     (onStoreChange) => pwaService.subscribePrompt(onStoreChange),
@@ -106,15 +113,35 @@ export function usePwaPresenter(): PwaVM {
 
   const downloadApp = useCallback(async () => {
     setDismissed(true);
+    installPromptMemory.snooze();
     await pwaService.downloadApp();
   }, []);
 
   const dismissPrompt = useCallback(() => {
     setDismissed(true);
+    installPromptMemory.snooze();
   }, []);
 
-  const isInstallable =
-    !isInstalled && !dismissed && (Boolean(deferredPrompt) || (isIos && !isInstalled));
+  const wouldOffer = !isInstalled && !dismissed && (Boolean(deferredPrompt) || isIos);
+  // Signed-in members only: never over the landing page, the age gate or sign-up.
+  // Asked again on each page, so it appears once someone signs in, and goes on sign-out.
+  useEffect(() => {
+    if (!wouldOffer) return;
+    let live = true;
+    authClient.getSession().then(
+      ({ data }) => {
+        if (live) setSignedIn(Boolean(data?.user));
+      },
+      () => {
+        if (live) setSignedIn(false);
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [pathname, wouldOffer]);
+
+  const isInstallable = wouldOffer && signedIn;
 
   return {
     installArtwork: PWA_INSTALL_ARTWORK,
