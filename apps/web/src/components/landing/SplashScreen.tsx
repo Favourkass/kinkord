@@ -56,7 +56,8 @@ export interface AdultBadgeData {
 
 export interface SplashScreenProps {
   logo: SplashImage;
-  wordmark: SplashImage & { width: number; height: number };
+  /** The animated wordmark, with a still for reduced motion. */
+  wordmark: SplashImage & { width: number; height: number; still?: string };
   hero: SplashImage;
   mobileHero?: SplashImage & { width: number; height: number };
   mobileContent?: {

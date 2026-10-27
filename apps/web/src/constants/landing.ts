@@ -1,10 +1,12 @@
 export const BRAND_NAME = "Kinkord";
 
+/** The animated wordmark (cropped to what shows), and a still of it for reduced motion. */
 export const HEADER_WORDMARK = {
-  src: "/brand/kinkord-header.gif",
+  src: "/brand/kinkord-header.webp",
+  still: "/brand/kinkord-header-still.webp",
   alt: BRAND_NAME,
-  width: 1280,
-  height: 720,
+  width: 540,
+  height: 171,
 } as const;
 
 export const BRAND_TAGLINE =
