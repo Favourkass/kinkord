@@ -38,9 +38,9 @@ describe("newChatsPerDay", () => {
     expect(FREE_NEW_CHATS_PER_DAY).toBe(3);
   });
 
-  it("raises the allowance for Silver", () => {
-    expect(newChatsPerDay({ email: "ada@example.com", emailVerified: true }, true)).toBe(
-      SILVER_NEW_CHATS_PER_DAY,
+  it.each(["NG", "KE", "GH", "US"])("allows Premium 50 new chats in %s", (country) => {
+    expect(newChatsPerDay({ email: "ada@example.com", emailVerified: true }, true, country)).toBe(
+      50,
     );
     expect(SILVER_NEW_CHATS_PER_DAY).toBeGreaterThan(FREE_NEW_CHATS_PER_DAY);
   });

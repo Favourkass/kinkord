@@ -319,15 +319,15 @@ describe("useChatThreadPresenter", () => {
     it("offers a Silver member nothing more, only when it resets", async () => {
       svc.history.mockResolvedValue([]);
       svc.allowance.mockResolvedValue({
-        newChatsPerDay: 10,
-        usedToday: 10,
+        newChatsPerDay: 50,
+        usedToday: 50,
         resetsAt: "2026-09-30T23:00:00.000Z",
         silver: true,
       });
       const { result } = await ready();
       await waitFor(() =>
         expect(result.current.thread.newChat).toEqual({
-          text: CHAT_COPY.newChatLimitSilver(10),
+          text: CHAT_COPY.newChatLimitSilver(50),
           blocking: true,
         }),
       );
