@@ -330,6 +330,21 @@ export class MembersService {
       .innerJoin(user, eq(user.id, profile.userId))
       .where(where);
 
+    // Population totals are anonymous and do not depend on the viewer's privacy
+    // access. Keep `total` above as the visible-card count for pagination/search.
+    let memberCount: number | undefined;
+    if (!params.q) {
+      const location: SQL[] = [];
+      if (params.country) location.push(eq(profile.country, params.country.toUpperCase()));
+      if (params.state) location.push(eq(profile.state, params.state));
+      if (params.state && params.lga) location.push(eq(profile.city, params.lga));
+      const [population] = await this.db
+        .select({ members: count() })
+        .from(profile)
+        .where(and(...location));
+      memberCount = Number(population?.members ?? 0);
+    }
+
     // One grouped query for the page rather than a count per card.
     const postCounts = await this.posts.postCountsFor(
       rows.map((r) => r.userId),
@@ -359,7 +374,13 @@ export class MembersService {
       })),
     );
 
-    return { items, total: Number(totalRow?.total ?? 0), page, limit };
+    return {
+      items,
+      total: Number(totalRow?.total ?? 0),
+      ...(memberCount === undefined ? {} : { memberCount }),
+      page,
+      limit,
+    };
   }
 
   /** Another member's public profile. Age is derived here so the birth date never leaves the API. */

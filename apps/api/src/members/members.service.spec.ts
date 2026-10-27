@@ -258,6 +258,39 @@ describe("MembersService", () => {
     expect(presignDownload).toHaveBeenCalledWith("avatars/u2/a.jpg", "md");
   });
 
+  it("keeps the location population separate from private visible-card totals", async () => {
+    const { service, select } = makeService();
+    for (const visible of [2, 0]) {
+      const wheres: SQL[] = [];
+      select
+        .mockReturnValueOnce(chain(undefined))
+        .mockReturnValueOnce(recordingChain([], wheres))
+        .mockReturnValueOnce(recordingChain([{ total: visible }], wheres))
+        .mockReturnValueOnce(recordingChain([{ members: 307 }], wheres));
+      const result = await service.list({ country: "ng", state: "Delta", lga: "Abraka" }, "viewer");
+      expect(result).toMatchObject({ items: [], total: visible, memberCount: 307 });
+      // The listing and pagination count still enforce the same privacy rules.
+      expect(renderWhere(wheres[0])).toEqual(renderWhere(wheres[1]));
+      expect(renderWhere(wheres[0]).sql).toContain("profile_privacy");
+      // The aggregate returns no identities and applies only the selected location.
+      const population = renderWhere(wheres[2]);
+      expect(population.params).toEqual(["NG", "Delta", "Abraka"]);
+      expect(population.sql).not.toMatch(/privacy|user_id|last_seen|banned/);
+    }
+  });
+
+  it("does not expose hidden matches through a name-search count", async () => {
+    const { service, select } = makeService();
+    select
+      .mockReturnValueOnce(chain(undefined))
+      .mockReturnValueOnce(chain([]))
+      .mockReturnValueOnce(chain([{ total: 0 }]));
+    const result = await service.search("viewer", "private person");
+    expect(result).toMatchObject({ items: [], total: 0 });
+    expect(result).not.toHaveProperty("memberCount");
+    expect(select).toHaveBeenCalledTimes(3);
+  });
+
   it("narrows by state and LGA only when they are given: country → state → LGA", async () => {
     const run = async (params: Parameters<MembersService["list"]>[0]) => {
       const { service, select } = makeService();

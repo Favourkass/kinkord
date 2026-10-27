@@ -57,7 +57,10 @@ export interface MediaDeletePM {
 
 export interface MembersPagePM {
   items: MemberCardPM[];
+  /** Visible matching cards only; used for pagination. */
   total: number;
+  /** All members in this location, including private profiles and the viewer. */
+  memberCount?: number;
   page: number;
   limit: number;
 }
