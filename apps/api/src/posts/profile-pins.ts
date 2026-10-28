@@ -2,20 +2,17 @@ import { BadRequestException } from "@nestjs/common";
 import { getTableName, sql, type AnyColumn } from "drizzle-orm";
 import { z } from "zod";
 import { post } from "../db/schema";
-import { privacyAllows } from "../privacy/privacy-policy";
 
 function column(column: AnyColumn) {
   return sql`${sql.identifier(getTableName(column.table))}.${sql.identifier(column.name)}`;
 }
 
-/** One pin per author, stored separately from ordinary feed ordering. */
+/**
+ * One pin per author, stored separately from ordinary feed ordering. A pin only moves the
+ * post to the top of its author's profile: who can see it is still the post's own audience.
+ */
 export function profilePostPinned(postId: AnyColumn) {
   return sql<boolean>`exists (select 1 from profile_post_pin where post_id=${column(postId)})`;
-}
-
-/** Pinning never bypasses the post audience or the reciprocal pinned-post audience. */
-export function pinnedPostAllows(viewerId: string, authorId: AnyColumn, postId: AnyColumn) {
-  return sql<boolean>`(not ${profilePostPinned(postId)} or ${privacyAllows(viewerId, authorId, "pinnedPosts")})`;
 }
 
 // JS Date preserves milliseconds. Order and paginate at the same precision, with id as tie-breaker.

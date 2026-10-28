@@ -1,6 +1,5 @@
 import {
   profilePostPinned,
-  pinnedPostAllows,
   profilePostTime,
   profilePostCursor,
   parseProfilePostCursor,
@@ -894,7 +893,6 @@ export class PostsService {
           eq(post.visibility, "public"),
           privacyAllows(viewerId, post.authorId, "posts"),
           privacyAllows(viewerId, post.authorId, "sharedContent"),
-          pinnedPostAllows(viewerId, post.authorId, post.id),
           notBanned(post.authorId),
         ),
       );

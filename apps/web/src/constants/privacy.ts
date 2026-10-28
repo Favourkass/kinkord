@@ -43,7 +43,7 @@ export const PRIVACY_FIELDS = [
   { key: "onlineStatus", icon: "🟢", label: "Who Can See My Online Status" },
   { key: "tagging", icon: "🏷️", label: "Who Can Tag or Mention Me" },
   { key: "stories", icon: "⏳", label: "Who Can See My Stories", unavailable: true },
-  { key: "pinnedPosts", icon: "📌", label: "Who Can See My Pinned Posts" },
+  { key: "pinnedPosts", icon: "📌", label: "Who Can See My Pinned Posts", unavailable: true },
   { key: "sharedContent", icon: "🔗", label: "Who Can See My Content When it is shared" },
   { key: "search", icon: "🌐", label: "Who Can Find Me Through Kinkord Search" },
   { key: "readReceipts", icon: "✓✓", label: "Who Can See When I Have Read Their Messages" },
@@ -72,8 +72,6 @@ export const PRIVACY_COPY = {
   hints: {
     directory:
       "Only me hides you from the directory, including name searches in it. Community totals still count you.",
-    pinnedPosts:
-      "Applies to a post while it is pinned, wherever it appears. Your post audience still applies. This works both ways.",
     sharedContent: "Also applies when someone opens a link to your post.",
     bio: "Also covers the rest of your About details: body type, languages, nationality, occupation, limits, social links and your verified badge.",
     interests: "Covers your kinks and what you are looking for.",

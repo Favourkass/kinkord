@@ -1,4 +1,3 @@
-import { pinnedPostAllows } from "./profile-pins";
 import { privacyAllows, privateProfileValue } from "../privacy/privacy-policy";
 import { acceptedFriendship } from "../members/friendship-policy";
 /**
@@ -92,7 +91,6 @@ function originalReadable(viewerId: string) {
     eq(original.visibility, "public"),
     notBanned(original.authorId),
     privacyAllows(viewerId, original.authorId, "posts"),
-    pinnedPostAllows(viewerId, original.authorId, original.id),
     privacyAllows(viewerId, original.authorId, "sharedContent"),
     noBlockEitherWay(original.authorId, viewerId),
   );

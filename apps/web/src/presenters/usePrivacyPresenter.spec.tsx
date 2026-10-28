@@ -66,10 +66,11 @@ describe("privacy presenter", () => {
       ),
     );
   });
-  it("enables the pinned-post audience while stories remain unavailable", async () => {
+  it("keeps the pinned-post and story audiences unavailable", async () => {
     const { result } = renderHook(() => usePrivacyPresenter("profile"));
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.fields.find((f) => f.key === "pinnedPosts")?.unavailable).toBe(false);
+    // A pinned post follows its own audience, and there are no stories yet.
+    expect(result.current.fields.find((f) => f.key === "pinnedPosts")?.unavailable).toBe(true);
     expect(result.current.fields.find((f) => f.key === "stories")?.unavailable).toBe(true);
   });
   it("offers and saves one messaging audience in its own category", async () => {

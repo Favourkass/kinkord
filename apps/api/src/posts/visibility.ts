@@ -1,4 +1,3 @@
-import { pinnedPostAllows } from "./profile-pins";
 import { privacyAllows } from "../privacy/privacy-policy";
 import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -32,12 +31,10 @@ export function visibleTo(
       and(eq(post.visibility, "friends"), acceptedFriendship(viewerId, post.authorId)),
     ),
     privacyAllows(viewerId, post.authorId, "posts"),
-    pinnedPostAllows(viewerId, post.authorId, post.id),
     sql`(${post.repostOfId} is null or exists (select 1 from ${post} as "privacy_original" where ${privacyOriginal.id}=${post.repostOfId}
       and ${privacyOriginal.visibility}='public' and ${privacyOriginal.deletedAt} is null and ${privacyOriginal.archivedAt} is null
       and ${notBanned(privacyOriginal.authorId)}
       and ${privacyAllows(viewerId, privacyOriginal.authorId, "posts")}
-      and ${pinnedPostAllows(viewerId, privacyOriginal.authorId, privacyOriginal.id)}
       and ${privacyAllows(viewerId, privacyOriginal.authorId, "sharedContent")}))`,
   );
 }
