@@ -8,6 +8,7 @@ import {
   privacyAllows,
   privateProfileValue,
   PRIVACY_FIELDS,
+  type PrivacyField,
 } from "./privacy-policy";
 describe("privacy policy", () => {
   it("preserves legacy About privacy and gives explicit field choices precedence", () => {
@@ -18,19 +19,21 @@ describe("privacy policy", () => {
       directory: "members",
     });
   });
-  it.each(PRIVACY_FIELDS)("requires both audiences for %s", (key) => {
+  const TWO_WAY: readonly PrivacyField[] = ["onlineStatus", "readReceipts", "messaging"];
+  it.each(PRIVACY_FIELDS)("reads the viewer's own %s setting only if it works both ways", (key) => {
     const query = new PgDialect().sqlToQuery(privacyAllows("viewer", "owner", key));
-    expect(query.sql.split("profile_privacy")).toHaveLength(3);
-    // The two lookups bind the same field, first to the owner and then the viewer.
+    // Each lookup binds the field and whose setting it reads: the owner's, then the viewer's.
     const lookups = [
       ...query.sql.matchAll(/settings ->> \$(\d+) from profile_privacy where user_id=\$(\d+)/g),
-    ];
-    expect(
-      lookups.map((m) => [query.params[Number(m[1]) - 1], query.params[Number(m[2]) - 1]]),
-    ).toEqual([
-      [key, "owner"],
-      [key, "viewer"],
-    ]);
+    ].map((m) => [query.params[Number(m[1]) - 1], query.params[Number(m[2]) - 1]]);
+    expect(lookups).toEqual(
+      TWO_WAY.includes(key)
+        ? [
+            [key, "owner"],
+            [key, "viewer"],
+          ]
+        : [[key, "owner"]],
+    );
     expect(query.sql).toContain("member_block");
   });
   it("binds user identifiers as values rather than SQL", () => {

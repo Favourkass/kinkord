@@ -33,13 +33,13 @@ describe("profile pin policy and pagination", () => {
     expect(() => parseProfilePostCursor(value)).toThrow("Invalid profile cursor");
   });
   it("starts without a cursor", () => expect(parseProfilePostCursor(null)).toBeNull());
-  it("applies both audiences to pinned originals, including an aliased original in a repost", () => {
+  it("applies the author's pinned-post audience, including to an aliased original in a repost", () => {
     const original = alias(post, "original");
     const query = new PgDialect().sqlToQuery(
       pinnedPostAllows("viewer", original.authorId, original.id),
     );
     expect(query.sql).toContain('post_id="original"."id"');
-    expect(query.params.filter((p) => p === "pinnedPosts")).toHaveLength(2);
+    expect(query.params.filter((p) => p === "pinnedPosts")).toHaveLength(1);
     expect(query.sql).toContain('"original"."author_id"');
     expect(new PgDialect().sqlToQuery(profilePostPinned(post.id)).sql).toContain(
       'post_id="post"."id"',

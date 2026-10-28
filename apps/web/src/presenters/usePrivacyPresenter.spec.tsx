@@ -29,10 +29,10 @@ describe("privacy presenter", () => {
     // Nobody can verify while identity verification is off.
     expect(labels).not.toContain("Verified members");
   });
-  it("explains that all privacy settings work both ways", async () => {
+  it("explains that only online status, read receipts and messaging work both ways", async () => {
     const { result } = renderHook(() => usePrivacyPresenter("profile"));
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.description).toContain("both ways");
+    expect(result.current.description).not.toContain("both ways");
     const hint = (key: string) => result.current.fields.find((x) => x.key === key)?.hint;
     expect(hint("onlineStatus")).toContain("both ways");
     expect(hint("bio")).toContain("body type");
