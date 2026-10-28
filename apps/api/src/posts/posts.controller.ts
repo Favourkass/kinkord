@@ -127,6 +127,16 @@ export class PostsController {
     return this.posts.remove(parseId(id), req.user.id);
   }
 
+  @HttpPost(":id/pin")
+  pin(@Req() req: AuthedRequest, @Param("id") id: string) {
+    return this.posts.pinToProfile(req.user.id, parseId(id));
+  }
+
+  @Delete(":id/pin")
+  unpin(@Req() req: AuthedRequest, @Param("id") id: string) {
+    return this.posts.unpinFromProfile(req.user.id, parseId(id));
+  }
+
   @HttpPost(":id/like")
   like(@Req() req: AuthedRequest, @Param("id") id: string) {
     return this.interactions.like(parseId(id), req.user.id);

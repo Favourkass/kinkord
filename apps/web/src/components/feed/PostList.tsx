@@ -11,6 +11,8 @@ export interface PostListProps {
   onOpenMenu: (id: string) => void;
   onCloseMenu: () => void;
   onAskDelete: (id: string) => void;
+  onTogglePin?: (id: string) => void;
+  pinBusy?: boolean;
   onToggleBody: (id: string) => void;
   onLike: (postId: string) => void;
   onRepost: (postId: string) => void;
@@ -59,6 +61,8 @@ export default function PostList(p: PostListProps) {
             onMenu={() => p.onOpenMenu(post.id)}
             onCloseMenu={p.onCloseMenu}
             onDelete={() => p.onAskDelete(post.id)}
+            onTogglePin={p.onTogglePin ? () => p.onTogglePin?.(post.id) : undefined}
+            pinBusy={p.pinBusy}
             onToggleBody={() => p.onToggleBody(post.id)}
             onLike={() => p.onLike(post.postId)}
             onRepost={() => p.onRepost(post.postId)}

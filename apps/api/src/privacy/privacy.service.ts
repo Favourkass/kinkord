@@ -20,8 +20,8 @@ export class PrivacyService {
     const parsed = privacyPatchSchema.safeParse(body);
     if (!parsed.success)
       throw new BadRequestException("Choose one available audience per setting.");
-    // No stories or pinned-post features exist yet: do not claim to save effective controls for them.
-    if (parsed.data.stories !== undefined || parsed.data.pinnedPosts !== undefined)
+    // Stories are not available yet. Pinned posts now use the shared mutual policy.
+    if (parsed.data.stories !== undefined)
       throw new BadRequestException("This feature is not available yet.");
     // Identity verification is switched off, so nobody could qualify: it would mean "Only me".
     if (Object.values(parsed.data).includes("verified"))
