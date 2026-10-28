@@ -291,8 +291,9 @@ describe("MembersService", () => {
       .mockReturnValueOnce(recordingChain([{ total: 0 }], wheres));
     await service.list({ country: "NG", q: "Ada" }, "viewer");
     const query = renderWhere(wheres[0]);
-    expect(query.params.filter((value) => value === "directory")).toHaveLength(2);
-    expect(query.params.filter((value) => value === "search")).toHaveLength(2);
+    // Both settings apply, each read once: they're one-way.
+    expect(query.params.filter((value) => value === "directory")).toHaveLength(1);
+    expect(query.params.filter((value) => value === "search")).toHaveLength(1);
     expect(renderWhere(wheres[1])).toEqual(query);
   });
 

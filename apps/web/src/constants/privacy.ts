@@ -63,7 +63,7 @@ export const PRIVACY_AUDIENCES = [
 
 export const PRIVACY_COPY = {
   description:
-    "All privacy settings work both ways. You can only see or interact with something if both your audience and the other member's audience allow it. For example, choosing Only me for your profile photo hides other members' profile photos from you too. Each post's own audience and your blocks still apply.",
+    "Choose who can see each part of your profile. Each post's own audience and your blocks still apply.",
   activityDescription:
     "Choose who can see when you are online. This works both ways: if you hide your online status from someone, you cannot see theirs.",
   messagingDescription:
@@ -71,7 +71,7 @@ export const PRIVACY_COPY = {
   comingSoon: "Controls for this category are coming soon. Your current settings are unchanged.",
   hints: {
     directory:
-      "Only me hides you from the directory and prevents you from browsing other members there. Community totals are unaffected.",
+      "Only me hides you from the directory, including name searches in it. Community totals still count you.",
     pinnedPosts:
       "Applies to a post while it is pinned, wherever it appears. Your post audience still applies. This works both ways.",
     sharedContent: "Also applies when someone opens a link to your post.",

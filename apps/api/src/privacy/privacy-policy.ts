@@ -79,14 +79,25 @@ function audienceAllows(viewer: SQL, owner: SQL, key: PrivacyField) {
     else false end`;
 }
 
-/** Both members must include each other in this setting's audience. Blocks hide everything. */
+/**
+ * Only these work both ways, as on WhatsApp: hide yours from someone and you don't see theirs,
+ * and you can only message members who could message you back.
+ * Every other setting is one-way, so narrowing your own never hides anyone else's posts,
+ * photos or profile from you (or an organization's pinned posts).
+ */
+const MUTUAL_FIELDS: readonly PrivacyField[] = ["onlineStatus", "readReceipts", "messaging"];
+
+/** Whether the viewer may see this part of the owner's profile. Blocks hide everything. */
 export function privacyAllows(viewerId: string, ownerId: string | AnyColumn, key: PrivacyField) {
   const viewer = identity(viewerId);
   const owner = identity(ownerId);
+  const mutual = MUTUAL_FIELDS.includes(key)
+    ? sql`and ${audienceAllows(owner, viewer, key)}`
+    : sql``;
   return sql<boolean>`(${owner} = ${viewer} or (
     not exists (select 1 from member_block where (blocker_id=${viewer} and blocked_id=${owner}) or (blocker_id=${owner} and blocked_id=${viewer}))
     and ${audienceAllows(viewer, owner, key)}
-    and ${audienceAllows(owner, viewer, key)}
+    ${mutual}
   ))`;
 }
 
