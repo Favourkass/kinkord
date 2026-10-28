@@ -249,14 +249,19 @@ export class MembersService {
     const conditions: SQL[] = [
       ne(profile.userId, viewerId),
       notBanned(profile.userId),
-      privacyAllows(viewerId, profile.userId, params.q ? "search" : "directory"),
+      privacyAllows(viewerId, profile.userId, params.sort === "match" ? "search" : "directory"),
     ];
     if (params.country || params.state || params.lga)
       conditions.push(privacyAllows(viewerId, profile.userId, "location"));
     if (params.country) conditions.unshift(eq(profile.country, params.country.toUpperCase()));
     if (params.state) conditions.push(eq(profile.state, params.state));
     if (params.state && params.lga) conditions.push(eq(profile.city, params.lga));
-    if (params.q) conditions.push(memberMatches(params.q));
+    if (params.q) {
+      conditions.push(memberMatches(params.q));
+      // Searching inside a country directory must not bypass directory privacy.
+      if (params.sort !== "match")
+        conditions.push(privacyAllows(viewerId, profile.userId, "search"));
+    }
     if (params.hideBlocked) {
       conditions.push(
         notBlocking(profile.userId, viewerId),

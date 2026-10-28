@@ -29,10 +29,10 @@ describe("privacy presenter", () => {
     // Nobody can verify while identity verification is off.
     expect(labels).not.toContain("Verified members");
   });
-  it("explains that only online status works both ways", async () => {
+  it("explains that all privacy settings work both ways", async () => {
     const { result } = renderHook(() => usePrivacyPresenter("profile"));
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.description).not.toContain("both ways");
+    expect(result.current.description).toContain("both ways");
     const hint = (key: string) => result.current.fields.find((x) => x.key === key)?.hint;
     expect(hint("onlineStatus")).toContain("both ways");
     expect(hint("bio")).toContain("body type");
@@ -65,6 +65,18 @@ describe("privacy presenter", () => {
         "Verified members",
       ),
     );
+  });
+  it("offers and saves one messaging audience in its own category", async () => {
+    const { result } = renderHook(() => usePrivacyPresenter("messaging"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.fields.map((field) => field.key)).toEqual(["messaging"]);
+    expect(result.current.description).toContain("both ways");
+    vi.mocked(savePrivacy).mockResolvedValue({
+      settings: { ...effectiveDefaults, messaging: "onlyMe" },
+    });
+    act(() => result.current.fields[0].options.find((item) => item.value === "onlyMe")!.onSelect());
+    await waitFor(() => expect(result.current.fields[0].audienceLabel).toBe("Only me"));
+    expect(savePrivacy).toHaveBeenCalledWith("messaging", "onlyMe");
   });
   it("keeps the old audience when saving fails", async () => {
     const { result } = renderHook(() => usePrivacyPresenter("activity"));

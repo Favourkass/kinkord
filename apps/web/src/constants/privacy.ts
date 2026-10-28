@@ -47,6 +47,7 @@ export const PRIVACY_FIELDS = [
   { key: "sharedContent", icon: "🔗", label: "Who Can See My Content When it is shared" },
   { key: "search", icon: "🌐", label: "Who Can Find Me Through Kinkord Search" },
   { key: "readReceipts", icon: "✓✓", label: "Who Can See When I Have Read Their Messages" },
+  { key: "messaging", icon: "💬", label: "Who Can Send Me a Message" },
 ] as const;
 
 export const PRIVACY_AUDIENCES = [
@@ -62,11 +63,16 @@ export const PRIVACY_AUDIENCES = [
 
 export const PRIVACY_COPY = {
   description:
-    "Choose who can see each part of your profile. Each post's own audience and your blocks still apply. Who can see your content when it is shared also covers anyone opening a link to your post.",
+    "All privacy settings work both ways. You can only see or interact with something if both your audience and the other member's audience allow it. For example, choosing Only me for your profile photo hides other members' profile photos from you too. Each post's own audience and your blocks still apply.",
   activityDescription:
     "Choose who can see when you are online. This works both ways: if you hide your online status from someone, you cannot see theirs.",
+  messagingDescription:
+    "Choose who can send you messages. This works both ways: you can message someone only when both of your messaging audiences allow it. Only me stops messages in both directions. Existing conversations remain available to read. Premium and daily limits still apply.",
   comingSoon: "Controls for this category are coming soon. Your current settings are unchanged.",
   hints: {
+    directory:
+      "Only me hides you from the directory and prevents you from browsing other members there. Community totals are unaffected.",
+    sharedContent: "Also applies when someone opens a link to your post.",
     bio: "Also covers the rest of your About details: body type, languages, nationality, occupation, limits, social links and your verified badge.",
     interests: "Covers your kinks and what you are looking for.",
     media:
