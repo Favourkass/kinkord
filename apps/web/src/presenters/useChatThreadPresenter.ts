@@ -211,7 +211,13 @@ export function useChatThreadPresenter(conversationId: string) {
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onTyping = useCallback(
     (active: boolean) => {
-      if (!live || summary?.peer?.blockedByMe || (!active && !typingSentAt.current)) return;
+      if (
+        !live ||
+        summary?.peer?.blockedByMe ||
+        summary?.peer?.canMessage === false ||
+        (!active && !typingSentAt.current)
+      )
+        return;
       if (typingTimer.current) clearTimeout(typingTimer.current);
       const now = Date.now();
       if (!active || now - typingSentAt.current >= 5_000) {
@@ -224,7 +230,7 @@ export function useChatThreadPresenter(conversationId: string) {
           void chatService.setTyping(conversationId, false).catch(() => undefined);
         }, 5_000);
     },
-    [conversationId, live, summary?.peer?.blockedByMe],
+    [conversationId, live, summary?.peer?.blockedByMe, summary?.peer?.canMessage],
   );
   useEffect(
     () => () => {
@@ -267,6 +273,7 @@ export function useChatThreadPresenter(conversationId: string) {
         setMessages((m) => mergeMessages(m, [saved]));
         setSendError(null);
       } catch (e) {
+        void pollHeader();
         if (e instanceof ApiError && isNewChatLimit(e.body)) {
           // Retrying can't help until tomorrow: say so instead of offering it.
           setPending((p) => p.filter((x) => x.clientId !== clientId));
@@ -285,7 +292,7 @@ export function useChatThreadPresenter(conversationId: string) {
         setSendError(messageOf(e, "Couldn't send. Tap the message to try again."));
       }
     },
-    [conversationId],
+    [conversationId, pollHeader],
   );
 
   const send = useCallback(
@@ -422,15 +429,18 @@ export function useChatThreadPresenter(conversationId: string) {
        * The daily new-chat allowance, shown while nobody has written yet; or,
        * after writing first to someone abroad was refused, the offer of Silver.
        */
-      newChat: needsSilver
-        ? {
-            text: CHAT_COPY.crossCountry,
-            blocking: true,
-            link: { label: CHAT_COPY.getSilver, href: Routes.subscription },
-          }
-        : notice === null
-          ? null
-          : newChatNoticeVM(notice, allowance?.for === conversationId ? allowance.value : null),
+      newChat:
+        summary?.peer?.canMessage === false
+          ? { text: CHAT_COPY.messagingPrivacy, blocking: true }
+          : needsSilver
+            ? {
+                text: CHAT_COPY.crossCountry,
+                blocking: true,
+                link: { label: CHAT_COPY.getSilver, href: Routes.subscription },
+              }
+            : notice === null
+              ? null
+              : newChatNoticeVM(notice, allowance?.for === conversationId ? allowance.value : null),
       /** Why photos aren't open yet, once the member has tried to add one. */
       photoNotice:
         photoLockedTapped && !canSendPhotos && peer ? photosLockedText(peer.displayName) : null,

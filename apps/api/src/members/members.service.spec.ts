@@ -282,6 +282,20 @@ describe("MembersService", () => {
     }
   });
 
+  it("keeps directory privacy enforced when a name search is entered inside the directory", async () => {
+    const { service, select } = makeService();
+    const wheres: SQL[] = [];
+    select
+      .mockReturnValueOnce(chain(undefined))
+      .mockReturnValueOnce(recordingChain([], wheres))
+      .mockReturnValueOnce(recordingChain([{ total: 0 }], wheres));
+    await service.list({ country: "NG", q: "Ada" }, "viewer");
+    const query = renderWhere(wheres[0]);
+    expect(query.params.filter((value) => value === "directory")).toHaveLength(2);
+    expect(query.params.filter((value) => value === "search")).toHaveLength(2);
+    expect(renderWhere(wheres[1])).toEqual(query);
+  });
+
   it("gives no total for a place with fewer than 10 members, which could point at someone hidden", async () => {
     const { service, select } = makeService();
     for (const [members, shown] of [

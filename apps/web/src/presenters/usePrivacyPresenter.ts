@@ -72,13 +72,16 @@ export function usePrivacyPresenter(categoryKey: string) {
   const category = PRIVACY_CATEGORIES.find((item) => item.key === categoryKey);
   const keys: Partial<Record<string, readonly PrivacyField[]>> = {
     activity: ["onlineStatus"],
+    messaging: ["messaging"],
     "read-receipts": ["readReceipts"],
     tagging: ["tagging"],
     sharing: ["sharedContent"],
   };
   const fields =
     categoryKey === "profile"
-      ? PRIVACY_FIELDS.filter((item) => item.key !== "tagging" && item.key !== "readReceipts")
+      ? PRIVACY_FIELDS.filter(
+          (item) => !["tagging", "readReceipts", "messaging"].includes(item.key),
+        )
       : PRIVACY_FIELDS.filter((item) => keys[categoryKey]?.includes(item.key));
   return {
     title: category?.label ?? "Privacy",
@@ -94,11 +97,13 @@ export function usePrivacyPresenter(categoryKey: string) {
     description:
       categoryKey === "read-receipts"
         ? READ_RECEIPTS_DESCRIPTION
-        : categoryKey === "activity"
-          ? PRIVACY_COPY.activityDescription
-          : fields.length
-            ? PRIVACY_COPY.description
-            : PRIVACY_COPY.comingSoon,
+        : categoryKey === "messaging"
+          ? PRIVACY_COPY.messagingDescription
+          : categoryKey === "activity"
+            ? PRIVACY_COPY.activityDescription
+            : fields.length
+              ? PRIVACY_COPY.description
+              : PRIVACY_COPY.comingSoon,
     fields: fields.map((field) => ({
       ...field,
       hint: PRIVACY_COPY.hints[field.key] ?? null,

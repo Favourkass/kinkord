@@ -23,6 +23,7 @@ describe("PrivacyService", () => {
     expect((await service.get("self")).settings).toMatchObject({
       bio: "friends",
       directory: "members",
+      messaging: "members",
     });
   });
   it("writes only touched fields for the authenticated member", async () => {
@@ -44,6 +45,13 @@ describe("PrivacyService", () => {
     const { service, patch } = setup();
     await expect(service.update("self", body)).rejects.toBeInstanceOf(BadRequestException);
     expect(patch).not.toHaveBeenCalled();
+  });
+  it("saves messaging permissions independently of visibility settings", async () => {
+    const { service, patch } = setup();
+    expect((await service.update("self", { messaging: "onlyMe" })).settings.messaging).toBe(
+      "onlyMe",
+    );
+    expect(patch).toHaveBeenCalledWith("self", { messaging: "onlyMe" });
   });
   it("does not create settings for a missing profile", async () => {
     const { service, read, patch } = setup();
