@@ -6,7 +6,6 @@ import {
   parseProfilePostCursor,
   profilePostCursor,
   profilePostPinned,
-  pinnedPostAllows,
 } from "./profile-pins";
 const ID = "00000000-0000-4000-8000-000000000001";
 const at = new Date("2026-10-28T10:20:30.123Z");
@@ -33,14 +32,12 @@ describe("profile pin policy and pagination", () => {
     expect(() => parseProfilePostCursor(value)).toThrow("Invalid profile cursor");
   });
   it("starts without a cursor", () => expect(parseProfilePostCursor(null)).toBeNull());
-  it("applies the author's pinned-post audience, including to an aliased original in a repost", () => {
+  it("finds a pin by the post's own id, through an alias too, and reads no privacy setting", () => {
     const original = alias(post, "original");
-    const query = new PgDialect().sqlToQuery(
-      pinnedPostAllows("viewer", original.authorId, original.id),
-    );
+    const query = new PgDialect().sqlToQuery(profilePostPinned(original.id));
     expect(query.sql).toContain('post_id="original"."id"');
-    expect(query.params.filter((p) => p === "pinnedPosts")).toHaveLength(1);
-    expect(query.sql).toContain('"original"."author_id"');
+    // Who can see a pinned post is the post's own audience, so no audience is read here.
+    expect(query.sql).not.toContain("profile_privacy");
     expect(new PgDialect().sqlToQuery(profilePostPinned(post.id)).sql).toContain(
       'post_id="post"."id"',
     );

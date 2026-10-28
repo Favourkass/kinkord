@@ -43,7 +43,8 @@ Neither changes the member totals. Those count everyone except suspended account
 
 ## Not available yet
 
-The API refuses to save either of these:
+The API refuses to save these:
 
 - **Stories:** greyed out in the app, since there are no stories yet.
+- **Pinned posts:** greyed out too. A pinned post follows its own audience (PROFILE_PINNED_POSTS.md), so this setting would do nothing.
 - **Verified members:** not offered as an audience while identity verification is switched off.
