@@ -3,7 +3,12 @@ import { sql } from "drizzle-orm";
 import { alias, PgDialect } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { profile } from "../db/schema";
-import { effectivePrivacy, privacyAllows, privateProfileValue } from "./privacy-policy";
+import {
+  effectivePrivacy,
+  privacyAllows,
+  privateProfileValue,
+  PRIVACY_FIELDS,
+} from "./privacy-policy";
 describe("privacy policy", () => {
   it("preserves legacy About privacy and gives explicit field choices precedence", () => {
     expect(effectivePrivacy({ bio: "country" }, "friends")).toMatchObject({
@@ -13,16 +18,20 @@ describe("privacy policy", () => {
       directory: "members",
     });
   });
-  it("works both ways only for online status and read receipts", () => {
-    const lookups = (key: Parameters<typeof privacyAllows>[2]) =>
-      new PgDialect().sqlToQuery(privacyAllows("viewer", "owner", key)).sql.split("profile_privacy")
-        .length - 1;
-    // One-way: only the owner's own setting is read.
-    for (const key of ["bio", "profilePhoto", "posts", "media", "directory", "tagging"] as const)
-      expect(lookups(key)).toBe(1);
-    // Two-way: the viewer's setting for the same thing is read too.
-    expect(lookups("onlineStatus")).toBe(2);
-    expect(lookups("readReceipts")).toBe(2);
+  it.each(PRIVACY_FIELDS)("requires both audiences for %s", (key) => {
+    const query = new PgDialect().sqlToQuery(privacyAllows("viewer", "owner", key));
+    expect(query.sql.split("profile_privacy")).toHaveLength(3);
+    // The two lookups bind the same field, first to the owner and then the viewer.
+    const lookups = [
+      ...query.sql.matchAll(/settings ->> \$(\d+) from profile_privacy where user_id=\$(\d+)/g),
+    ];
+    expect(
+      lookups.map((m) => [query.params[Number(m[1]) - 1], query.params[Number(m[2]) - 1]]),
+    ).toEqual([
+      [key, "owner"],
+      [key, "viewer"],
+    ]);
+    expect(query.sql).toContain("member_block");
   });
   it("binds user identifiers as values rather than SQL", () => {
     const viewer = "x' or true --";

@@ -3,6 +3,8 @@ export const INBOX_SEARCH_MAX = 100;
 
 /** Copy for the chat screens. */
 export const CHAT_COPY = {
+  messagingPrivacy:
+    "Your privacy settings or this member's privacy settings do not allow messaging between you. Existing messages are still available to read.",
   heading: "Messages",
   inbox: {
     search: "Search chats…",

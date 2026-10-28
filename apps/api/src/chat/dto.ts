@@ -102,6 +102,8 @@ export interface ChatPeerDto {
   presence: "online" | "away" | "offline";
   /** The viewer blocked them: the thread stays, read-only until they unblock. */
   blockedByMe: boolean;
+  /** Both members' messaging audiences permit sending. History stays readable when false. */
+  canMessage: boolean;
 }
 
 export interface ConversationSummaryDto {

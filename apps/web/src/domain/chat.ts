@@ -43,6 +43,8 @@ export interface ChatPeerPM {
   online: boolean;
   /** The viewer blocked them: the thread stays, read-only until they unblock. */
   blockedByMe: boolean;
+  /** Missing on an older API; the backend always enforces the permission. */
+  canMessage?: boolean;
 }
 
 export interface ChatReceiptsPM {
@@ -150,6 +152,7 @@ export interface ThreadPeerVM {
   avatarUrl: string | null;
   isOnline: boolean;
   blockedByMe: boolean;
+
   /** Their profile, opened by tapping them in the header. */
   profileHref: string;
 }
