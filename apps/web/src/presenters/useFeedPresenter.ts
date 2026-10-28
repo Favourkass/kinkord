@@ -11,6 +11,8 @@ import {
   toCommentVM,
   toFeedSuggestionVM,
   toPostVM,
+  withProfilePin,
+  prependCreatedPost,
   type CommentPM,
   type CommentVM,
   type DraftPhotoVM,
@@ -292,6 +294,8 @@ export function useFeedPresenter({
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [pinBusy, setPinBusy] = useState(false);
+  const pinInFlight = useRef(false);
 
   // "Kinksters Near You". The segment asked for (null: the member's default,
   // which the API knows), then the segment shown and those offered, as the
@@ -556,7 +560,7 @@ export function useFeedPresenter({
         mediaKeys: ready.map((p) => p.key as string),
         tags: tagPicker.usernames,
       });
-      setPosts((prev) => [created, ...prev]);
+      setPosts((prev) => prependCreatedPost(prev, created, Boolean(author)));
       closeComposer();
     } catch (e) {
       if (onUnauthorized(e)) return;
@@ -566,7 +570,16 @@ export function useFeedPresenter({
     } finally {
       setPosting(false);
     }
-  }, [draft, photos, posting, visibility, tagPicker.usernames, closeComposer, onUnauthorized]);
+  }, [
+    draft,
+    photos,
+    posting,
+    visibility,
+    tagPicker.usernames,
+    closeComposer,
+    onUnauthorized,
+    author,
+  ]);
 
   /** The viewer takes their tag off a post: every row showing it updates at once. */
   const removeTag = useCallback(
@@ -771,6 +784,40 @@ export function useFeedPresenter({
     setConfirmDelete(id);
   }, []);
   const cancelDelete = useCallback(() => setConfirmDelete(null), []);
+
+  const togglePin = useCallback(
+    async (id: string) => {
+      const target = posts.find((post) => post.id === id);
+      if (!target?.mine || target.id !== target.postId || pinInFlight.current) return;
+      pinInFlight.current = true;
+      setPinBusy(true);
+      setMenuFor(null);
+      const listRound = shownRound.current;
+      try {
+        const result = await (target.isPinned ? postsApi.unpin(id) : postsApi.pin(id));
+        if (shownRound.current !== listRound) return;
+        setShareNote(
+          result.pinned
+            ? "Pinned to your profile. This replaces any previous pin."
+            : "Post unpinned from your profile.",
+        );
+        if (author) {
+          // Refresh ordering and cursor together; discard any older page still loading.
+          shownRound.current = listRound + 1;
+          setRequested((current) => ({ ...current, round: current.round + 1 }));
+        } else {
+          setPosts((current) => withProfilePin(current, result.postId, result.pinned));
+        }
+      } catch (error) {
+        if (shownRound.current === listRound && !onUnauthorized(error))
+          setShareNote("Could not change your pinned post. Please try again.");
+      } finally {
+        pinInFlight.current = false;
+        setPinBusy(false);
+      }
+    },
+    [posts, author, onUnauthorized],
+  );
 
   const confirmDeletePost = useCallback(async () => {
     if (!confirmDelete || deleting) return;
@@ -1323,6 +1370,8 @@ export function useFeedPresenter({
     deleteComment,
 
     menuFor,
+    togglePin,
+    pinBusy,
     openMenu,
     closeMenu,
     askDelete,

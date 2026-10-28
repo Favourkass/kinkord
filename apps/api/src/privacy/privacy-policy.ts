@@ -20,6 +20,7 @@ export const PRIVACY_FIELDS = [
   "sharedContent",
   "search",
   "readReceipts",
+  "messaging",
 ] as const;
 export const PRIVACY_AUDIENCES = [
   "friends",
@@ -79,11 +80,12 @@ function audienceAllows(viewer: SQL, owner: SQL, key: PrivacyField) {
 }
 
 /**
- * Only these work both ways, as on WhatsApp: hide yours from someone and you don't see theirs.
+ * Only these work both ways, as on WhatsApp: hide yours from someone and you don't see theirs,
+ * and you can only message members who could message you back.
  * Every other setting is one-way, so narrowing your own never hides anyone else's posts,
  * photos or profile from you (or an organization's pinned posts).
  */
-const MUTUAL_FIELDS: readonly PrivacyField[] = ["onlineStatus", "readReceipts"];
+const MUTUAL_FIELDS: readonly PrivacyField[] = ["onlineStatus", "readReceipts", "messaging"];
 
 /** Whether the viewer may see this part of the owner's profile. Blocks hide everything. */
 export function privacyAllows(viewerId: string, ownerId: string | AnyColumn, key: PrivacyField) {

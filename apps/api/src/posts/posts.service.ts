@@ -1,3 +1,10 @@
+import {
+  profilePostPinned,
+  profilePostTime,
+  profilePostCursor,
+  parseProfilePostCursor,
+  afterProfilePost,
+} from "./profile-pins";
 import { notBanned } from "../moderation/admins";
 import { privacyAllows, privateProfileValue } from "../privacy/privacy-policy";
 import { teamBadge } from "../members/team-badge";
@@ -40,6 +47,7 @@ import {
   postMedia,
   postSave,
   postTag,
+  profilePostPin,
   profile,
   user,
   walletGift,
@@ -210,6 +218,7 @@ export interface PostVM {
   repostedBy: Pick<PostAuthorVM, "userId" | "username" | "displayName"> | null;
   /** Whether the viewer may delete this row — their own post or their own repost. */
   mine: boolean;
+  isPinned: boolean;
   /** Each @handle in the body that names a member, and whom: the ones the app links. */
   mentions: Mention[];
   /** The author's friends tagged in the post, as the viewer may see them. */
@@ -331,6 +340,40 @@ export class PostsService {
     return vm;
   }
 
+  async pinToProfile(userId: string, postId: string) {
+    const [owned] = await this.db
+      .select({ id: post.id })
+      .from(post)
+      .where(
+        and(
+          eq(post.id, postId),
+          eq(post.authorId, userId),
+          isNull(post.repostOfId),
+          isNull(post.deletedAt),
+          isNull(post.archivedAt),
+        ),
+      )
+      .limit(1);
+    if (!owned)
+      throw new NotFoundException("Only your own available original posts can be pinned.");
+    await this.db
+      .insert(profilePostPin)
+      .values({ userId, postId })
+      .onConflictDoUpdate({
+        target: profilePostPin.userId,
+        set: { postId, pinnedAt: new Date() },
+      });
+    return { postId, pinned: true };
+  }
+
+  async unpinFromProfile(userId: string, postId: string) {
+    // A delayed unpin of an old post must never remove a newer replacement pin.
+    await this.db
+      .delete(profilePostPin)
+      .where(and(eq(profilePostPin.userId, userId), eq(profilePostPin.postId, postId)));
+    return { postId, pinned: false };
+  }
+
   /** Whether the viewer can read this post, by the feed's own rules. */
   async canSee(postId: string, viewerId: string): Promise<boolean> {
     return (await this.selectPosts(viewerId, [eq(post.id, postId)], 1)).length > 0;
@@ -370,12 +413,14 @@ export class PostsService {
     const tab = params.author || params.q || params.tagged ? null : (params.tab ?? null);
     if (tab === "for_you" || tab === "nearby") return this.rankedFeed(viewerId, tab, params, limit);
     const following = tab === "following";
-    const cursor = parseCursor(params.cursor);
     const authorId = params.author ? await this.resolveAuthor(params.author) : null;
+    const profileCursor = authorId ? parseProfilePostCursor(params.cursor) : null;
+    const cursor = authorId ? null : parseCursor(params.cursor);
     const taggedId = params.tagged ? await this.resolveAuthor(params.tagged) : null;
     const rows = await this.selectPosts(
       viewerId,
       [
+        ...(profileCursor ? [afterProfilePost(profileCursor)] : []),
         ...(cursor ? [lt(post.createdAt, cursor)] : []),
         ...(authorId ? [eq(post.authorId, authorId)] : []),
         ...(taggedId ? [tags(post.id, taggedId)] : []),
@@ -383,10 +428,17 @@ export class PostsService {
         ...(following ? followingConditions(viewerId) : []),
       ],
       limit + 1,
+      Boolean(authorId),
     );
     const page = rows.slice(0, limit);
     const items = await this.decorate(page, viewerId);
-    const nextCursor = rows.length > limit ? (page.at(-1)?.createdAt.toISOString() ?? null) : null;
+    const last = page.at(-1);
+    const nextCursor =
+      rows.length > limit && last
+        ? authorId
+          ? profilePostCursor(last)
+          : last.createdAt.toISOString()
+        : null;
     // An empty Following says how to fill it when the viewer follows nobody yet.
     if (following && !cursor && !rows.length && !(await followsAnyone(this.db, viewerId))) {
       return { items, nextCursor, hint: "no_follows" };
@@ -747,12 +799,18 @@ export class PostsService {
    * Rows the viewer is allowed to see: anything public, everything of their own,
    * and friends-only posts from members they and the author both follow.
    */
-  private async selectPosts(viewerId: string, extra: ReturnType<typeof eq>[], limit: number) {
+  private async selectPosts(
+    viewerId: string,
+    extra: ReturnType<typeof eq>[],
+    limit: number,
+    pinnedFirst = false,
+  ) {
     const viewerFollows = alias(follow, "viewer_follows_author");
     const authorFollows = alias(follow, "author_follows_viewer");
     return this.db
       .select({
         id: post.id,
+        isPinned: profilePostPinned(post.id),
         body: post.body,
         shares: post.shares,
         visibility: post.visibility,
@@ -786,7 +844,11 @@ export class PostsService {
           ...extra,
         ),
       )
-      .orderBy(desc(post.createdAt))
+      .orderBy(
+        ...(pinnedFirst
+          ? [desc(profilePostPinned(post.id)), desc(profilePostTime), desc(post.id)]
+          : [desc(post.createdAt)]),
+      )
       .limit(limit);
   }
 
@@ -801,6 +863,7 @@ export class PostsService {
     const rows = await this.db
       .select({
         id: post.id,
+        isPinned: profilePostPinned(post.id),
         body: post.body,
         shares: post.shares,
         visibility: post.visibility,
@@ -979,6 +1042,7 @@ export class PostsService {
                 displayName: row.displayName ?? row.username ?? "Member",
               },
         mine: row.authorId === viewerId,
+        isPinned: Boolean(row.isPinned),
         mentions: mentionsIn(content.body, members),
         tagged: tagged.get(content.id) ?? [],
         taggedMe: (tagged.get(content.id) ?? []).some((t) => t.userId === viewerId),

@@ -11,6 +11,8 @@ import {
   toCommentVM,
   toFeedSuggestionVM,
   toPostVM,
+  withProfilePin,
+  prependCreatedPost,
   type CommentPM,
   type FeedSuggestionPM,
   type SuggestionReasonCopy,
@@ -449,5 +451,29 @@ it("keeps team identity independent of Silver", () => {
   expect(toPostVM(post({ author: { ...author, silver: true } }), false, href, NOW)).toMatchObject({
     authorTeamMember: false,
     authorSilver: true,
+  });
+});
+
+describe("profile pin view models", () => {
+  it("reflects the backend pin and defaults older responses to unpinned", () => {
+    expect(toPostVM(post({ isPinned: true }), false, href).isPinned).toBe(true);
+    expect(toPostVM(post(), false, href).isPinned).toBe(false);
+  });
+  it("replaces only the viewer's original pin, leaving others' pins and ordering alone", () => {
+    const rows = [
+      post({ mine: true, isPinned: true }),
+      post({ id: "p2", postId: "p2", mine: true }),
+      post({ id: "p3", postId: "p3", isPinned: true }),
+    ];
+    const updated = withProfilePin(rows, "p2", true);
+    expect(updated.map((p) => p.id)).toEqual(["p1", "p2", "p3"]);
+    expect(updated.map((p) => p.isPinned)).toEqual([false, true, true]);
+    expect(withProfilePin(updated, "p1", false)[1].isPinned).toBe(true);
+  });
+  it("keeps a newly created profile post below the pin, without affecting timeline order", () => {
+    const pinned = post({ isPinned: true });
+    const created = post({ id: "p2", postId: "p2" });
+    expect(prependCreatedPost([pinned], created, true).map((p) => p.id)).toEqual(["p1", "p2"]);
+    expect(prependCreatedPost([pinned], created, false).map((p) => p.id)).toEqual(["p2", "p1"]);
   });
 });

@@ -245,3 +245,18 @@ export const postNotInterested = pgTable(
   },
   (t) => [primaryKey({ columns: [t.userId, t.postId] })],
 );
+
+/** A single featured post on a member's profile. Upserting the user key replaces their previous pin. */
+export const profilePostPin = pgTable(
+  "profile_post_pin",
+  {
+    userId: text("user_id")
+      .primaryKey()
+      .references(() => user.id, { onDelete: "cascade" }),
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => post.id, { onDelete: "cascade" }),
+    pinnedAt: timestamp("pinned_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("profile_post_pin_post_idx").on(t.postId)],
+);

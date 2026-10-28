@@ -7,6 +7,9 @@ import PostCard from "./PostCard";
 afterEach(cleanup);
 
 const labels = {
+  pin: "Pin to profile",
+  unpin: "Unpin from profile",
+  pinned: "Pinned to profile",
   like: "Like",
   unlike: "Unlike",
   comment: "Comment",
@@ -94,7 +97,12 @@ describe("post Silver badge and gift eligibility", () => {
 
 function menuOf(
   over: Partial<PostPM>,
-  extra: { onNotInterested?: () => void; onSeen?: () => void } = {},
+  extra: {
+    onNotInterested?: () => void;
+    onSeen?: () => void;
+    onTogglePin?: () => void;
+    pinBusy?: boolean;
+  } = {},
 ) {
   const pm: PostPM = {
     id: "p1",
@@ -378,4 +386,25 @@ describe("the organization's Follow button", () => {
     card({ author: { ...organization, avatarUrl: null } });
     expect(screen.queryByRole("button", { name: "Follow" })).toBeNull();
   });
+});
+
+describe("profile pin menu", () => {
+  it("offers Pin for your original post and calls its handler", () => {
+    const onTogglePin = vi.fn();
+    menuOf({ mine: true }, { onTogglePin });
+    fireEvent.click(screen.getByRole("button", { name: "Pin to profile" }));
+    expect(onTogglePin).toHaveBeenCalledTimes(1);
+  });
+  it("labels a pinned post and offers Unpin", () => {
+    menuOf({ mine: true, isPinned: true }, { onTogglePin: vi.fn() });
+    expect(screen.getByText("Pinned to profile")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Unpin from profile" })).toBeTruthy();
+  });
+  it.each([{ mine: false }, { mine: true, id: "repost", postId: "p1" }])(
+    "does not offer to pin a foreign post or repost",
+    (over) => {
+      menuOf(over, { onTogglePin: vi.fn() });
+      expect(screen.queryByRole("button", { name: "Pin to profile" })).toBeNull();
+    },
+  );
 });

@@ -16,6 +16,7 @@ export const PRIVACY_FIELD_KEYS = [
   "sharedContent",
   "search",
   "readReceipts",
+  "messaging",
 ] as const;
 export const PRIVACY_AUDIENCE_VALUES = [
   "friends",
@@ -38,7 +39,8 @@ export function privacyFromTransport(value: unknown): PrivacyPM {
   if (!settings || typeof settings !== "object") throw new Error("Invalid privacy response.");
   const parsed = {} as Record<PrivacyField, PrivacyAudience>;
   for (const field of PRIVACY_FIELD_KEYS) {
-    const choice = (settings as Record<string, unknown>)[field];
+    const raw = (settings as Record<string, unknown>)[field];
+    const choice = field === "messaging" && raw === undefined ? "members" : raw;
     const audience = PRIVACY_AUDIENCE_VALUES.find((item) => item === choice);
     if (!audience) throw new Error("Invalid privacy audience.");
     parsed[field] = audience;

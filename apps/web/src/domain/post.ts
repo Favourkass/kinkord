@@ -55,6 +55,8 @@ export interface PostPM {
   /** Set when this row is somebody's repost of the post above. */
   repostedBy: Pick<PostAuthorPM, "userId" | "username" | "displayName"> | null;
   mine: boolean;
+  /** The author has featured this post on their profile. */
+  isPinned?: boolean;
   /** Each @handle in the body that names a member, and whom. Absent from an older API. */
   mentions?: MentionPM[];
   /** The author's friends tagged in the post. Absent from an older API. */
@@ -234,6 +236,8 @@ export interface PostVM {
   repostedByMe: boolean;
   savedByMe: boolean;
   mine: boolean;
+  /** The author has featured this post on their profile. */
+  isPinned?: boolean;
   /** Friends-only posts say so, so nobody is surprised by who can read them. */
   visibilityNote: string | null;
   /** Who the post tags, each out to their profile. */
@@ -464,6 +468,7 @@ export function toPostVM(
     repostedByMe: pm.repostedByMe,
     savedByMe: pm.savedByMe,
     mine: pm.mine,
+    isPinned: Boolean(pm.isPinned),
     visibilityNote: pm.visibility === "friends" ? "Friends only" : null,
     tagged: (pm.tagged ?? []).map((t) => ({
       userId: t.userId,
@@ -531,4 +536,24 @@ export function toFeedSuggestionVM(
     busy,
     href: hrefFor(pm.username),
   };
+}
+
+/** A member has at most one profile pin; unrelated authors and reposts remain unchanged. */
+export function withProfilePin(posts: PostPM[], postId: string, pinned: boolean): PostPM[] {
+  return posts.map((post) => {
+    if (!post.mine || post.id !== post.postId) return post;
+    if (post.id === postId) return { ...post, isPinned: pinned };
+    return pinned && post.isPinned ? { ...post, isPinned: false } : post;
+  });
+}
+
+/** New posts never displace a profile's featured post. Home feeds keep their normal insertion order. */
+export function prependCreatedPost(posts: PostPM[], created: PostPM, profile: boolean): PostPM[] {
+  const remaining = posts.filter((post) => post.id !== created.id);
+  if (!profile) return [created, ...remaining];
+  return [
+    ...remaining.filter((post) => post.isPinned),
+    created,
+    ...remaining.filter((post) => !post.isPinned),
+  ];
 }

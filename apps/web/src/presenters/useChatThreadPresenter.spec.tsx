@@ -100,6 +100,21 @@ async function ready() {
 }
 
 describe("useChatThreadPresenter", () => {
+  it("keeps chat history visible and stops composing when messaging privacy is restricted", async () => {
+    svc.conversation.mockResolvedValue(header({ peer: { ...header().peer!, canMessage: false } }));
+    const { result } = await ready();
+    expect(result.current.thread.messages.length).toBeGreaterThan(0);
+    expect(result.current.thread.unavailable).toBe(false);
+    expect(result.current.thread.newChat).toEqual({
+      text: CHAT_COPY.messagingPrivacy,
+      blocking: true,
+    });
+    expect(result.current.composerPhoto.allowed).toBe(false);
+    // A later refresh restores messaging when both audiences permit it again.
+    svc.conversation.mockResolvedValue(header({ peer: { ...header().peer!, canMessage: true } }));
+    await act(async () => polls.get(HEADER_POLL_MS)?.tick());
+    expect(result.current.thread.newChat).toBeNull();
+  });
   it("updates existing bubbles when peer receipts refresh, including hidden receipts", async () => {
     const { result } = await ready();
     const own = result.current.thread.messages.find((m) => m.isOwn)!;

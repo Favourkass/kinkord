@@ -106,6 +106,12 @@ const photoPrefix = (conversationId: string, userId: string) =>
   `${CHAT_PHOTO_PREFIX}/${conversationId}/${userId}/`;
 /** Photos open up once the other member has written in the thread. */
 export const PHOTOS_LOCKED = "You can send photos once they've written to you.";
+/** Privacy restrictions do not offer a Premium upgrade as a way around consent. */
+export const MESSAGING_PRIVACY = "MESSAGING_PRIVACY";
+export const MESSAGING_PRIVACY_MESSAGE =
+  "Your privacy settings or this member's privacy settings do not allow messaging between you.";
+const messagingDenied = () =>
+  new ForbiddenException({ code: MESSAGING_PRIVACY, message: MESSAGING_PRIVACY_MESSAGE });
 /** Said to a member writing to someone they blocked; the blocked side reads them as gone. */
 export const YOU_BLOCKED = "You've blocked this member. Unblock them to send messages.";
 const photoTooLarge = () => `Photo is too large — max ${CHAT_PHOTO_MAX_MB}MB.`;
@@ -144,7 +150,7 @@ export class ChatService {
     const selfId = self.id;
     if (selfId === otherId) throw new BadRequestException("You can't message yourself.");
     const [target] = await this.db
-      .select({ id: user.id })
+      .select({ id: user.id, canMessage: privacyAllows(selfId, user.id, "messaging") })
       .from(user)
       .where(and(eq(user.id, otherId), notBanned(user.id), notBlocking(user.id, selfId)))
       .limit(1);
@@ -159,6 +165,7 @@ export class ChatService {
     // An existing thread always opens. Nobody has written in a new one yet, so
     // opening it with someone abroad takes Silver.
     if (!existing) {
+      if (!target.canMessage) throw messagingDenied();
       await this.assertCanReach(self, otherId, null);
       if (newChatsPerDay(self) !== null) await this.assertCanOpenConversation(selfId);
     }
@@ -240,6 +247,7 @@ export class ChatService {
       .select({
         userId: conversationParticipant.userId,
         blockedByMe: blockedBy(userId, conversationParticipant.userId),
+        canMessage: privacyAllows(userId, conversationParticipant.userId, "messaging"),
       })
       .from(conversationParticipant)
       .where(
@@ -253,6 +261,7 @@ export class ChatService {
       .limit(1);
     if (!peer) throw new BadRequestException("This member is no longer on Kinkord.");
     if (peer.blockedByMe) throw new ForbiddenException(YOU_BLOCKED);
+    if (!peer.canMessage) throw messagingDenied();
     return peer.userId;
   }
 
@@ -634,6 +643,7 @@ export class ChatService {
     const canSendPhotos =
       peer !== null &&
       !peer.blockedByMe &&
+      peer.canMessage &&
       ((lastMessage !== null && lastMessage.senderId !== userId) ||
         (await this.peerHasWritten(conversationId, userId)));
     return { ...row.summary, canSendPhotos };
@@ -814,6 +824,7 @@ export class ChatService {
         avatarKey: privateProfileValue(userId, profile.userId, "profilePhoto", profile.avatarKey),
         lastSeenAt: privateProfileValue(userId, profile.userId, "onlineStatus", profile.lastSeenAt),
         blockedByMe: blockedBy(userId, conversationParticipant.userId),
+        canMessage: privacyAllows(userId, conversationParticipant.userId, "messaging"),
         silver: silverCheck(conversationParticipant.userId),
         teamMember: teamBadge(conversationParticipant.userId),
         deliveredAt:
@@ -885,6 +896,7 @@ export class ChatService {
                 online: PresenceService.isOnline(p.lastSeenAt),
                 presence: PresenceService.status(p.lastSeenAt),
                 blockedByMe: Boolean(p.blockedByMe),
+                canMessage: Boolean(p.canMessage),
               },
             ] as const,
         ),

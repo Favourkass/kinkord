@@ -9,6 +9,14 @@ describe("privacy domain mapping", () => {
     });
     expect(model).toEqual({ settings });
   });
+  it("defaults messaging for an older API during rollout without changing existing settings", () => {
+    const old = { ...settings };
+    delete old.messaging;
+    expect(privacyFromTransport({ settings: old }).settings.messaging).toBe("members");
+    expect(() =>
+      privacyFromTransport({ settings: { ...settings, messaging: "unknown" } }),
+    ).toThrow();
+  });
   it.each([
     null,
     {},
