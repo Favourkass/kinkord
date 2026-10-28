@@ -83,6 +83,10 @@ export const postsApi = {
       `/posts/tag-suggestions?q=${encodeURIComponent(query.trim())}`,
     ),
   byId: (id: string) => api.get<PostPM>(`/posts/${encodeURIComponent(id)}`),
+  pin: (id: string) =>
+    api.post<{ postId: string; pinned: boolean }>(`/posts/${encodeURIComponent(id)}/pin`, {}),
+  unpin: (id: string) =>
+    api.del<{ postId: string; pinned: boolean }>(`/posts/${encodeURIComponent(id)}/pin`),
   remove: (id: string) => api.del<{ deleted: string }>(`/posts/${encodeURIComponent(id)}`),
   like: (id: string) => api.post<LikePM>(`/posts/${encodeURIComponent(id)}/like`, {}),
   unlike: (id: string) => api.del<LikePM>(`/posts/${encodeURIComponent(id)}/like`),

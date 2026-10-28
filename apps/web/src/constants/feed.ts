@@ -135,6 +135,9 @@ export const FEED_VISIBILITIES = [
 
 /** Every label a post card needs, shared by the home feed and the profile Posts tab. */
 export const POST_CARD_LABELS = {
+  pin: "Pin to profile",
+  unpin: "Unpin from profile",
+  pinned: "Pinned to profile",
   like: FEED_COPY.like,
   unlike: FEED_COPY.unlike,
   comment: FEED_COPY.comment,

@@ -19,6 +19,8 @@ const comments = vi.fn();
 const comment = vi.fn();
 const removeComment = vi.fn();
 const removePost = vi.fn();
+const pinPost = vi.fn();
+const unpinPost = vi.fn();
 const suggested = vi.fn();
 const dismissSuggestion = vi.fn();
 const recordShare = vi.fn().mockResolvedValue({ postId: "p1", shares: 1 });
@@ -49,6 +51,8 @@ vi.mock("@/services/posts.service", async (importOriginal) => ({
     comment: (...a: unknown[]) => comment(...a),
     removeComment: (...a: unknown[]) => removeComment(...a),
     remove: (...a: unknown[]) => removePost(...a),
+    pin: (...a: unknown[]) => pinPost(...a),
+    unpin: (...a: unknown[]) => unpinPost(...a),
     byId: (...a: unknown[]) => byId(...a),
     repost: (...a: unknown[]) => repost(...a),
     unrepost: (...a: unknown[]) => unrepost(...a),
@@ -128,6 +132,8 @@ const commentPm = (over: Partial<CommentPM> = {}): CommentPM => ({
 
 beforeEach(() => {
   replace.mockReset();
+  pinPost.mockReset().mockResolvedValue({ postId: "p1", pinned: true });
+  unpinPost.mockReset().mockResolvedValue({ postId: "p1", pinned: false });
   feed.mockReset().mockResolvedValue({ items: [pm()], nextCursor: null });
   create.mockReset().mockResolvedValue(pm({ id: "p-new", body: "fresh" }));
   like.mockReset().mockResolvedValue({ postId: "p1", likes: 6, likedByMe: true });
@@ -2065,5 +2071,46 @@ describe("what the home feed has shown, and Not interested", () => {
     act(() => result.current.selectTab("nearby"));
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.notInterested).toBeDefined();
+  });
+});
+
+describe("profile pin actions", () => {
+  it("refreshes the profile page and its cursor after pinning", async () => {
+    const mine = pm({ mine: true });
+    const other = pm({ id: "p2", postId: "p2", mine: true });
+    feed.mockResolvedValueOnce({ items: [other, mine], nextCursor: "old-cursor" });
+    const { result, unmount } = renderHook(() => useFeedPresenter({ author: "tega" }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    feed.mockResolvedValueOnce({
+      items: [{ ...mine, isPinned: true }, other],
+      nextCursor: "new-cursor",
+    });
+    await act(async () => result.current.togglePin("p1"));
+    await waitFor(() => expect(result.current.posts[0].isPinned).toBe(true));
+    expect(pinPost).toHaveBeenCalledWith("p1");
+    expect(result.current.posts.map((p) => p.id)).toEqual(["p1", "p2"]);
+    expect(result.current.shareNote).toContain("Pinned to your profile");
+    unmount();
+  });
+  it("can unpin, and never offers a successful state after a failed save", async () => {
+    feed.mockResolvedValue({ items: [pm({ mine: true, isPinned: true })], nextCursor: null });
+    const { result, unmount } = renderHook(() => useFeedPresenter({ author: "tega" }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    unpinPost.mockRejectedValueOnce(new Error("offline"));
+    await act(async () => result.current.togglePin("p1"));
+    expect(result.current.posts[0].isPinned).toBe(true);
+    expect(result.current.shareNote).toContain("Could not change");
+    feed.mockResolvedValue({ items: [pm({ mine: true, isPinned: false })], nextCursor: null });
+    await act(async () => result.current.togglePin("p1"));
+    await waitFor(() => expect(result.current.posts[0].isPinned).toBe(false));
+    expect(unpinPost).toHaveBeenCalledWith("p1");
+    unmount();
+  });
+  it("does not send a pin request for someone else's post", async () => {
+    const { result, unmount } = renderHook(() => useFeedPresenter({ author: "tega" }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => result.current.togglePin("p1"));
+    expect(pinPost).not.toHaveBeenCalled();
+    unmount();
   });
 });

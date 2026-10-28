@@ -330,6 +330,13 @@
       "when": 1793104814776,
       "tag": "0046_kink_rings",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1793175106105,
+      "tag": "0047_profile_post_pin",
+      "breakpoints": true
     }
   ]
 }

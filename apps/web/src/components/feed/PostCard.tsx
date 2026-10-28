@@ -29,12 +29,17 @@ export interface PostCardProps {
     with: string;
     removeTag: string;
     notInterested: string;
+    pin: string;
+    unpin: string;
+    pinned: string;
   };
   /** Open when this card's overflow menu is showing. */
   menuOpen: boolean;
   onMenu: () => void;
   onCloseMenu: () => void;
   onDelete: () => void;
+  onTogglePin?: () => void;
+  pinBusy?: boolean;
   onToggleBody: () => void;
   onLike: () => void;
   onRepost: () => void;
@@ -64,6 +69,8 @@ export default function PostCard({
   onMenu,
   onCloseMenu,
   onDelete,
+  onTogglePin,
+  pinBusy,
   onToggleBody,
   onLike,
   onRepost,
@@ -100,6 +107,12 @@ export default function PostCard({
       ref={card}
       className="mx-2 mb-3 rounded-[20px] border border-kink-gold-bright/15 px-4 py-[18px]"
     >
+      {post.isPinned && (
+        <p className="flex items-center gap-2 pb-3 text-xs font-bold text-kink-gold-bright">
+          <span aria-hidden="true">📌</span>
+          {labels.pinned}
+        </p>
+      )}
       {post.repostedByName && (
         <p className="flex items-center gap-[8px] pb-[10px] pl-[2px] text-[12px] font-medium text-feed-muted">
           <MaskIcon src="/app/feed/icon-repost.svg" width={14} />
@@ -225,6 +238,20 @@ export default function PostCard({
                   className="block w-full px-[14px] py-[10px] text-left text-[13px] font-medium text-feed-text"
                 >
                   {labels.notInterested}
+                </button>
+              )}
+              {post.mine && !post.isRepost && onTogglePin && (
+                <button
+                  type="button"
+                  aria-pressed={Boolean(post.isPinned)}
+                  disabled={pinBusy}
+                  onClick={() => {
+                    onCloseMenu();
+                    onTogglePin();
+                  }}
+                  className="block w-full px-[14px] py-[10px] text-left text-[13px] font-bold text-kink-gold-bright disabled:opacity-50"
+                >
+                  {post.isPinned ? labels.unpin : labels.pin}
                 </button>
               )}
               {post.mine && (

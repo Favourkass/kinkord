@@ -38,13 +38,19 @@ describe("PrivacyService", () => {
     { userId: "other", bio: "members" },
     { unknown: "friends" },
     { stories: "friends" },
-    { pinnedPosts: "country" },
     // Nobody can verify while identity verification is off.
     { profilePhoto: "verified" },
   ])("rejects invalid or unavailable settings: %j", async (body) => {
     const { service, patch } = setup();
     await expect(service.update("self", body)).rejects.toBeInstanceOf(BadRequestException);
     expect(patch).not.toHaveBeenCalled();
+  });
+  it("now saves the audience for pinned posts", async () => {
+    const { service, patch } = setup();
+    expect((await service.update("self", { pinnedPosts: "friends" })).settings.pinnedPosts).toBe(
+      "friends",
+    );
+    expect(patch).toHaveBeenCalledWith("self", { pinnedPosts: "friends" });
   });
   it("saves messaging permissions independently of visibility settings", async () => {
     const { service, patch } = setup();
