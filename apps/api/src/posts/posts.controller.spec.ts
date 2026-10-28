@@ -8,6 +8,8 @@ const postsService = () => ({
   feed: vi.fn(async () => ({ items: [], nextCursor: null })),
   create: vi.fn(async () => ({ id: ID })),
   byId: vi.fn(async () => ({ id: ID })),
+  pinToProfile: vi.fn(async () => ({ postId: ID, pinned: true })),
+  unpinFromProfile: vi.fn(async () => ({ postId: ID, pinned: false })),
   remove: vi.fn(async () => ({ deleted: ID })),
   presignMediaUpload: vi.fn(async () => ({ key: `posts/u1/${ID}.jpg` })),
   repost: vi.fn(async () => ({ postId: ID, reposts: 1, repostedByMe: true })),
@@ -37,6 +39,14 @@ const controller = (posts = postsService(), inter = interactions(), fb = feedbac
   new PostsController(posts as never, inter as never, fb as never);
 
 describe("PostsController", () => {
+  it("pins and unpins only as the authenticated member and rejects bad ids", async () => {
+    const posts = postsService();
+    await controller(posts).pin(req("self"), ID);
+    await controller(posts).unpin(req("self"), ID);
+    expect(posts.pinToProfile).toHaveBeenCalledWith("self", ID);
+    expect(posts.unpinFromProfile).toHaveBeenCalledWith("self", ID);
+    expect(() => controller(posts).pin(req("self"), "bad")).toThrow();
+  });
   it("reads the feed as the caller, never as an id from the query", async () => {
     const posts = postsService();
     await controller(posts).feed(req("u1"), { author: "tega", limit: "5" });

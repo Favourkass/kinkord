@@ -9,7 +9,7 @@ import {
   PostsService,
 } from "./posts.service";
 import { rankedTabPage } from "./feed-tabs";
-import { post, postTag } from "../db/schema";
+import { post, postTag, profilePostPin } from "../db/schema";
 import { TAG_FRIENDS_ONLY } from "./post-tags";
 
 // For You and Nearby pick their rows in feed-tabs.ts (feed-tabs.spec.ts); here
@@ -1059,5 +1059,81 @@ describe("share counts", () => {
     vi.spyOn(svc, "byId").mockResolvedValue(null);
     await expect(svc.share("private", "viewer")).rejects.toThrow("Post not found");
     expect(db.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("profile pin mutations", () => {
+  it("refuses foreign, reposted, deleted or archived posts without writing", async () => {
+    const db = makeDb([[]]);
+    const wheres: SQL[] = [];
+    const originalSelect = db.select.getMockImplementation()!;
+    db.select.mockImplementation(() => recordWhere(originalSelect(), wheres) as never);
+    await expect(service(db).pinToProfile("self", "post-id")).rejects.toThrow("Only your own");
+    expect(db.insert).not.toHaveBeenCalled();
+    const q = new PgDialect().sqlToQuery(wheres[0]);
+    expect(q.params).toEqual(["post-id", "self"]);
+    expect(q.sql).toContain('"post"."repost_of_id" is null');
+    expect(q.sql).toContain('"post"."deleted_at" is null');
+    expect(q.sql).toContain('"post"."archived_at" is null');
+  });
+  it("atomically replaces the member's previous pin using the unique user key", async () => {
+    const values = vi.fn();
+    const upsert = vi.fn(async () => undefined);
+    values.mockReturnValue({ onConflictDoUpdate: upsert });
+    const db = makeDb([[{ id: "p1" }]]);
+    db.insert.mockReturnValue({ values } as never);
+    await expect(service(db).pinToProfile("self", "p1")).resolves.toEqual({
+      postId: "p1",
+      pinned: true,
+    });
+    expect(db.insert).toHaveBeenCalledWith(profilePostPin);
+    expect(values).toHaveBeenCalledWith({ userId: "self", postId: "p1" });
+    expect(upsert).toHaveBeenCalledWith({
+      target: profilePostPin.userId,
+      set: { postId: "p1", pinnedAt: expect.any(Date) },
+    });
+  });
+  it("an old unpin cannot clear someone else's pin or a newer replacement", async () => {
+    const where = vi.fn(async () => undefined);
+    const db = makeDb();
+    db.delete.mockReturnValue({ where } as never);
+    await expect(service(db).unpinFromProfile("self", "old-post")).resolves.toEqual({
+      postId: "old-post",
+      pinned: false,
+    });
+    expect(db.delete).toHaveBeenCalledWith(profilePostPin);
+    const q = new PgDialect().sqlToQuery(where.mock.calls[0][0]);
+    expect(q.params).toEqual(["self", "old-post"]);
+  });
+});
+
+describe("profile feed pin ordering", () => {
+  it("orders profiles by pin before date and id but leaves the timeline chronological", async () => {
+    const orders: SQL[][] = [];
+    const recording = (): unknown => {
+      const chain: unknown = new Proxy(
+        {},
+        {
+          get: (_t, key) => {
+            if (key === "then") return (resolve: (value: unknown[]) => void) => resolve([]);
+            return (...args: SQL[]) => {
+              if (key === "orderBy") orders.push(args);
+              return chain;
+            };
+          },
+        },
+      );
+      return chain;
+    };
+    const svc = service({ select: vi.fn(recording) } as never);
+    vi.spyOn(svc as never, "resolveAuthor").mockResolvedValue("u2" as never);
+    await svc.feed("viewer", { author: "tega" });
+    await svc.feed("viewer");
+    const sql = (order: SQL[]) =>
+      order.map((item) => new PgDialect().sqlToQuery(item).sql).join(", ");
+    expect(sql(orders[0])).toContain("profile_post_pin");
+    expect(sql(orders[0])).toContain("date_trunc('milliseconds'");
+    expect(sql(orders[0])).toContain('"post"."id" desc');
+    expect(sql(orders[1])).not.toContain("profile_post_pin");
   });
 });

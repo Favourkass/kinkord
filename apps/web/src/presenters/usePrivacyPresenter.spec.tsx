@@ -66,6 +66,12 @@ describe("privacy presenter", () => {
       ),
     );
   });
+  it("enables the pinned-post audience while stories remain unavailable", async () => {
+    const { result } = renderHook(() => usePrivacyPresenter("profile"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.fields.find((f) => f.key === "pinnedPosts")?.unavailable).toBe(false);
+    expect(result.current.fields.find((f) => f.key === "stories")?.unavailable).toBe(true);
+  });
   it("offers and saves one messaging audience in its own category", async () => {
     const { result } = renderHook(() => usePrivacyPresenter("messaging"));
     await waitFor(() => expect(result.current.loading).toBe(false));

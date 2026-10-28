@@ -20,6 +20,8 @@ export function getPostList(feed: Feed, viewerAvatarUrl: string | null) {
     onOpenMenu: feed.openMenu,
     onCloseMenu: feed.closeMenu,
     onAskDelete: feed.askDelete,
+    onTogglePin: feed.togglePin,
+    pinBusy: feed.pinBusy,
     onToggleBody: feed.toggleExpanded,
     onLike: feed.toggleLike,
     onRepost: feed.toggleRepost,

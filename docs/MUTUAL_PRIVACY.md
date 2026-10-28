@@ -20,7 +20,7 @@ The web privacy mapper accepts older API responses without the messaging field d
 
 ## Existing unavailable controls
 
-Stories and member-managed pinned posts remain disabled until their features are available. “Verified members” is not selectable while identity verification is switched off. These limitations are not replaced with ineffective controls.
+Stories remain disabled until the feature is available. Profile pinning now enables the mutual pinned-post audience control. “Verified members” is not selectable while identity verification is switched off. These limitations are not replaced with ineffective controls.
 
 ## Validation
 

@@ -28,6 +28,8 @@ export interface FeedScreenProps {
   onOpenMenu: (id: string) => void;
   onCloseMenu: () => void;
   onAskDelete: (id: string) => void;
+  onTogglePin?: (id: string) => void;
+  pinBusy?: boolean;
   onToggleBody: (id: string) => void;
   /** Reactions target `post.postId`: acting on a repost acts on the post it points at. */
   onLike: (postId: string) => void;
@@ -86,6 +88,8 @@ export default function FeedScreen(p: FeedScreenProps) {
       onMenu={() => p.onOpenMenu(post.id)}
       onCloseMenu={p.onCloseMenu}
       onDelete={() => p.onAskDelete(post.id)}
+      onTogglePin={p.onTogglePin ? () => p.onTogglePin?.(post.id) : undefined}
+      pinBusy={p.pinBusy}
       onToggleBody={() => p.onToggleBody(post.id)}
       onLike={() => p.onLike(post.postId)}
       onRepost={() => p.onRepost(post.postId)}

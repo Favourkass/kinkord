@@ -371,3 +371,13 @@ describe("tagging", () => {
     expect(withTagsLeft(pm({ postId: "p2", taggedMe: true }), left).taggedMe).toBe(true);
   });
 });
+
+describe("profile pin API", () => {
+  it("uses authenticated post endpoints for pin and unpin", async () => {
+    const { postsApi } = await import("./posts.service");
+    await postsApi.pin("post/id");
+    await postsApi.unpin("post/id");
+    expect(post).toHaveBeenCalledWith("/posts/post%2Fid/pin", {});
+    expect(del).toHaveBeenCalledWith("/posts/post%2Fid/pin");
+  });
+});
