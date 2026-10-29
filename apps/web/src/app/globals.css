@@ -375,3 +375,12 @@ body {
   --color-feed-sheet: var(--feed-sheet);
   --color-feed-field: var(--feed-field);
 }
+
+@keyframes share-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}

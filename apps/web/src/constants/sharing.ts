@@ -1,5 +1,11 @@
 export const SHARE_COPY = {
   title: "Share post",
+  feed: "Feed",
+  public: "Public",
+  groupAudience: "Group members",
+  friendAudience: "Selected friend",
+  destinations: "Share to",
+  sharing: "Sharing…",
   close: "Close",
   now: "Share now",
   caption: "Add a caption",
