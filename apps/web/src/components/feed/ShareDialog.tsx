@@ -1,17 +1,6 @@
 import Image from "next/image";
-import Link from "next/link";
 import { useEffect, useRef } from "react";
-import {
-  X,
-  Share2,
-  Users,
-  UserRound,
-  Copy,
-  ArrowLeft,
-  Globe2,
-  MessageCircle,
-  ChevronDown,
-} from "lucide-react";
+import { X, Share2, Users, UserRound, Copy, ArrowLeft, Globe2, MessageCircle } from "lucide-react";
 import type { ExternalShare, ShareMode } from "@/domain/sharing";
 export interface ShareDialogProps {
   open: boolean;
@@ -23,13 +12,10 @@ export interface ShareDialogProps {
   error: string | null;
   viewer: { name: string; avatarUrl: string | null };
   friends: Array<{ id: string; name: string; initial: string }>;
-  groups: Array<{ id: string; name: string }>;
-  groupsHref: string;
   copy: {
     title: string;
     feed: string;
     public: string;
-    groupAudience: string;
     friendAudience: string;
     destinations: string;
     sharing: string;
@@ -37,7 +23,6 @@ export interface ShareDialogProps {
     now: string;
     caption: string;
     friend: string;
-    group: string;
     external: string;
     whatsapp: string;
     twitter: string;
@@ -49,9 +34,6 @@ export interface ShareDialogProps {
     search: string;
     loading: string;
     noFriends: string;
-    noGroups: string;
-    manageGroups: string;
-    privateNotice: string;
     friendsNotice: string;
     limit: number;
   };
@@ -61,7 +43,6 @@ export interface ShareDialogProps {
   onQuery: (value: string) => void;
   onFeed: () => void;
   onFriend: (id: string) => void;
-  onGroup: (id: string) => void;
   onExternal: (target: ExternalShare) => void;
 }
 const button =
@@ -131,26 +112,13 @@ export default function ShareDialog(p: ShareDialogProps) {
               <div className="min-w-0">
                 <p className="truncate font-semibold">{p.viewer.name}</p>
                 <div className="mt-1.5 flex gap-2 text-xs">
-                  <button
-                    aria-label={p.copy.destinations}
-                    onClick={() => p.onMode("groups")}
-                    className="flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1.5"
-                  >
+                  <span className="flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1.5">
                     <Users size={13} />
-                    {p.mode === "groups"
-                      ? p.copy.group
-                      : p.mode === "friends"
-                        ? p.copy.friend
-                        : p.copy.feed}
-                    <ChevronDown size={13} />
-                  </button>
+                    {p.mode === "friends" ? p.copy.friend : p.copy.feed}
+                  </span>
                   <span className="flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1.5">
                     <Globe2 size={13} />
-                    {p.mode === "groups"
-                      ? p.copy.groupAudience
-                      : p.mode === "friends"
-                        ? p.copy.friendAudience
-                        : p.copy.public}
+                    {p.mode === "friends" ? p.copy.friendAudience : p.copy.public}
                   </span>
                 </div>
               </div>
@@ -167,11 +135,7 @@ export default function ShareDialog(p: ShareDialogProps) {
             <div className="mt-2 flex items-center justify-between gap-3">
               <span className="flex items-center gap-1.5 text-xs text-white/50">
                 <Globe2 size={14} />
-                {p.mode === "groups"
-                  ? p.copy.groupAudience
-                  : p.mode === "friends"
-                    ? p.copy.friendAudience
-                    : p.copy.public}
+                {p.mode === "friends" ? p.copy.friendAudience : p.copy.public}
               </span>
               {(p.mode === "choices" || p.mode === "caption") && (
                 <button
@@ -214,15 +178,6 @@ export default function ShareDialog(p: ShareDialogProps) {
               <div className="border-t border-white/10 pt-4">
                 <p className="mb-3 text-xs font-semibold text-white/50">{p.copy.destinations}</p>
                 <div className="flex gap-4 overflow-x-auto pb-2">
-                  <button
-                    onClick={() => p.onMode("groups")}
-                    className="flex w-16 shrink-0 flex-col items-center gap-2 text-center text-xs"
-                  >
-                    <span className="flex size-14 items-center justify-center rounded-full bg-kink-gold-bright/15 text-kink-gold-bright">
-                      <Users size={26} />
-                    </span>
-                    {p.copy.group}
-                  </button>
                   {(["whatsapp", "twitter", "native", "copy"] as const).map((target) => (
                     <button
                       key={target}
@@ -268,25 +223,6 @@ export default function ShareDialog(p: ShareDialogProps) {
                     {friend.name}
                   </button>
                 ))}
-            </>
-          )}
-          {p.mode === "groups" && (
-            <>
-              <p className="text-sm text-white/60">{p.copy.privateNotice}</p>
-              {!p.loading && !p.error && !p.groups.length && <p>{p.copy.noGroups}</p>}
-              {!p.loading &&
-                p.groups.map((group) => (
-                  <button
-                    key={group.id}
-                    className={`${button} w-full`}
-                    onClick={() => p.onGroup(group.id)}
-                  >
-                    {group.name}
-                  </button>
-                ))}
-              <Link className="inline-block text-kink-gold-bright underline" href={p.groupsHref}>
-                {p.copy.manageGroups}
-              </Link>
             </>
           )}
           {p.loading && <p role="status">{p.copy.loading}</p>}

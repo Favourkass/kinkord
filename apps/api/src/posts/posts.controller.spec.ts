@@ -18,6 +18,7 @@ const postsService = () => ({
   savedFeed: vi.fn(async () => ({ items: [], nextCursor: null })),
   removeTag: vi.fn(async () => ({ removed: true })),
   tagSuggestions: vi.fn(async () => ({ items: [] })),
+  shareFriends: vi.fn(async () => []),
 });
 
 const interactions = () => ({
@@ -138,6 +139,16 @@ describe("PostsController", () => {
     await controller(posts).tagSuggestions(req("u1"), undefined);
     expect(posts.tagSuggestions.mock.calls).toEqual([
       ["u1", "ad"],
+      ["u1", ""],
+    ]);
+  });
+
+  it("suggests friends to send a post to", async () => {
+    const posts = postsService();
+    await controller(posts).shareFriends(req("u1"), "sa");
+    await controller(posts).shareFriends(req("u1"), undefined);
+    expect(posts.shareFriends.mock.calls).toEqual([
+      ["u1", "sa"],
       ["u1", ""],
     ]);
   });

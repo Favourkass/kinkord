@@ -65,6 +65,7 @@ import {
 } from "./mentions";
 import {
   MAX_TAGS,
+  shareFriends,
   tags,
   taggableIds,
   tagSuggestions,
@@ -1119,6 +1120,11 @@ export class PostsService {
         })),
       ),
     };
+  }
+
+  /** Friends to offer in the share sheet's "Send to a friend". */
+  shareFriends(viewerId: string, query: string) {
+    return shareFriends(this.db, viewerId, query);
   }
 
   /**

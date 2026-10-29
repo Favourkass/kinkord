@@ -1,4 +1,3 @@
-import { GroupsModule } from "./groups/groups.module";
 import { PrivacyModule } from "./privacy/privacy.module";
 import { WalletModule } from "./wallet/wallet.module";
 import { Module } from "@nestjs/common";
@@ -42,7 +41,6 @@ import { VerificationModule } from "./verification/verification.module";
     VerificationModule,
     OtpModule,
     PostsModule,
-    GroupsModule,
     SafetyModule,
     ChatModule,
     PushModule,

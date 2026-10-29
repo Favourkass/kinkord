@@ -3,7 +3,15 @@ import { PgDialect } from "drizzle-orm/pg-core";
 import type { SQL } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { post } from "../db/schema";
-import { MAX_TAGS, TAG_FRIENDS_ONLY, taggableIds, tags, tagSuggestions, tagsOn } from "./post-tags";
+import {
+  MAX_TAGS,
+  TAG_FRIENDS_ONLY,
+  shareFriends,
+  taggableIds,
+  tags,
+  tagSuggestions,
+  tagsOn,
+} from "./post-tags";
 
 /** Each `await` takes the next queued answer; the calls are kept to check what was asked. */
 function queuedDb(answers: unknown[]) {
@@ -110,5 +118,23 @@ describe("tagSuggestions", () => {
     expect(sql).toContain('"profile"."display_name" ilike');
     // The underscore is literal, not a wildcard.
     expect(params).toContain("%Ad\\_%");
+  });
+});
+
+describe("shareFriends", () => {
+  it("offers friends whose messaging setting allows the viewer, by name or username", async () => {
+    const { db, calls } = queuedDb([[]]);
+    await shareFriends(db, "u1", " @Sa ");
+    const { sql, params } = whereOf(calls);
+    expect(sql).toContain('from "friendship"');
+    expect(sql).toContain("member_block");
+    expect(params).toContain("messaging");
+    expect(params).not.toContain("tagging");
+    expect(params).toContain("%Sa%");
+  });
+  it("lists every such friend when nothing is typed", async () => {
+    const { db, calls } = queuedDb([[]]);
+    await shareFriends(db, "u1", "  ");
+    expect(whereOf(calls).sql).not.toContain("ilike");
   });
 });

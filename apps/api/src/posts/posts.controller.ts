@@ -91,6 +91,12 @@ export class PostsController {
     return this.posts.tagSuggestions(req.user.id, typeof q === "string" ? q : "");
   }
 
+  /** Friends to send a post to from the share sheet, by name or username. Before ":id" too. */
+  @Get("share-friends")
+  shareFriends(@Req() req: AuthedRequest, @Query("q") q?: string) {
+    return this.posts.shareFriends(req.user.id, typeof q === "string" ? q : "");
+  }
+
   @HttpPost("upload-url")
   presignUpload(@Req() req: AuthedRequest, @Body() body: unknown) {
     const parsed = uploadUrlSchema.safeParse(body);

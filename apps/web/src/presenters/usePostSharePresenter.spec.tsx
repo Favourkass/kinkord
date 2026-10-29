@@ -1,12 +1,11 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
-import { groupsService, sharingService } from "@/services/sharing.service";
+import { sharingService } from "@/services/sharing.service";
 import { profileApi } from "@/services/profile.service";
 import { usePostSharePresenter } from "./usePostSharePresenter";
 vi.mock("@/services/sharing.service", () => ({
-  groupsService: { friends: vi.fn(), list: vi.fn() },
-  sharingService: { feed: vi.fn(), group: vi.fn(), friend: vi.fn(), external: vi.fn() },
+  sharingService: { friends: vi.fn(), feed: vi.fn(), friend: vi.fn(), external: vi.fn() },
 }));
 vi.mock("@/services/profile.service", () => ({
   profileApi: { own: vi.fn().mockResolvedValue({ displayName: "Alex", avatarUrl: null }) },
@@ -16,8 +15,7 @@ beforeEach(() => {
   vi.mocked(profileApi.own).mockResolvedValue({ displayName: "Alex", avatarUrl: null } as Awaited<
     ReturnType<typeof profileApi.own>
   >);
-  vi.mocked(groupsService.friends).mockResolvedValue([]);
-  vi.mocked(groupsService.list).mockResolvedValue([]);
+  vi.mocked(sharingService.friends).mockResolvedValue([]);
 });
 it("opens options without sharing anything", () => {
   const done = vi.fn();
@@ -61,16 +59,13 @@ it("keeps a failed draft open and preserves its caption", async () => {
   expect(result.current.dialog.caption).toBe("Keep this");
   expect(result.current.dialog.error).toBe("Not allowed");
 });
-it("offers only joined groups", async () => {
-  vi.mocked(groupsService.list).mockResolvedValue([
-    { id: "a", name: "Joined", ownerId: "me", status: "joined" },
-    { id: "b", name: "Invited", ownerId: "other", status: "invited" },
-  ]);
+it("searches friends from the full list and settles its loading state", async () => {
   const { result } = renderHook(() => usePostSharePresenter(vi.fn()));
   act(() => result.current.open("p"));
-  act(() => result.current.dialog.onMode("groups"));
-  await waitFor(() => expect(result.current.dialog.groups).toHaveLength(1));
-  expect(result.current.dialog.groups[0].id).toBe("a");
+  act(() => result.current.dialog.onMode("friends"));
+  act(() => result.current.dialog.onQuery("sa"));
+  await waitFor(() => expect(sharingService.friends).toHaveBeenLastCalledWith("sa"));
+  await waitFor(() => expect(result.current.dialog.loading).toBe(false));
 });
 it("reuses the same message id on a failed friend-send retry", async () => {
   vi.mocked(sharingService.friend).mockRejectedValue(new Error("Offline"));
@@ -83,7 +78,7 @@ it("reuses the same message id on a failed friend-send retry", async () => {
   expect(calls[0][3]).toBe(calls[1][3]);
 });
 it("loads friend shortcuts and the member identity as soon as the sheet opens", async () => {
-  vi.mocked(groupsService.friends).mockResolvedValue([
+  vi.mocked(sharingService.friends).mockResolvedValue([
     { userId: "f", displayName: "Sam", username: "sam" },
   ]);
   const { result } = renderHook(() => usePostSharePresenter(vi.fn()));
