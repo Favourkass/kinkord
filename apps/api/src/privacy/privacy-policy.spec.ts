@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { alias, PgDialect } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { profile } from "../db/schema";
+import { SUPER_ADMIN_EMAILS } from "../moderation/admins";
 import {
   effectivePrivacy,
   privacyAllows,
@@ -36,6 +37,32 @@ describe("privacy policy", () => {
     );
     expect(query.sql).toContain("member_block");
   });
+  const ADMIN_SEES: readonly PrivacyField[] = [
+    "directory",
+    "search",
+    "profilePhoto",
+    "coverPhoto",
+    "bio",
+    "location",
+    "interests",
+    "relationshipStatus",
+    "followersFollowing",
+    "media",
+  ];
+  it.each(PRIVACY_FIELDS)(
+    "lets founders and staff admins past %s only if it's about the member",
+    (key) => {
+      const query = new PgDialect().sqlToQuery(privacyAllows("viewer", "owner", key));
+      const admin = query.sql.includes("from staff where user_id=");
+      expect(admin).toBe(ADMIN_SEES.includes(key));
+      if (!admin) return;
+      // Founders by their verified email, bound as values; blocks still come first.
+      expect(query.sql).toContain("privacy_admin.email_verified");
+      expect(query.params).toEqual(expect.arrayContaining(SUPER_ADMIN_EMAILS));
+      for (const email of SUPER_ADMIN_EMAILS) expect(query.sql).not.toContain(email);
+      expect(query.sql.indexOf("member_block")).toBeLessThan(query.sql.indexOf("from staff"));
+    },
+  );
   it("binds user identifiers as values rather than SQL", () => {
     const viewer = "x' or true --";
     const query = new PgDialect().sqlToQuery(privacyAllows(viewer, "owner", "bio"));

@@ -25,6 +25,23 @@ How the audiences are read:
 - Followers means people who follow the owner. People I follow means people the owner follows.
 - Members who used the old Profile Visibility switch on "friends" keep Friends for their bio, interests, relationship status and Media tab until they choose something else.
 
+## What admins see
+
+The founders and staff admins (`isAdmin`: a founder's verified email, or a `staff` row) see every member in the app, whatever the member chose (founders, 2026-10-29). This is `ADMIN_SEES` in `privacy-policy.ts`.
+
+**What it covers:**
+- finding the member in the members directory and in search
+- the profile photo and cover photo
+- the bio and About details, location, interests and relationship status
+- followers and following, and the profile's Media tab
+
+**What it doesn't change:**
+- **Posts** keep their own audience and the member's "Who Can See My Posts". The admin tools' All posts screen is for moderation.
+- **Online status, read receipts, messaging and tagging** keep the member's own settings.
+- **Blocks still apply**, and suspended members stay out. Moderation → Members finds anyone, blocked or suspended.
+
+Settings → Privacy tells members that admins can always find them and see their profile.
+
 ## Who Can Send Me a Message
 
 This setting is under Settings → Privacy → Messaging, Friend Requests & Following. It's stored with the other settings, so there's no migration. Everyone is on Kinkordians until they change it.
