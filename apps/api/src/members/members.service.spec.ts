@@ -1332,10 +1332,12 @@ describe("MembersService.suggestedForFeed (matching v1)", () => {
     const men = await run(me, [], undefined, "men");
     expect(men.result.show).toBe("men");
     expect(men.where?.params).toContain("male");
+    expect(men.where?.sql).toContain('lower("profile"."gender")');
 
     const all = await run({ ...me, orientation: "Bisexual" }, []);
     expect(all.result).toMatchObject({ show: "all", options: ["all", "women", "men"] });
-    expect(all.where?.sql).not.toContain("lower(");
+    // No gender filter: All mixes both.
+    expect(all.where?.sql).not.toContain('lower("profile"."gender")');
   });
 
   it("looks in the member's state when they have no country", async () => {

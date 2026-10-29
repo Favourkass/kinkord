@@ -1,5 +1,6 @@
 import { getTableName, sql, type AnyColumn, type GetColumnData, type SQL } from "drizzle-orm";
 
+import { SUPER_ADMIN_EMAILS } from "../moderation/admins";
 import continents from "./country-continents";
 
 export const PRIVACY_FIELDS = [
@@ -87,6 +88,34 @@ function audienceAllows(viewer: SQL, owner: SQL, key: PrivacyField) {
  */
 const MUTUAL_FIELDS: readonly PrivacyField[] = ["onlineStatus", "readReceipts", "messaging"];
 
+/**
+ * What the founders and staff admins see of every member, whatever the member chose (founders,
+ * 2026-10-29): finding them in the directory and search, and their profile. Posts, online status,
+ * chat and tagging keep the member's own settings, and blocks still apply.
+ */
+const ADMIN_SEES: readonly PrivacyField[] = [
+  "directory",
+  "search",
+  "profilePhoto",
+  "coverPhoto",
+  "bio",
+  "location",
+  "interests",
+  "relationshipStatus",
+  "followersFollowing",
+  "media",
+];
+
+/** SQL: the viewer is a founder (by verified email, as in isSuperAdmin) or has a staff row. */
+function viewerIsAdmin(viewer: SQL) {
+  const founders = sql.join(
+    SUPER_ADMIN_EMAILS.map((email) => sql`${email}`),
+    sql`, `,
+  );
+  return sql`(exists (select 1 from staff where user_id=${viewer})
+    or exists (select 1 from "user" privacy_admin where privacy_admin.id=${viewer} and privacy_admin.email_verified and lower(privacy_admin.email) in (${founders})))`;
+}
+
 /** Whether the viewer may see this part of the owner's profile. Blocks hide everything. */
 export function privacyAllows(viewerId: string, ownerId: string | AnyColumn, key: PrivacyField) {
   const viewer = identity(viewerId);
@@ -94,9 +123,10 @@ export function privacyAllows(viewerId: string, ownerId: string | AnyColumn, key
   const mutual = MUTUAL_FIELDS.includes(key)
     ? sql`and ${audienceAllows(owner, viewer, key)}`
     : sql``;
+  const admin = ADMIN_SEES.includes(key) ? sql`${viewerIsAdmin(viewer)} or` : sql``;
   return sql<boolean>`(${owner} = ${viewer} or (
     not exists (select 1 from member_block where (blocker_id=${viewer} and blocked_id=${owner}) or (blocker_id=${owner} and blocked_id=${viewer}))
-    and ${audienceAllows(viewer, owner, key)}
+    and (${admin} ${audienceAllows(viewer, owner, key)})
     ${mutual}
   ))`;
 }
