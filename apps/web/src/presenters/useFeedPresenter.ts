@@ -1,5 +1,7 @@
 "use client";
 
+import { usePostSharePresenter } from "./usePostSharePresenter";
+
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { FEED_EDITOR, FEED_COPY, FEED_PHOTO_LIMIT, FEED_SUGGESTION_LIMIT } from "@/constants/feed";
@@ -56,7 +58,6 @@ import {
   canSubmitComment,
   canSubmitPost,
   feedTabMemory,
-  postPermalink,
   postsApi,
   remainingPhotoSlots,
   toggleLikeOnPost,
@@ -662,28 +663,17 @@ export function useFeedPresenter({
     [react],
   );
 
-  /**
-   * Share hands the post's link to the system sheet where there is one, and
-   * otherwise copies it. Either way the member is told what happened — a button
-   * that silently does something is the same as one that does nothing.
-   */
-  const share = useCallback(async (postId: string) => {
-    const url = postPermalink(postId);
-    try {
-      if (typeof navigator !== "undefined" && navigator.share) {
-        await navigator.share({ url });
-      } else {
-        await navigator.clipboard.writeText(url);
-        setShareNote(FEED_COPY.shareCopied);
-      }
-      const result = await postsApi.share(postId);
+  /** One share entry opens the available destinations; confirmed feed shares refresh ordering. */
+  const postSharing = usePostSharePresenter((result, message) => {
+    if (result)
       setPosts((prev) =>
         applyToContent(prev, result.postId, (p) => ({ ...p, shares: result.shares })),
       );
-    } catch {
-      // A cancelled share sheet lands here too, which is not worth a message.
-    }
-  }, []);
+    setShareNote(message);
+    if (author || (result && "item" in result))
+      setRequested((current) => ({ ...current, round: current.round + 1 }));
+  });
+  const share = postSharing.open;
 
   const dismissShareNote = useCallback(() => setShareNote(null), []);
 
@@ -1342,6 +1332,7 @@ export function useFeedPresenter({
     toggleSave,
     share,
     shareNote,
+    shareDialog: postSharing.dialog,
     /** Undo, beside the note it belongs to. */
     shareNoteAction:
       noteAction && noteAction.note === shareNote

@@ -56,6 +56,7 @@ export default function HomePage() {
       onShare={feed.share}
       onGift={feed.openGift}
       giftDialog={feed.giftDialog}
+      shareDialog={feed.shareDialog}
       onOpenMedia={feed.openMedia}
       onTogglePostAuthorFollow={feed.toggleFollow}
       onRemoveTag={feed.removeTag}

@@ -119,6 +119,11 @@ export default function PostCard({
           {labels.repostedBy(post.repostedByName)}
         </p>
       )}
+      {post.shareCaption && (
+        <p className="mb-3 whitespace-pre-wrap break-words text-[15px] text-feed-text">
+          {post.shareCaption}
+        </p>
+      )}
       <header className="flex items-start gap-[12px]">
         <AvatarCircle
           silver={Boolean(post.authorSilver)}
@@ -178,7 +183,7 @@ export default function PostCard({
             {post.authorIsFollowing ? labels.following : labels.follow}
           </button>
         ) : null}
-        {/* Repost and save live here, so the action row keeps its four buttons. */}
+        {/* Post management lives here; sharing has its own action sheet. */}
         <div className="relative shrink-0">
           <button
             type="button"
@@ -191,20 +196,6 @@ export default function PostCard({
           </button>
           {menuOpen && (
             <div className="absolute right-0 top-[26px] z-10 min-w-[160px] overflow-hidden rounded-[10px] border border-feed-line bg-feed-sheet shadow-lg">
-              {/* Your own repost row undoes itself below. */}
-              {!(post.mine && post.isRepost) && (
-                <button
-                  type="button"
-                  aria-pressed={post.repostedByMe}
-                  onClick={() => {
-                    onCloseMenu();
-                    onRepost();
-                  }}
-                  className="block w-full px-[14px] py-[10px] text-left text-[13px] font-medium text-feed-text"
-                >
-                  {post.repostedByMe ? labels.unrepost : labels.repost}
-                </button>
-              )}
               <button
                 type="button"
                 aria-pressed={post.savedByMe}

@@ -1,3 +1,4 @@
+import ShareDialog, { type ShareDialogProps } from "./ShareDialog";
 import GiftDialog, { type GiftDialogProps } from "./GiftDialog";
 import CommentsPanel, { type CommentsPanelProps } from "./CommentsPanel";
 import ConfirmDialog, { type ConfirmDialogProps } from "./ConfirmDialog";
@@ -10,6 +11,7 @@ export interface PostListScreenProps extends PostListProps {
   shell: Omit<FeedShellProps, "aside" | "children">;
   heading: string;
   giftDialog: GiftDialogProps;
+  shareDialog?: ShareDialogProps;
   commentsPanel: CommentsPanelProps;
   lightbox: MediaLightboxProps;
   confirm: ConfirmDialogProps;
@@ -37,6 +39,7 @@ export default function PostListScreen(p: PostListScreenProps) {
       <ConfirmDialog {...p.confirm} />
       <Toast {...p.toast} />
       <GiftDialog {...p.giftDialog} />
+      {p.shareDialog && <ShareDialog {...p.shareDialog} />}
     </>
   );
 }

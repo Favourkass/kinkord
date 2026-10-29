@@ -144,7 +144,7 @@ export function decidePush(ctx: PushContext): PushDecision {
 /** What a held type says, for one event and for several: who, never what. */
 const SAYS: Partial<Record<NotificationType, [one: string, many: string]>> = {
   like: ["liked your post", "liked your posts"],
-  repost: ["reposted your post", "reposted your posts"],
+  repost: ["shared your post", "shared your posts"],
   follow: ["followed you", "followed you"],
   comment: ["commented on your post", "commented on your posts"],
   mention: ["mentioned you", "mentioned you"],

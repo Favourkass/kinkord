@@ -6,7 +6,7 @@ export const NOTIFICATION_SETTINGS_COPY = {
   description:
     "Choose what reaches your phone. Everything still appears in your Notifications list.",
   rhythm:
-    "Likes, reposts and new followers come bundled, at most one push every two hours. Between 11pm and 7am only messages are sent; the rest waits until the morning.",
+    "Likes, shares and new followers come bundled, at most one push every two hours. Between 11pm and 7am only messages are sent; the rest waits until the morning.",
   loading: "Loading notification settings…",
   saved: "Saved.",
   loadError: "Could not load your notification settings. Please try again.",
@@ -17,7 +17,7 @@ export const NOTIFICATION_SETTINGS_COPY = {
     { key: "comments", label: "Comments and mentions", hint: null },
     { key: "tags", label: "Tags", hint: "When someone tags you in a post." },
     { key: "friends", label: "Friend and relationship requests", hint: null },
-    { key: "likes", label: "Likes and reposts", hint: "Bundled, at most every two hours." },
+    { key: "likes", label: "Likes and shares", hint: "Bundled, at most every two hours." },
     { key: "follows", label: "New followers", hint: "Bundled, at most every two hours." },
   ] satisfies ReadonlyArray<{ key: PushGroup; label: string; hint: string | null }>,
 } as const;
