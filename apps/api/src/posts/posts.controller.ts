@@ -152,6 +152,13 @@ export class PostsController {
     return this.posts.share(parseId(id), req.user.id);
   }
 
+  @HttpPost(":id/share-feed")
+  shareToFeed(@Req() req: AuthedRequest, @Param("id") id: string, @Body() body: unknown) {
+    const parsed = z.object({ caption: z.string().trim().max(2000).default("") }).safeParse(body);
+    if (!parsed.success) throw new BadRequestException("Captions can be up to 2,000 characters.");
+    return this.posts.shareToFeed(parseId(id), req.user.id, parsed.data.caption);
+  }
+
   @HttpPost(":id/repost")
   repost(@Req() req: AuthedRequest, @Param("id") id: string) {
     return this.posts.repost(parseId(id), req.user.id);

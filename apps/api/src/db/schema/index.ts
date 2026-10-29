@@ -25,3 +25,5 @@ export * from "./profile-privacy";
 export * from "./sign-in";
 
 export * from "./kink-ring";
+
+export * from "./group";

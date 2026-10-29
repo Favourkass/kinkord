@@ -1,3 +1,4 @@
+import ShareDialog, { type ShareDialogProps } from "./ShareDialog";
 import InfiniteSentinel from "@/components/members/InfiniteSentinel";
 import Link from "next/link";
 import type { FeedEmptyVM, PostMediaVM, PostVM } from "@/domain/post";
@@ -60,6 +61,7 @@ export interface FeedScreenProps {
   confirm: ConfirmDialogProps;
   toast: ToastProps;
   giftDialog: GiftDialogProps;
+  shareDialog?: ShareDialogProps;
   copy: {
     loading: string;
     loadMore: string;
@@ -183,6 +185,7 @@ export default function FeedScreen(p: FeedScreenProps) {
       <ConfirmDialog {...p.confirm} />
       <Toast {...p.toast} />
       <GiftDialog {...p.giftDialog} />
+      {p.shareDialog && <ShareDialog {...p.shareDialog} />}
     </>
   );
 }

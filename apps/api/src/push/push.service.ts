@@ -314,7 +314,7 @@ export class PushService {
   }
 
   newRepost(postId: string, authorId: string, actorId: string): void {
-    this.postActivity("repost", "reposted", postId, authorId, actorId);
+    this.postActivity("repost", "shared", postId, authorId, actorId);
   }
 
   private postActivity(

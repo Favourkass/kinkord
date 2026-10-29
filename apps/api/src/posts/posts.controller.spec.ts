@@ -6,6 +6,7 @@ const ID = "0f1c8b1e-1111-4111-8111-111111111111";
 
 const postsService = () => ({
   feed: vi.fn(async () => ({ items: [], nextCursor: null })),
+  shareToFeed: vi.fn(),
   create: vi.fn(async () => ({ id: ID })),
   byId: vi.fn(async () => ({ id: ID })),
   pinToProfile: vi.fn(async () => ({ postId: ID, pinned: true })),
@@ -236,4 +237,14 @@ describe("PostsController", () => {
     });
     expect(posts.presignMediaUpload).toHaveBeenCalledWith("u1", "image/jpeg", 1024);
   });
+});
+
+it("validates caption length and binds feed shares to the signed-in member", async () => {
+  const posts = postsService();
+  await controller(posts).shareToFeed(req("self"), ID, { caption: "  Hello  ", userId: "other" });
+  expect(posts.shareToFeed).toHaveBeenCalledWith(ID, "self", "Hello");
+  expect(() =>
+    controller(posts).shareToFeed(req("self"), ID, { caption: "x".repeat(2001) }),
+  ).toThrow();
+  expect(() => controller(posts).shareToFeed(req("self"), "bad", {})).toThrow();
 });
