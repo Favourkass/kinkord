@@ -24,7 +24,7 @@ export const PRIVACY_CATEGORIES = [
   {
     key: "sharing",
     icon: "🔄",
-    label: "Content Sharing & Reposting",
+    label: "Content Sharing",
     href: Routes.settingsPrivacySharing,
   },
 ] as const;

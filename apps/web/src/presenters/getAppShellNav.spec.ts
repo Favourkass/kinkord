@@ -43,6 +43,7 @@ describe("the account menu", () => {
   it("keeps Philip's order, with Silver Premium and KinkCoins live", () => {
     // Kink Rings follows Silver Premium (founders, 2026-10-27).
     expect(drawer.primary.map((i) => i.label)).toEqual([
+      "Groups",
       "Members",
       "Saved",
       "Kinkopedia",

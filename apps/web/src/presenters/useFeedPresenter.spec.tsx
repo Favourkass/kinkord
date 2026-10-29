@@ -1181,12 +1181,13 @@ describe("sharing", () => {
     const { result } = await loaded();
     await act(async () => result.current.share("p1"));
 
-    expect(share).toHaveBeenCalledWith({ url: `${origin}/p/p1` });
+    await act(async () => result.current.shareDialog.onExternal("native"));
+    await waitFor(() => expect(recordShare).toHaveBeenCalled());
+    expect(share).toHaveBeenCalledWith({ url: `${origin}/p/p1`, text: undefined });
     expect(recordShare).toHaveBeenCalledWith("p1");
     expect(result.current.posts[0].shares).toBe("1");
 
-    // The sheet is its own confirmation; no toast on top of it.
-    expect(result.current.shareNote).toBeNull();
+    expect(result.current.shareNote).toBe("Shared successfully.");
     Reflect.deleteProperty(navigator, "share");
   });
 
@@ -1198,8 +1199,10 @@ describe("sharing", () => {
     const { result } = await loaded();
     await act(async () => result.current.share("p1"));
 
+    await act(async () => result.current.shareDialog.onExternal("copy"));
+    await waitFor(() => expect(recordShare).toHaveBeenCalled());
     expect(writeText).toHaveBeenCalledWith(`${origin}/p/p1`);
-    expect(result.current.shareNote).toBe("Link copied");
+    expect(result.current.shareNote).toBe("Link copied.");
     expect(recordShare).toHaveBeenCalledWith("p1");
     expect(result.current.posts[0].shares).toBe("1");
 
@@ -1208,12 +1211,15 @@ describe("sharing", () => {
   });
 
   it("stays quiet when the member cancels the share sheet", async () => {
-    const share = vi.fn().mockRejectedValue(new Error("AbortError"));
+    const share = vi.fn().mockRejectedValue(new DOMException("Cancelled", "AbortError"));
     Object.defineProperty(navigator, "share", { value: share, configurable: true });
 
     const { result } = await loaded();
     await act(async () => result.current.share("p1"));
 
+    await act(async () => result.current.shareDialog.onExternal("native"));
+    expect(result.current.shareDialog.open).toBe(true);
+    expect(result.current.shareDialog.error).toBeNull();
     expect(result.current.shareNote).toBeNull();
     expect(recordShare).not.toHaveBeenCalled();
     Reflect.deleteProperty(navigator, "share");

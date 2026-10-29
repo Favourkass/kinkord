@@ -129,7 +129,7 @@ const SEARCH_WORDS: Record<NotificationType, readonly string[]> = {
   mention: ["mention", "mentioned", "mentions"],
   tag: ["tag", "tagged", "tags"],
   like: ["like", "liked", "likes"],
-  repost: ["repost", "reposted", "reposts"],
+  repost: ["repost", "reposted", "reposts", "share", "shared", "shares"],
   report: ["report", "reports", "moderation"],
   verification: ["verification", "verify", "moderation"],
   verification_update: ["verification", "verify", "identity"],

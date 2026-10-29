@@ -110,7 +110,7 @@ const KINDS: Record<
   mention: { category: "Mention", icon: "mention", action: () => "mentioned you." },
   comment: { category: "Comment", icon: "comment", action: () => "commented on your post." },
   like: { category: "Like", icon: "heart", action: () => "liked your post." },
-  repost: { category: "Repost", icon: "repost", action: () => "reposted your post." },
+  repost: { category: "Share", icon: "repost", action: () => "shared your post." },
   report: { category: "Moderation", icon: "shield", action: () => "New report to review." },
   payment: { category: "Payments", icon: "shield", action: () => "New payment to verify." },
   payment_verified: {

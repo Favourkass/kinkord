@@ -1,3 +1,4 @@
+import ShareDialog, { type ShareDialogProps } from "@/components/feed/ShareDialog";
 import type { FriendshipActionProps } from "./FriendshipAction";
 import type { AppNavLabels, AppNavLinks, AppTab } from "@/components/app/nav";
 import GiftDialog, { type GiftDialogProps } from "@/components/feed/GiftDialog";
@@ -54,6 +55,7 @@ export interface ProfileScreenProps {
   postOverlays: {
     comments: CommentsPanelProps;
     gift: GiftDialogProps;
+    share?: ShareDialogProps;
     confirm: ConfirmDialogProps;
     lightbox: MediaLightboxProps;
     toast: ToastProps;
@@ -136,6 +138,7 @@ export default function ProfileScreen(p: ProfileScreenProps) {
       </ProfileShell>
       <CommentsPanel {...p.postOverlays.comments} />
       <GiftDialog {...p.postOverlays.gift} />
+      {p.postOverlays.share && <ShareDialog {...p.postOverlays.share} />}
       <ConfirmDialog {...p.postOverlays.confirm} />
       {p.unfriendConfirm ? <ConfirmDialog {...p.unfriendConfirm} /> : null}
       <MediaLightbox {...p.postOverlays.lightbox} />

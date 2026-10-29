@@ -202,6 +202,7 @@ export interface PostVM {
    */
   postId: string;
   body: string | null;
+  shareCaption?: string | null;
   visibility: PostVisibility;
   createdAt: string;
   author: PostAuthorVM;
@@ -544,6 +545,45 @@ export class PostsService {
     return this.repostState(target, userId);
   }
 
+  /** A feed share keeps the original attached and stores the member's optional caption. */
+  async shareToFeed(postId: string, userId: string, caption = "") {
+    const vm = await this.shareablePost(postId, userId);
+    const added = await this.db
+      .insert(post)
+      .values({
+        authorId: userId,
+        repostOfId: vm.postId,
+        body: caption.trim() || null,
+        visibility: "public",
+      })
+      .onConflictDoNothing()
+      .returning({ id: post.id });
+    if (!added.length) {
+      throw new BadRequestException("You have already shared this post to your profile.");
+    }
+    this.push.newRepost(vm.postId, vm.author.userId, userId);
+    const counts = await this.share(vm.postId, userId).catch(() => ({
+      postId: vm.postId,
+      shares: vm.shares,
+    }));
+    // The share already exists: a later refresh/count failure must not invite a duplicate retry.
+    return { ...counts, item: await this.byId(added[0].id, userId).catch(() => null) };
+  }
+
+  async shareablePost(postId: string, userId: string): Promise<PostVM> {
+    const vm = await this.repostTargetVM(postId, userId);
+    const [allowed] = await this.db
+      .select({ id: post.id })
+      .from(post)
+      .where(and(eq(post.id, vm.postId), privacyAllows(userId, post.authorId, "sharedContent")))
+      .limit(1);
+    if (!allowed)
+      throw new ForbiddenException(
+        "This member's privacy settings do not allow sharing this post.",
+      );
+    return vm;
+  }
+
   async unrepost(postId: string, userId: string): Promise<RepostVM> {
     const target = await this.repostTarget(postId, userId);
     await this.db
@@ -604,7 +644,7 @@ export class PostsService {
     const vm = await this.byId(postId, viewerId);
     if (!vm) throw new NotFoundException("Post not found");
     if (vm.visibility !== "public") {
-      throw new ForbiddenException("Friends-only posts cannot be reposted");
+      throw new ForbiddenException("Friends-only posts cannot be shared to a feed");
     }
     // Reposting somebody's repost points at the post itself.
     return vm;
@@ -1011,6 +1051,7 @@ export class PostsService {
         id: row.id,
         postId: content.id,
         body: content.body,
+        shareCaption: row.id === content.id ? null : row.body,
         visibility: content.visibility,
         // The age shown is the age of the repost — that is when it reached the feed.
         createdAt: row.createdAt.toISOString(),

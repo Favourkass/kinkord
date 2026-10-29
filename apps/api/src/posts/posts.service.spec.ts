@@ -926,7 +926,7 @@ describe("PostsService.repost", () => {
 
   it("refuses to lift a friends-only post into a stranger's feed", async () => {
     const svc = withTarget({ ...publicVm, visibility: "friends" });
-    await expect(svc.repost("p1", "u1")).rejects.toThrow(/cannot be reposted/);
+    await expect(svc.repost("p1", "u1")).rejects.toThrow(/cannot be shared/);
   });
 
   it("is a 404 for a post the viewer cannot see", async () => {
@@ -1135,5 +1135,39 @@ describe("profile feed pin ordering", () => {
     expect(sql(orders[0])).toContain("date_trunc('milliseconds'");
     expect(sql(orders[0])).toContain('"post"."id" desc');
     expect(sql(orders[1])).not.toContain("profile_post_pin");
+  });
+});
+
+describe("feed sharing with captions", () => {
+  it("stores the caption on the share, preserving the original", async () => {
+    const db = makeDb([[{ id: "shared" }]]);
+    const svc = new PostsService(
+      db as never,
+      makeStorage() as never,
+      { newRepost: vi.fn() } as never,
+    );
+    vi.spyOn(svc, "shareablePost").mockResolvedValue({
+      postId: "original",
+      author: { userId: "author" },
+    } as never);
+    vi.spyOn(svc, "share").mockResolvedValue({ postId: "original", shares: 1 });
+    vi.spyOn(svc, "byId").mockResolvedValue({ id: "shared", shareCaption: "Caption" } as never);
+    const result = await svc.shareToFeed("original", "viewer", "Caption");
+    expect(result.item?.shareCaption).toBe("Caption");
+    expect(svc.share).toHaveBeenCalledWith("original", "viewer");
+  });
+  it("rejects duplicate shares without changing a previous caption", async () => {
+    const db = makeDb([[]]);
+    const svc = new PostsService(db as never, makeStorage() as never, {} as never);
+    vi.spyOn(svc, "shareablePost").mockResolvedValue({ postId: "p" } as never);
+    await expect(svc.shareToFeed("p", "me", "New caption")).rejects.toThrow("already shared");
+    expect(db.update).not.toHaveBeenCalled();
+  });
+  it("does not write when original sharing privacy refuses", async () => {
+    const db = makeDb();
+    const svc = new PostsService(db as never, makeStorage() as never, {} as never);
+    vi.spyOn(svc, "shareablePost").mockRejectedValue(new Error("Private"));
+    await expect(svc.shareToFeed("p", "me", "Caption")).rejects.toThrow("Private");
+    expect(db.insert).not.toHaveBeenCalled();
   });
 });

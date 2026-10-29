@@ -337,6 +337,13 @@
       "when": 1793175106105,
       "tag": "0047_profile_post_pin",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1793254386725,
+      "tag": "0048_member_groups",
+      "breakpoints": true
     }
   ]
 }

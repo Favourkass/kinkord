@@ -37,6 +37,7 @@ export interface PostPM {
   id: string;
   /** The post the content belongs to; every reaction targets this. */
   postId: string;
+  shareCaption?: string | null;
   body: string | null;
   visibility: PostVisibility;
   createdAt: string;
@@ -120,6 +121,7 @@ export interface FeedTabVM {
 /** What an empty feed says, and the one thing to do about it when there is one. */
 export interface FeedEmptyVM {
   title: string;
+  shareCaption?: string | null;
   body: string | null;
   action: { label: string; href: string } | null;
 }
@@ -220,6 +222,7 @@ export interface PostVM {
   avatarUrl: string | null;
   time: string;
   /** Already clamped when `canExpand` is true and the reader hasn't expanded it. */
+  shareCaption?: string | null;
   body: string | null;
   /** The body as text and @mention links. */
   bodyParts: BodyPart[];
@@ -432,6 +435,7 @@ export function toPostVM(
   return {
     id: pm.id,
     postId: pm.postId,
+    shareCaption: pm.shareCaption ?? null,
     repostedByName: pm.repostedBy?.displayName ?? null,
     isRepost: pm.id !== pm.postId,
     authorUserId: pm.author.userId,
