@@ -29,6 +29,7 @@ export const PRIVACY_CATEGORIES = [
   },
 ] as const;
 
+/** No row for pinned posts: a pinned post follows its own audience, so there's nothing to set. */
 export const PRIVACY_FIELDS = [
   { key: "directory", icon: "🔎", label: "Who Can Find Me in the Members Directory" },
   { key: "profilePhoto", icon: "🖼️", label: "Who Can See My Profile Photo" },
@@ -43,7 +44,6 @@ export const PRIVACY_FIELDS = [
   { key: "onlineStatus", icon: "🟢", label: "Who Can See My Online Status" },
   { key: "tagging", icon: "🏷️", label: "Who Can Tag or Mention Me" },
   { key: "stories", icon: "⏳", label: "Who Can See My Stories", unavailable: true },
-  { key: "pinnedPosts", icon: "📌", label: "Who Can See My Pinned Posts", unavailable: true },
   { key: "sharedContent", icon: "🔗", label: "Who Can See My Content When it is shared" },
   { key: "search", icon: "🌐", label: "Who Can Find Me Through Kinkord Search" },
   { key: "readReceipts", icon: "✓✓", label: "Who Can See When I Have Read Their Messages" },
