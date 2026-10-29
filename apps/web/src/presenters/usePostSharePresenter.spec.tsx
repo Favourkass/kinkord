@@ -2,13 +2,20 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { groupsService, sharingService } from "@/services/sharing.service";
+import { profileApi } from "@/services/profile.service";
 import { usePostSharePresenter } from "./usePostSharePresenter";
 vi.mock("@/services/sharing.service", () => ({
   groupsService: { friends: vi.fn(), list: vi.fn() },
   sharingService: { feed: vi.fn(), group: vi.fn(), friend: vi.fn(), external: vi.fn() },
 }));
+vi.mock("@/services/profile.service", () => ({
+  profileApi: { own: vi.fn().mockResolvedValue({ displayName: "Alex", avatarUrl: null }) },
+}));
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(profileApi.own).mockResolvedValue({ displayName: "Alex", avatarUrl: null } as Awaited<
+    ReturnType<typeof profileApi.own>
+  >);
   vi.mocked(groupsService.friends).mockResolvedValue([]);
   vi.mocked(groupsService.list).mockResolvedValue([]);
 });
@@ -74,4 +81,17 @@ it("reuses the same message id on a failed friend-send retry", async () => {
   const calls = vi.mocked(sharingService.friend).mock.calls;
   expect(calls).toHaveLength(2);
   expect(calls[0][3]).toBe(calls[1][3]);
+});
+it("loads friend shortcuts and the member identity as soon as the sheet opens", async () => {
+  vi.mocked(groupsService.friends).mockResolvedValue([
+    { userId: "f", displayName: "Sam", username: "sam" },
+  ]);
+  const { result } = renderHook(() => usePostSharePresenter(vi.fn()));
+  act(() => result.current.open("p"));
+  await waitFor(() =>
+    expect(result.current.dialog.friends).toEqual([{ id: "f", name: "Sam", initial: "S" }]),
+  );
+  expect(result.current.dialog.viewer.name).toBe("Alex");
+  expect(result.current.dialog.mode).toBe("choices");
+  expect(sharingService.friend).not.toHaveBeenCalled();
 });

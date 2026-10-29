@@ -3,6 +3,8 @@ import { SHARE_COPY } from "@/constants/sharing";
 import { Routes } from "@/constants/Routes";
 import type { ExternalShare, GroupPM, ShareFriendPM, ShareMode } from "@/domain/sharing";
 import { groupsService, sharingService } from "@/services/sharing.service";
+import { profileApi } from "@/services/profile.service";
+import type { OwnProfilePM } from "@/domain/profile";
 import { ApiError } from "@/services/apiClient";
 
 export function usePostSharePresenter(
@@ -17,14 +19,28 @@ export function usePostSharePresenter(
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [profile, setProfile] = useState<OwnProfilePM | null>(null);
   const lock = useRef(false);
+  useEffect(() => {
+    if (!postId) return;
+    let active = true;
+    void profileApi
+      .own()
+      .then((value) => {
+        if (active) setProfile(value);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [postId]);
   const attempt = useRef(new Map<string, string>());
   useEffect(() => {
-    if (!postId || (mode !== "friends" && mode !== "groups")) return;
+    if (!postId) return;
     let active = true;
     const timer = setTimeout(() => {
       const work =
-        mode === "friends"
+        mode !== "groups"
           ? groupsService.friends(query).then((rows) => {
               if (active) setFriends(rows);
             })
@@ -48,6 +64,7 @@ export function usePostSharePresenter(
     if (lock.current) return;
     setPostId(id);
     setMode("choices");
+    setLoading(true);
     setCaption("");
     setQuery("");
     setError(null);
@@ -105,16 +122,21 @@ export function usePostSharePresenter(
       busy,
       error,
       copy: SHARE_COPY,
+      viewer: {
+        name: profile?.displayName || "Your profile",
+        avatarUrl: profile?.avatarUrl ?? null,
+      },
       groupsHref: Routes.groups,
       friends: friends.map((p) => ({
         id: p.userId,
         name: p.displayName ?? p.username ?? "Member",
+        initial: (p.displayName ?? p.username ?? "M").slice(0, 1).toUpperCase(),
       })),
       groups: groups.filter((g) => g.status === "joined").map((g) => ({ id: g.id, name: g.name })),
       onClose: close,
       onMode: (m: ShareMode) => {
         setMode(m);
-        setLoading(m === "friends" || m === "groups");
+        setLoading(true);
         setError(null);
       },
       onCaption: setCaption,
