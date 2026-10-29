@@ -19,12 +19,7 @@
     "changes": "Retained populated-place names, deduplicated within each county, spatially assigned counties from coordinates. Current GeoNames county used only when the coordinate did not intersect a county boundary. Unmapped records omitted; signup allows an unlisted town/area.",
     "remappedByCoordinates": 198,
     "fallbackCountyAssignments": 50,
-    "unmappedRecords": [
-      "Kiunga",
-      "Kiwayu",
-      "Holili",
-      "Tana Power Station"
-    ]
+    "unmappedRecords": ["Kiunga", "Kiwayu", "Holili", "Tana Power Station"]
   },
   "kenyaBoundaries": {
     "publisher": "geoBoundaries / RCMRD GeoPortal / Africa GeoPortal",
