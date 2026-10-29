@@ -63,7 +63,7 @@ export const PRIVACY_AUDIENCES = [
 
 export const PRIVACY_COPY = {
   description:
-    "Choose who can see each part of your profile. Each post's own audience and your blocks still apply.",
+    "Choose who can see each part of your profile. Each post's own audience and your blocks still apply. Kinkord's admins can always find you and see your profile, to keep the community safe.",
   activityDescription:
     "Choose who can see when you are online. This works both ways: if you hide your online status from someone, you cannot see theirs.",
   messagingDescription:
@@ -71,7 +71,7 @@ export const PRIVACY_COPY = {
   comingSoon: "Controls for this category are coming soon. Your current settings are unchanged.",
   hints: {
     directory:
-      "Only me hides you from the directory, including name searches in it. Community totals still count you.",
+      "Only me hides you from the directory, including name searches in it, except from Kinkord's admins. Community totals still count you.",
     sharedContent: "Also applies when someone opens a link to your post.",
     bio: "Also covers the rest of your About details: body type, languages, nationality, occupation, limits, social links and your verified badge.",
     interests: "Covers your kinks and what you are looking for.",

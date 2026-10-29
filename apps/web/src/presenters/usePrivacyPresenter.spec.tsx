@@ -42,6 +42,13 @@ describe("privacy presenter", () => {
     await waitFor(() => expect(activity.current.loading).toBe(false));
     expect(activity.current.description).toContain("both ways");
   });
+  it("tells members that Kinkord's admins can always find them and see their profile", async () => {
+    const { result } = renderHook(() => usePrivacyPresenter("profile"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.description).toContain("admins can always find you");
+    const hint = (key: string) => result.current.fields.find((x) => x.key === key)?.hint;
+    expect(hint("directory")).toContain("except from Kinkord's admins");
+  });
   it("shows a saved choice and reloads changes from another device on focus", async () => {
     const { result } = renderHook(() => usePrivacyPresenter("profile"));
     await waitFor(() => expect(result.current.loading).toBe(false));
