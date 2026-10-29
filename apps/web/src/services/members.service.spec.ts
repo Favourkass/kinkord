@@ -115,6 +115,13 @@ describe("searchCountries", () => {
         available: true,
       },
       {
+        code: "ZA",
+        name: "South Africa",
+        flag: "/app/members/flag-za.svg",
+        membersCount: 0,
+        available: true,
+      },
+      {
         code: "US",
         name: "USA",
         flag: "/app/members/flag-us.svg",
@@ -161,6 +168,8 @@ describe("directory countries", () => {
     expect(isCountryAvailable("ng")).toBe(true);
     expect(isCountryAvailable("GH")).toBe(true);
     expect(isCountryAvailable("us")).toBe(true);
+    expect(isCountryAvailable("za")).toBe(true);
+    expect(searchCountries("South Africa", [])[0]).toMatchObject({ code: "ZA", available: true });
     expect(isCountryAvailable("CA")).toBe(false);
   });
 });

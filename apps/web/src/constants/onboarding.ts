@@ -6,6 +6,7 @@ export const LAUNCH_COUNTRIES = [
   { code: "GH", name: "Ghana", flag: "🇬🇭", dialCode: "+233" },
   { code: "KE", name: "Kenya", flag: "🇰🇪", dialCode: "+254" },
   { code: "NG", name: "Nigeria", flag: "🇳🇬", dialCode: "+234" },
+  { code: "ZA", name: "South Africa", flag: "🇿🇦", dialCode: "+27" },
   { code: "US", name: "USA", flag: "🇺🇸", dialCode: "+1" },
 ] as const;
 

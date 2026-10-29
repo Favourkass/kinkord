@@ -9,7 +9,13 @@ import {
 
 describe("signup countries and locations", () => {
   it("offers Ghana, Kenya, Nigeria and USA alphabetically", () => {
-    expect(signupCountryOptions().map((option) => option.value)).toEqual(["GH", "KE", "NG", "US"]);
+    expect(signupCountryOptions().map((option) => option.value)).toEqual([
+      "GH",
+      "KE",
+      "NG",
+      "ZA",
+      "US",
+    ]);
   });
   it.each([
     ["KE", 47, "Nairobi", "West Pokot"],
@@ -184,4 +190,22 @@ it("calls Ghana's places below a region cities and towns, never a second region"
     areaLabel: "Region / City / Town",
     customAreaLabel: "Region / City / Town name",
   });
+});
+
+it("uses South African provinces and municipalities throughout signup", () => {
+  expect(
+    signupLocationFields("ZA", "Gauteng", false, {
+      areas: ["City of Johannesburg"],
+      loading: false,
+    }),
+  ).toMatchObject({
+    stateLabel: "Province",
+    statePlaceholder: "Select your province",
+    areaLabel: "Municipality",
+    areaPlaceholder: "Select your municipality",
+    areaSearchPlaceholder: "Search municipalities",
+    credit: null,
+    areas: [{ value: "City of Johannesburg", label: "City of Johannesburg" }],
+  });
+  expect(signupLocationFields("ZA", "").states).toHaveLength(9);
 });

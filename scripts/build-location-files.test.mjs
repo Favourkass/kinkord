@@ -226,7 +226,7 @@ test("retains supplied short names, punctuation, capitalization and alternate gr
 test("retains additional existing towns and leaves countries without overrides unchanged", () => {
   const original = buildLocations(places, curated);
   for (const [file, names] of Object.entries(original.files)) {
-    if (!file.startsWith("GH/") && !file.startsWith("US/")) {
+    if (!file.startsWith("GH/") && !file.startsWith("US/") && !file.startsWith("ZA/")) {
       assert.deepEqual(built.files[file], names);
     } else {
       const keys = new Set(built.files[file].map(placeKey));
@@ -240,4 +240,30 @@ test("rejects a misspelled requested region instead of silently dropping it", ()
     () => buildLocations(places, curated, { GH: { Unknown: ["Town"] } }),
     /unknown subdivision GH\/Unknown/,
   );
+});
+
+test("South Africa has exactly the supplied 213 municipalities in nine provinces", () => {
+  const counts = {
+    "Eastern Cape": 33,
+    "Free State": 19,
+    Gauteng: 9,
+    "KwaZulu-Natal": 44,
+    Limpopo: 22,
+    Mpumalanga: 17,
+    "North West": 18,
+    "Northern Cape": 26,
+    "Western Cape": 25,
+  };
+  assert.equal(built.states.ZA.length, 9);
+  assert.equal(Object.values(requested.ZA).flat().length, 213);
+  for (const [province, count] of Object.entries(counts)) {
+    assert.equal(list("ZA", province).length, count);
+    assert.deepEqual(
+      list("ZA", province),
+      [...requested.ZA[province]].sort((a, b) => a.localeCompare(b)),
+    );
+  }
+  for (const name of ["!Kheis", "Kai !Garib", "Khâi-Ma"])
+    assert.ok(list("ZA", "Northern Cape").includes(name));
+  assert.ok(list("ZA", "KwaZulu-Natal").includes("Big 5 Hlabisa"));
 });

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { KEEP_TYPING, typedPlaceLabel } from "@/constants/location";
-import { PROFILE_EDIT_COPY, ROW_ICONS } from "@/constants/profileEdit";
+import { PROFILE_EDIT_COPY, ROW_ICONS, SOUTH_AFRICA_LOCATION_ROWS } from "@/constants/profileEdit";
 import { Routes } from "@/constants/Routes";
 import type {
   EditorDraft,
@@ -210,12 +210,14 @@ export function useEditSectionPresenter(section: EditSectionKey) {
     }
   }, [editor, current, profile, copy, router]);
 
+  const rowCopy =
+    profile?.country === "ZA" ? { ...copy.rows, ...SOUTH_AFRICA_LOCATION_ROWS } : copy.rows;
   const rowItems = rows.map((r) => {
     const optionCopy = OPTION_COPY[r.key];
     return {
       key: r.key,
       icon: ROW_ICONS[r.key],
-      title: copy.rows[r.key].title,
+      title: rowCopy[r.key].title,
       subtitle: optionCopy
         ? optionCopy(r.value ?? "").label
         : (r.value ?? (r.key === "socialLinks" ? copy.notLinked : copy.empty)),
@@ -229,8 +231,8 @@ export function useEditSectionPresenter(section: EditSectionKey) {
     const lockDate = spec.kind === "text" ? spec.lockedUntil : null;
     const lockMessage = lockDate ? copy.lockedUntil(shortDate(lockDate) ?? lockDate) : null;
     editorVM = {
-      title: copy.rows[editor.key].title,
-      help: copy.rows[editor.key].help,
+      title: rowCopy[editor.key].title,
+      help: rowCopy[editor.key].help,
       lockMessage,
       editor: toEditorVM(editor.key, spec),
       draft: editor.draft,
