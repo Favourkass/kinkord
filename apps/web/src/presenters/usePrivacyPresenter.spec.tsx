@@ -21,7 +21,7 @@ describe("privacy presenter", () => {
   it("offers exactly one selected audience for each available setting", async () => {
     const { result } = renderHook(() => usePrivacyPresenter("profile"));
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.fields).toHaveLength(15);
+    expect(result.current.fields).toHaveLength(14);
     expect(result.current.fields[0].options.filter((x) => x.selected)).toHaveLength(1);
     const labels = result.current.fields[0].options.map((x) => x.label);
     expect(labels).toContain("Kinkordians");
@@ -66,11 +66,11 @@ describe("privacy presenter", () => {
       ),
     );
   });
-  it("keeps the pinned-post and story audiences unavailable", async () => {
+  it("doesn't list pinned posts, and keeps stories unavailable", async () => {
     const { result } = renderHook(() => usePrivacyPresenter("profile"));
     await waitFor(() => expect(result.current.loading).toBe(false));
     // A pinned post follows its own audience, and there are no stories yet.
-    expect(result.current.fields.find((f) => f.key === "pinnedPosts")?.unavailable).toBe(true);
+    expect(result.current.fields.map((f) => f.key)).not.toContain("pinnedPosts");
     expect(result.current.fields.find((f) => f.key === "stories")?.unavailable).toBe(true);
   });
   it("offers and saves one messaging audience in its own category", async () => {

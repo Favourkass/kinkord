@@ -8,7 +8,7 @@ A member can pin one of their own posts to the top of their profile from the pos
   - Its cursor carries the pin, the millisecond timestamp and the post id, so paging never skips or repeats a post, even after an old pin or with equal timestamps.
   - Changing the pin reloads the profile.
 - **Home feeds** keep their own order. The post shows "Pinned to profile" there too.
-- **Who sees it:** a pinned post follows its own audience. Pinning never changes who can see a post. Its audience, blocks, moderation and the author's "Who Can See My Posts" still decide. "Who Can See My Pinned Posts" stays switched off, since it would do nothing (see PRIVACY.md).
+- **Who sees it:** a pinned post follows its own audience. Pinning never changes who can see a post. Its audience, blocks, moderation and the author's "Who Can See My Posts" still decide. So Settings → Privacy has no "Who Can See My Pinned Posts" row (see PRIVACY.md).
 
 ## API
 
