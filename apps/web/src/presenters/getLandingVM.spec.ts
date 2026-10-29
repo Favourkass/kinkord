@@ -6,7 +6,7 @@ describe("getLandingVM", () => {
   const vm = getLandingVM();
 
   it("counts all available countries on the landing page", () => {
-    expect(vm.membership.countries).toBe("4 countries");
+    expect(vm.membership.countries).toBe("5 countries");
   });
 
   it("brands the splash with the Kinkord name and tagline", () => {

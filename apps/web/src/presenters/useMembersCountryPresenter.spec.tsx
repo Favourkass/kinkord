@@ -39,7 +39,7 @@ describe("useMembersCountryPresenter", () => {
       expect(result.current.rows.find((r) => r.code === "NG")!.membersLabel).toBe("12.4K Members"),
     );
     // Every signup country is open, even before its first member joins.
-    expect(result.current.rows.map((r) => r.code)).toEqual(["GH", "KE", "NG", "US"]);
+    expect(result.current.rows.map((r) => r.code)).toEqual(["GH", "KE", "NG", "ZA", "US"]);
     expect(result.current.rows.find((r) => r.code === "NG")!).toMatchObject({
       name: "Nigeria",
       flag: "/app/members/flag-ng.svg",

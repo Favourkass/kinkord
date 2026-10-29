@@ -456,3 +456,23 @@ it("hides sexuality for Nigerian profiles without changing saved values", () => 
     ),
   ).toBe(true);
 });
+
+it("offers South Africa and its provinces in Edit Profile", () => {
+  const context = {
+    ...ctx,
+    profile: { ...profile, country: "ZA", state: "Gauteng", city: "City of Johannesburg" },
+    cityOptions: ["City of Johannesburg"],
+  };
+  const country = buildEditRow("country", context).editor;
+  const province = buildEditRow("state", context).editor;
+  const municipality = buildEditRow("city", context).editor;
+  expect(country.kind === "single" && country.options).toContainEqual({
+    value: "ZA",
+    label: "South Africa",
+  });
+  expect(province.kind === "single" && province.options).toHaveLength(9);
+  expect(municipality.kind === "single" && municipality.options).toContainEqual({
+    value: "City of Johannesburg",
+    label: "City of Johannesburg",
+  });
+});

@@ -4,7 +4,8 @@
     "NG": "36 states plus FCT; populated places and named areas, excluding abandoned/historical places",
     "KE": "47 counties; GeoNames populated places and named areas, excluding abandoned/historical places",
     "GH": "16 regions; populated places and named areas",
-    "US": "50 states plus District of Columbia; populated places and named areas"
+    "US": "50 states plus District of Columbia; populated places and named areas",
+    "ZA": "9 provinces; 213 product-supplied municipalities, preserved exactly"
   },
   "processing": "scripts/build-location-files.mjs splits the lists per state/county into apps/web/public/locations. It drops records that are not places people live (one- or two-letter names, names with digits after removing a trailing sub-area number such as \"Umoja 1\", facilities such as schools, markets and camps, addresses), removes misfiled records, adds a few well-known places, and merges the Nigerian areas signup offered before (ng-curated-areas.json).",
   "kenyaPlaces": {
@@ -18,7 +19,12 @@
     "changes": "Retained populated-place names, deduplicated within each county, spatially assigned counties from coordinates. Current GeoNames county used only when the coordinate did not intersect a county boundary. Unmapped records omitted; signup allows an unlisted town/area.",
     "remappedByCoordinates": 198,
     "fallbackCountyAssignments": 50,
-    "unmappedRecords": ["Kiunga", "Kiwayu", "Holili", "Tana Power Station"]
+    "unmappedRecords": [
+      "Kiunga",
+      "Kiwayu",
+      "Holili",
+      "Tana Power Station"
+    ]
   },
   "kenyaBoundaries": {
     "publisher": "geoBoundaries / RCMRD GeoPortal / Africa GeoPortal",
@@ -384,5 +390,11 @@
     "file": "requested-location-options.json",
     "scope": "320 Ghana entries across all 16 regions; 1,233 unique USA entries across 30 states and Washington, D.C. (1,240 supplied lines, 7 exact repeats).",
     "processing": "Preserve exact supplied spelling and regional grouping. Deduplicate repeated names within each group, merge with existing additional names, and sort alphabetically. Supplied names take precedence over normalized variants and bypass generic cleanup, preserving Wa, Ho and Ko. These are product-supplied groupings, not independently verified geographic corrections."
+  },
+  "southAfricaMunicipalities": {
+    "source": "User-supplied list, 2026-10-29",
+    "count": 213,
+    "provinces": 9,
+    "processing": "Preserve supplied names and province groupings; sort for display. No GeoNames places are merged into South Africa."
   }
 }

@@ -240,17 +240,19 @@ function SignupWizard() {
             <p className="-mt-3 w-full text-left text-[11px] text-kink-help lg:text-[16px]">
               {p.aboutStep.location.helper}
             </p>
-            <p className="-mt-5 w-full text-left text-[10px] text-kink-help lg:-mt-7 lg:text-[13px]">
-              {p.aboutStep.location.credit.text}{" "}
-              <a
-                href={p.aboutStep.location.credit.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline"
-              >
-                {p.aboutStep.location.credit.licence}
-              </a>
-            </p>
+            {p.aboutStep.location.credit && (
+              <p className="-mt-5 w-full text-left text-[10px] text-kink-help lg:-mt-7 lg:text-[13px]">
+                {p.aboutStep.location.credit.text}{" "}
+                <a
+                  href={p.aboutStep.location.credit.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                >
+                  {p.aboutStep.location.credit.licence}
+                </a>
+              </p>
+            )}
             <DobPicker
               id={fieldId("dob")}
               day={p.aboutStep.draft.dobDay}

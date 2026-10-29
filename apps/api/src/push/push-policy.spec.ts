@@ -31,6 +31,7 @@ describe("timeZoneOf", () => {
     expect(timeZoneOf("NG", "Lagos")).toBe("Africa/Lagos");
     expect(timeZoneOf("GH", "Greater Accra")).toBe("Africa/Accra");
     expect(timeZoneOf("KE", "Nairobi")).toBe("Africa/Nairobi");
+    expect(timeZoneOf("ZA", "Gauteng")).toBe("Africa/Johannesburg");
     expect(timeZoneOf("US", "California")).toBe("America/Los_Angeles");
     expect(timeZoneOf("US", "Texas")).toBe("America/Chicago");
     expect(timeZoneOf("US", "Arizona")).toBe("America/Phoenix");

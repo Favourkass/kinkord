@@ -123,6 +123,7 @@ export const AVAILABLE_COUNTRIES = [
   { code: "GH", name: "Ghana" },
   { code: "KE", name: "Kenya" },
   { code: "NG", name: "Nigeria" },
+  { code: "ZA", name: "South Africa" },
   { code: "US", name: "USA" },
 ] as const;
 
