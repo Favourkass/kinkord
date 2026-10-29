@@ -10,7 +10,7 @@ describe("Privacy menu", () => {
       "Activity Status",
       "Read Receipts",
       "Tagging & Mentions",
-      "Content Sharing & Reposting",
+      "Content Sharing",
     ]);
     expect(menu.categories[0].href).toBe(Routes.settingsPrivacyProfile);
     expect(new Set(menu.categories.map((item) => item.href)).size).toBe(6);

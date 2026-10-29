@@ -182,19 +182,19 @@ describe("tags on a post", () => {
 });
 
 describe("the post menu", () => {
-  it("keeps repost and save on anyone's post, and closes once one is picked", () => {
+  it("keeps save in the menu and sharing in its own action", () => {
     const on = menuOf({});
     expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(on.save).toHaveBeenCalledOnce();
     expect(on.close).toHaveBeenCalledOnce();
-    fireEvent.click(screen.getByRole("button", { name: "Repost" }));
-    expect(on.repost).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("button", { name: "Repost" })).toBeNull();
+    expect(on.repost).not.toHaveBeenCalled();
   });
-  it("offers unsave and undo once they're done", () => {
+  it("offers unsave without a repost toggle", () => {
     menuOf({ savedByMe: true, repostedByMe: true });
     expect(screen.getByRole("button", { name: "Unsave" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Undo repost" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Undo repost" })).toBeNull();
   });
   it("undoes your own repost once, not twice", () => {
     const on = menuOf({ id: "r1", mine: true, repostedByMe: true });
@@ -407,4 +407,20 @@ describe("profile pin menu", () => {
       expect(screen.queryByRole("button", { name: "Pin to profile" })).toBeNull();
     },
   );
+});
+
+it("keeps sharing out of the three-dot menu", () => {
+  menuOf({});
+  expect(screen.queryByRole("button", { name: "Repost" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Quote" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Share (0)" })).toBeTruthy();
+});
+it("renders a shared caption separately from original content", () => {
+  menuOf({
+    shareCaption: "My caption",
+    repostedBy: { userId: "other", username: "other", displayName: "Other" },
+    id: "shared",
+  });
+  expect(screen.getByText("My caption")).toBeTruthy();
+  expect(screen.getByText("A post")).toBeTruthy();
 });

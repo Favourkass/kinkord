@@ -126,3 +126,28 @@ export async function tagSuggestions(db: Db, viewerId: string, query: string, li
     .orderBy(asc(profile.displayName))
     .limit(limit);
 }
+
+/**
+ * Friends to offer in the share sheet's "Send to a friend", by name or username: those whose
+ * messaging setting lets the viewer write to them. Sending still goes through chat's own rules.
+ */
+export async function shareFriends(db: Db, viewerId: string, query: string, limit = 50) {
+  const q = query.trim().replace(/^@/, "").slice(0, 64);
+  const pattern = containsPattern(q);
+  return db
+    .select({ userId: user.id, username: user.username, displayName: profile.displayName })
+    .from(user)
+    .innerJoin(profile, eq(profile.userId, user.id))
+    .where(
+      and(
+        ne(user.id, viewerId),
+        acceptedFriendship(user.id, viewerId),
+        privacyAllows(viewerId, user.id, "messaging"),
+        notBanned(user.id),
+        noBlockEitherWay(user.id, viewerId),
+        q ? or(ilike(user.username, pattern), ilike(profile.displayName, pattern)) : undefined,
+      ),
+    )
+    .orderBy(asc(profile.displayName), asc(user.id))
+    .limit(limit);
+}

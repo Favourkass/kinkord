@@ -79,6 +79,7 @@ export function getProfilePosts(
     },
     postOverlays: {
       gift: feed.giftDialog,
+      share: feed.shareDialog,
       comments: {
         open: feed.commentsFor !== null,
         comments: feed.comments,

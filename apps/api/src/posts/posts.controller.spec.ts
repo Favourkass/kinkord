@@ -6,6 +6,7 @@ const ID = "0f1c8b1e-1111-4111-8111-111111111111";
 
 const postsService = () => ({
   feed: vi.fn(async () => ({ items: [], nextCursor: null })),
+  shareToFeed: vi.fn(),
   create: vi.fn(async () => ({ id: ID })),
   byId: vi.fn(async () => ({ id: ID })),
   pinToProfile: vi.fn(async () => ({ postId: ID, pinned: true })),
@@ -17,6 +18,7 @@ const postsService = () => ({
   savedFeed: vi.fn(async () => ({ items: [], nextCursor: null })),
   removeTag: vi.fn(async () => ({ removed: true })),
   tagSuggestions: vi.fn(async () => ({ items: [] })),
+  shareFriends: vi.fn(async () => []),
 });
 
 const interactions = () => ({
@@ -141,6 +143,16 @@ describe("PostsController", () => {
     ]);
   });
 
+  it("suggests friends to send a post to", async () => {
+    const posts = postsService();
+    await controller(posts).shareFriends(req("u1"), "sa");
+    await controller(posts).shareFriends(req("u1"), undefined);
+    expect(posts.shareFriends.mock.calls).toEqual([
+      ["u1", "sa"],
+      ["u1", ""],
+    ]);
+  });
+
   it("reads a profile's Tagged tab from the feed", async () => {
     const posts = postsService();
     await controller(posts).feed(req("u1"), { tagged: "ada" });
@@ -236,4 +248,14 @@ describe("PostsController", () => {
     });
     expect(posts.presignMediaUpload).toHaveBeenCalledWith("u1", "image/jpeg", 1024);
   });
+});
+
+it("validates caption length and binds feed shares to the signed-in member", async () => {
+  const posts = postsService();
+  await controller(posts).shareToFeed(req("self"), ID, { caption: "  Hello  ", userId: "other" });
+  expect(posts.shareToFeed).toHaveBeenCalledWith(ID, "self", "Hello");
+  expect(() =>
+    controller(posts).shareToFeed(req("self"), ID, { caption: "x".repeat(2001) }),
+  ).toThrow();
+  expect(() => controller(posts).shareToFeed(req("self"), "bad", {})).toThrow();
 });

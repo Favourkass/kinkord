@@ -91,6 +91,12 @@ export class PostsController {
     return this.posts.tagSuggestions(req.user.id, typeof q === "string" ? q : "");
   }
 
+  /** Friends to send a post to from the share sheet, by name or username. Before ":id" too. */
+  @Get("share-friends")
+  shareFriends(@Req() req: AuthedRequest, @Query("q") q?: string) {
+    return this.posts.shareFriends(req.user.id, typeof q === "string" ? q : "");
+  }
+
   @HttpPost("upload-url")
   presignUpload(@Req() req: AuthedRequest, @Body() body: unknown) {
     const parsed = uploadUrlSchema.safeParse(body);
@@ -150,6 +156,13 @@ export class PostsController {
   @HttpPost(":id/share")
   share(@Req() req: AuthedRequest, @Param("id") id: string) {
     return this.posts.share(parseId(id), req.user.id);
+  }
+
+  @HttpPost(":id/share-feed")
+  shareToFeed(@Req() req: AuthedRequest, @Param("id") id: string, @Body() body: unknown) {
+    const parsed = z.object({ caption: z.string().trim().max(2000).default("") }).safeParse(body);
+    if (!parsed.success) throw new BadRequestException("Captions can be up to 2,000 characters.");
+    return this.posts.shareToFeed(parseId(id), req.user.id, parsed.data.caption);
   }
 
   @HttpPost(":id/repost")
