@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { SHARE_COPY } from "@/constants/sharing";
-import { Routes } from "@/constants/Routes";
-import type { ExternalShare, GroupPM, ShareFriendPM, ShareMode } from "@/domain/sharing";
-import { groupsService, sharingService } from "@/services/sharing.service";
+import type { ExternalShare, ShareFriendPM, ShareMode } from "@/domain/sharing";
+import { sharingService } from "@/services/sharing.service";
 import { profileApi } from "@/services/profile.service";
 import type { OwnProfilePM } from "@/domain/profile";
 import { ApiError } from "@/services/apiClient";
@@ -15,7 +14,6 @@ export function usePostSharePresenter(
   const [caption, setCaption] = useState("");
   const [query, setQuery] = useState("");
   const [friends, setFriends] = useState<ShareFriendPM[]>([]);
-  const [groups, setGroups] = useState<GroupPM[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,16 +36,13 @@ export function usePostSharePresenter(
   useEffect(() => {
     if (!postId) return;
     let active = true;
+    // Re-run on a mode change too: switching mode shows the loading state until this settles.
     const timer = setTimeout(() => {
-      const work =
-        mode !== "groups"
-          ? groupsService.friends(query).then((rows) => {
-              if (active) setFriends(rows);
-            })
-          : groupsService.list().then((rows) => {
-              if (active) setGroups(rows);
-            });
-      void work
+      void sharingService
+        .friends(query)
+        .then((rows) => {
+          if (active) setFriends(rows);
+        })
         .catch(() => {
           if (active) setError("Could not load sharing destinations. Please try again.");
         })
@@ -69,16 +64,12 @@ export function usePostSharePresenter(
     setQuery("");
     setError(null);
     setFriends([]);
-    setGroups([]);
     attempt.current.clear();
   }
   function close() {
     if (!lock.current) setPostId(null);
   }
-  async function perform(
-    action: "feed" | "friend" | "group" | ExternalShare,
-    destination?: string,
-  ) {
+  async function perform(action: "feed" | "friend" | ExternalShare, destination?: string) {
     if (!postId || lock.current) return;
     lock.current = true;
     setBusy(true);
@@ -86,8 +77,6 @@ export function usePostSharePresenter(
     try {
       let result: { postId: string; shares: number } | null;
       if (action === "feed") result = await sharingService.feed(postId, caption);
-      else if (action === "group")
-        result = await sharingService.group(destination!, postId, caption);
       else if (action === "friend") {
         const key = `${destination}:${caption}`;
         const clientId = attempt.current.get(key) ?? crypto.randomUUID();
@@ -126,13 +115,11 @@ export function usePostSharePresenter(
         name: profile?.displayName || "Your profile",
         avatarUrl: profile?.avatarUrl ?? null,
       },
-      groupsHref: Routes.groups,
       friends: friends.map((p) => ({
         id: p.userId,
         name: p.displayName ?? p.username ?? "Member",
         initial: (p.displayName ?? p.username ?? "M").slice(0, 1).toUpperCase(),
       })),
-      groups: groups.filter((g) => g.status === "joined").map((g) => ({ id: g.id, name: g.name })),
       onClose: close,
       onMode: (m: ShareMode) => {
         setMode(m);
@@ -146,7 +133,6 @@ export function usePostSharePresenter(
       },
       onFeed: () => void perform("feed"),
       onFriend: (id: string) => void perform("friend", id),
-      onGroup: (id: string) => void perform("group", id),
       onExternal: (target: ExternalShare) => void perform(target),
     },
   };

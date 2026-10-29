@@ -3,7 +3,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { api } from "./apiClient";
 import { chatService } from "./chat.service";
 import { postsApi } from "./posts.service";
-import { externalShareUrl, groupsService, sharingService } from "./sharing.service";
+import { externalShareUrl, sharingService } from "./sharing.service";
 vi.mock("./apiClient", () => ({ api: { get: vi.fn(), post: vi.fn(), del: vi.fn() } }));
 vi.mock("./chat.service", () => ({ chatService: { start: vi.fn(), send: vi.fn() } }));
 vi.mock("./posts.service", () => ({
@@ -47,9 +47,9 @@ it("does not claim an external-window share was completed", async () => {
   await expect(sharingService.external("whatsapp", "p", "")).resolves.toBeNull();
   expect(postsApi.share).not.toHaveBeenCalled();
 });
-it("routes private-group actions through authenticated endpoints", async () => {
-  await groupsService.accept("a/b");
-  expect(api.post).toHaveBeenCalledWith("/groups/a%2Fb/accept", {});
-  await sharingService.group("a/b", "p", "Caption");
-  expect(api.post).toHaveBeenCalledWith("/groups/a%2Fb/posts", { postId: "p", caption: "Caption" });
+it("looks up friends to send to, and shares to the feed with the caption", async () => {
+  await sharingService.friends(" a&b ");
+  expect(api.get).toHaveBeenCalledWith("/posts/share-friends?q=a%26b");
+  await sharingService.feed("p/1", "Caption");
+  expect(api.post).toHaveBeenCalledWith("/posts/p%2F1/share-feed", { caption: "Caption" });
 });

@@ -1,6 +1,4 @@
 export const Routes = {
-  groups: "/groups",
-  group: (id: string) => `/groups/${encodeURIComponent(id)}`,
   friendRequests: "/friends/requests",
   relationships: "/relationships",
   /** The Relationships screen with the request form filled in for this member. */

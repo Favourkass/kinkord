@@ -1,32 +1,28 @@
-import { createGroupsRepository } from "@/repositories/groups.repository";
-import type { ExternalShare } from "@/domain/sharing";
+import { shareText, type ExternalShare, type ShareFriendPM } from "@/domain/sharing";
 import type { PostPM } from "@/domain/post";
 import { api } from "./apiClient";
 import { chatService } from "./chat.service";
 import { postPermalink, postsApi } from "./posts.service";
-export const groupsService = createGroupsRepository(api);
 export function externalShareUrl(target: "whatsapp" | "twitter", url: string, caption: string) {
   return target === "whatsapp"
-    ? `https://wa.me/?text=${encodeURIComponent([caption.trim(), url].filter(Boolean).join("\n\n"))}`
+    ? `https://wa.me/?text=${encodeURIComponent(shareText(caption, url))}`
     : `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(caption.trim())}`;
 }
 export const sharingService = {
+  /** Friends the viewer can send a post to: accepted friends whose messaging setting allows it. */
+  friends: (query: string) =>
+    api.get<ShareFriendPM[]>(`/posts/share-friends?q=${encodeURIComponent(query.trim())}`),
   feed: (postId: string, caption: string) =>
     api.post<{ postId: string; shares: number; item: PostPM | null }>(
       `/posts/${encodeURIComponent(postId)}/share-feed`,
       { caption },
     ),
-  group: (id: string, postId: string, caption: string) =>
-    api.post<{ postId: string; shares: number }>(`/groups/${encodeURIComponent(id)}/posts`, {
-      postId,
-      caption,
-    }),
   friend: async (userId: string, postId: string, caption: string, clientId: string) => {
     // Existing messaging rules and daily allowances remain authoritative on the API.
     const conversation = await chatService.start(userId);
     await chatService.send(
       conversation.conversationId,
-      [caption.trim(), postPermalink(postId)].filter(Boolean).join("\n\n"),
+      shareText(caption, postPermalink(postId)),
       clientId,
     );
     // A failed counter update must not make a successfully sent message look unsent.

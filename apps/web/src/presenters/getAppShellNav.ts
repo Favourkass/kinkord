@@ -80,7 +80,6 @@ function drawerNavigation(): AppShellDrawerVM {
   return {
     menuLabel: copy.menuLabel,
     primary: [
-      { key: "groups", label: "Groups", href: Routes.groups, icon: "members" },
       {
         key: "members",
         label: nav.members,
