@@ -5,7 +5,19 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { and, asc, count, desc, eq, gt, isNotNull, isNull, type SQL } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gt,
+  isNotNull,
+  isNull,
+  inArray,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { DRIZZLE, type Db } from "../db/db.module";
@@ -20,6 +32,26 @@ import { addSilverTime } from "./silver-time";
 const GIVEN_SHOWN = 20;
 
 export const giveRingSchema = z.object({ username: z.string().trim().min(1).max(64) }).strict();
+
+export const giveSelectedRingsSchema = z
+  .object({
+    gifts: z
+      .array(
+        z
+          .object({
+            ringId: z.string().uuid().toLowerCase(),
+            username: z.string().trim().min(1).max(64),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(50),
+  })
+  .strict()
+  .refine(
+    (value) => new Set(value.gifts.map((g) => g.ringId)).size === value.gifts.length,
+    "Choose each ring once.",
+  );
 
 export interface KinkRingsDto {
   /** The rings the member can give, soonest to expire first. */
@@ -85,6 +117,110 @@ export class KinkRingsService {
     };
   }
 
+  /** Explicit ring ids make retries safe: the same completed assignment never adds Silver twice. */
+  async giveSelected(
+    giverId: string,
+    gifts: Array<{ ringId: string; username: string }>,
+    now = new Date(),
+  ) {
+    const parsed = giveSelectedRingsSchema.safeParse({ gifts });
+    if (!parsed.success) throw new BadRequestException("Choose between 1 and 50 distinct rings.");
+    gifts = parsed.data.gifts;
+    const handles = [
+      ...new Set(gifts.map((g) => g.username.trim().replace(/^@/, "").toLowerCase())),
+    ];
+    const result = await this.db.transaction(async (tx) => {
+      const recipients = await tx
+        .select({
+          id: user.id,
+          username: user.username,
+          displayName: profile.displayName,
+          accountType: profile.accountType,
+        })
+        .from(user)
+        .innerJoin(profile, eq(profile.userId, user.id))
+        .where(
+          and(
+            inArray(user.username, handles),
+            notBanned(user.id),
+            noBlockEitherWay(user.id, giverId),
+          ),
+        );
+      if (recipients.length !== handles.length)
+        throw new NotFoundException("One of these members is no longer available.");
+      if (recipients.some((r) => r.id === giverId || r.accountType === "organization"))
+        throw new BadRequestException("Choose other personal members to receive your rings.");
+      const assignment = gifts.map((g) => ({
+        ...g,
+        to: recipients.find(
+          (r) => r.username === g.username.trim().replace(/^@/, "").toLowerCase(),
+        )!,
+      }));
+      const rings = await tx
+        .select({
+          id: kinkRing.id,
+          givenTo: kinkRing.givenTo,
+          givenAt: kinkRing.givenAt,
+          expiresAt: kinkRing.expiresAt,
+        })
+        .from(kinkRing)
+        .where(
+          and(
+            eq(kinkRing.ownerId, giverId),
+            inArray(
+              kinkRing.id,
+              gifts.map((g) => g.ringId),
+            ),
+          ),
+        )
+        .orderBy(asc(kinkRing.id))
+        .for("update");
+      if (rings.length !== gifts.length)
+        throw new ConflictException(
+          "Some selected rings are no longer available. Refresh your inventory.",
+        );
+      const replay = rings.every(
+        (r) => r.givenAt && r.givenTo === assignment.find((a) => a.ringId === r.id)!.to.id,
+      );
+      if (!replay) {
+        if (rings.some((r) => r.givenAt || r.expiresAt <= now))
+          throw new ConflictException(
+            "Some selected rings were gifted or have expired. Refresh your inventory.",
+          );
+        // Serializes gifts to the same recipient, including when no subscription row exists yet.
+        for (const recipient of [...recipients].sort((a, b) => a.id.localeCompare(b.id))) {
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtextextended(${"kink-ring:"} || ${recipient.id}, 0))`,
+          );
+          if (silverForGood(await silverUntil(tx as unknown as Db, recipient.id)))
+            throw new BadRequestException(`${recipient.displayName} already has Silver for good.`);
+        }
+        for (const gift of assignment) {
+          await addSilverTime(tx, gift.to.id, "silver", "monthly", now, { clearHeldCheck: false });
+          await tx
+            .update(kinkRing)
+            .set({ givenTo: gift.to.id, givenAt: now })
+            .where(eq(kinkRing.id, gift.ringId));
+        }
+      }
+      return {
+        replay,
+        gifts: assignment.map((g) => ({
+          ringId: g.ringId,
+          to: { username: g.to.username, displayName: g.to.displayName, id: g.to.id },
+        })),
+      };
+    });
+    if (!result.replay)
+      for (const gift of result.gifts) this.push.kinkRingGiven(giverId, gift.to.id, gift.ringId);
+    return {
+      gifts: result.gifts.map((g) => ({
+        ringId: g.ringId,
+        to: { username: g.to.username, displayName: g.to.displayName },
+      })),
+    };
+  }
+
   /**
    * Gives the member's soonest-to-expire ring to someone else: a month of
    * Silver for them, on from wherever theirs ends. Never to themselves, an
@@ -127,6 +263,9 @@ export class KinkRingsService {
         .update(kinkRing)
         .set({ givenTo: to.id, givenAt: now })
         .where(eq(kinkRing.id, ring.id));
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${"kink-ring:"} || ${to.id}, 0))`,
+      );
       await addSilverTime(tx, to.id, "silver", "monthly", now, { clearHeldCheck: false });
       return ring.id;
     });

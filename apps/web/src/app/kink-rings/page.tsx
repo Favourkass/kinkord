@@ -10,7 +10,12 @@ export default function KinkRingsPage() {
   const shell = useHomePresenter();
   const vm = useKinkRingsPresenter();
   return (
-    <AppShell {...appShellProps(shell, getAppShellNav())} activeNav="none">
+    <AppShell
+      {...appShellProps(shell, getAppShellNav())}
+      activeNav="none"
+      mobileHeader={<></>}
+      desktopGreeting={false}
+    >
       <KinkRingsScreen {...vm} />
     </AppShell>
   );

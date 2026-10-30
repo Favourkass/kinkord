@@ -20,13 +20,33 @@ founders set the rules on 2026-10-27.
 The founders each got three rings to try giving when this shipped (migration
 0046): 30, 60 and 90 days. They went to their main accounts only.
 
-## Giving one
+## Giving rings
 
-From **Kink Rings** in the account menu (`/kink-rings`): find a member by name
-or @username, pick them, confirm.
+From **Kink Rings** in the account menu (`/kink-rings`):
 
-- The giver's **soonest-to-expire** ring is used. It's locked while it's given
-  (`FOR UPDATE SKIP LOCKED`), so two gifts at once never spend the same ring.
+1. The overview shows the available balance and recent gifting history.
+2. Tap the balance to view inventory: abbreviated ring IDs (copy or open details
+   for the full UUID), purchase/award dates, expiry dates and days remaining.
+3. Gift an individual ring or select multiple rings (up to 50 per submission).
+   The overview's Gift button offers the soonest-expiring 50 available rings.
+4. Choose recipients from accepted Friends or Search. Search honors search
+   visibility; avatars, location and online status honor profile privacy.
+5. Review recipients and quantities. Each starts with one ring, and can receive
+   more within the selected balance. Unassigned rings stay in inventory.
+6. Confirm & Gift submits the explicit ring IDs together in one transaction.
+
+**Buy Kink Ring opens the existing Silver Premium purchase page** (`/subscription`).
+There is no separate ring purchase or price.
+
+- Selected rings are ownership-checked and locked in UUID order (`FOR UPDATE`).
+  One unavailable, expired or invalid gift rejects the entire batch. Recipient
+  advisory locks serialize gifts that extend the same Silver subscription.
+- Repeating an identical completed ring-to-recipient assignment returns success
+  without extending Silver or sending notifications again. The browser retains
+  the attempted payload after network failure, including if a ring expires
+  before the retry. No replacement ring is silently spent.
+- The legacy single-gift endpoint still chooses the **soonest-to-expire** ring
+  using `FOR UPDATE SKIP LOCKED`, for compatibility with existing clients.
 - The receiver gets **a month of Silver**, by the same rule as a member's own
   payment (`addSilverTime`, `subscriptions/silver-time.ts`):
   - it runs on from where their Silver ends, or from now when it has run out;
@@ -37,8 +57,10 @@ or @username, pick them, confirm.
 - The receiver is told: "Ada gave you a Kink Ring: a month of Silver". The push
   goes at once, is held through quiet hours, and has no switch, like account
   notices. Tapping it opens the giver's profile.
-- The giver sees the rings they have left, each with its expiry date (Lagos
-  time), and the last 20 they gave and to whom.
+- Dates are shown in Lagos time. Gifting history and expired inventory paginate
+  in pages of 20. Active/Expired in history describes the recipient's **current
+  Silver status**, not a separately tracked expiry of that particular gift.
+  Unavailable recipients display without profile details.
 
 Never to:
 - **themselves**, since rings are for giving;
@@ -54,6 +76,20 @@ Never to:
 | --- | --- |
 | `GET /kink-rings` | `{ available: [{ id, expiresAt }], given: [{ id, givenAt, to }] }` |
 | `POST /kink-rings/give` `{ username }` | `{ ringId, to: { username, displayName }, left }`. 404 when there's no such member, 400 for the refusals above, 409 with no ring left. |
+
+### Inventory and gifting flow endpoints
+
+All routes require authentication and derive ownership from the session.
+
+| Route | Behavior |
+| --- | --- |
+| `GET /kink-rings/inventory` | Available rings plus the first history and expired pages |
+| `GET /kink-rings/history?page=1` | Gift history, `items` and `nextPage` |
+| `GET /kink-rings/expired?page=1` | Expired unspent rings, `items`, `total`, `nextPage` |
+| `GET /kink-rings/recipients?tab=friends&q=&page=1` | Eligible accepted friends; `tab=search` requires two characters and honors search privacy |
+| `POST /kink-rings/give-selected` | `{ gifts: [{ ringId, username }] }`, 1–50 distinct owned rings; atomic and idempotent for the same assignment |
+
+No schema migration is required for the redesigned flow.
 
 ## Data
 
@@ -73,3 +109,9 @@ leaves.
 - A "Give a Kink Ring" button on members' profiles.
 - Mentioning rings on the Silver plans screen.
 - Telling a member when one of their rings is about to expire.
+
+## Artwork
+
+The hero is `apps/web/public/kink-rings/gold-heart-ring.png`, generated with
+`image_gen` from the supplied ring reference. The UI and text are rendered in
+React. [Generation prompt and asset details](KINK_RINGS_ARTWORK.md).

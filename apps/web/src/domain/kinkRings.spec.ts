@@ -53,3 +53,26 @@ describe("toKinkRingsVM", () => {
     ]);
   });
 });
+
+it("marks rings expiring within seven days and distinguishes awards from purchases", async () => {
+  const { toRingItemVM } = await import("./kinkRings");
+  const ring = {
+    id: "12345678-abcd",
+    createdAt: "2026-10-01T00:00:00Z",
+    expiresAt: "2026-11-01T00:00:00Z",
+    source: "award" as const,
+  };
+  const vm = toRingItemVM(ring, new Date("2026-10-30T00:00:00Z"));
+  expect(vm).toMatchObject({
+    code: "KR-12345678",
+    urgent: true,
+    expired: false,
+    remaining: "2 days left",
+    received: "Received: 1 Oct 2026",
+  });
+  expect(toRingItemVM(ring, new Date(ring.expiresAt))).toMatchObject({
+    expired: true,
+    urgent: false,
+    remaining: "Expired",
+  });
+});
