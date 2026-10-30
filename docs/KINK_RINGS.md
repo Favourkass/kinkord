@@ -31,9 +31,14 @@ From **Kink Rings** in the account menu (`/kink-rings`):
    The overview's Gift button offers the soonest-expiring 50 available rings.
 4. Choose recipients from accepted Friends or Search. Search honors search
    visibility; avatars, location and online status honor profile privacy.
-5. Review recipients and quantities. Each starts with one ring, and can receive
-   more within the selected balance. Unassigned rings stay in inventory.
-6. Confirm & Gift submits the explicit ring IDs together in one transaction.
+5. Review Selected Recipients, then continue to Ring Allocation. Each starts
+   with one ring and can receive more within the selected balance. Choose exact
+   IDs using each ring's dropdown; choosing an already assigned ring swaps the
+   two slots. Unassigned rings stay in inventory.
+6. Add an optional personal message (up to 500 characters) for each recipient.
+7. Review & Confirm shows the exact recipient, ring IDs and message. Edit
+   Recipients preserves existing allocations and messages. Only the final Send
+   button submits the gifts, together in one transaction.
 
 **Buy Kink Ring opens the existing Silver Premium purchase page** (`/subscription`).
 There is no separate ring purchase or price.
@@ -42,7 +47,8 @@ There is no separate ring purchase or price.
   One unavailable, expired or invalid gift rejects the entire batch. Recipient
   advisory locks serialize gifts that extend the same Silver subscription.
 - Repeating an identical completed ring-to-recipient assignment returns success
-  without extending Silver or sending notifications again. The browser retains
+  without extending Silver or sending notifications again. A replay must also
+  match the saved message; it cannot rewrite a sent note. The browser retains
   the attempted payload after network failure, including if a ring expires
   before the retry. No replacement ring is silently spent.
 - The legacy single-gift endpoint still chooses the **soonest-to-expire** ring
@@ -56,7 +62,11 @@ There is no separate ring purchase or price.
     admin confirming a payment, a ring from another member vouches for nothing.
 - The receiver is told: "Ada gave you a Kink Ring: a month of Silver". The push
   goes at once, is held through quiet hours, and has no switch, like account
-  notices. Tapping it opens the giver's profile.
+  notices. Tapping it opens the giver's profile. An optional personal message is stored
+  on the ring and displayed as plain text in the recipient's notification inbox.
+  The inbox query checks the ring's recipient and giver before returning the
+  note; public profiles and other members never receive it. Push previews keep
+  the existing generic gift text.
 - Dates are shown in Lagos time. Gifting history and expired inventory paginate
   in pages of 20. Active/Expired in history describes the recipient's **current
   Silver status**, not a separately tracked expiry of that particular gift.
@@ -87,9 +97,11 @@ All routes require authentication and derive ownership from the session.
 | `GET /kink-rings/history?page=1` | Gift history, `items` and `nextPage` |
 | `GET /kink-rings/expired?page=1` | Expired unspent rings, `items`, `total`, `nextPage` |
 | `GET /kink-rings/recipients?tab=friends&q=&page=1` | Eligible accepted friends; `tab=search` requires two characters and honors search privacy |
-| `POST /kink-rings/give-selected` | `{ gifts: [{ ringId, username }] }`, 1–50 distinct owned rings; atomic and idempotent for the same assignment |
+| `POST /kink-rings/give-selected` | `{ gifts: [{ ringId, username, message? }] }`, 1–50 distinct owned rings; atomic and idempotent for the same assignment |
 
-No schema migration is required for the redesigned flow.
+Migration `0048_kink_ring_gift_message` adds a nullable `gift_message` column.
+Apply it before deploying the updated API. Existing rings keep a null note; no
+existing balances, Silver grants or payment rules are changed.
 
 ## Data
 
@@ -99,6 +111,7 @@ No schema migration is required for the redesigned flow.
 - `seq` (1 to 12)
 - `expires_at`
 - `given_to`, `given_at`
+- `gift_message` (nullable, migration 0048)
 
 A ring is **available** while `given_at` is null and `expires_at` is ahead.
 Rings go with their owner's account. The giver's record stays if the receiver
@@ -112,6 +125,7 @@ leaves.
 
 ## Artwork
 
-The hero is `apps/web/public/kink-rings/gold-heart-ring.png`, generated with
+The overview hero is `apps/web/public/kink-rings/gold-heart-ring.png` and the
+confirmation illustration is `apps/web/public/kink-rings/gift-box.png`, generated with
 `image_gen` from the supplied ring reference. The UI and text are rendered in
 React. [Generation prompt and asset details](KINK_RINGS_ARTWORK.md).

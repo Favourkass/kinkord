@@ -406,3 +406,18 @@ describe("viewed notification versions", () => {
     expect(t.sqlOf(selection.total).sql).toContain('"chat_inbox_seen"');
   });
 });
+
+it("reads a gift message only from the ring assigned to this inbox owner", async () => {
+  const t = make([[row({ type: "kink_ring", subjectId: ID, giftMessage: "Enjoy your ring! 💛" })]]);
+  const result = await t.service.list("kemi");
+  expect(result.items[0].giftMessage).toBe("Enjoy your ring! 💛");
+  const selected = t.chains.find((c) => c[0].method === "select")?.[0].args[0] as {
+    giftMessage: SQL;
+  };
+  const query = t.sqlOf(selected.giftMessage);
+  expect(query.params).toContain("kemi");
+  expect(query.sql).toContain('"kink_ring"."given_to"');
+  expect(query.sql).toContain('"kink_ring"."owner_id" = "notification"."actor_id"');
+  const other = make([[row({ type: "like", giftMessage: "must not appear" })]]);
+  expect((await other.service.list("kemi")).items[0].giftMessage).toBeUndefined();
+});

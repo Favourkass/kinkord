@@ -24,6 +24,8 @@ export const kinkRing = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     /** Who it was given to. Kept as given if they later leave, for the giver's history. */
     givenTo: text("given_to").references(() => user.id, { onDelete: "set null" }),
+    /** Private note from the giver, displayed only to the recipient in their inbox. */
+    giftMessage: text("gift_message"),
     givenAt: timestamp("given_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },

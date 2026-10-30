@@ -1,0 +1,1 @@
+ALTER TABLE "kink_ring" ADD COLUMN "gift_message" text;

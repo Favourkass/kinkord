@@ -130,3 +130,15 @@ export function toRingHistoryVM(row: RingHistoryPM, hrefFor: (u: string) => stri
     href: row.to?.username ? hrefFor(row.to.username) : null,
   };
 }
+
+/** Persisted draft selections, before display formatting. */
+export interface RingRecipientDraft {
+  member: RingRecipientPM;
+  ringIds: string[];
+  message: string;
+}
+export interface RingGiftAssignment {
+  ringId: string;
+  username: string;
+  message?: string;
+}

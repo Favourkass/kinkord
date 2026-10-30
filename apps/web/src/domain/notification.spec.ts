@@ -214,3 +214,19 @@ describe("relationship notifications", () => {
     );
   });
 });
+
+it("shows a ring's personal message as plain text, only for ring notifications", () => {
+  const pm = {
+    id: "gift",
+    type: "kink_ring" as const,
+    actor: null,
+    url: "/notifications",
+    count: 1,
+    createdAt: new Date().toISOString(),
+    readAt: null,
+    giftMessage: "Enjoy! 💛 <b>Hello</b>",
+  };
+  expect(toNotificationVM(pm).giftMessage).toBe(pm.giftMessage);
+  expect(toNotificationVM(pm).body).toContain(pm.giftMessage);
+  expect(toNotificationVM({ ...pm, type: "like" }).giftMessage).toBeUndefined();
+});

@@ -18,6 +18,8 @@ import {
   Check,
   Search,
   CalendarDays,
+  UserRoundPlus,
+  MessageCircle,
 } from "lucide-react";
 import AvatarCircle from "@/components/app/AvatarCircle";
 import type { KinkRingsScreenVM } from "@/presenters/useKinkRingsPresenter";
@@ -127,8 +129,65 @@ function RingCard({
     </article>
   );
 }
+function RecipientIdentity({
+  member,
+  large = false,
+}: {
+  member: KinkRingsScreenProps["picked"][number];
+  large?: boolean;
+}) {
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-3">
+      <span className="relative shrink-0">
+        <AvatarCircle
+          src={member.avatarUrl}
+          alt=""
+          size={large ? 58 : 48}
+          ringClassName="bg-[#bc9336]"
+        />
+        {member.online && (
+          <span
+            aria-label="Online"
+            className="absolute right-0 top-0 size-3 rounded-full border-2 border-black bg-green-400"
+          />
+        )}
+      </span>
+      <div className="min-w-0">
+        <p className="truncate text-base font-bold">{member.name}</p>
+        <p className="truncate text-xs text-white/55">{member.handle}</p>
+        {member.location && (
+          <p className="mt-1 flex items-center gap-1 text-xs text-white/65">
+            <MapPin size={13} className="shrink-0 text-kink-gold-bright" />
+            {member.location}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
 export default function KinkRingsScreen(p: KinkRingsScreenProps) {
   const c = p.copy;
+  const gifting = ["recipients", "selected", "allocation", "message", "review"].includes(p.stage);
+  const heading =
+    p.stage === "recipients"
+      ? c.recipients
+      : p.stage === "selected"
+        ? c.selected
+        : p.stage === "allocation"
+          ? c.allocation
+          : p.stage === "message"
+            ? c.messages
+            : c.review;
+  const intro =
+    p.stage === "recipients"
+      ? "Select who will receive your Kink Rings."
+      : p.stage === "selected"
+        ? c.selectedIntro
+        : p.stage === "allocation"
+          ? c.allocationIntro
+          : p.stage === "message"
+            ? c.messageIntro
+            : c.reviewIntro;
   return (
     <section className="mx-auto min-h-dvh w-full max-w-[720px] bg-black pb-8 text-white">
       <header className="relative z-10 flex items-center gap-2 px-4 pt-5">
@@ -140,22 +199,58 @@ export default function KinkRingsScreen(p: KinkRingsScreenProps) {
         >
           <ArrowLeft size={22} />
         </button>
-        <h1 className="flex-1 text-center text-3xl font-extrabold tracking-tight text-[#ffd45a] sm:text-4xl">
-          {p.stage === "recipients"
-            ? c.recipients
-            : p.stage === "review"
-              ? c.review
-              : p.stage === "history"
-                ? c.history
-                : c.title}
-        </h1>
+        {!gifting && (
+          <h1 className="flex-1 text-center text-3xl font-extrabold tracking-tight text-[#ffd45a] sm:text-4xl">
+            {p.stage === "history" ? c.history : c.title}
+          </h1>
+        )}
+        {gifting && <span className="flex-1" />}
         <button onClick={p.onInfo} aria-label={c.info} className="p-2 text-white/70">
           <Info size={22} />
         </button>
       </header>
-      <p className="relative z-10 mt-2 px-5 text-center text-sm text-white/75 sm:text-base">
-        {c.subtitle}
-      </p>
+      {gifting ? (
+        <div className={`relative mx-4 mt-4 ${p.stage === "review" ? "min-h-40 pt-10" : ""}`}>
+          {p.stage === "review" && (
+            <div className="absolute -right-4 -top-10 h-56 w-[80%]">
+              <Image
+                src={p.giftHero}
+                alt="Gold rings in a gift box"
+                fill
+                sizes="500px"
+                className="object-contain"
+              />
+              <div className="absolute inset-0 bg-gradient-to-r from-black via-black/30 to-transparent" />
+            </div>
+          )}
+          <div className="relative flex items-start gap-2">
+            {p.stage !== "review" && (
+              <div className="relative mt-3 size-16 shrink-0 overflow-hidden rounded-lg">
+                <Image src={p.hero} alt="" fill sizes="80px" className="scale-[1.6] object-cover" />
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="mb-1 text-sm text-kink-gold-bright">{c.gifting}</p>
+              <h1 className="text-2xl font-bold leading-tight sm:text-3xl">{heading}</h1>
+              <p className="mt-2 text-sm leading-5 text-white/65">{intro}</p>
+            </div>
+            {p.stage !== "review" && (
+              <div className="flex shrink-0 items-center gap-1.5 rounded-2xl border border-[#a57a12]/50 bg-[#141005] p-2 text-kink-gold-bright">
+                <strong className="text-2xl">{p.selectedCount}</strong>
+                <span className="text-[10px] leading-3">
+                  Rings
+                  <br />
+                  Selected
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <p className="relative z-10 mt-2 px-5 text-center text-sm text-white/75 sm:text-base">
+          {c.subtitle}
+        </p>
+      )}
       {p.info && (
         <aside className={`${panel} mx-4 mt-4 p-4 text-sm leading-6`}>
           <div className="mb-2 flex justify-between font-bold text-kink-gold-bright">
@@ -398,11 +493,11 @@ export default function KinkRingsScreen(p: KinkRingsScreenProps) {
                   className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-[#0c0c0c] p-3 text-left"
                 >
                   <span className="relative">
-                    <AvatarCircle src={m.avatarUrl} alt="" size={42} />
+                    <AvatarCircle src={m.avatarUrl} alt="" size={52} />
                     {m.online && (
                       <span
                         aria-label="Online"
-                        className="absolute bottom-0 right-0 size-2.5 rounded-full border border-black bg-green-400"
+                        className="absolute top-0 right-0 size-3 rounded-full border border-black bg-green-400"
                       />
                     )}
                   </span>
@@ -450,90 +545,251 @@ export default function KinkRingsScreen(p: KinkRingsScreenProps) {
               disabled={!p.canContinue}
               className={`${gold} mt-5 w-full`}
             >
-              {c.continue}
+              {c.continue} ({p.picked.length} Recipients)
               <ChevronRight size={18} />
             </button>
           </>
         )}
-        {p.stage === "review" && (
-          <>
-            <p className="my-5 text-center text-sm leading-6 text-white/65">{c.reviewNote}</p>
+        {p.stage === "selected" && (
+          <div className="mt-6">
+            <p className="mb-4 text-sm text-white/65">
+              You have selected {p.picked.length} recipient{p.picked.length === 1 ? "" : "s"} to
+              receive your Kink Rings.
+            </p>
             <div className="space-y-3">
               {p.picked.map((m) => (
-                <article key={m.userId} className={`${panel} p-3`}>
-                  <div className="flex items-center gap-3">
-                    <AvatarCircle
-                      src={m.avatarUrl}
-                      alt=""
-                      size={44}
-                      ringClassName="bg-kink-gold-bright"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold">{m.name}</p>
-                      <p className="text-xs text-white/55">{m.handle}</p>
-                      {m.location && <p className="mt-1 text-[11px] text-white/50">{m.location}</p>}
-                    </div>
-                    <button
-                      onClick={() => p.onRemove(m.userId)}
-                      disabled={p.busy}
-                      aria-label={`${c.remove}: ${m.name}`}
-                      className="rounded-full bg-white/10 p-1"
-                    >
-                      <X size={17} />
-                    </button>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-3 text-xs text-white/60">
-                    <span>
-                      {c.quantity} · {m.quantity} month{m.quantity === 1 ? "" : "s"} of Silver
-                    </span>
-                    <span className="flex items-center gap-3">
-                      <button
-                        aria-label={`Fewer rings for ${m.name}`}
-                        disabled={p.busy || m.quantity <= 1}
-                        onClick={() => p.onQuantity(m.userId, m.quantity - 1)}
-                        className="rounded-md border border-white/20 p-1 disabled:opacity-25"
-                      >
-                        <Minus size={15} />
-                      </button>
-                      <strong className="text-kink-gold-bright">{m.quantity}</strong>
-                      <button
-                        aria-label={`More rings for ${m.name}`}
-                        disabled={p.busy || p.remaining <= 0}
-                        onClick={() => p.onQuantity(m.userId, m.quantity + 1)}
-                        className="rounded-md border border-white/20 p-1 disabled:opacity-25"
-                      >
-                        <Plus size={15} />
-                      </button>
-                    </span>
-                  </div>
+                <article key={m.userId} className={`${panel} flex items-center gap-3 p-4`}>
+                  <RecipientIdentity member={m} large />
+                  <button
+                    aria-label={`${c.remove}: ${m.name}`}
+                    onClick={() => p.onRemove(m.userId)}
+                    className="rounded-full bg-white/10 p-1.5 text-white/65"
+                  >
+                    <X size={22} />
+                  </button>
                 </article>
               ))}
             </div>
             <button
-              disabled={p.busy}
               onClick={p.onAddMore}
-              className="mt-4 flex w-full items-center justify-between rounded-xl border border-[#b48b25] px-4 py-3 text-sm font-semibold text-kink-gold-bright"
+              className="mt-5 flex w-full items-center gap-3 rounded-xl border border-[#b48b25] p-4 font-bold text-kink-gold-bright"
             >
-              <span className="flex items-center gap-2">
-                <Plus size={18} />
-                {c.addMore}
-              </span>
-              <ChevronRight size={18} />
+              <UserRoundPlus size={24} />
+              {c.addMore}
+              <ChevronRight size={18} className="ml-auto" />
             </button>
-            <p className="my-4 rounded-xl bg-[#15130c] p-3 text-xs leading-6 text-white/60">
-              {p.quantityTotal} rings to {p.picked.length} recipient
-              {p.picked.length === 1 ? "" : "s"}. {p.inventoryRemaining} ring
-              {p.inventoryRemaining === 1 ? "" : "s"} will remain in your inventory.
-            </p>
+            <div className="my-5 flex items-start gap-3 rounded-xl border border-white/10 bg-[#0b0b0b] p-4 text-sm leading-6 text-white/60">
+              <Info size={22} className="shrink-0 text-kink-gold-bright" />
+              <p>
+                You can select multiple recipients. Each recipient will receive one or more Kink
+                Rings in the next step.
+              </p>
+            </div>
+            <button
+              disabled={!p.canContinue}
+              onClick={p.onContinue}
+              className={`${gold} mt-5 w-full`}
+            >
+              {c.continue} ({p.picked.length} Recipients)
+              <ChevronRight size={20} />
+            </button>
+          </div>
+        )}
+        {p.stage === "allocation" && (
+          <div className="mt-6">
+            <div className="space-y-4">
+              {p.picked.map((m) => (
+                <article key={m.userId} className={`${panel} p-3 sm:p-4`}>
+                  <div className="mb-3 flex items-center gap-3">
+                    <RecipientIdentity member={m} large />
+                    <button
+                      aria-label={`${c.remove}: ${m.name}`}
+                      onClick={() => p.onRemove(m.userId)}
+                      className="rounded-full bg-white/10 p-1.5 text-white/65"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+                  <div className="border-t border-white/15 pt-3">
+                    <p className="mb-2 text-xs text-white/65">Assign Kink Rings</p>
+                    <div className="space-y-2">
+                      {m.rings.map((ring, slot) => (
+                        <div key={slot} className="flex items-center gap-2">
+                          <div className="relative size-10 shrink-0 overflow-hidden rounded-lg border border-[#a57a12]/40">
+                            <Image
+                              src={p.hero}
+                              alt=""
+                              fill
+                              sizes="40px"
+                              className="scale-[1.6] object-cover"
+                            />
+                          </div>
+                          <select
+                            aria-label={`Ring ${slot + 1} for ${m.name}`}
+                            value={ring.id}
+                            onChange={(e) => p.onRing(m.userId, slot, e.target.value)}
+                            className="h-12 min-w-0 flex-1 rounded-xl border border-white/15 bg-[#111] px-2 text-xs text-white"
+                          >
+                            {p.allocationOptions.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 flex items-center justify-between">
+                      <span className="text-xs text-white/60">
+                        {m.quantity} month{m.quantity === 1 ? "" : "s"} of Silver
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          aria-label={`Fewer rings for ${m.name}`}
+                          disabled={m.quantity <= 1}
+                          onClick={() => p.onQuantity(m.userId, m.quantity - 1)}
+                          className="rounded-xl border border-[#a57a12]/50 p-2.5 text-white/65 disabled:opacity-30"
+                        >
+                          <Minus size={18} />
+                        </button>
+                        <strong className="grid size-10 place-items-center rounded-xl border border-[#a57a12] text-lg text-kink-gold-bright">
+                          {m.quantity}
+                        </strong>
+                        <button
+                          aria-label={`More rings for ${m.name}`}
+                          disabled={p.remaining <= 0}
+                          onClick={() => p.onQuantity(m.userId, m.quantity + 1)}
+                          className="rounded-xl border border-[#a57a12]/50 p-2.5 text-white/65 disabled:opacity-30"
+                        >
+                          <Plus size={18} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+            <div className="my-5 flex items-start gap-3 rounded-xl border border-white/10 bg-[#0b0b0b] p-4 text-xs leading-5 text-white/60">
+              <Info size={22} className="shrink-0 text-kink-gold-bright" />
+              <p>
+                You have {p.selectedCount} rings selected. {c.allocationNote}
+              </p>
+            </div>
+            <button disabled={!p.canContinue} onClick={p.onContinue} className={`${gold} w-full`}>
+              {c.toMessage} ({p.picked.length} Recipients)
+              <ChevronRight size={20} />
+            </button>
+          </div>
+        )}
+        {p.stage === "message" && (
+          <div className="mt-6">
+            <div className="space-y-4">
+              {p.picked.map((m) => (
+                <article key={m.userId} className={`${panel} p-4`}>
+                  <RecipientIdentity member={m} large />
+                  <label className="mt-4 block text-sm text-kink-gold-bright">
+                    {c.messageLabel} for {m.name}
+                    <textarea
+                      aria-label={`Message for ${m.name}`}
+                      value={m.message}
+                      maxLength={500}
+                      onChange={(e) => p.onMessage(m.userId, e.target.value)}
+                      placeholder={c.messagePlaceholder}
+                      rows={4}
+                      className="mt-2 w-full resize-y rounded-xl border border-white/15 bg-black p-3 text-base leading-6 text-white placeholder:text-white/35"
+                    />
+                  </label>
+                  <p className="mt-1 text-right text-xs text-white/40">{m.message.length}/500</p>
+                </article>
+              ))}
+            </div>
+            <button
+              disabled={!p.canContinue}
+              onClick={p.onContinue}
+              className={`${gold} mt-5 w-full`}
+            >
+              {c.reviewButton}
+              <ChevronRight size={20} />
+            </button>
+          </div>
+        )}
+        {p.stage === "review" && (
+          <div className="relative mt-4">
+            <div className={`${panel} flex items-center gap-4 p-4`}>
+              <Gift size={36} className="text-kink-gold-bright" />
+              <div>
+                <p className="text-sm text-white/65">You are sending</p>
+                <strong className="text-xl text-kink-gold-bright">
+                  {p.quantityTotal} Kink Ring{p.quantityTotal === 1 ? "" : "s"}
+                </strong>
+                <p className="text-sm text-white/65">
+                  to {p.picked.length} recipient{p.picked.length === 1 ? "" : "s"}
+                </p>
+              </div>
+            </div>
+            <div className="my-4 flex items-center justify-between gap-2">
+              <h2 className="flex items-center gap-2 text-lg font-bold">
+                <UserRoundPlus size={22} className="text-kink-gold-bright" />
+                Recipients
+              </h2>
+              <button
+                disabled={p.busy}
+                onClick={p.onEditRecipients}
+                className="rounded-xl border border-[#a57a12] px-3 py-2 text-xs text-kink-gold-bright"
+              >
+                {c.editRecipients}
+              </button>
+            </div>
+            <div className="space-y-3">
+              {p.picked.map((m) => (
+                <article
+                  key={m.userId}
+                  className="rounded-2xl border border-white/10 bg-[#0b0b0b] p-3"
+                >
+                  <div className="flex flex-wrap gap-3">
+                    <RecipientIdentity member={m} />
+                    <div className="flex min-w-0 flex-wrap items-center gap-2 border-l border-white/15 pl-3">
+                      {m.rings.map((ring) => (
+                        <div key={ring.id} className="min-w-0">
+                          <p className="text-[10px] text-kink-gold-bright">Kink Ring</p>
+                          <p className="text-xs font-bold">{ring.code}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-start gap-2 rounded-xl border border-[#a57a12]/60 bg-black/50 p-3">
+                    <MessageCircle size={18} className="shrink-0 text-kink-gold-bright" />
+                    <div className="min-w-0 text-xs">
+                      <p className="mb-1 text-kink-gold-bright">{c.messageLabel}:</p>
+                      <p className="whitespace-pre-wrap break-words leading-5 text-white/80">
+                        {m.message.trim() || c.noMessage}
+                      </p>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+            <div className="my-4 flex items-start gap-3 rounded-xl border border-white/10 bg-[#0b0b0b] p-4 text-xs leading-5 text-white/60">
+              <Info size={22} className="shrink-0 text-kink-gold-bright" />
+              <div>
+                <p>{c.finalNote}</p>
+                <p className="mt-2">
+                  {p.inventoryRemaining} ring{p.inventoryRemaining === 1 ? "" : "s"} will remain in
+                  your inventory.
+                </p>
+              </div>
+            </div>
             <button
               disabled={p.busy || !p.canSubmit}
               onClick={() => void p.onGive()}
               className={`${gold} w-full`}
             >
-              <Gift size={22} />
-              {p.busy ? c.sending : c.confirm}
+              <Gift size={24} />
+              {p.busy
+                ? c.sending
+                : `Send ${p.quantityTotal} Kink Ring${p.quantityTotal === 1 ? "" : "s"}`}
             </button>
-          </>
+          </div>
         )}
         {p.giveError && (
           <p

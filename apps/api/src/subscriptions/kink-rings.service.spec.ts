@@ -209,7 +209,46 @@ it("gifts the exact selected ring, grants one calendar month and leaves check ho
   });
   const upsert = calls.find((c) => c.op === "onConflictDoUpdate")?.args[0] as { set: object };
   expect(upsert.set).not.toHaveProperty("checkHeldAt");
-  expect(after("update", kinkRing, "set")).toEqual({ givenTo: "ada", givenAt: now });
+  expect(after("update", kinkRing, "set")).toEqual({
+    givenTo: "ada",
+    givenAt: now,
+    giftMessage: null,
+  });
   expect(push.kinkRingGiven).toHaveBeenCalledWith("me", "ada", RING);
   expect(left()).toBe(0);
+});
+
+it("stores the reviewed personal message and rejects a different-message replay", async () => {
+  const { service, after } = make([
+    [ada],
+    [{ id: RING, givenTo: null, givenAt: null, expiresAt: new Date("2027-01-01") }],
+    undefined,
+    [],
+    [],
+    undefined,
+    undefined,
+  ]);
+  await service.giveSelected(
+    "me",
+    [{ ringId: RING, username: "ada", message: "  Enjoy! 💛  " }],
+    now,
+  );
+  expect(after("update", kinkRing, "set")).toEqual({
+    givenTo: "ada",
+    givenAt: now,
+    giftMessage: "Enjoy! 💛",
+  });
+  const replay = make([
+    [ada],
+    [{ id: RING, givenTo: "ada", givenAt: now, expiresAt: now, giftMessage: "Original" }],
+  ]);
+  await expect(
+    replay.service.giveSelected("me", [{ ringId: RING, username: "ada", message: "Changed" }], now),
+  ).rejects.toBeInstanceOf(ConflictException);
+  expect(replay.push.kinkRingGiven).not.toHaveBeenCalled();
+  expect(
+    giveSelectedRingsSchema.safeParse({
+      gifts: [{ ringId: RING, username: "ada", message: "x".repeat(501) }],
+    }).success,
+  ).toBe(false);
 });
