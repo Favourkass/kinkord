@@ -19,7 +19,14 @@ import {
 } from "drizzle-orm";
 import { z } from "zod";
 import { DRIZZLE, type Db } from "../db/db.module";
-import { memberBlock, notification, profile, user, type NotificationType } from "../db/schema";
+import {
+  kinkRing,
+  memberBlock,
+  notification,
+  profile,
+  user,
+  type NotificationType,
+} from "../db/schema";
 import { notBanned } from "../moderation/admins";
 import { RealtimeService } from "../realtime/realtime.service";
 import { blockedBy } from "../safety/blocks";
@@ -38,6 +45,8 @@ export interface InboxEvent {
 }
 
 export interface InboxItem {
+  /** A personal Kink Ring note, only for this gift’s recipient. */
+  giftMessage?: string;
   id: string;
   type: NotificationType;
   actor: {
@@ -59,6 +68,7 @@ export interface InboxItem {
 
 /** A row as the inbox reads it, with who did it as they are now. */
 interface InboxRow {
+  giftMessage?: string | null;
   id: string;
   type: NotificationType;
   actorId: string | null;
@@ -430,6 +440,9 @@ export class NotificationsService {
         type: notification.type,
         actorId: notification.actorId,
         subjectId: notification.subjectId,
+        giftMessage: sql<string | null>`case when ${notification.type} = 'kink_ring' then
+          (select ${kinkRing.giftMessage} from ${kinkRing} where ${kinkRing.id}::text = ${notification.subjectId}
+           and ${kinkRing.givenTo} = ${userId} and ${kinkRing.ownerId} = ${notification.actorId}) else null end`,
         count: notification.count,
         createdAt: notification.createdAt,
         readAt: notification.readAt,
@@ -512,6 +525,7 @@ export class NotificationsService {
     return {
       id: row.id,
       type: row.type,
+      ...(row.type === "kink_ring" && row.giftMessage ? { giftMessage: row.giftMessage } : {}),
       actor: row.actorId
         ? {
             userId: row.actorId,

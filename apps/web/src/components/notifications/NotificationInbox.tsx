@@ -290,6 +290,11 @@ export default function NotificationInbox(p: NotificationInboxProps) {
                       )}
                       <span>{item.action}</span>
                     </span>
+                    {item.giftMessage && (
+                      <span className="mt-2 block whitespace-pre-wrap break-words rounded-lg border border-kink-gold-bright/25 p-2 text-sm text-app-text">
+                        {item.giftMessage}
+                      </span>
+                    )}
                     <time
                       dateTime={item.dateTime}
                       title={item.fullTime}

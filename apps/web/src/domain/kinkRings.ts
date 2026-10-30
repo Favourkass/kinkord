@@ -55,3 +55,92 @@ export function toKinkRingsVM(
     })),
   };
 }
+
+export interface RingInventoryItemPM {
+  id: string;
+  createdAt: string;
+  expiresAt: string;
+  source: "purchase" | "award";
+}
+export interface RingHistoryPM {
+  id: string;
+  givenAt: string;
+  to: { username: string | null; name: string; avatarUrl: string | null } | null;
+  status: "active" | "expired" | "gifted";
+}
+export interface RingRecipientPM {
+  userId: string;
+  username: string;
+  name: string;
+  avatarUrl: string | null;
+  city: string | null;
+  country: string | null;
+  online: boolean;
+  /** Their messaging setting lets the giver write to them, so a note can go with the ring. Missing on an older API. */
+  canMessage?: boolean;
+}
+export interface RingPagePM<T> {
+  items: T[];
+  nextPage: number | null;
+}
+export interface RingInventoryPM {
+  available: RingInventoryItemPM[];
+  expired: RingPagePM<RingInventoryItemPM> & { total: number };
+  history: RingPagePM<RingHistoryPM>;
+}
+export interface RingItemVM {
+  id: string;
+  code: string;
+  received: string;
+  expires: string;
+  remaining: string;
+  urgent: boolean;
+  expired: boolean;
+}
+export function toRingItemVM(ring: RingInventoryItemPM, now: Date): RingItemVM {
+  const remaining = new Date(ring.expiresAt).getTime() - now.getTime();
+  const days = Math.ceil(remaining / 86_400_000);
+  return {
+    id: ring.id,
+    code: `KR-${ring.id.slice(0, 8).toUpperCase()}`,
+    received: `${ring.source === "purchase" ? "Purchased" : "Received"}: ${planDate(ring.createdAt)}`,
+    expires: `Expires: ${planDate(ring.expiresAt)}`,
+    remaining: remaining <= 0 ? "Expired" : days === 1 ? "1 day left" : `${days} days left`,
+    urgent: remaining > 0 && days <= 7,
+    expired: remaining <= 0,
+  };
+}
+export interface RingHistoryVM {
+  id: string;
+  name: string;
+  handle: string | null;
+  date: string;
+  avatarUrl: string | null;
+  status: string;
+  active: boolean;
+  href: string | null;
+}
+export function toRingHistoryVM(row: RingHistoryPM, hrefFor: (u: string) => string): RingHistoryVM {
+  return {
+    id: row.id,
+    name: row.to?.name ?? "Member unavailable",
+    handle: row.to?.username ? `@${row.to.username}` : null,
+    date: planDate(row.givenAt),
+    avatarUrl: row.to?.avatarUrl ?? null,
+    status: row.status === "active" ? "Active" : row.status === "expired" ? "Expired" : "Gifted",
+    active: row.status === "active",
+    href: row.to?.username ? hrefFor(row.to.username) : null,
+  };
+}
+
+/** Persisted draft selections, before display formatting. */
+export interface RingRecipientDraft {
+  member: RingRecipientPM;
+  ringIds: string[];
+  message: string;
+}
+export interface RingGiftAssignment {
+  ringId: string;
+  username: string;
+  message?: string;
+}

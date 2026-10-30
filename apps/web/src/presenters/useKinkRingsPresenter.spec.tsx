@@ -1,139 +1,192 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { KinkRingsPM } from "@/domain/kinkRings";
-
+import { beforeEach, expect, it, vi } from "vitest";
+import { kinkRingsApi } from "@/services/kinkRings.service";
+import { useKinkRingsPresenter } from "./useKinkRingsPresenter";
+import { ApiError } from "@/services/apiClient";
 const replace = vi.fn();
 const router = { replace, push: vi.fn() };
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
-
-const mine = vi.fn();
-const give = vi.fn();
-vi.mock("@/services/kinkRings.service", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/services/kinkRings.service")>()),
+vi.mock("@/services/kinkRings.service", async (original) => ({
+  ...(await original<typeof import("@/services/kinkRings.service")>()),
   kinkRingsApi: {
-    mine: (...a: unknown[]) => mine(...a),
-    give: (...a: unknown[]) => give(...a),
+    inventory: vi.fn(),
+    recipients: vi.fn(),
+    giveSelected: vi.fn(),
+    history: vi.fn(),
+    expired: vi.fn(),
   },
 }));
-
-const search = vi.fn();
-vi.mock("@/services/members.service", async (importOriginal) => {
-  const original = await importOriginal<typeof import("@/services/members.service")>();
-  return {
-    ...original,
-    membersApi: { ...original.membersApi, search: (...a: unknown[]) => search(...a) },
-  };
-});
-
-const { useKinkRingsPresenter } = await import("./useKinkRingsPresenter");
-const { ApiError } = await import("@/services/apiClient");
-
-const rings = (n: number): KinkRingsPM => ({
-  available: Array.from({ length: n }, (_, i) => ({
+const rings = {
+  available: [1, 2].map((i) => ({
     id: `r${i}`,
-    expiresAt: `2026-1${i + 1}-26T12:00:00.000Z`,
+    createdAt: "2026-10-01T12:00:00Z",
+    expiresAt: "2090-11-01T12:00:00Z",
+    source: "purchase" as const,
   })),
-  given: [],
-});
-
-const ada = {
-  userId: "u-ada",
-  username: "ada",
-  displayName: "Ada",
-  avatarUrl: null,
-  age: null,
-  gender: null,
-  roles: [],
-  city: null,
-  state: null,
-  isOnline: false,
-  lastSeenAt: null,
+  expired: { items: [], total: 0, nextPage: null },
+  history: { items: [], nextPage: null },
 };
-
+const ada = {
+  userId: "a",
+  username: "ada",
+  name: "Ada",
+  avatarUrl: null,
+  city: null,
+  country: null,
+  online: false,
+};
 beforeEach(() => {
-  replace.mockReset();
-  mine.mockReset().mockResolvedValue(rings(2));
-  give
-    .mockReset()
-    .mockResolvedValue({ ringId: "r0", to: { username: "ada", displayName: "Ada" }, left: 1 });
-  search.mockReset().mockResolvedValue({ items: [ada], total: 1, page: 1, limit: 6 });
+  vi.clearAllMocks();
+  vi.mocked(kinkRingsApi.inventory).mockResolvedValue(rings);
+  vi.mocked(kinkRingsApi.recipients).mockResolvedValue({ items: [ada], nextPage: null });
+  vi.mocked(kinkRingsApi.giveSelected).mockResolvedValue({ gifts: [] });
 });
-
-const loaded = async () => {
+async function loaded() {
   const hook = renderHook(() => useKinkRingsPresenter());
   await waitFor(() => expect(hook.result.current.loading).toBe(false));
   return hook;
-};
-
-describe("useKinkRingsPresenter", () => {
-  it("shows the member's rings, each with when it expires", async () => {
-    const { result } = await loaded();
-    expect(result.current.vm?.heading).toBe("You have 2 Kink Rings to give");
-    expect(result.current.vm?.rings[0].expires).toBe("Expires 26 Nov 2026");
-    expect(result.current.canGive).toBe(true);
+}
+async function selected() {
+  const h = await loaded();
+  act(() => h.result.current.onGift());
+  await waitFor(() => expect(h.result.current.recipients).toHaveLength(1));
+  act(() => h.result.current.onRecipient("a"));
+  act(() => h.result.current.onContinue());
+  expect(h.result.current.stage).toBe("selected");
+  act(() => h.result.current.onContinue());
+  expect(h.result.current.stage).toBe("allocation");
+  act(() => h.result.current.onContinue());
+  expect(h.result.current.stage).toBe("message");
+  act(() => h.result.current.onContinue());
+  return h;
+}
+it("opens inventory from the available count and selects a specific ring", async () => {
+  const { result } = await loaded();
+  expect(result.current.count).toBe(2);
+  act(() => result.current.onInventory());
+  expect(result.current.stage).toBe("inventory");
+  act(() => result.current.onGiftRing("r2"));
+  expect(result.current.selectedCount).toBe(1);
+  expect(result.current.inventoryRemaining).toBe(2);
+  expect(result.current.stage).toBe("recipients");
+  expect(kinkRingsApi.giveSelected).not.toHaveBeenCalled();
+});
+it("reviews quantities before sending explicit rings and prevents duplicate clicks", async () => {
+  const { result } = await selected();
+  expect(result.current.stage).toBe("review");
+  expect(kinkRingsApi.giveSelected).not.toHaveBeenCalled();
+  act(() => result.current.onQuantity("a", 2));
+  let resolve!: (v: { gifts: [] }) => void;
+  vi.mocked(kinkRingsApi.giveSelected).mockImplementationOnce(
+    () =>
+      new Promise((r) => {
+        resolve = r;
+      }),
+  );
+  act(() => {
+    void result.current.onGive();
+    void result.current.onGive();
   });
+  expect(kinkRingsApi.giveSelected).toHaveBeenCalledTimes(1);
+  expect(kinkRingsApi.giveSelected).toHaveBeenCalledWith([
+    { ringId: "r1", username: "ada" },
+    { ringId: "r2", username: "ada" },
+  ]);
+  await act(async () => resolve({ gifts: [] }));
+  expect(result.current.stage).toBe("overview");
+});
+it("retains the same assignment after a network error so retry cannot consume other rings", async () => {
+  vi.mocked(kinkRingsApi.giveSelected).mockRejectedValueOnce(new Error("offline"));
+  const { result } = await selected();
+  await act(() => result.current.onGive());
+  expect(result.current.stage).toBe("review");
+  expect(result.current.picked[0].username).toBe("ada");
+  await act(() => result.current.onGive());
+  const calls = vi.mocked(kinkRingsApi.giveSelected).mock.calls;
+  expect(calls[0]).toEqual(calls[1]);
+});
+it("does not present a completed gift as failed if balance refresh fails", async () => {
+  const { result } = await selected();
+  vi.mocked(kinkRingsApi.inventory).mockRejectedValueOnce(new Error("offline"));
+  await act(() => result.current.onGive());
+  expect(result.current.stage).toBe("overview");
+  expect(result.current.note).toContain("gifted");
+  expect(result.current.giveError).toBeNull();
+  expect(result.current.count).toBe(1);
+});
+it("does not allow quantities beyond the selected ring budget", async () => {
+  const { result } = await selected();
+  act(() => result.current.onQuantity("a", 3));
+  expect(result.current.quantityTotal).toBe(1);
+  act(() => result.current.onRemove("a"));
+  expect(result.current.canContinue).toBe(false);
+});
+it("redirects signed-out members", async () => {
+  vi.mocked(kinkRingsApi.inventory).mockRejectedValueOnce(new ApiError(401, null));
+  renderHook(() => useKinkRingsPresenter());
+  await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
+});
 
-  it("points a member with no rings to Silver instead of offering to give", async () => {
-    mine.mockResolvedValueOnce(rings(0));
-    const { result } = await loaded();
-    expect(result.current.canGive).toBe(false);
-    expect(result.current.vm?.heading).toBe("You have no Kink Rings to give");
-    expect(result.current.none.href).toBe("/subscription");
-  });
-
-  it("finds members once two letters are typed, then gives the picked one a ring", async () => {
-    const { result } = await loaded();
-    act(() => result.current.search.onChange("a"));
-    expect(result.current.search.status).toBeNull();
-    act(() => result.current.search.onChange("ad"));
-    expect(result.current.search.status).toBe("Searching…");
-    await waitFor(() => expect(result.current.search.results).toHaveLength(1));
-    expect(search).toHaveBeenCalledWith("ad", 1, 6);
-    expect(result.current.search.results[0]).toEqual({
-      userId: "u-ada",
-      name: "Ada",
-      handle: "@ada",
-      avatarUrl: null,
-    });
-
-    act(() => result.current.search.onPick("u-ada"));
-    expect(result.current.picked?.name).toBe("Ada");
-    expect(result.current.confirm).toBe("Give Ada a Kink Ring? They get a month of Silver.");
-
-    mine.mockResolvedValueOnce(rings(1));
+it("retries the identical gift when a ring expires after an uncertain response", async () => {
+  const { result, unmount } = await selected();
+  vi.mocked(kinkRingsApi.giveSelected).mockRejectedValueOnce(new Error("offline"));
+  await act(() => result.current.onGive());
+  vi.useFakeTimers();
+  try {
+    vi.setSystemTime(new Date("2091-01-01T12:00:00Z"));
+    // The real interval also ticks after 30s; reload updates the presenter's clock immediately.
+    await act(() => result.current.onRetry());
+    expect(result.current.count).toBe(0);
+    expect(result.current.expiredCount).toBe(2);
+    expect(result.current.canSubmit).toBe(true);
     await act(() => result.current.onGive());
-    expect(give).toHaveBeenCalledWith("ada");
-    expect(result.current.note).toBe("Ring given. Ada has a month of Silver.");
-    expect(result.current.picked).toBeNull();
-    expect(result.current.vm?.count).toBe(1);
-  });
-
-  it("keeps the pick and says why when the API refuses", async () => {
-    give.mockRejectedValueOnce(new ApiError(400, { message: "Ada already has Silver for good." }));
-    const { result } = await loaded();
-    act(() => result.current.search.onChange("ada"));
-    await waitFor(() => expect(result.current.search.results).toHaveLength(1));
-    act(() => result.current.search.onPick("u-ada"));
-    await act(() => result.current.onGive());
-    expect(result.current.giveError).toBe("Ada already has Silver for good.");
-    expect(result.current.picked?.name).toBe("Ada");
-    act(() => result.current.onCancel());
-    expect(result.current.picked).toBeNull();
-    expect(result.current.giveError).toBeNull();
-  });
-
-  it("sends a signed-out member to log in", async () => {
-    mine.mockRejectedValueOnce(new ApiError(401, null));
-    renderHook(() => useKinkRingsPresenter());
-    await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
-  });
-
-  it("says when the rings can't be read", async () => {
-    mine.mockRejectedValueOnce(new Error("offline"));
-    const { result } = renderHook(() => useKinkRingsPresenter());
-    await waitFor(() =>
-      expect(result.current.error).toBe("Couldn't load your Kink Rings. Refresh to try again."),
+    expect(vi.mocked(kinkRingsApi.giveSelected).mock.calls[0]).toEqual(
+      vi.mocked(kinkRingsApi.giveSelected).mock.calls[1],
     );
+  } finally {
+    unmount();
+    vi.useRealTimers();
+  }
+});
+
+it("keeps unselected rings in the inventory remainder", async () => {
+  const { result } = await loaded();
+  act(() => result.current.onGiftRing("r1"));
+  await waitFor(() => expect(result.current.recipients).toHaveLength(1));
+  act(() => result.current.onRecipient("a"));
+  expect(result.current.remaining).toBe(0);
+  expect(result.current.inventoryRemaining).toBe(1);
+});
+
+it("preserves ring swaps and individual messages through review and editing", async () => {
+  vi.mocked(kinkRingsApi.recipients).mockResolvedValue({
+    items: [ada, { ...ada, userId: "b", username: "bob", name: "Bob" }],
+    nextPage: null,
   });
+  const { result } = await loaded();
+  act(() => result.current.onGift());
+  await waitFor(() => expect(result.current.recipients).toHaveLength(2));
+  act(() => result.current.onRecipient("a"));
+  act(() => result.current.onRecipient("b"));
+  act(() => result.current.onContinue());
+  act(() => result.current.onContinue());
+  act(() => result.current.onRing("a", 0, "r2"));
+  expect(result.current.picked[1].rings[0].id).toBe("r1");
+  act(() => result.current.onContinue());
+  act(() => result.current.onMessage("a", "Enjoy! 💛"));
+  act(() => result.current.onMessage("b", "Thanks, Bob"));
+  act(() => result.current.onContinue());
+  expect(result.current.stage).toBe("review");
+  expect(kinkRingsApi.giveSelected).not.toHaveBeenCalled();
+  act(() => result.current.onEditRecipients());
+  expect(result.current.picked[0].message).toBe("Enjoy! 💛");
+  act(() => result.current.onContinue());
+  act(() => result.current.onContinue());
+  act(() => result.current.onContinue());
+  await act(() => result.current.onGive());
+  expect(kinkRingsApi.giveSelected).toHaveBeenCalledWith([
+    { ringId: "r2", username: "ada", message: "Enjoy! 💛" },
+    { ringId: "r1", username: "bob", message: "Thanks, Bob" },
+  ]);
 });
