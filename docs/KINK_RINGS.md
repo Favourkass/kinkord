@@ -129,7 +129,7 @@ leaves.
 
 ## Artwork
 
-The overview hero is `apps/web/public/kink-rings/gold-heart-ring.png` and the
-confirmation illustration is `apps/web/public/kink-rings/gift-box.png`, generated with
+The overview hero is `apps/web/public/kink-rings/gold-heart-ring.webp` and the
+confirmation illustration is `apps/web/public/kink-rings/gift-box.webp`, generated with
 `image_gen` from the supplied ring reference. The UI and text are rendered in
 React. [Generation prompt and asset details](KINK_RINGS_ARTWORK.md).
