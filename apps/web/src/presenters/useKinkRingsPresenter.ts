@@ -1,58 +1,52 @@
 "use client";
-
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { KINK_RINGS_COPY } from "@/constants/kinkRings";
+import { RING_FLOW_COPY } from "@/constants/kinkRings";
 import { Routes } from "@/constants/Routes";
-import { toKinkRingsVM, type KinkRingsPM } from "@/domain/kinkRings";
-import type { MemberCardPM } from "@/domain/member";
+import {
+  toRingItemVM,
+  toRingHistoryVM,
+  type RingInventoryPM,
+  type RingRecipientPM,
+  type RingPagePM,
+} from "@/domain/kinkRings";
 import { ApiError } from "@/services/apiClient";
-import { giveRingError, kinkRingsApi } from "@/services/kinkRings.service";
-import { membersApi } from "@/services/members.service";
+import { giveRingError, kinkRingsApi, ringGiftAssignments } from "@/services/kinkRings.service";
+import { countryName } from "@/util/format";
 
-/** A search waits this long after the last key, so typing a name is one request. */
-const SEARCH_DELAY_MS = 300;
-/** Search from this many characters. */
-const SEARCH_MIN = 2;
-/** How many members a search offers. */
-const SEARCH_LIMIT = 6;
-
-const memberHref = (username: string | null) => (username ? Routes.member(username) : null);
-
-export interface RingRecipientVM {
-  userId: string;
-  name: string;
-  handle: string | null;
-  avatarUrl: string | null;
-}
-
-const toRecipient = (m: MemberCardPM): RingRecipientVM => ({
-  userId: m.userId,
-  name: m.displayName,
-  handle: m.username ? `@${m.username}` : null,
-  avatarUrl: m.avatarUrl,
-});
-
-/**
- * Kink Rings: the member's rings, and giving one. Find a member by name or
- * username, pick them, confirm, and they get a month of Silver.
- */
+type Stage = "overview" | "inventory" | "recipients" | "review" | "history";
 export function useKinkRingsPresenter() {
   const router = useRouter();
-  const copy = KINK_RINGS_COPY;
-  const [pm, setPm] = useState<KinkRingsPM | null>(null);
+  const copy = RING_FLOW_COPY;
+  const [pm, setPm] = useState<RingInventoryPM | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [stage, setStage] = useState<Stage>("overview");
+  const [selected, setSelected] = useState<string[]>([]);
+  const [multiple, setMultiple] = useState(false);
+  const [tab, setTab] = useState<"friends" | "search">("friends");
   const [query, setQuery] = useState("");
-  /** The last search answered: what was asked, and who matched. */
-  const [answer, setAnswer] = useState<{ q: string; items: MemberCardPM[] }>({
-    q: "",
-    items: [],
-  });
-  const [picked, setPicked] = useState<MemberCardPM | null>(null);
-  const [giving, setGiving] = useState(false);
+  const [page, setPage] = useState(1);
+  const [answer, setAnswer] = useState<{
+    key: string;
+    page: number;
+    data: RingPagePM<RingRecipientPM>;
+  } | null>(null);
+  const [searchRetry, setSearchRetry] = useState(0);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [picked, setPicked] = useState<Array<{ member: RingRecipientPM; quantity: number }>>([]);
+  const [busy, setBusy] = useState(false);
+  const lock = useRef(false);
+  const [attempt, setAttempt] = useState<{
+    key: string;
+    gifts: Array<{ ringId: string; username: string }>;
+  } | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [giveError, setGiveError] = useState<string | null>(null);
-
+  const [expanded, setExpanded] = useState(false);
+  const [info, setInfo] = useState(false);
+  const [detail, setDetail] = useState<string | null>(null);
+  const [moreBusy, setMoreBusy] = useState(false);
+  const [now, setNow] = useState(() => new Date());
   const signedOut = useCallback(
     (e: unknown) => {
       if (e instanceof ApiError && e.status === 401) {
@@ -63,128 +57,304 @@ export function useKinkRingsPresenter() {
     },
     [router],
   );
-
-  /** Reads the member's rings; `live` says whether the answer is still wanted. */
-  const read = useCallback(
-    (live: () => boolean) =>
-      kinkRingsApi.mine().then(
-        (rings) => {
-          if (!live()) return;
-          setPm(rings);
-          setError(null);
-        },
-        (e) => {
-          if (live() && !signedOut(e)) setError(copy.loadFailed);
-        },
-      ),
-    [copy.loadFailed, signedOut],
-  );
-
+  const reload = useCallback(async () => {
+    try {
+      const data = await kinkRingsApi.inventory();
+      setPm(data);
+      setNow(new Date());
+      setError(null);
+    } catch (e) {
+      if (!signedOut(e)) setError(copy.loadError);
+    }
+  }, [signedOut, copy.loadError]);
   useEffect(() => {
     let live = true;
-    void read(() => live);
+    void kinkRingsApi
+      .inventory()
+      .then((data) => {
+        if (live) setPm(data);
+      })
+      .catch((e) => {
+        if (live && !signedOut(e)) setError(copy.loadError);
+      });
     return () => {
       live = false;
     };
-  }, [read]);
-
-  const q = query.trim();
+  }, [signedOut, copy.loadError]);
   useEffect(() => {
-    if (q.length < SEARCH_MIN) return;
-    // A slower earlier search never replaces a later one's answer.
+    const timer = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+  const key = `${tab}:${query.trim()}`;
+  useEffect(() => {
+    if (stage !== "recipients" || (tab === "search" && query.trim().replace(/^@/, "").length < 2))
+      return;
     let live = true;
     const timer = setTimeout(() => {
-      membersApi
-        .search(q, 1, SEARCH_LIMIT)
-        .then((page) => {
-          if (live) setAnswer({ q, items: page.items });
+      void kinkRingsApi
+        .recipients(tab, query.trim(), page)
+        .then((data) => {
+          if (live) {
+            setSearchError(null);
+            setAnswer((previous) => ({
+              key,
+              page,
+              data: {
+                ...data,
+                items:
+                  page > 1 && previous?.key === key
+                    ? [
+                        ...previous.data.items,
+                        ...data.items.filter(
+                          (m) => !previous.data.items.some((p) => p.userId === m.userId),
+                        ),
+                      ]
+                    : data.items,
+              },
+            }));
+          }
         })
         .catch((e) => {
-          if (live && !signedOut(e)) setAnswer({ q, items: [] });
+          if (live && !signedOut(e)) setSearchError(copy.searchError);
         });
-    }, SEARCH_DELAY_MS);
+    }, 250);
     return () => {
       live = false;
       clearTimeout(timer);
     };
-  }, [q, signedOut]);
-  const answered = answer.q === q;
-  const found = q.length >= SEARCH_MIN && answered ? answer.items : [];
-  const searching = q.length >= SEARCH_MIN && !answered;
-
-  const pick = useCallback((m: MemberCardPM) => {
-    setPicked(m);
-    setQuery("");
+  }, [stage, tab, query, page, key, signedOut, copy.searchError, searchRetry]);
+  const available = pm?.available.filter((r) => new Date(r.expiresAt) > now) ?? [];
+  const validSelected = selected.filter((id) => available.some((r) => r.id === id));
+  const freshlyExpired = pm?.available.filter((r) => new Date(r.expiresAt) <= now) ?? [];
+  const startGift = (ids: string[]) => {
+    setAttempt(null);
+    setSelected(ids.slice(0, 50));
+    setPicked([]);
     setGiveError(null);
     setNote(null);
-  }, []);
-
-  const cancel = useCallback(() => {
-    setPicked(null);
+    setTab("friends");
+    setQuery("");
+    setPage(1);
+    setSearchError(null);
+    setStage("recipients");
+  };
+  const changeSearch = (value: string) => {
+    setQuery(value);
+    setPage(1);
+    setSearchError(null);
+  };
+  const members = answer?.key === key ? answer.data.items : [];
+  const toggleRecipient = (id: string) => {
+    const existing = picked.find((p) => p.member.userId === id);
+    if (existing) {
+      setPicked(picked.filter((p) => p.member.userId !== id));
+      return;
+    }
+    const member = members.find((m) => m.userId === id);
+    if (!member) return;
+    if (picked.reduce((n, p) => n + p.quantity, 0) >= validSelected.length) {
+      setGiveError(copy.maxRecipients);
+      return;
+    }
+    setPicked([...picked, { member, quantity: 1 }]);
     setGiveError(null);
-  }, []);
-
-  const give = useCallback(async () => {
-    if (!picked?.username || giving) return;
-    setGiving(true);
+  };
+  const quantityTotal = picked.reduce((n, p) => n + p.quantity, 0);
+  const draftKey = JSON.stringify({
+    selected,
+    picked: picked.map((p) => [p.member.username, p.quantity]),
+  });
+  const give = async () => {
+    if (lock.current) return;
+    let gifts;
+    try {
+      // Preserve the exact payload after an uncertain response, even if a ring expires before retry.
+      gifts =
+        attempt?.key === draftKey
+          ? attempt.gifts
+          : ringGiftAssignments(
+              validSelected,
+              picked.map((p) => ({ username: p.member.username, quantity: p.quantity })),
+            );
+      setAttempt({ key: draftKey, gifts });
+    } catch (e) {
+      setGiveError(e instanceof Error ? e.message : copy.error);
+      return;
+    }
+    lock.current = true;
+    setBusy(true);
     setGiveError(null);
     try {
-      const result = await kinkRingsApi.give(picked.username);
-      setNote(copy.given(result.to.displayName));
-      setPicked(null);
-      await read(() => true);
+      await kinkRingsApi.giveSelected(gifts);
+      setPm((old) =>
+        old
+          ? {
+              ...old,
+              available: old.available.filter((r) => !gifts.some((g) => g.ringId === r.id)),
+            }
+          : old,
+      );
+      setAttempt(null);
+      setPicked([]);
+      setSelected([]);
+      setStage("overview");
+      setNote(copy.success);
+      await reload();
     } catch (e) {
-      if (!signedOut(e)) setGiveError(giveRingError(e, copy.giveFailed));
+      if (!signedOut(e)) setGiveError(giveRingError(e, copy.error));
     } finally {
-      setGiving(false);
+      lock.current = false;
+      setBusy(false);
     }
-  }, [copy, giving, read, picked, signedOut]);
-
-  const vm = useMemo(() => (pm ? toKinkRingsVM(pm, copy.labels, memberHref) : null), [pm, copy]);
-
+  };
+  const loadMore = async (type: "history" | "expired") => {
+    if (moreBusy || !pm?.[type].nextPage) return;
+    setMoreBusy(true);
+    try {
+      const next = await kinkRingsApi[type](pm[type].nextPage);
+      setPm((old) =>
+        old
+          ? {
+              ...old,
+              [type]: {
+                ...old[type],
+                ...next,
+                items: [
+                  ...old[type].items,
+                  ...next.items.filter((r) => !old[type].items.some((p) => p.id === r.id)),
+                ],
+              },
+            }
+          : old,
+      );
+    } catch (e) {
+      if (!signedOut(e)) setError(copy.loadError);
+    } finally {
+      setMoreBusy(false);
+    }
+  };
+  const recipientVM = (member: RingRecipientPM) => ({
+    ...member,
+    handle: `@${member.username}`,
+    location: [member.city, countryName(member.country)].filter(Boolean).join(", "),
+  });
+  const detailRing = [...(pm?.available ?? []), ...(pm?.expired.items ?? [])].find(
+    (r) => r.id === detail,
+  );
   return {
-    title: copy.title,
-    intro: copy.intro,
+    stage,
+    copy,
     loading: !pm && !error,
-    loadingLabel: copy.loading,
     error,
-    vm,
-    /** Giving needs a ring; without one the screen points to Silver. */
-    canGive: Boolean(vm && vm.count > 0),
-    none: { text: copy.none, action: copy.getSilver, href: Routes.subscription },
-    search: {
-      label: copy.searchLabel,
-      placeholder: copy.searchPlaceholder,
-      value: query,
-      onChange: setQuery,
-      results: found.filter((m) => m.username).map(toRecipient),
-      onPick: (userId: string) => {
-        const m = found.find((f) => f.userId === userId);
-        if (m) pick(m);
-      },
-      status:
-        q.length < SEARCH_MIN
-          ? null
-          : searching
-            ? copy.searching
-            : found.length
-              ? null
-              : copy.noMatches,
+    onRetry: reload,
+    buyHref: Routes.subscription,
+    hero: "/kink-rings/gold-heart-ring.png",
+    count: available.length,
+    rings: available.map((r) => ({ ...toRingItemVM(r, now), selected: selected.includes(r.id) })),
+    selectedCount: validSelected.length,
+    multiple,
+    onMultiple: () => {
+      setMultiple(!multiple);
+      setSelected([]);
     },
-    giveLabel: copy.give,
-    picked: picked ? toRecipient(picked) : null,
-    confirm: picked ? copy.confirm(picked.displayName) : null,
-    confirmLabel: giving ? copy.giving : copy.confirmButton,
-    cancelLabel: copy.cancel,
-    giving,
+    onSelect: (id: string) => {
+      setMultiple(true);
+      if (selected.includes(id)) setSelected(selected.filter((x) => x !== id));
+      else if (selected.length < 50) setSelected([...selected, id]);
+      else setNote(copy.max);
+    },
+    onInventory: () => setStage("inventory"),
+    onGift: () => startGift(available.slice(0, 50).map((r) => r.id)),
+    onGiftRing: (id: string) => startGift([id]),
+    onGiftSelected: () => startGift(validSelected),
+    onHistory: () => setStage("history"),
+    history: (pm?.history.items ?? []).map((r) => toRingHistoryVM(r, Routes.member)),
+    historyMore: Boolean(pm?.history.nextPage),
+    onMoreHistory: () => void loadMore("history"),
+    expiredCount: (pm?.expired.total ?? 0) + freshlyExpired.length,
+    expired: [...freshlyExpired, ...(pm?.expired.items ?? [])].map((r) => toRingItemVM(r, now)),
+    expanded,
+    onExpand: () => setExpanded(!expanded),
+    expiredMore: Boolean(pm?.expired.nextPage),
+    onMoreExpired: () => void loadMore("expired"),
+    moreBusy,
+    tab,
+    onTab: (value: "friends" | "search") => {
+      setTab(value);
+      setQuery("");
+      setPage(1);
+      setSearchError(null);
+    },
+    query,
+    onQuery: changeSearch,
+    recipients: members.map((m) => ({
+      ...recipientVM(m),
+      selected: picked.some((p) => p.member.userId === m.userId),
+    })),
+    searchStatus:
+      searchError ??
+      (tab === "search" && query.trim().replace(/^@/, "").length < 2
+        ? copy.searchHint
+        : answer?.key !== key || answer.page !== page
+          ? copy.loading
+          : members.length
+            ? null
+            : tab === "friends"
+              ? copy.emptyFriends
+              : copy.emptySearch),
+    searchFailed: Boolean(searchError),
+    onRetryRecipients: () => {
+      setSearchError(null);
+      setSearchRetry((n) => n + 1);
+    },
+    recipientsMore: answer?.key === key && Boolean(answer.data.nextPage),
+    onMoreRecipients: () => {
+      if (answer?.data.nextPage) setPage(answer.data.nextPage);
+    },
+    onRecipient: toggleRecipient,
+    picked: picked.map((p) => ({ ...recipientVM(p.member), quantity: p.quantity })),
+    onRemove: (id: string) => setPicked(picked.filter((p) => p.member.userId !== id)),
+    onQuantity: (id: string, n: number) => {
+      if (
+        Number.isInteger(n) &&
+        n >= 1 &&
+        quantityTotal - (picked.find((p) => p.member.userId === id)?.quantity ?? 0) + n <=
+          validSelected.length
+      )
+        setPicked(picked.map((p) => (p.member.userId === id ? { ...p, quantity: n } : p)));
+    },
+    quantityTotal,
+    remaining: Math.max(0, validSelected.length - quantityTotal),
+    inventoryRemaining: Math.max(0, available.length - quantityTotal),
+    canSubmit:
+      picked.length > 0 && (quantityTotal <= validSelected.length || attempt?.key === draftKey),
+    canContinue: picked.length > 0 && quantityTotal <= validSelected.length,
+    onContinue: () => setStage("review"),
+    onAddMore: () => setStage("recipients"),
     onGive: give,
-    onCancel: cancel,
+    busy,
     giveError,
+    onBack: () => {
+      if (lock.current) return;
+      if (stage === "overview") router.push(Routes.home);
+      else if (stage === "review") setStage("recipients");
+      else if (stage === "recipients") setStage("inventory");
+      else setStage("overview");
+    },
+    info,
+    onInfo: () => setInfo(!info),
+    detail: detailRing ? toRingItemVM(detailRing, now) : null,
+    onDetail: setDetail,
+    onCopy: async (id: string) => {
+      try {
+        await navigator.clipboard.writeText(id);
+        setNote(copy.copied);
+      } catch {
+        setNote(copy.copyFailed);
+      }
+    },
     note,
-    dismissLabel: copy.dismiss,
     onDismissNote: () => setNote(null),
-    givenHeading: copy.givenHeading,
   };
 }
-
 export type KinkRingsScreenVM = ReturnType<typeof useKinkRingsPresenter>;

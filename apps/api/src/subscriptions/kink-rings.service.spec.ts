@@ -4,7 +4,7 @@ import type { SQL } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
 import { kinkRing, memberSubscription } from "../db/schema";
 import type { PushService } from "../push/push.service";
-import { KinkRingsService, giveRingSchema } from "./kink-rings.service";
+import { KinkRingsService, giveRingSchema, giveSelectedRingsSchema } from "./kink-rings.service";
 
 /**
  * Each `await` takes the next queued answer; `transaction(fn)` runs `fn` on the
@@ -85,6 +85,7 @@ describe("KinkRingsService.give", () => {
       [], // no Silver of theirs yet
       [{ id: RING }], // the ring, locked
       undefined, // marked given
+      undefined, // recipient advisory lock
       [], // their subscription, locked
       undefined, // Silver for a month
       [{ n: 2 }], // left to give
@@ -145,4 +146,70 @@ describe("giveRingSchema", () => {
     expect(giveRingSchema.safeParse({ username: "" }).success).toBe(false);
     expect(giveRingSchema.safeParse({ username: "ada", ringId: "x" }).success).toBe(false);
   });
+});
+
+it("rejects duplicate ring ids and forged assignment fields", () => {
+  expect(
+    giveSelectedRingsSchema.safeParse({
+      gifts: [
+        { ringId: RING, username: "ada" },
+        { ringId: RING, username: "bob" },
+      ],
+    }).success,
+  ).toBe(false);
+  expect(
+    giveSelectedRingsSchema.safeParse({
+      gifts: [{ ringId: RING, username: "ada", ownerId: "other" }],
+    }).success,
+  ).toBe(false);
+});
+it("replays a completed selected gift without adding Silver or notifying again", async () => {
+  const { service, calls, push } = make([
+    [ada],
+    [{ id: RING, givenTo: "ada", givenAt: now, expiresAt: now }],
+  ]);
+  const result = await service.giveSelected("me", [{ ringId: RING, username: "ada" }], now);
+  expect(result.gifts[0].ringId).toBe(RING);
+  expect(calls.some((c) => c.op === "update" || c.op === "insert")).toBe(false);
+  expect(push.kinkRingGiven).not.toHaveBeenCalled();
+});
+it("rejects a selected ring given to a different recipient, expired, or owned elsewhere", async () => {
+  for (const rows of [
+    [],
+    [{ id: RING, givenTo: "other", givenAt: now, expiresAt: now }],
+    [{ id: RING, givenTo: null, givenAt: null, expiresAt: now }],
+  ]) {
+    const { service, push } = make([[ada], rows]);
+    await expect(
+      service.giveSelected("me", [{ ringId: RING, username: "ada" }], now),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(push.kinkRingGiven).not.toHaveBeenCalled();
+  }
+});
+
+it("gifts the exact selected ring, grants one calendar month and leaves check holds intact", async () => {
+  const { service, calls, after, push, left } = make([
+    [ada],
+    [{ id: RING, givenTo: null, givenAt: null, expiresAt: new Date("2027-01-01") }],
+    undefined, // recipient lock
+    [], // no permanent Silver
+    [], // subscription locked
+    undefined, // Silver inserted
+    undefined, // ring marked given
+  ]);
+  const result = await service.giveSelected(
+    "me",
+    [{ ringId: RING.toUpperCase(), username: "@Ada" }],
+    now,
+  );
+  expect(result.gifts).toEqual([{ ringId: RING, to: { username: "ada", displayName: "Ada" } }]);
+  expect(after("insert", memberSubscription, "values")).toMatchObject({
+    userId: "ada",
+    currentPeriodEnd: new Date("2026-11-27T12:00:00Z"),
+  });
+  const upsert = calls.find((c) => c.op === "onConflictDoUpdate")?.args[0] as { set: object };
+  expect(upsert.set).not.toHaveProperty("checkHeldAt");
+  expect(after("update", kinkRing, "set")).toEqual({ givenTo: "ada", givenAt: now });
+  expect(push.kinkRingGiven).toHaveBeenCalledWith("me", "ada", RING);
+  expect(left()).toBe(0);
 });

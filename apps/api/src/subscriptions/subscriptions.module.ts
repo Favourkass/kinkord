@@ -1,3 +1,4 @@
+import { KinkRingsInventoryService } from "./kink-rings-inventory.service";
 import { Module } from "@nestjs/common";
 import { PushModule } from "../push/push.module";
 import { KinkRingsController } from "./kink-rings.controller";
@@ -21,7 +22,13 @@ import { SubscriptionsService } from "./subscriptions.service";
     SilverChecksController,
     KinkRingsController,
   ],
-  providers: [SubscriptionsService, PaymentsService, SilverChecksService, KinkRingsService],
+  providers: [
+    SubscriptionsService,
+    PaymentsService,
+    SilverChecksService,
+    KinkRingsService,
+    KinkRingsInventoryService,
+  ],
   // /me reports the member's plan; a profile change puts their check on hold.
   exports: [SubscriptionsService, SilverChecksService],
 })
