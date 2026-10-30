@@ -1,7 +1,7 @@
 # Kink Rings artwork
 
 - Tool: `image_gen` (built-in), reference-guided image generation.
-- Saved asset: `apps/web/public/kink-rings/gold-heart-ring.png`.
+- Saved asset: `apps/web/public/kink-rings/gold-heart-ring.webp`.
 - Output: opaque PNG, 1536 × 1024. The original generated image is used without raster edits.
 - Reference: the user-supplied Kink Rings overview screenshot.
 - Used as the hero and inventory thumbnail; UI controls and text are native components.
@@ -14,7 +14,7 @@ Use case: product-mockup. Create a polished landscape 3:2 hero artwork asset for
 ## Confirmation illustration
 
 - Tool: `image_gen` (built-in), reference-guided image generation.
-- Saved asset: `apps/web/public/kink-rings/gift-box.png`.
+- Saved asset: `apps/web/public/kink-rings/gift-box.webp`.
 - Output: opaque PNG, 1536 × 1024, used without raster edits.
 - Reference: the user's Review & Confirm screenshot.
 
