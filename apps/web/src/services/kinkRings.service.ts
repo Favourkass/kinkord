@@ -1,5 +1,7 @@
 /** Kink Rings: the member's own, and giving one away. */
 import type {
+  RingRecipientDraft,
+  RingGiftAssignment,
   GiveRingPM,
   KinkRingsPM,
   RingInventoryPM,
@@ -21,7 +23,7 @@ export const kinkRingsApi = {
     api.get<RingPagePM<RingRecipientPM>>(
       `/kink-rings/recipients?tab=${tab}&q=${encodeURIComponent(query)}&page=${page}`,
     ),
-  giveSelected: (gifts: Array<{ ringId: string; username: string }>) =>
+  giveSelected: (gifts: RingGiftAssignment[]) =>
     api.post<{ gifts: Array<{ ringId: string; to: { username: string; displayName: string } }> }>(
       "/kink-rings/give-selected",
       { gifts },
@@ -62,4 +64,70 @@ export function ringGiftAssignments(
   return recipients.flatMap((r) =>
     Array.from({ length: r.quantity }, () => ({ ringId: ringIds[at++], username: r.username })),
   );
+}
+
+/** A recipient always receives at least one distinct ring from this selected inventory. */
+export function resizeRingAllocation(
+  draft: RingRecipientDraft[],
+  userId: string,
+  quantity: number,
+  selected: string[],
+): RingRecipientDraft[] {
+  const recipient = draft.find((p) => p.member.userId === userId);
+  if (!recipient || !Number.isInteger(quantity) || quantity < 1 || quantity > 50)
+    throw new Error("Choose between 1 and 50 rings per recipient.");
+  const used = new Set(draft.flatMap((p) => p.ringIds));
+  const free = selected.filter((id) => !used.has(id));
+  const extra = quantity - recipient.ringIds.length;
+  if (extra > free.length) throw new Error("You do not have enough selected rings.");
+  const ringIds =
+    extra > 0
+      ? [...recipient.ringIds, ...free.slice(0, extra)]
+      : recipient.ringIds.slice(0, quantity);
+  return draft.map((p) => (p.member.userId === userId ? { ...p, ringIds } : p));
+}
+
+/** Choosing a ring already assigned elsewhere swaps the two slots; no ring can be gifted twice. */
+export function replaceRingAllocation(
+  draft: RingRecipientDraft[],
+  userId: string,
+  slot: number,
+  ringId: string,
+  selected: string[],
+): RingRecipientDraft[] {
+  const recipient = draft.find((p) => p.member.userId === userId);
+  const previous = recipient?.ringIds[slot];
+  if (!previous || !selected.includes(ringId))
+    throw new Error("Choose a ring from your selected inventory.");
+  return draft.map((p) => ({
+    ...p,
+    ringIds: p.ringIds.map((id, i) =>
+      p.member.userId === userId && i === slot ? ringId : id === ringId ? previous : id,
+    ),
+  }));
+}
+
+/** The final payload is made from the exact reviewed IDs and personal messages. */
+export function ringAllocationGifts(
+  selected: string[],
+  draft: RingRecipientDraft[],
+): RingGiftAssignment[] {
+  if (!draft.length || selected.length > 50 || new Set(selected).size !== selected.length)
+    throw new Error("Choose rings and recipients first.");
+  if (new Set(draft.map((p) => p.member.username.toLowerCase())).size !== draft.length)
+    throw new Error("Choose each recipient once.");
+  const used = new Set<string>();
+  return draft.flatMap((p) => {
+    if (!p.member.username || !p.ringIds.length)
+      throw new Error("Assign at least one ring to each recipient.");
+    const message = p.message.trim();
+    if (message.length > 500)
+      throw new Error("Personal messages can contain up to 500 characters.");
+    return p.ringIds.map((ringId) => {
+      if (!selected.includes(ringId) || used.has(ringId))
+        throw new Error("Each selected ring can be assigned only once.");
+      used.add(ringId);
+      return { ringId, username: p.member.username, ...(message ? { message } : {}) };
+    });
+  });
 }

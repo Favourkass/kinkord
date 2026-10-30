@@ -62,3 +62,35 @@ it("posts the exact selected assignments for safe retries", async () => {
   await kinkRingsApi.giveSelected(gifts);
   expect(post).toHaveBeenCalledWith("/kink-rings/give-selected", { gifts });
 });
+
+it("swaps exact ring allocations and includes only bounded personal messages", async () => {
+  const { resizeRingAllocation, replaceRingAllocation, ringAllocationGifts } =
+    await import("./kinkRings.service");
+  const member = {
+    userId: "a",
+    username: "ada",
+    name: "Ada",
+    avatarUrl: null,
+    city: null,
+    country: null,
+    online: false,
+  };
+  const draft = [
+    { member, ringIds: ["r1"], message: " Hi! " },
+    { member: { ...member, userId: "b", username: "bob" }, ringIds: ["r2"], message: "" },
+  ];
+  const swapped = replaceRingAllocation(draft, "a", 0, "r2", ["r1", "r2", "r3"]);
+  expect(swapped.map((p) => p.ringIds)).toEqual([["r2"], ["r1"]]);
+  const bigger = resizeRingAllocation(swapped, "a", 2, ["r1", "r2", "r3"]);
+  expect(ringAllocationGifts(["r1", "r2", "r3"], bigger)).toEqual([
+    { ringId: "r2", username: "ada", message: "Hi!" },
+    { ringId: "r3", username: "ada", message: "Hi!" },
+    { ringId: "r1", username: "bob" },
+  ]);
+  expect(() => resizeRingAllocation(bigger, "b", 2, ["r1", "r2", "r3"])).toThrow();
+  expect(() =>
+    ringAllocationGifts(["r1", "r2"], [draft[0], { ...draft[1], ringIds: ["r1"] }]),
+  ).toThrow();
+  expect(() => ringAllocationGifts(["r1"], [{ ...draft[0], message: "x".repeat(501) }])).toThrow();
+  expect(() => replaceRingAllocation(draft, "a", 0, "unknown", ["r1", "r2"])).toThrow();
+});

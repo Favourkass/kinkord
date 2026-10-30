@@ -26,6 +26,7 @@ export type NotificationKind =
  * renamed or re-photographed member always shows as they are now.
  */
 export interface NotificationPM {
+  giftMessage?: string;
   id: string;
   type: NotificationKind;
   actor: {
@@ -51,6 +52,7 @@ export interface NotificationPagePM {
 }
 
 export interface NotificationVM {
+  giftMessage?: string;
   id: string;
   activityCount: number;
   /** The whole sentence, for screen readers. */
@@ -205,7 +207,10 @@ export function toNotificationVM(
   return {
     id: item.id,
     activityCount: item.count,
-    body: actorName ? `${actorName} ${action}` : action,
+    body:
+      (actorName ? `${actorName} ${action}` : action) +
+      (item.type === "kink_ring" && item.giftMessage ? ` Message: ${item.giftMessage}` : ""),
+    ...(item.type === "kink_ring" && item.giftMessage ? { giftMessage: item.giftMessage } : {}),
     category: kind.category,
     actorName,
     actorTeamMember: Boolean(item.actor?.teamMember),

@@ -15,6 +15,7 @@ export default function KinkRingsPage() {
       activeNav="none"
       mobileHeader={<></>}
       desktopGreeting={false}
+      mobileFooter={vm.gifting ? <></> : undefined}
     >
       <KinkRingsScreen {...vm} />
     </AppShell>

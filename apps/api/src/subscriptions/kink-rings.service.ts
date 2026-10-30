@@ -41,6 +41,7 @@ export const giveSelectedRingsSchema = z
           .object({
             ringId: z.string().uuid().toLowerCase(),
             username: z.string().trim().min(1).max(64),
+            message: z.string().trim().max(500).optional(),
           })
           .strict(),
       )
@@ -120,7 +121,7 @@ export class KinkRingsService {
   /** Explicit ring ids make retries safe: the same completed assignment never adds Silver twice. */
   async giveSelected(
     giverId: string,
-    gifts: Array<{ ringId: string; username: string }>,
+    gifts: Array<{ ringId: string; username: string; message?: string }>,
     now = new Date(),
   ) {
     const parsed = giveSelectedRingsSchema.safeParse({ gifts });
@@ -161,6 +162,7 @@ export class KinkRingsService {
           id: kinkRing.id,
           givenTo: kinkRing.givenTo,
           givenAt: kinkRing.givenAt,
+          giftMessage: kinkRing.giftMessage,
           expiresAt: kinkRing.expiresAt,
         })
         .from(kinkRing)
@@ -180,7 +182,10 @@ export class KinkRingsService {
           "Some selected rings are no longer available. Refresh your inventory.",
         );
       const replay = rings.every(
-        (r) => r.givenAt && r.givenTo === assignment.find((a) => a.ringId === r.id)!.to.id,
+        (r) =>
+          r.givenAt &&
+          r.givenTo === assignment.find((a) => a.ringId === r.id)!.to.id &&
+          (r.giftMessage ?? "") === (assignment.find((a) => a.ringId === r.id)!.message ?? ""),
       );
       if (!replay) {
         if (rings.some((r) => r.givenAt || r.expiresAt <= now))
@@ -199,7 +204,7 @@ export class KinkRingsService {
           await addSilverTime(tx, gift.to.id, "silver", "monthly", now, { clearHeldCheck: false });
           await tx
             .update(kinkRing)
-            .set({ givenTo: gift.to.id, givenAt: now })
+            .set({ givenTo: gift.to.id, givenAt: now, giftMessage: gift.message || null })
             .where(eq(kinkRing.id, gift.ringId));
         }
       }

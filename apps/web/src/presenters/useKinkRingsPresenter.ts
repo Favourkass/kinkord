@@ -9,12 +9,28 @@ import {
   type RingInventoryPM,
   type RingRecipientPM,
   type RingPagePM,
+  type RingRecipientDraft,
+  type RingGiftAssignment,
 } from "@/domain/kinkRings";
 import { ApiError } from "@/services/apiClient";
-import { giveRingError, kinkRingsApi, ringGiftAssignments } from "@/services/kinkRings.service";
+import {
+  giveRingError,
+  kinkRingsApi,
+  ringAllocationGifts,
+  resizeRingAllocation,
+  replaceRingAllocation,
+} from "@/services/kinkRings.service";
 import { countryName } from "@/util/format";
 
-type Stage = "overview" | "inventory" | "recipients" | "review" | "history";
+type Stage =
+  | "overview"
+  | "inventory"
+  | "recipients"
+  | "selected"
+  | "allocation"
+  | "message"
+  | "review"
+  | "history";
 export function useKinkRingsPresenter() {
   const router = useRouter();
   const copy = RING_FLOW_COPY;
@@ -33,12 +49,12 @@ export function useKinkRingsPresenter() {
   } | null>(null);
   const [searchRetry, setSearchRetry] = useState(0);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [picked, setPicked] = useState<Array<{ member: RingRecipientPM; quantity: number }>>([]);
+  const [picked, setPicked] = useState<RingRecipientDraft[]>([]);
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
   const [attempt, setAttempt] = useState<{
     key: string;
-    gifts: Array<{ ringId: string; username: string }>;
+    gifts: RingGiftAssignment[];
   } | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [giveError, setGiveError] = useState<string | null>(null);
@@ -152,17 +168,20 @@ export function useKinkRingsPresenter() {
     }
     const member = members.find((m) => m.userId === id);
     if (!member) return;
-    if (picked.reduce((n, p) => n + p.quantity, 0) >= validSelected.length) {
+    if (picked.reduce((n, p) => n + p.ringIds.length, 0) >= validSelected.length) {
       setGiveError(copy.maxRecipients);
       return;
     }
-    setPicked([...picked, { member, quantity: 1 }]);
+    const used = new Set(picked.flatMap((p) => p.ringIds));
+    const ringId = validSelected.find((id) => !used.has(id));
+    if (!ringId) return;
+    setPicked([...picked, { member, ringIds: [ringId], message: "" }]);
     setGiveError(null);
   };
-  const quantityTotal = picked.reduce((n, p) => n + p.quantity, 0);
+  const quantityTotal = picked.reduce((n, p) => n + p.ringIds.length, 0);
   const draftKey = JSON.stringify({
     selected,
-    picked: picked.map((p) => [p.member.username, p.quantity]),
+    picked: picked.map((p) => [p.member.username, p.ringIds, p.message]),
   });
   const give = async () => {
     if (lock.current) return;
@@ -170,12 +189,7 @@ export function useKinkRingsPresenter() {
     try {
       // Preserve the exact payload after an uncertain response, even if a ring expires before retry.
       gifts =
-        attempt?.key === draftKey
-          ? attempt.gifts
-          : ringGiftAssignments(
-              validSelected,
-              picked.map((p) => ({ username: p.member.username, quantity: p.quantity })),
-            );
+        attempt?.key === draftKey ? attempt.gifts : ringAllocationGifts(validSelected, picked);
       setAttempt({ key: draftKey, gifts });
     } catch (e) {
       setGiveError(e instanceof Error ? e.message : copy.error);
@@ -243,12 +257,14 @@ export function useKinkRingsPresenter() {
   );
   return {
     stage,
+    gifting: ["recipients", "selected", "allocation", "message", "review"].includes(stage),
     copy,
     loading: !pm && !error,
     error,
     onRetry: reload,
     buyHref: Routes.subscription,
     hero: "/kink-rings/gold-heart-ring.png",
+    giftHero: "/kink-rings/gift-box.png",
     count: available.length,
     rings: available.map((r) => ({ ...toRingItemVM(r, now), selected: selected.includes(r.id) })),
     selectedCount: validSelected.length,
@@ -312,24 +328,90 @@ export function useKinkRingsPresenter() {
       if (answer?.data.nextPage) setPage(answer.data.nextPage);
     },
     onRecipient: toggleRecipient,
-    picked: picked.map((p) => ({ ...recipientVM(p.member), quantity: p.quantity })),
-    onRemove: (id: string) => setPicked(picked.filter((p) => p.member.userId !== id)),
+    picked: picked.map((p) => ({
+      ...recipientVM(p.member),
+      quantity: p.ringIds.length,
+      message: p.message,
+      rings: p.ringIds.map((id) => {
+        const ring = pm?.available.find((r) => r.id === id);
+        return ring
+          ? toRingItemVM(ring, now)
+          : {
+              id,
+              code: id,
+              received: "",
+              expires: "Unavailable",
+              remaining: "Unavailable",
+              urgent: false,
+              expired: true,
+            };
+      }),
+    })),
+    allocationOptions: (pm?.available ?? [])
+      .filter((r) => selected.includes(r.id))
+      .map((r) => ({
+        value: r.id,
+        label: `${toRingItemVM(r, now).code} · ${toRingItemVM(r, now).remaining}`,
+      })),
+    onRemove: (id: string) => {
+      if (!lock.current) setPicked(picked.filter((p) => p.member.userId !== id));
+    },
     onQuantity: (id: string, n: number) => {
-      if (
-        Number.isInteger(n) &&
-        n >= 1 &&
-        quantityTotal - (picked.find((p) => p.member.userId === id)?.quantity ?? 0) + n <=
-          validSelected.length
-      )
-        setPicked(picked.map((p) => (p.member.userId === id ? { ...p, quantity: n } : p)));
+      if (lock.current) return;
+      try {
+        setPicked(resizeRingAllocation(picked, id, n, validSelected));
+        setGiveError(null);
+      } catch (e) {
+        setGiveError(e instanceof Error ? e.message : copy.error);
+      }
+    },
+    onRing: (id: string, slot: number, ringId: string) => {
+      if (lock.current) return;
+      try {
+        setPicked(replaceRingAllocation(picked, id, slot, ringId, validSelected));
+        setGiveError(null);
+      } catch (e) {
+        setGiveError(e instanceof Error ? e.message : copy.error);
+      }
+    },
+    onMessage: (id: string, message: string) => {
+      if (!lock.current)
+        setPicked(
+          picked.map((p) =>
+            p.member.userId === id ? { ...p, message: message.slice(0, 500) } : p,
+          ),
+        );
     },
     quantityTotal,
     remaining: Math.max(0, validSelected.length - quantityTotal),
     inventoryRemaining: Math.max(0, available.length - quantityTotal),
     canSubmit:
-      picked.length > 0 && (quantityTotal <= validSelected.length || attempt?.key === draftKey),
-    canContinue: picked.length > 0 && quantityTotal <= validSelected.length,
-    onContinue: () => setStage("review"),
+      picked.length > 0 &&
+      (picked.every((p) => p.ringIds.every((id) => validSelected.includes(id))) ||
+        attempt?.key === draftKey),
+    canContinue:
+      picked.length > 0 && picked.every((p) => p.ringIds.every((id) => validSelected.includes(id))),
+    onContinue: () => {
+      try {
+        ringAllocationGifts(validSelected, picked);
+      } catch (e) {
+        setGiveError(e instanceof Error ? e.message : copy.error);
+        return;
+      }
+      setGiveError(null);
+      setStage(
+        stage === "recipients"
+          ? "selected"
+          : stage === "selected"
+            ? "allocation"
+            : stage === "allocation"
+              ? "message"
+              : "review",
+      );
+    },
+    onEditRecipients: () => {
+      if (!lock.current) setStage("selected");
+    },
     onAddMore: () => setStage("recipients"),
     onGive: give,
     busy,
@@ -337,7 +419,10 @@ export function useKinkRingsPresenter() {
     onBack: () => {
       if (lock.current) return;
       if (stage === "overview") router.push(Routes.home);
-      else if (stage === "review") setStage("recipients");
+      else if (stage === "review") setStage("message");
+      else if (stage === "message") setStage("allocation");
+      else if (stage === "allocation") setStage("selected");
+      else if (stage === "selected") setStage("recipients");
       else if (stage === "recipients") setStage("inventory");
       else setStage("overview");
     },
