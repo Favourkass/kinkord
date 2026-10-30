@@ -94,3 +94,32 @@ it("swaps exact ring allocations and includes only bounded personal messages", a
   expect(() => ringAllocationGifts(["r1"], [{ ...draft[0], message: "x".repeat(501) }])).toThrow();
   expect(() => replaceRingAllocation(draft, "a", 0, "unknown", ["r1", "r2"])).toThrow();
 });
+
+it("sends a member who doesn't take messages from the giver their ring without the note", async () => {
+  const { ringAllocationGifts } = await import("./kinkRings.service");
+  const member = {
+    userId: "a",
+    username: "ada",
+    name: "Ada",
+    avatarUrl: null,
+    city: null,
+    country: null,
+    online: false,
+  };
+  expect(
+    ringAllocationGifts(
+      ["r1", "r2"],
+      [
+        { member: { ...member, canMessage: false }, ringIds: ["r1"], message: "Hi" },
+        {
+          member: { ...member, userId: "b", username: "bob", canMessage: true },
+          ringIds: ["r2"],
+          message: "Yo",
+        },
+      ],
+    ),
+  ).toEqual([
+    { ringId: "r1", username: "ada" },
+    { ringId: "r2", username: "bob", message: "Yo" },
+  ]);
+});

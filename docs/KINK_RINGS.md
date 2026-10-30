@@ -36,6 +36,10 @@ From **Kink Rings** in the account menu (`/kink-rings`):
    IDs using each ring's dropdown; choosing an already assigned ring swaps the
    two slots. Unassigned rings stay in inventory.
 6. Add an optional personal message (up to 500 characters) for each recipient.
+   A note is a message, so it follows "Who Can Send Me a Message", both ways, as
+   chat does. A recipient whose setting leaves the giver out gets the ring with
+   no note: the screen says so instead of offering the box, and the API refuses
+   a note to them (403).
 7. Review & Confirm shows the exact recipient, ring IDs and message. Edit
    Recipients preserves existing allocations and messages. Only the final Send
    button submits the gifts, together in one transaction.

@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from "@nestjs/common";
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { SQL } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
@@ -45,7 +50,13 @@ function make(answers: unknown[]) {
   return { ...q, push, service: new KinkRingsService(q.db, push as unknown as PushService) };
 }
 
-const ada = { id: "ada", username: "ada", displayName: "Ada", accountType: "personal" };
+const ada = {
+  id: "ada",
+  username: "ada",
+  displayName: "Ada",
+  accountType: "personal",
+  canMessage: true,
+};
 
 describe("KinkRingsService.mine", () => {
   it("lists the rings left to give, soonest to expire first, and the last ones given", async () => {
@@ -251,4 +262,24 @@ it("stores the reviewed personal message and rejects a different-message replay"
       gifts: [{ ringId: RING, username: "ada", message: "x".repeat(501) }],
     }).success,
   ).toBe(false);
+});
+
+it("sends no note to a member whose messaging setting leaves the giver out, but still the ring", async () => {
+  const closed = { ...ada, canMessage: false };
+  const ring = { id: RING, givenTo: null, givenAt: null, expiresAt: new Date("2027-01-01") };
+  const noted = make([[closed], [ring]]);
+  await expect(
+    noted.service.giveSelected("me", [{ ringId: RING, username: "ada", message: "Hi" }], now),
+  ).rejects.toBeInstanceOf(ForbiddenException);
+  expect(noted.push.kinkRingGiven).not.toHaveBeenCalled();
+  const picked = noted.calls.find((c) => c.op === "select")?.args[0] as { canMessage: SQL };
+  expect(render(picked.canMessage).params).toContain("messaging");
+
+  const plain = make([[closed], [ring], undefined, [], [], undefined, undefined]);
+  await plain.service.giveSelected("me", [{ ringId: RING, username: "ada", message: "  " }], now);
+  expect(plain.after("update", kinkRing, "set")).toMatchObject({
+    givenTo: "ada",
+    giftMessage: null,
+  });
+  expect(plain.push.kinkRingGiven).toHaveBeenCalledWith("me", "ada", RING);
 });

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -23,6 +24,7 @@ import { z } from "zod";
 import { DRIZZLE, type Db } from "../db/db.module";
 import { kinkRing, profile, user } from "../db/schema";
 import { notBanned } from "../moderation/admins";
+import { privacyAllows } from "../privacy/privacy-policy";
 import { PushService } from "../push/push.service";
 import { noBlockEitherWay } from "../safety/blocks";
 import { silverForGood, silverUntil } from "./plans";
@@ -137,6 +139,7 @@ export class KinkRingsService {
           username: user.username,
           displayName: profile.displayName,
           accountType: profile.accountType,
+          canMessage: privacyAllows(giverId, user.id, "messaging"),
         })
         .from(user)
         .innerJoin(profile, eq(profile.userId, user.id))
@@ -191,6 +194,12 @@ export class KinkRingsService {
         if (rings.some((r) => r.givenAt || r.expiresAt <= now))
           throw new ConflictException(
             "Some selected rings were gifted or have expired. Refresh your inventory.",
+          );
+        // A note is a message: it follows "Who Can Send Me a Message", both ways, like chat.
+        const unreachable = assignment.find((a) => a.message && !a.to.canMessage);
+        if (unreachable)
+          throw new ForbiddenException(
+            `${unreachable.to.displayName ?? "This member"} doesn't take messages from you. Send their ring without a note.`,
           );
         // Serializes gifts to the same recipient, including when no subscription row exists yet.
         for (const recipient of [...recipients].sort((a, b) => a.id.localeCompare(b.id))) {

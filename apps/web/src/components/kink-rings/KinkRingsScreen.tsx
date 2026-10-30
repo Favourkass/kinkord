@@ -687,19 +687,27 @@ export default function KinkRingsScreen(p: KinkRingsScreenProps) {
               {p.picked.map((m) => (
                 <article key={m.userId} className={`${panel} p-4`}>
                   <RecipientIdentity member={m} large />
-                  <label className="mt-4 block text-sm text-kink-gold-bright">
-                    {c.messageLabel} for {m.name}
-                    <textarea
-                      aria-label={`Message for ${m.name}`}
-                      value={m.message}
-                      maxLength={500}
-                      onChange={(e) => p.onMessage(m.userId, e.target.value)}
-                      placeholder={c.messagePlaceholder}
-                      rows={4}
-                      className="mt-2 w-full resize-y rounded-xl border border-white/15 bg-black p-3 text-base leading-6 text-white placeholder:text-white/35"
-                    />
-                  </label>
-                  <p className="mt-1 text-right text-xs text-white/40">{m.message.length}/500</p>
+                  {m.canMessage === false ? (
+                    <p className="mt-4 text-sm text-white/60">{c.noteNotAllowed(m.name)}</p>
+                  ) : (
+                    <>
+                      <label className="mt-4 block text-sm text-kink-gold-bright">
+                        {c.messageLabel} for {m.name}
+                        <textarea
+                          aria-label={`Message for ${m.name}`}
+                          value={m.message}
+                          maxLength={500}
+                          onChange={(e) => p.onMessage(m.userId, e.target.value)}
+                          placeholder={c.messagePlaceholder}
+                          rows={4}
+                          className="mt-2 w-full resize-y rounded-xl border border-white/15 bg-black p-3 text-base leading-6 text-white placeholder:text-white/35"
+                        />
+                      </label>
+                      <p className="mt-1 text-right text-xs text-white/40">
+                        {m.message.length}/500
+                      </p>
+                    </>
+                  )}
                 </article>
               ))}
             </div>
