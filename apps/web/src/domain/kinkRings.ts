@@ -76,6 +76,8 @@ export interface RingRecipientPM {
   city: string | null;
   country: string | null;
   online: boolean;
+  /** Their messaging setting lets the giver write to them, so a note can go with the ring. Missing on an older API. */
+  canMessage?: boolean;
 }
 export interface RingPagePM<T> {
   items: T[];

@@ -133,6 +133,8 @@ export class KinkRingsInventoryService {
         city: privateProfileValue(viewerId, user.id, "location", profile.city),
         country: privateProfileValue(viewerId, user.id, "location", profile.country),
         lastSeenAt: privateProfileValue(viewerId, user.id, "onlineStatus", profile.lastSeenAt),
+        // A ring's note is a message, so it's offered only where messaging is.
+        canMessage: privacyAllows(viewerId, user.id, "messaging"),
       })
       .from(user)
       .innerJoin(profile, eq(profile.userId, user.id))
@@ -163,6 +165,7 @@ export class KinkRingsInventoryService {
           city: r.city,
           country: r.country,
           online: Boolean(r.lastSeenAt && Date.now() - r.lastSeenAt.getTime() < 5 * 60_000),
+          canMessage: Boolean(r.canMessage),
         })),
       ),
       nextPage: rows.length > PAGE_SIZE ? page + 1 : null,

@@ -120,7 +120,8 @@ export function ringAllocationGifts(
   return draft.flatMap((p) => {
     if (!p.member.username || !p.ringIds.length)
       throw new Error("Assign at least one ring to each recipient.");
-    const message = p.message.trim();
+    // A note is a message: none for a member whose messaging setting leaves the giver out.
+    const message = p.member.canMessage === false ? "" : p.message.trim();
     if (message.length > 500)
       throw new Error("Personal messages can contain up to 500 characters.");
     return p.ringIds.map((ringId) => {

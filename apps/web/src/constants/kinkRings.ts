@@ -69,6 +69,8 @@ export const RING_FLOW_COPY = {
     "Each recipient will receive their personal message with the gift notification. You can go back to edit before confirming. Sent rings cannot be taken back.",
   messageLabel: "Message",
   messagePlaceholder: "Enjoy your Kink Ring! 💛",
+  noteNotAllowed: (name: string) =>
+    `${name} doesn't take messages from you, so their ring goes without a note.`,
   editRecipients: "Edit Recipients",
   reviewButton: "Review Gifts",
   toMessage: "Continue to Message",

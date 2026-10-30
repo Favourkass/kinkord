@@ -77,3 +77,22 @@ it("filters friend recipients using accepted friendships, blocks, bans and perso
   expect(params).toContain("organization");
   expect(params).toContain("owner");
 });
+it("says whether each recipient takes a note, by their messaging setting", async () => {
+  const row = {
+    userId: "u1",
+    username: "ada",
+    name: "Ada",
+    avatarKey: null,
+    city: null,
+    country: null,
+    lastSeenAt: null,
+  };
+  const { service } = make([
+    [
+      { ...row, canMessage: true },
+      { ...row, userId: "u2", canMessage: false },
+    ],
+  ]);
+  const result = await service.recipients("owner", "friends", "", 1);
+  expect(result.items.map((i) => i.canMessage)).toEqual([true, false]);
+});
