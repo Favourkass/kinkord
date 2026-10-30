@@ -28,16 +28,17 @@ export function signupLocationFields(
   const code = country?.toUpperCase() ?? "";
   const county = code === "KE";
   const region = code === "GH";
-  const term = county ? "county" : region ? "region" : "state";
+  const province = code === "ZA";
+  const term = province ? "province" : county ? "county" : region ? "region" : "state";
   // Ghana's regions are the top level already, so below them are just cities and towns.
-  const areaTerm = region ? "city / town" : "region / city / town";
-  const areaTitle = region ? "City / Town" : "Region / City / Town";
+  const areaTerm = province ? "municipality" : region ? "city / town" : "region / city / town";
+  const areaTitle = province ? "Municipality" : region ? "City / Town" : "Region / City / Town";
   return {
-    stateLabel: county ? "County" : region ? "Region" : "State",
+    stateLabel: province ? "Province" : county ? "County" : region ? "Region" : "State",
     statePlaceholder: `Select your ${term}`,
     helper: `Your ${term} and ${areaTerm} help us show you local communities and events.`,
-    credit: PLACE_NAMES_CREDIT,
-    stateSearchPlaceholder: `Search ${county ? "counties" : region ? "regions" : "states"}`,
+    credit: province ? null : PLACE_NAMES_CREDIT,
+    stateSearchPlaceholder: `Search ${province ? "provinces" : county ? "counties" : region ? "regions" : "states"}`,
     states: statesForCountry(code)
       .map((value) => ({
         value,
@@ -47,14 +48,22 @@ export function signupLocationFields(
     areaLabel: areaTitle,
     areaPlaceholder: !state
       ? `Select your ${term} first`
+      : province
+        ? "Select your municipality"
+        : region
+          ? "Select your city or town"
+          : "Select your region, city or town",
+    areaSearchPlaceholder: province
+      ? "Search municipalities"
       : region
-        ? "Select your city or town"
-        : "Select your region, city or town",
-    areaSearchPlaceholder: region ? "Search cities / towns" : "Search regions / cities / towns",
+        ? "Search cities / towns"
+        : "Search regions / cities / towns",
     areaEmptyLabel: loaded.loading
-      ? region
-        ? "Loading cities and towns…"
-        : "Loading regions, cities and towns…"
+      ? province
+        ? "Loading municipalities…"
+        : region
+          ? "Loading cities and towns…"
+          : "Loading regions, cities and towns…"
       : "No matching areas",
     /** The box for a place the list doesn't have. */
     customAreaLabel: `${areaTitle} name`,

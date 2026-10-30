@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { KEEP_TYPING } from "@/constants/location";
-import { MEMBERS_COPY, MEMBERS_PAGE_SIZE } from "@/constants/members";
+import { MEMBERS_COPY, SOUTH_AFRICA_REGION_COPY, MEMBERS_PAGE_SIZE } from "@/constants/members";
 import { Routes } from "@/constants/Routes";
 import {
   toMemberCardVM,
@@ -61,8 +61,8 @@ export function useMembersRegionPresenter(
 ) {
   const organizations = useOrganizations();
   const router = useRouter();
-  const copy = MEMBERS_COPY.region;
   const country = countryParam.toUpperCase();
+  const copy = country === "ZA" ? SOUTH_AFRICA_REGION_COPY : MEMBERS_COPY.region;
   const state = stateParam ? decodeParam(stateParam) : null;
   const countryMode = state === null;
 

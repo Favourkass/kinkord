@@ -258,3 +258,19 @@ export const AVAILABLE_COUNTRIES = LAUNCH_COUNTRIES.map(({ code, name }) => ({
 
 /** Page size for the infinite-scrolling members list. */
 export const MEMBERS_PAGE_SIZE = 20;
+
+export const SOUTH_AFRICA_REGION_COPY = {
+  ...MEMBERS_COPY.region,
+  selectorLabel: "Municipality",
+  allRegions: "All municipalities",
+  searchByRegion: "Search by Municipality",
+  sheetTitle: "Choose a municipality",
+  allStates: "All provinces",
+  searchByState: "Search by Province",
+  sheetTitleStates: "Choose a province",
+  searchRegions: "Search municipalities",
+  searchStates: "Search provinces",
+  loadingRegions: "Loading municipalities…",
+  noRegionMatch: "No matching municipalities",
+  unknownState: "We don’t know that province yet.",
+} as const;

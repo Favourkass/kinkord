@@ -61,6 +61,7 @@ const COUNTRY_ZONES: Record<string, string> = {
   NG: "Africa/Lagos",
   GH: "Africa/Accra",
   KE: "Africa/Nairobi",
+  ZA: "Africa/Johannesburg",
 };
 const US_ZONES: Record<string, string[]> = {
   "America/Chicago": [

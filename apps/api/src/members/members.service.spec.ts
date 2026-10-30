@@ -189,6 +189,7 @@ describe("MembersService", () => {
       { code: "GH", name: "Ghana", membersCount: 3 },
       { code: "KE", name: "Kenya", membersCount: 0 },
       { code: "NG", name: "Nigeria", membersCount: 42 },
+      { code: "ZA", name: "South Africa", membersCount: 0 },
       { code: "US", name: "USA", membersCount: 7 },
     ]);
     select.mockReturnValueOnce(chain([]));
@@ -196,6 +197,7 @@ describe("MembersService", () => {
       { code: "GH", name: "Ghana", membersCount: 0 },
       { code: "KE", name: "Kenya", membersCount: 0 },
       { code: "NG", name: "Nigeria", membersCount: 0 },
+      { code: "ZA", name: "South Africa", membersCount: 0 },
       { code: "US", name: "USA", membersCount: 0 },
     ]);
   });

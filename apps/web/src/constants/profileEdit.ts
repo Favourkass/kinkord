@@ -242,3 +242,8 @@ export const SECURITY_COPY = {
   },
   loadError: "Could not load your account. Refresh to try again.",
 } as const;
+
+export const SOUTH_AFRICA_LOCATION_ROWS = {
+  state: { title: "Province", help: "Changing your province clears your municipality." },
+  city: { title: "Municipality", help: "Members in your municipality find you first." },
+} as const;

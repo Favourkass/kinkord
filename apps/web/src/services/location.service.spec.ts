@@ -33,6 +33,7 @@ describe("states and counties", () => {
     );
     expect(statesForCountry("GH")).toHaveLength(16);
     expect(statesForCountry("US")).toHaveLength(51);
+    expect(statesForCountry("ZA")).toHaveLength(9);
     expect(statesForCountry("ZZ")).toEqual([]);
     expect(isKnownState("ng", "Delta")).toBe(true);
     expect(isKnownState("KE", "Delta")).toBe(false);
@@ -43,7 +44,7 @@ describe("states and counties", () => {
     const { locationSlug, statesForCountry } = await load();
     expect(locationSlug("Akwa Ibom")).toBe("akwa-ibom");
     expect(locationSlug("Murang’a")).toBe("muranga");
-    for (const country of ["NG", "KE", "GH", "US"])
+    for (const country of ["NG", "KE", "GH", "US", "ZA"])
       for (const state of statesForCountry(country))
         expect(
           fs.existsSync(path.join(PUBLIC_DIR, "locations", country, `${locationSlug(state)}.json`)),
