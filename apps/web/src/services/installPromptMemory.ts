@@ -1,33 +1,53 @@
 /**
- * When a member puts off the full-screen install prompt, for how long. Kept in
- * this browser only; unreadable storage (a private window) just means asking
- * again next visit.
+ * Whether the full-screen install prompt may show (founders, 2026-10-31): on every
+ * visit to someone without the app, including after they uninstall it, until they
+ * choose "Don't show again". "Not now", the close button or tapping install put it
+ * off for the rest of this visit only. Kept in this browser; unreadable storage (a
+ * private window) just means asking again.
  */
 
-/** "Not now" keeps the prompt away this many days. */
-export const INSTALL_PROMPT_SNOOZE_DAYS = 7;
-
-const KEY = "kinkord_pwa_install_snoozed_until";
-/** The old banner's "dismissed for good", from before the full-screen prompt. */
-const OLD_KEY = "kinkord_pwa_install_dismissed";
-const DAY_MS = 24 * 60 * 60 * 1000;
+/** "Don't show again": for good, in this browser. */
+const OFF_KEY = "kinkord_pwa_install_off";
+/** Put off for this visit: the tab's session, so the next visit asks again. */
+const VISIT_KEY = "kinkord_pwa_install_hidden";
+/** Earlier rules' keys, a week's snooze and the first banner's dismissal, cleared so everyone is asked again. */
+const OLD_KEYS = ["kinkord_pwa_install_snoozed_until", "kinkord_pwa_install_dismissed"];
 
 export const installPromptMemory = {
-  /** Put off, and the week isn't over. */
-  isSnoozed(now = Date.now()): boolean {
+  /** "Don't show again", from this visit or an earlier one. */
+  isOff(): boolean {
     try {
-      const until = Number(localStorage.getItem(KEY));
-      return Number.isFinite(until) && until > now;
+      return localStorage.getItem(OFF_KEY) === "1";
     } catch {
       return false;
     }
   },
-  snooze(now = Date.now()): void {
+  isHiddenThisVisit(): boolean {
     try {
-      localStorage.setItem(KEY, String(now + INSTALL_PROMPT_SNOOZE_DAYS * DAY_MS));
-      localStorage.removeItem(OLD_KEY);
+      return sessionStorage.getItem(VISIT_KEY) === "1";
     } catch {
-      // Storage off or full: the prompt may come back next visit.
+      return false;
+    }
+  },
+  hideThisVisit(): void {
+    try {
+      sessionStorage.setItem(VISIT_KEY, "1");
+    } catch {
+      // Storage off: it may come back on the next page load.
+    }
+  },
+  turnOff(): void {
+    try {
+      localStorage.setItem(OFF_KEY, "1");
+    } catch {
+      // Storage off: the prompt may come back next visit.
+    }
+  },
+  forgetOldRules(): void {
+    try {
+      for (const key of OLD_KEYS) localStorage.removeItem(key);
+    } catch {
+      // Nothing to clear.
     }
   },
 };
