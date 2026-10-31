@@ -9,6 +9,16 @@ export const HEADER_WORDMARK = {
   height: 171,
 } as const;
 
+/** Static landing wordmark matching the community artwork. Other headers keep their animation. */
+export const LANDING_WORDMARK = {
+  src: "/brand/kinkord-mask-wordmark.png",
+  alt: BRAND_NAME,
+  width: 720,
+  height: 232,
+} as const;
+
+export const LANDING_HEADER_TAGLINE = "THE WORLD’S KINK COMMUNITY";
+
 export const BRAND_TAGLINE =
   "Where kinksters connect, explore their interests, build meaningful relationships, and find a community where they truly belong.";
 

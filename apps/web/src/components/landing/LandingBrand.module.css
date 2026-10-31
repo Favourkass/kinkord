@@ -51,3 +51,32 @@
   font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
   font-variant-emoji: emoji;
 }
+
+/* A live 18+ label sits where the artwork fades into the page. */
+.ageSeal {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  display: grid;
+  width: clamp(28px, 5.8vw, 42px);
+  aspect-ratio: 1;
+  place-items: center;
+  transform: translate(-50%, 15%);
+  border: 3px solid #e9404d;
+  border-radius: 50%;
+  background: #101010;
+  box-shadow:
+    0 0 0 2px #3b191b,
+    inset 0 0 4px #fff8,
+    0 0 9px #e9404d55;
+  color: white;
+  font-size: clamp(12px, 2.5vw, 18px);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.community {
+  background:
+    radial-gradient(ellipse at 100% 36%, #a6650712, transparent 35%),
+    radial-gradient(ellipse at 0% 50%, #a665070d, transparent 30%);
+}
