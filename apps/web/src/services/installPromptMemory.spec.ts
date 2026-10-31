@@ -24,6 +24,20 @@ describe("installPromptMemory", () => {
     expect(localStorage.getItem("kinkord_pwa_install_dismissed")).toBeNull();
   });
 
+  it("notifies other prompt instances and tabs, and unsubscribes cleanly", () => {
+    const changed = vi.fn();
+    const unsubscribe = installPromptMemory.subscribe(changed);
+    installPromptMemory.snooze();
+    expect(changed).toHaveBeenCalledTimes(1);
+    window.dispatchEvent(new StorageEvent("storage", { key: "unrelated" }));
+    expect(changed).toHaveBeenCalledTimes(1);
+    window.dispatchEvent(new StorageEvent("storage", { key: "kinkord_pwa_install_snoozed_until" }));
+    expect(changed).toHaveBeenCalledTimes(2);
+    unsubscribe();
+    installPromptMemory.snooze();
+    expect(changed).toHaveBeenCalledTimes(2);
+  });
+
   it("shrugs off storage it can't use", () => {
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
       throw new Error("denied");

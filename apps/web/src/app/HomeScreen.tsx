@@ -1,5 +1,6 @@
 "use client";
 
+import { PwaInstallBanner } from "@/components/ui/PwaInstallBanner";
 import BrandSplash from "@/components/ui/BrandSplash";
 import SplashScreen from "@/components/landing/SplashScreen";
 import { useBrandSplashPresenter } from "@/presenters/useBrandSplashPresenter";
@@ -28,6 +29,7 @@ export default function HomeScreen() {
       <div hidden={splash.visible}>
         <SplashScreen {...vm} showAgeGate={vm.showAgeGate && !splash.visible} />
       </div>
+      {!splash.visible && !vm.showAgeGate && <PwaInstallBanner {...vm.installPrompt} />}
     </>
   );
 }

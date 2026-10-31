@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
+import { Routes } from "@/constants/Routes";
 import { PWA_INSTALL_ARTWORK } from "@/constants/pwa";
 import { authClient } from "@/services/authClient";
 import { installPromptMemory } from "@/services/installPromptMemory";
@@ -26,11 +27,20 @@ export interface PwaVM {
 
 const emptySubscribe = () => () => {};
 
-export function usePwaPresenter(): PwaVM {
+const getSnoozedSnapshot = () => installPromptMemory.isSnoozed();
+const getSnoozedServerSnapshot = () => false;
+
+/** Landing owns its popup so it can wait for the video and age confirmation. */
+export function usePwaPresenter({ landing = false }: { landing?: boolean } = {}): PwaVM {
   // Put off for a week by "Not now", the close button or tapping install (the
   // browser takes it from there). Read on the client; the server offers nothing.
   const [dismissed, setDismissed] = useState(() =>
     typeof window === "undefined" ? false : installPromptMemory.isSnoozed(),
+  );
+  const snoozed = useSyncExternalStore(
+    installPromptMemory.subscribe,
+    getSnoozedSnapshot,
+    getSnoozedServerSnapshot,
   );
   const [signedIn, setSignedIn] = useState(false);
   const pathname = usePathname();
@@ -122,11 +132,12 @@ export function usePwaPresenter(): PwaVM {
     installPromptMemory.snooze();
   }, []);
 
-  const wouldOffer = !isInstalled && !dismissed && (Boolean(deferredPrompt) || isIos);
-  // Signed-in members only: never over the landing page, the age gate or sign-up.
+  const wouldOffer =
+    !isInstalled && !dismissed && !snoozed && (landing || Boolean(deferredPrompt) || isIos);
+  // The global prompt remains member-only. HomeScreen owns the guest landing popup.
   // Asked again on each page, so it appears once someone signs in, and goes on sign-out.
   useEffect(() => {
-    if (!wouldOffer) return;
+    if (!wouldOffer || landing || pathname === Routes.home) return;
     let live = true;
     authClient.getSession().then(
       ({ data }) => {
@@ -139,9 +150,9 @@ export function usePwaPresenter(): PwaVM {
     return () => {
       live = false;
     };
-  }, [pathname, wouldOffer]);
+  }, [pathname, wouldOffer, landing]);
 
-  const isInstallable = wouldOffer && signedIn;
+  const isInstallable = wouldOffer && (landing || (pathname !== Routes.home && signedIn));
 
   return {
     installArtwork: PWA_INSTALL_ARTWORK,

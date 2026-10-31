@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { PwaInstallArtwork, type InstallArtwork } from "./PwaInstallArtwork";
 
@@ -18,17 +19,31 @@ export function PwaInstallBanner({
   onInstall,
   onDismiss,
 }: PwaInstallBannerProps) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (!isInstallable) return;
+    const element = dialog.current;
+    element?.showModal();
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      element?.close();
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isInstallable]);
+
   if (!isInstallable) return null;
 
   return (
-    <section
-      role="dialog"
+    <dialog
+      ref={dialog}
       aria-modal="true"
       aria-label="Install Kinkord App"
-      onKeyDown={(event) => {
-        if (event.key === "Escape") onDismiss();
+      onCancel={(event) => {
+        event.preventDefault();
+        onDismiss();
       }}
-      className="fixed inset-0 z-50 h-dvh w-full overflow-hidden bg-black"
+      className="fixed inset-0 z-50 m-0 h-dvh max-h-none w-full max-w-none overflow-hidden border-0 bg-black p-0"
     >
       <button
         type="button"
@@ -67,6 +82,6 @@ export function PwaInstallBanner({
           Not now
         </button>
       )}
-    </section>
+    </dialog>
   );
 }

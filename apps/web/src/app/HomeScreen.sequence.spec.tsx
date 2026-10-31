@@ -15,8 +15,11 @@ const splash = vi.hoisted(() => ({
   onFinished: vi.fn(),
 }));
 vi.mock("@/presenters/useBrandSplashPresenter", () => ({ useBrandSplashPresenter: () => splash }));
-vi.mock("@/presenters/useLandingPresenter", () => ({
-  useLandingPresenter: () => ({ showAgeGate: true }),
+const landing = vi.hoisted(() => ({ showAgeGate: true, installPrompt: { isInstallable: true } }));
+vi.mock("@/presenters/useLandingPresenter", () => ({ useLandingPresenter: () => landing }));
+vi.mock("@/components/ui/PwaInstallBanner", () => ({
+  PwaInstallBanner: ({ isInstallable }: { isInstallable: boolean }) =>
+    isInstallable ? <div role="dialog" aria-label="Install Kinkord App" /> : null,
 }));
 vi.mock("@/components/landing/SplashScreen", () => ({
   default: ({ showAgeGate }: { showAgeGate: boolean }) => (
@@ -30,6 +33,7 @@ vi.mock("@/components/landing/SplashScreen", () => ({
 beforeEach(() => {
   splash.visible = true;
   splash.leaving = false;
+  landing.showAgeGate = true;
 });
 afterEach(cleanup);
 
@@ -39,6 +43,19 @@ describe("entry screen ordering", () => {
     expect(html).toContain('<div hidden="">');
     expect(html).toContain('role="status"');
     expect(html).not.toContain('role="dialog"');
+  });
+
+  it("waits for both the preloader and age confirmation before offering installation", () => {
+    const { rerender } = render(<HomeScreen />);
+    expect(screen.queryByRole("dialog", { name: "Install Kinkord App" })).toBeNull();
+    splash.visible = false;
+    rerender(<HomeScreen />);
+    expect(screen.getByRole("dialog", { name: "Age verification" })).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: "Install Kinkord App" })).toBeNull();
+    landing.showAgeGate = false;
+    rerender(<HomeScreen />);
+    expect(screen.getByRole("dialog", { name: "Install Kinkord App" })).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: "Age verification" })).toBeNull();
   });
 
   it("shows the loading animation first and reveals the landing and age popup only after its fade", () => {

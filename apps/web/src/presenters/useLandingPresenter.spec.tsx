@@ -37,6 +37,8 @@ describe("useLandingPresenter", () => {
     expect(result.current.joinAgeDisclaimer).toBe("You must be 18 years or older to join.");
     expect(result.current.policyLinks).toHaveLength(8);
     expect(result.current.allRightsReserved).toBe("All rights reserved.");
+    expect(result.current.installPrompt.isInstallable).toBe(true);
+    expect(result.current.installPrompt.artwork.src).toBe("/brand/kinkord-install.webp");
     expect(typeof result.current.onDownload).toBe("function");
     expect(typeof result.current.downloadCta.onClick).toBe("function");
   });

@@ -56,13 +56,42 @@ describe("usePwaPresenter", () => {
     pathname = "/";
     pwaService.setDeferredPrompt({} as BeforeInstallPromptEvent);
     const { result, rerender } = renderHook(() => usePwaPresenter());
-    await waitFor(() => expect(getSession).toHaveBeenCalled());
+    expect(getSession).not.toHaveBeenCalled();
     expect(result.current.isInstallable).toBe(false);
 
     getSession.mockResolvedValue(signedIn);
     pathname = "/home";
     rerender();
     await waitFor(() => expect(result.current.isInstallable).toBe(true));
+  });
+
+  it("offers the landing animation to guests even without a native install event", () => {
+    getSession.mockResolvedValue({ data: null });
+    pathname = "/";
+    const landing = renderHook(() => usePwaPresenter({ landing: true }));
+    const global = renderHook(() => usePwaPresenter());
+    expect(landing.result.current.isInstallable).toBe(true);
+    expect(global.result.current.isInstallable).toBe(false);
+    expect(getSession).not.toHaveBeenCalled();
+    act(() => landing.result.current.dismissPrompt());
+    expect(landing.result.current.isInstallable).toBe(false);
+    const nextVisit = renderHook(() => usePwaPresenter({ landing: true }));
+    expect(nextVisit.result.current.isInstallable).toBe(false);
+  });
+
+  it("synchronizes dismissal across existing presenter instances", async () => {
+    pwaService.setDeferredPrompt({} as BeforeInstallPromptEvent);
+    const first = renderHook(() => usePwaPresenter({ landing: true }));
+    const second = renderHook(() => usePwaPresenter());
+    await waitFor(() => expect(second.result.current.isInstallable).toBe(true));
+    act(() => first.result.current.dismissPrompt());
+    expect(second.result.current.isInstallable).toBe(false);
+  });
+
+  it("does not offer the landing animation inside the installed app", () => {
+    vi.spyOn(pwaService, "isStandalone").mockReturnValue(true);
+    const { result } = renderHook(() => usePwaPresenter({ landing: true }));
+    expect(result.current.isInstallable).toBe(false);
   });
 
   it("handles promptInstall trigger and updates isInstalled when accepted", async () => {

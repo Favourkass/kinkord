@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { getLandingVM, LandingVM } from "./getLandingVM";
-import { usePwaPresenter } from "./usePwaPresenter";
+import { usePwaPresenter, type PwaVM } from "./usePwaPresenter";
 import { communityStatsToVM, type CommunityStatsPM } from "@/domain/communityStats";
 import {
   communityStatsService,
@@ -11,6 +11,13 @@ import {
 import { ageGateService } from "@/services/ageGate.service";
 
 export type ClientLandingVM = LandingVM & {
+  installPrompt: {
+    artwork: PwaVM["installArtwork"];
+    isInstallable: boolean;
+    isInstalling: boolean;
+    onInstall: () => Promise<void>;
+    onDismiss: () => void;
+  };
   isInstalled: boolean;
   onDownload: () => void;
   showAgeGate: boolean;
@@ -24,7 +31,7 @@ const getAgeGateServerSnapshot = () => false;
 
 export function useLandingPresenter(): ClientLandingVM {
   const baseVM = useMemo(() => getLandingVM(), []);
-  const pwa = usePwaPresenter();
+  const pwa = usePwaPresenter({ landing: true });
   const [stats, setStats] = useState<CommunityStatsPM | null>(null);
 
   useEffect(() => {
@@ -72,6 +79,13 @@ export function useLandingPresenter(): ClientLandingVM {
     membership: {
       ...baseVM.membership,
       count: stats ? communityStatsToVM(stats).count : baseVM.membership.count,
+    },
+    installPrompt: {
+      artwork: pwa.installArtwork,
+      isInstallable: pwa.isInstallable && !pwa.showInstallGuide,
+      isInstalling: pwa.isInstalling,
+      onInstall: pwa.downloadApp,
+      onDismiss: pwa.dismissPrompt,
     },
     isInstalled: pwa.isInstalled,
     showAgeGate: !dismissed && !hasConfirmedAge,
