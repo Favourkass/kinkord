@@ -252,4 +252,46 @@ describe("PwaService", () => {
       expect(pwaService.getIsInstallGuideOpen()).toBe(true);
     });
   });
+
+  describe("sparing slow connections", () => {
+    afterEach(() => {
+      Object.defineProperty(navigator, "connection", { value: undefined, configurable: true });
+      vi.unstubAllGlobals();
+    });
+    const connection = (value: object | undefined) =>
+      Object.defineProperty(navigator, "connection", { value, configurable: true });
+
+    it("spares a data saver or a 2G connection, and nothing else", () => {
+      connection(undefined);
+      expect(pwaService.isSlowOrSavingData()).toBe(false);
+      connection({ effectiveType: "4g", saveData: false });
+      expect(pwaService.isSlowOrSavingData()).toBe(false);
+      connection({ effectiveType: "3g" });
+      expect(pwaService.isSlowOrSavingData()).toBe(false);
+      connection({ effectiveType: "2g" });
+      expect(pwaService.isSlowOrSavingData()).toBe(true);
+      connection({ effectiveType: "slow-2g" });
+      expect(pwaService.isSlowOrSavingData()).toBe(true);
+      connection({ effectiveType: "4g", saveData: true });
+      expect(pwaService.isSlowOrSavingData()).toBe(true);
+    });
+
+    it("preloads an image, resolving once it has arrived and failing if it can't", async () => {
+      const requested: string[] = [];
+      vi.stubGlobal(
+        "Image",
+        class {
+          onload: (() => void) | null = null;
+          onerror: (() => void) | null = null;
+          set src(value: string) {
+            requested.push(value);
+            setTimeout(() => (value.includes("missing") ? this.onerror?.() : this.onload?.()));
+          }
+        },
+      );
+      await expect(pwaService.preloadImage("/brand/still.webp")).resolves.toBeUndefined();
+      await expect(pwaService.preloadImage("/brand/missing.webp")).rejects.toThrow();
+      expect(requested).toEqual(["/brand/still.webp", "/brand/missing.webp"]);
+    });
+  });
 });

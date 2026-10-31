@@ -233,6 +233,30 @@ export class PwaService {
   }
 
   /**
+   * Whether to spare this connection anything optional: the browser's data saver,
+   * or a connection it rates 2G. Browsers without the Network Information API
+   * (Safari, Firefox) say no.
+   */
+  isSlowOrSavingData(): boolean {
+    if (typeof navigator === "undefined") return false;
+    const connection = (
+      navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }
+    ).connection;
+    return Boolean(connection?.saveData) || /(^|-)2g$/.test(connection?.effectiveType ?? "");
+  }
+
+  /** Downloads an image into the browser's cache; resolves once it has fully arrived. */
+  preloadImage(src: string): Promise<void> {
+    if (typeof window === "undefined") return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error(`Couldn't load ${src}`));
+      image.src = src;
+    });
+  }
+
+  /**
    * Captures the browser's `beforeinstallprompt` event.
    */
   setupInstallPromptListener(
