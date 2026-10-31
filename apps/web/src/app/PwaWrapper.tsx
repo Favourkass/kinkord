@@ -15,6 +15,7 @@ export function PwaWrapper() {
         artwork={pwa.installArtwork}
         onInstall={pwa.downloadApp}
         onDismiss={pwa.dismissPrompt}
+        onNeverShow={pwa.neverShowPrompt}
       />
       <PwaInstallModal
         artwork={pwa.installArtwork}

@@ -8,7 +8,10 @@ export interface PwaInstallBannerProps {
   isInstalling: boolean;
   artwork: InstallArtwork;
   onInstall: () => void;
+  /** Not now, or the close button: gone for the rest of this visit. */
   onDismiss: () => void;
+  /** Don't show again: gone for good, in this browser. */
+  onNeverShow: () => void;
 }
 
 export function PwaInstallBanner({
@@ -17,6 +20,7 @@ export function PwaInstallBanner({
   artwork,
   onInstall,
   onDismiss,
+  onNeverShow,
 }: PwaInstallBannerProps) {
   if (!isInstallable) return null;
 
@@ -58,14 +62,23 @@ export function PwaInstallBanner({
           Opening installer…
         </p>
       ) : (
-        // Put it off for a week, as the close button does.
-        <button
-          type="button"
-          onClick={onDismiss}
-          className="absolute inset-x-0 bottom-[max(16px,env(safe-area-inset-bottom))] mx-auto w-fit px-5 py-2 text-sm font-semibold text-white/70 hover:text-white"
-        >
-          Not now
-        </button>
+        <div className="absolute inset-x-0 bottom-[max(16px,env(safe-area-inset-bottom))] flex justify-center gap-2">
+          {/* For this visit, as the close button is. */}
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="px-4 py-2 text-sm font-semibold text-white/70 hover:text-white"
+          >
+            Not now
+          </button>
+          <button
+            type="button"
+            onClick={onNeverShow}
+            className="px-4 py-2 text-sm font-semibold text-white/50 hover:text-white"
+          >
+            Don&apos;t show again
+          </button>
+        </div>
       )}
     </section>
   );
