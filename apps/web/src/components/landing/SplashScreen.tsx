@@ -544,6 +544,9 @@ export default function SplashScreen({
         <div
           className={`${brandStyles.community} flex flex-col items-center px-5 pb-8 pt-3 sm:px-8 sm:pt-5`}
         >
+          <p className="mb-4 max-w-[680px] text-center text-[17px] font-semibold leading-snug text-kink-paper sm:text-[22px]">
+            The Global Social Network for Kinksters, Fetishists &amp; BDSM Enthusiasts.
+          </p>
           <div className="grid w-full max-w-[760px] grid-cols-2 gap-2.5 sm:gap-4">
             <SignUpButton cta={signUp} />
             <SignInButton cta={signIn} />
