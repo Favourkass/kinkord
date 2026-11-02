@@ -204,8 +204,25 @@ const { WalletService } = require(path.join(root, "apps/api/dist/wallet/wallet.s
     const renewed = await purchase.checkout("buyer", await input("bank"));
     assert.equal(renewed.amountKobo, abandoned.amountKobo);
     assert.equal((await subscriptions.payment("buyer", abandoned.id)).status, "expired");
+    // Subscription payments still grant their owner the included rings, including renewals.
+    const included = async (id, expected) => {
+      const rows = (await pg.query("select owner_id from kink_ring where payment_id=$1", [id]))
+        .rows;
+      assert.equal(rows.length, expected);
+      assert.ok(rows.every((row) => row.owner_id === "buyer"));
+    };
+    await payments.verify("admin", silver.id);
+    await included(silver.id, 1);
+    const yearly = await subscriptions.checkout("buyer", "yearly");
+    await payments.verify("admin", yearly.id);
+    await included(yearly.id, 12);
+    await assert.rejects(payments.verify("admin", yearly.id), /already/);
+    await included(yearly.id, 12);
+    const renewal = await subscriptions.checkout("buyer", "monthly");
+    await payments.verify("admin", renewal.id);
+    await included(renewal.id, 1);
     console.log(
-      "PASS: all migrations, pricing, coins, replay, rollback, ownership, bank proof, approval/rejection, history, gifting, expiry; no real transactions.",
+      "PASS: all migrations, pricing, coins, replay, rollback, ownership, bank proof, approval/rejection, history, gifting, expiry, monthly/yearly subscription grants and renewals; no real transactions.",
     );
   } finally {
     await pg.close();
