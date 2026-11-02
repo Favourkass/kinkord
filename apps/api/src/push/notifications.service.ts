@@ -146,6 +146,8 @@ const SEARCH_WORDS: Record<NotificationType, readonly string[]> = {
   verification_underage: ["verification", "moderation", "age"],
   test: ["notifications", "enabled"],
   payment: ["payment", "payments", "verify"],
+  ring_purchase_verified: ["rings", "purchase", "payment"],
+  ring_purchase_rejected: ["rings", "purchase", "payment"],
   payment_verified: ["payment", "silver", "premium", "subscription"],
   payment_rejected: ["payment", "silver", "premium", "subscription"],
   silver_check: ["silver", "check", "review"],
@@ -177,6 +179,9 @@ export function notificationUrl(
     case "payment":
     case "silver_check":
       return "/moderation/payments";
+    case "ring_purchase_verified":
+    case "ring_purchase_rejected":
+      return subjectId ? `/subscription/pay/${subjectId}` : "/kink-rings";
     case "payment_verified":
     case "payment_rejected":
       return "/subscription";

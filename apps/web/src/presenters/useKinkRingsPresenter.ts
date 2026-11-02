@@ -30,7 +30,8 @@ type Stage =
   | "allocation"
   | "message"
   | "review"
-  | "history";
+  | "history"
+  | "success";
 export function useKinkRingsPresenter() {
   const router = useRouter();
   const copy = RING_FLOW_COPY;
@@ -55,6 +56,10 @@ export function useKinkRingsPresenter() {
   const [attempt, setAttempt] = useState<{
     key: string;
     gifts: RingGiftAssignment[];
+  } | null>(null);
+  const [completed, setCompleted] = useState<{
+    recipients: RingRecipientDraft[];
+    at: string;
   } | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [giveError, setGiveError] = useState<string | null>(null);
@@ -199,7 +204,15 @@ export function useKinkRingsPresenter() {
     setBusy(true);
     setGiveError(null);
     try {
-      await kinkRingsApi.giveSelected(gifts);
+      const result = await kinkRingsApi.giveSelected(gifts);
+      setCompleted({
+        recipients: picked.map((p) => ({
+          ...p,
+          ringIds: [...p.ringIds],
+          message: p.message.trim(),
+        })),
+        at: result.givenAt ?? new Date().toISOString(),
+      });
       setPm((old) =>
         old
           ? {
@@ -211,8 +224,7 @@ export function useKinkRingsPresenter() {
       setAttempt(null);
       setPicked([]);
       setSelected([]);
-      setStage("overview");
-      setNote(copy.success);
+      setStage("success");
       await reload();
     } catch (e) {
       if (!signedOut(e)) setGiveError(giveRingError(e, copy.error));
@@ -257,12 +269,36 @@ export function useKinkRingsPresenter() {
   );
   return {
     stage,
-    gifting: ["recipients", "selected", "allocation", "message", "review"].includes(stage),
+    completed: completed
+      ? {
+          count: completed.recipients.reduce((n, p) => n + p.ringIds.length, 0),
+          date: new Date(completed.at).toLocaleString("en-GB", {
+            timeZone: "Africa/Lagos",
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          recipients: completed.recipients.map((p) => ({
+            ...recipientVM(p.member),
+            quantity: p.ringIds.length,
+            message: p.message,
+          })),
+        }
+      : null,
+    onDone: () => {
+      setCompleted(null);
+      setStage("overview");
+    },
+    gifting: ["recipients", "selected", "allocation", "message", "review", "success"].includes(
+      stage,
+    ),
     copy,
     loading: !pm && !error,
     error,
     onRetry: reload,
-    buyHref: Routes.subscription,
+    buyHref: Routes.kinkRingsBuy,
     hero: "/kink-rings/gold-heart-ring.webp",
     giftHero: "/kink-rings/gift-box.webp",
     count: available.length,

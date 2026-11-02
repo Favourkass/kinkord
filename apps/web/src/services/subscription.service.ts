@@ -54,7 +54,7 @@ export const paymentsAdminService = {
   },
 
   verify: (id: string) =>
-    api.post<{ id: string; silverUntil: string }>(`${adminPayment(id)}/verify`, {}),
+    api.post<{ id: string; silverUntil: string | null }>(`${adminPayment(id)}/verify`, {}),
 
   reject: (id: string, reason: string) =>
     api.post<{ id: string }>(`${adminPayment(id)}/reject`, { reason }),

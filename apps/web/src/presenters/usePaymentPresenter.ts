@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ringPurchaseSummary } from "@/domain/ringPurchase";
+import { RING_PAYMENT_STATES } from "@/constants/ringPurchase";
 import { Routes } from "@/constants/Routes";
 import { SUBSCRIPTION_COPY } from "@/constants/subscription";
 import {
@@ -43,13 +45,14 @@ export interface PaymentNoticeVM {
 export function paymentNotice(
   view: PaymentView | null,
   reviewNote: string | null,
+  rings = false,
 ): PaymentNoticeVM | null {
   const state = SUBSCRIPTION_COPY.state;
   switch (view) {
     case "submitted":
-      return { tone: "info", ...state.submitted };
+      return rings ? RING_PAYMENT_STATES.submitted : { tone: "info", ...state.submitted };
     case "verified":
-      return { tone: "success", ...state.verified };
+      return rings ? RING_PAYMENT_STATES.verified : { tone: "success", ...state.verified };
     case "rejected":
       return {
         tone: "problem",
@@ -107,6 +110,23 @@ export function usePaymentPresenter(id: string) {
     };
   }, []);
 
+  useEffect(() => {
+    if (payment?.status !== "submitted") return;
+    let live = true;
+    const timer = setInterval(() => {
+      void subscriptionService
+        .payment(id)
+        .then((p) => {
+          if (live) setPayment(p);
+        })
+        .catch(() => undefined);
+    }, 15000);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [id, payment?.status]);
+
   /** Another plan is another payment: the server makes it, and this screen moves to it. */
   const startOver = useCallback(
     async (period: PlanPeriod) => {
@@ -138,7 +158,8 @@ export function usePaymentPresenter(id: string) {
   }, []);
 
   const view = payment ? paymentView(payment, now) : null;
-  const notice = paymentNotice(view, payment?.reviewNote ?? null);
+  const isRings = payment?.purpose === "rings";
+  const notice = paymentNotice(view, payment?.reviewNote ?? null, isRings);
   const canSwitch = (view === "pay" || view === "expired") && !switching;
   const copyLabel = (t: CopyTarget) => (copied === t ? copy.copied : copy.copy);
 
@@ -146,9 +167,11 @@ export function usePaymentPresenter(id: string) {
     loading: payment === null && error === null,
     error,
     view,
-    backHref: Routes.subscription,
+    ringSummary: isRings && payment ? ringPurchaseSummary(payment) : null,
+    ringHero: "/kink-rings/gift-box.webp",
+    backHref: isRings ? Routes.kinkRings : Routes.subscription,
     plans:
-      payment && prices
+      payment && prices && !isRings
         ? planOptions(prices, payment.period).map((o) => ({
             ...o,
             save:
@@ -200,6 +223,10 @@ export function usePaymentPresenter(id: string) {
     canContinue: view === "pay" && confirmed,
     proceed: () => router.push(Routes.subscriptionProof(id)),
     restart: () => {
+      if (isRings) {
+        router.push(Routes.kinkRingsBuy);
+        return;
+      }
       if (payment) void startOver(payment.period);
     },
   };

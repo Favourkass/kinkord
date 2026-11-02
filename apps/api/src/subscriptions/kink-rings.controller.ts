@@ -1,3 +1,6 @@
+import { RingPurchasesService } from "./ring-purchases.service";
+import { ringCheckoutSchema, ringQuantitySchema } from "./ring-purchases.rules";
+import { parse } from "./subscriptions.controller";
 import { z } from "zod";
 import { KinkRingsInventoryService } from "./kink-rings-inventory.service";
 import {
@@ -20,7 +23,21 @@ export class KinkRingsController {
   constructor(
     private readonly rings: KinkRingsService,
     private readonly inventoryService: KinkRingsInventoryService,
+    private readonly purchases: RingPurchasesService,
   ) {}
+
+  @Get("purchase-quote")
+  quote(@Req() req: AuthedRequest, @Query("quantity") quantity: string) {
+    return this.purchases.quote(req.user.id, parse(ringQuantitySchema, Number(quantity)));
+  }
+  @Get("purchases")
+  purchasesList(@Req() req: AuthedRequest, @Query("page") page?: string) {
+    return this.purchases.history(req.user.id, pageNumber(page));
+  }
+  @Post("checkout")
+  checkout(@Req() req: AuthedRequest, @Body() body: unknown) {
+    return this.purchases.checkout(req.user.id, parse(ringCheckoutSchema, body));
+  }
 
   @Get()
   mine(@Req() req: AuthedRequest) {

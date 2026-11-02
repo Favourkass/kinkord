@@ -219,6 +219,7 @@ export class KinkRingsService {
       }
       return {
         replay,
+        givenAt: (replay ? rings[0].givenAt! : now).toISOString(),
         gifts: assignment.map((g) => ({
           ringId: g.ringId,
           to: { username: g.to.username, displayName: g.to.displayName, id: g.to.id },
@@ -228,6 +229,7 @@ export class KinkRingsService {
     if (!result.replay)
       for (const gift of result.gifts) this.push.kinkRingGiven(giverId, gift.to.id, gift.ringId);
     return {
+      givenAt: result.givenAt,
       gifts: result.gifts.map((g) => ({
         ringId: g.ringId,
         to: { username: g.to.username, displayName: g.to.displayName },

@@ -128,7 +128,12 @@ export const walletService = {
     history:
       data?.history.map((row) => ({
         ...walletOperationVM(row),
-        href: row.kind === "purchase" ? Routes.kinkcoinsPay(row.id) : null,
+        href:
+          row.kind === "ring_purchase"
+            ? Routes.subscriptionPay(row.id)
+            : row.kind === "purchase"
+              ? Routes.kinkcoinsPay(row.id)
+              : null,
       })) ?? [],
     currencies: (["coin", "star", "crown"] as const).map((kind) => ({
       kind,

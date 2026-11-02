@@ -44,8 +44,29 @@ From **Kink Rings** in the account menu (`/kink-rings`):
    Recipients preserves existing allocations and messages. Only the final Send
    button submits the gifts, together in one transaction.
 
-**Buy Kink Ring opens the existing Silver Premium purchase page** (`/subscription`).
-There is no separate ring purchase or price.
+**Buy Kink Ring opens `/kink-rings/buy`**. Separate purchases cost **$5 per
+2 rings**, in multiples of two (2–100 per checkout). Purchased rings expire
+**90 days after payment confirmation**; bank purchases are confirmed on admin
+approval. Existing monthly/yearly Silver bundles keep the expiry rules above.
+
+- KinkCoin checkout uses the configured wallet coin **buy** rate in USD cents,
+  rounding up to whole coins. At 10 cents per coin, two rings cost 50 coins.
+  Balance debit, payment ledger and ring issuance commit in one transaction.
+  Bought coins are used before earned coins; spending appears in wallet history.
+- Bank checkout uses the configured wallet exchange rate and payment bank
+  account. The server assigns an exact unique amount and a reference. Members
+  transfer, upload a receipt and sender details, then submit for review. No rings
+  are issued before approval. Admin approval issues rings once without extending
+  the buyer's Silver; approval/rejection notifies the buyer.
+- Each checkout carries a member-bound idempotency key. The browser retains an
+  uncertain purchase in session storage across refresh and retries the same key.
+  Rate changes and insufficient balances are rejected before any charge.
+- `/kink-rings/purchases` lists the signed-in member's purchase history. Payment
+  details and proof routes remain owner-scoped. Submitted status polls for review
+  results. Coin purchases complete immediately without a receipt.
+- Gifting ends with a success screen showing the actual recipients, quantities,
+  personal messages and server confirmation time. Recipients receive Silver
+  immediately; there is no separate activation step.
 
 - Selected rings are ownership-checked and locked in UUID order (`FOR UPDATE`).
   One unavailable, expired or invalid gift rejects the entire batch. Recipient
@@ -112,7 +133,7 @@ existing balances, Silver grants or payment rules are changed.
 `kink_ring` (migration 0046):
 - `owner_id`
 - `payment_id` (null for the founders' rings)
-- `seq` (1 to 12)
+- `seq` (1 to 12 for Silver bundles; 1 to purchased quantity for separate purchases)
 - `expires_at`
 - `given_to`, `given_at`
 - `gift_message` (nullable, migration 0048)
@@ -133,3 +154,26 @@ The overview hero is `apps/web/public/kink-rings/gold-heart-ring.webp` and the
 confirmation illustration is `apps/web/public/kink-rings/gift-box.webp`, generated with
 `image_gen` from the supplied ring reference. The UI and text are rendered in
 React. [Generation prompt and asset details](KINK_RINGS_ARTWORK.md).
+
+## Separate purchase API and rollout
+
+Migration `0049_ring_purchases` adds the payment purpose, quantity, method,
+member-bound request key and coin spending ledger fields, with uniqueness and
+quantity/coin constraints. Apply it before the API and web release. Existing
+payments default to Silver/bank; existing balances and rings are unchanged.
+
+| Route | Behavior |
+| --- | --- |
+| `GET /kink-rings/purchase-quote?quantity=2` | Current server price, payment availability, balance and ring count |
+| `POST /kink-rings/checkout` | Quantity, method, senderId, requestKey and expected quote; atomic, replay-safe checkout |
+| `GET /kink-rings/purchases?page=1` | Owner-only payment history, 20 per page |
+
+Receipt upload, proof submission and admin review reuse subscription payment
+routes and authorization, branching on payment purpose. Bank account details
+always come from configuration, never artwork sample account numbers.
+
+`scripts/tests/ring-purchases-integration.cjs` runs all migrations against an
+isolated PGlite database and covers spending, rollback, replay, approval,
+rejection, ownership, history, notifications and gift fulfillment. Set
+`PGLITE_MODULE` to an installed PGlite module and build `apps/api` first. It does
+not connect to production or exercise real bank payments.

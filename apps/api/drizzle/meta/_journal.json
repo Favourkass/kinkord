@@ -344,6 +344,13 @@
       "when": 1793353315996,
       "tag": "0048_kink_ring_gift_message",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1793639873000,
+      "tag": "0049_ring_purchases",
+      "breakpoints": true
     }
   ]
 }
