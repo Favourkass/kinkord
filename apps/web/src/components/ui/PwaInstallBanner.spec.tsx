@@ -63,6 +63,38 @@ describe("PwaInstallBanner", () => {
     expect(screen.getByRole("img", { name: "Install Kinkord" }).className).toContain("opacity-100");
   });
 
+  it("takes focus when it opens, keeps Tab inside, and hands focus back when it closes", () => {
+    const outside = document.createElement("button");
+    document.body.append(outside);
+    outside.focus();
+    const props = { artwork, isInstalling: false, ...handlers() };
+    const { rerender } = render(<PwaInstallBanner {...props} isInstallable />);
+    const dialog = screen.getByRole("dialog", { name: "Install Kinkord App" });
+    expect(document.activeElement).toBe(dialog);
+
+    const install = screen.getByRole("button", { name: "Install Kinkord App" });
+    const neverShow = screen.getByRole("button", { name: "Don't show again" });
+    fireEvent.keyDown(dialog, { key: "Tab" });
+    expect(document.activeElement).toBe(install);
+    neverShow.focus();
+    fireEvent.keyDown(neverShow, { key: "Tab" });
+    expect(document.activeElement).toBe(install);
+    fireEvent.keyDown(install, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(neverShow);
+
+    rerender(<PwaInstallBanner {...props} isInstallable={false} />);
+    expect(document.activeElement).toBe(outside);
+    outside.remove();
+  });
+
+  it("closes for the visit on Escape", () => {
+    const h = handlers();
+    render(<PwaInstallBanner artwork={artwork} isInstallable isInstalling={false} {...h} />);
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(h.onDismiss).toHaveBeenCalledTimes(1);
+    expect(h.onNeverShow).not.toHaveBeenCalled();
+  });
+
   it("prevents duplicate install attempts while the browser prompt is pending", () => {
     const h = handlers();
     render(<PwaInstallBanner artwork={artwork} isInstallable isInstalling {...h} />);

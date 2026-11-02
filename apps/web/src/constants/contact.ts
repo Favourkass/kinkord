@@ -54,7 +54,7 @@ export const CONTACT_CHANNELS: readonly ContactChannel[] = [
     title: "Instagram",
     subtitle: "Follow us on Instagram",
     value: "@kinkordlimited",
-    href: "https://www.instagram.com/kinkordlimited?cplk=MXJyejNsZ3ZvbG00NQ==",
+    href: "https://www.instagram.com/kinkordlimited/",
     icon: "instagram",
   },
 ];

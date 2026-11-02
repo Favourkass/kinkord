@@ -11,13 +11,16 @@ export const HEADER_WORDMARK = {
 
 /** Static landing wordmark matching the community artwork. Other headers keep their animation. */
 export const LANDING_WORDMARK = {
-  src: "/brand/kinkord-mask-wordmark.png",
+  src: "/brand/kinkord-mask-wordmark.webp",
   alt: BRAND_NAME,
   width: 720,
   height: 232,
 } as const;
 
 export const LANDING_HEADER_TAGLINE = "THE WORLD’S KINK COMMUNITY";
+
+export const LANDING_AUDIENCE_STATEMENT =
+  "The Global Social Network for Kinksters, Fetishists & BDSM Enthusiasts.";
 
 export const BRAND_TAGLINE =
   "Where kinksters connect, explore their interests, build meaningful relationships, and find a community where they truly belong.";
@@ -104,7 +107,7 @@ export const SOCIALS = [
   { name: "X / Twitter", href: "https://x.com/kinkordofficial", icon: "twitter" },
   {
     name: "Instagram",
-    href: "https://www.instagram.com/kinkordlimited?cplk=MXJyejNsZ3ZvbG00NQ==",
+    href: "https://www.instagram.com/kinkordlimited/",
     icon: "instagram",
   },
   { name: "TikTok", href: null, icon: "tiktok" },
