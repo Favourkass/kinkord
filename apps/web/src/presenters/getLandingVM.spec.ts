@@ -31,13 +31,17 @@ describe("getLandingVM", () => {
 
   it("serves the redesign assets from public/brand", () => {
     expect(vm.logo.src).toBe("/brand/logo-badge.png");
+    // Light enough for slow networks: WebP, the artwork cropped to what shows.
     expect(vm.hero).toMatchObject({
-      src: "/brand/landing-connections.png",
+      src: "/brand/landing-connections.webp",
       width: 1080,
-      height: 809,
+      height: 625,
     });
-    expect(vm.wordmark.src).toBe("/brand/kinkord-mask-wordmark.png");
+    expect(vm.wordmark.src).toBe("/brand/kinkord-mask-wordmark.webp");
     expect(vm.headerTagline).toBe("THE WORLD’S KINK COMMUNITY");
+    expect(vm.audienceStatement).toBe(
+      "The Global Social Network for Kinksters, Fetishists & BDSM Enthusiasts.",
+    );
     expect(vm.logo.alt).not.toHaveLength(0);
     expect(vm.hero.alt).not.toHaveLength(0);
   });
@@ -48,7 +52,7 @@ describe("getLandingVM", () => {
       { name: "X / Twitter", href: "https://x.com/kinkordofficial" },
       {
         name: "Instagram",
-        href: "https://www.instagram.com/kinkordlimited?cplk=MXJyejNsZ3ZvbG00NQ==",
+        href: "https://www.instagram.com/kinkordlimited/",
       },
     ]);
   });

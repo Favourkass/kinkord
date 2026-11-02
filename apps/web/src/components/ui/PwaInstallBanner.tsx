@@ -9,7 +9,10 @@ export interface PwaInstallBannerProps {
   isInstalling: boolean;
   artwork: InstallArtwork;
   onInstall: () => void;
+  /** Not now, or the close button: gone for the rest of this visit. */
   onDismiss: () => void;
+  /** Don't show again: gone for good, in this browser. */
+  onNeverShow: () => void;
 }
 
 export function PwaInstallBanner({
@@ -18,32 +21,52 @@ export function PwaInstallBanner({
   artwork,
   onInstall,
   onDismiss,
+  onNeverShow,
 }: PwaInstallBannerProps) {
-  const dialog = useRef<HTMLDialogElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
+
+  // Focus moves into the prompt when it opens, so keys reach it rather than the page
+  // underneath, and goes back to wherever it was once it closes. The prompt itself takes
+  // focus, not a button, so a tap never shows a focus ring around the artwork.
   useEffect(() => {
     if (!isInstallable) return;
-    const element = dialog.current;
-    element?.showModal();
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const previous = document.activeElement;
+    dialogRef.current?.focus({ preventScroll: true });
     return () => {
-      element?.close();
-      document.body.style.overflow = originalOverflow;
+      if (previous instanceof HTMLElement && previous.isConnected) {
+        previous.focus({ preventScroll: true });
+      }
     };
   }, [isInstallable]);
 
   if (!isInstallable) return null;
 
   return (
-    <dialog
-      ref={dialog}
+    <section
+      ref={dialogRef}
+      role="dialog"
       aria-modal="true"
       aria-label="Install Kinkord App"
-      onCancel={(event) => {
-        event.preventDefault();
-        onDismiss();
+      tabIndex={-1}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") onDismiss();
+        if (event.key !== "Tab") return;
+        // Tab wraps at either end rather than walking into the page behind.
+        const buttons = Array.from(
+          event.currentTarget.querySelectorAll<HTMLElement>("button:not(:disabled)"),
+        );
+        const first = buttons[0];
+        const last = buttons[buttons.length - 1];
+        const onButton = buttons.includes(document.activeElement as HTMLElement);
+        if (event.shiftKey && (!onButton || document.activeElement === first)) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && (!onButton || document.activeElement === last)) {
+          event.preventDefault();
+          first?.focus();
+        }
       }}
-      className="fixed inset-0 z-50 m-0 h-dvh max-h-none w-full max-w-none overflow-hidden border-0 bg-black p-0"
+      className="fixed inset-0 z-50 h-dvh w-full overflow-hidden bg-black outline-none"
     >
       <button
         type="button"
@@ -73,15 +96,24 @@ export function PwaInstallBanner({
           Opening installer…
         </p>
       ) : (
-        // Put it off for a week, as the close button does.
-        <button
-          type="button"
-          onClick={onDismiss}
-          className="absolute inset-x-0 bottom-[max(16px,env(safe-area-inset-bottom))] mx-auto w-fit px-5 py-2 text-sm font-semibold text-white/70 hover:text-white"
-        >
-          Not now
-        </button>
+        <div className="absolute inset-x-0 bottom-[max(16px,env(safe-area-inset-bottom))] flex justify-center gap-2">
+          {/* For this visit, as the close button is. */}
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="px-4 py-2 text-sm font-semibold text-white/70 hover:text-white"
+          >
+            Not now
+          </button>
+          <button
+            type="button"
+            onClick={onNeverShow}
+            className="px-4 py-2 text-sm font-semibold text-white/50 hover:text-white"
+          >
+            Don&apos;t show again
+          </button>
+        </div>
       )}
-    </dialog>
+    </section>
   );
 }

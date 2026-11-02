@@ -60,6 +60,8 @@ export interface SplashScreenProps {
   wordmark: SplashImage & { width: number; height: number; still?: string };
   hero: SplashImage & { width: number; height: number };
   headerTagline: string;
+  /** Who Kinkord is for, above the sign-up buttons. */
+  audienceStatement: string;
   mobileContent?: {
     eyebrow: string;
     title: string;
@@ -472,6 +474,7 @@ export default function SplashScreen({
   wordmark,
   hero,
   headerTagline,
+  audienceStatement,
   platformOverview,
   membership,
   downloadCta,
@@ -519,8 +522,8 @@ export default function SplashScreen({
         </header>
 
         <div className="relative">
-          {/* Display only the upper 625px of the 1080px-wide artwork. The baked-in
-              wordmark starts below this crop; never use object-cover here. */}
+          {/* The artwork file is cropped above its baked-in wordmark, to 1080×625;
+              the box keeps that crop if a taller file comes back. Never object-cover. */}
           <div className="relative aspect-[1080/625] overflow-hidden">
             <Image
               src={hero.src}
@@ -545,7 +548,7 @@ export default function SplashScreen({
           className={`${brandStyles.community} flex flex-col items-center px-5 pb-8 pt-3 sm:px-8 sm:pt-5`}
         >
           <p className="mb-4 max-w-[680px] text-center text-[17px] font-semibold leading-snug text-kink-paper sm:text-[22px]">
-            The Global Social Network for Kinksters, Fetishists &amp; BDSM Enthusiasts.
+            {audienceStatement}
           </p>
           <div className="grid w-full max-w-[760px] grid-cols-2 gap-2.5 sm:gap-4">
             <SignUpButton cta={signUp} />

@@ -4,29 +4,27 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 
 let pathname = "/home";
 vi.mock("next/navigation", () => ({ usePathname: () => pathname }));
-const getSession = vi.fn();
-vi.mock("@/services/authClient", () => ({
-  authClient: { getSession: (...a: unknown[]) => getSession(...a) },
-}));
 
 const { usePwaPresenter } = await import("./usePwaPresenter");
 const { pwaService } = await import("@/services/pwa.service");
+const { ageGateService } = await import("@/services/ageGate.service");
 type BeforeInstallPromptEvent = import("@/services/pwa.service").BeforeInstallPromptEvent;
-
-const signedIn = { data: { user: { id: "u1" } } };
 
 describe("usePwaPresenter", () => {
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
     vi.restoreAllMocks();
+    ageGateService.reset();
     pathname = "/home";
-    getSession.mockReset().mockResolvedValue(signedIn);
     pwaService.setDeferredPrompt(null);
     pwaService.closeInstallGuide();
     vi.spyOn(pwaService, "registerServiceWorker").mockResolvedValue(null);
     vi.spyOn(pwaService, "isStandalone").mockReturnValue(false);
     vi.spyOn(pwaService, "isIosDevice").mockReturnValue(false);
     vi.spyOn(pwaService, "isOnline").mockReturnValue(true);
+    vi.spyOn(pwaService, "isSlowOrSavingData").mockReturnValue(false);
+    vi.spyOn(pwaService, "preloadImage").mockResolvedValue();
   });
 
   it("initializes with default states and registers service worker", () => {
@@ -51,47 +49,23 @@ describe("usePwaPresenter", () => {
     expect(result.current.canPromptDirectly).toBe(true);
   });
 
-  it("never covers a page for a signed-out visitor, and offers once they sign in", async () => {
-    getSession.mockResolvedValue({ data: null });
+  it("shows on the landing page once the visitor has answered the age question", async () => {
     pathname = "/";
     pwaService.setDeferredPrompt({} as BeforeInstallPromptEvent);
-    const { result, rerender } = renderHook(() => usePwaPresenter());
-    expect(getSession).not.toHaveBeenCalled();
+    const { result } = renderHook(() => usePwaPresenter());
     expect(result.current.isInstallable).toBe(false);
+    // The card's still is fetched while the question is up, so it's there when it opens.
+    expect(pwaService.preloadImage).toHaveBeenCalledWith("/brand/kinkord-install-still.webp");
 
-    getSession.mockResolvedValue(signedIn);
-    pathname = "/home";
-    rerender();
+    act(() => ageGateService.confirm());
     await waitFor(() => expect(result.current.isInstallable).toBe(true));
   });
 
-  it("offers the landing animation to guests even without a native install event", () => {
-    getSession.mockResolvedValue({ data: null });
-    pathname = "/";
-    const landing = renderHook(() => usePwaPresenter({ landing: true }));
-    const global = renderHook(() => usePwaPresenter());
-    expect(landing.result.current.isInstallable).toBe(true);
-    expect(global.result.current.isInstallable).toBe(false);
-    expect(getSession).not.toHaveBeenCalled();
-    act(() => landing.result.current.dismissPrompt());
-    expect(landing.result.current.isInstallable).toBe(false);
-    const nextVisit = renderHook(() => usePwaPresenter({ landing: true }));
-    expect(nextVisit.result.current.isInstallable).toBe(false);
-  });
-
-  it("synchronizes dismissal across existing presenter instances", async () => {
+  it("shows to signed-out visitors anywhere else, without the age question", async () => {
+    pathname = "/login";
     pwaService.setDeferredPrompt({} as BeforeInstallPromptEvent);
-    const first = renderHook(() => usePwaPresenter({ landing: true }));
-    const second = renderHook(() => usePwaPresenter());
-    await waitFor(() => expect(second.result.current.isInstallable).toBe(true));
-    act(() => first.result.current.dismissPrompt());
-    expect(second.result.current.isInstallable).toBe(false);
-  });
-
-  it("does not offer the landing animation inside the installed app", () => {
-    vi.spyOn(pwaService, "isStandalone").mockReturnValue(true);
-    const { result } = renderHook(() => usePwaPresenter({ landing: true }));
-    expect(result.current.isInstallable).toBe(false);
+    const { result } = renderHook(() => usePwaPresenter());
+    await waitFor(() => expect(result.current.isInstallable).toBe(true));
   });
 
   it("handles promptInstall trigger and updates isInstalled when accepted", async () => {
@@ -113,24 +87,61 @@ describe("usePwaPresenter", () => {
     expect(triggerSpy).toHaveBeenCalledWith(mockEvent);
   });
 
-  it("puts the prompt off for a week across visits, not the old banner's for good", async () => {
-    localStorage.setItem("kinkord_pwa_install_dismissed", "true");
+  it("puts the prompt off for this visit only: the next visit asks again", async () => {
     pwaService.setDeferredPrompt({} as BeforeInstallPromptEvent);
-
     const { result } = renderHook(() => usePwaPresenter());
     await waitFor(() => expect(result.current.isInstallable).toBe(true));
 
-    act(() => {
-      result.current.dismissPrompt();
-    });
-
+    act(() => result.current.dismissPrompt());
     expect(result.current.isInstallable).toBe(false);
+    // Another page in the same visit: still put off.
+    expect(renderHook(() => usePwaPresenter()).result.current.isInstallable).toBe(false);
+
+    sessionStorage.clear(); // a new visit
     const nextVisit = renderHook(() => usePwaPresenter());
-    await waitFor(() => expect(getSession).toHaveBeenCalled());
-    expect(nextVisit.result.current.isInstallable).toBe(false);
-    expect(Number(localStorage.getItem("kinkord_pwa_install_snoozed_until"))).toBeGreaterThan(
-      Date.now() + 6 * 86_400_000,
-    );
+    await waitFor(() => expect(nextVisit.result.current.isInstallable).toBe(true));
+  });
+
+  it("asks again after tapping install, if the app isn't installed on the next visit", async () => {
+    pwaService.setDeferredPrompt({} as BeforeInstallPromptEvent);
+    vi.spyOn(pwaService, "downloadApp").mockResolvedValue("dismissed");
+    const { result } = renderHook(() => usePwaPresenter());
+    await act(async () => {
+      await result.current.downloadApp();
+    });
+    expect(result.current.isInstallable).toBe(false);
+    sessionStorage.clear();
+    const nextVisit = renderHook(() => usePwaPresenter());
+    await waitFor(() => expect(nextVisit.result.current.isInstallable).toBe(true));
+  });
+
+  it("stays away for good after Don't show again", async () => {
+    pwaService.setDeferredPrompt({} as BeforeInstallPromptEvent);
+    const { result } = renderHook(() => usePwaPresenter());
+    await waitFor(() => expect(result.current.isInstallable).toBe(true));
+    act(() => result.current.neverShowPrompt());
+    expect(result.current.isInstallable).toBe(false);
+    sessionStorage.clear();
+    expect(renderHook(() => usePwaPresenter()).result.current.isInstallable).toBe(false);
+  });
+
+  it("forgets the old week's snooze, so it shows again", async () => {
+    localStorage.setItem("kinkord_pwa_install_snoozed_until", String(Date.now() + 86_400_000));
+    localStorage.setItem("kinkord_pwa_install_dismissed", "true");
+    pwaService.setDeferredPrompt({} as BeforeInstallPromptEvent);
+    const { result } = renderHook(() => usePwaPresenter());
+    await waitFor(() => expect(result.current.isInstallable).toBe(true));
+    expect(localStorage.getItem("kinkord_pwa_install_snoozed_until")).toBeNull();
+  });
+
+  it("plays the motion, except on a data saver or 2G, where the still stays", () => {
+    const { result } = renderHook(() => usePwaPresenter());
+    expect(result.current.installArtwork).toMatchObject({
+      still: "/brand/kinkord-install-still.webp",
+      motion: "/brand/kinkord-install.mp4",
+    });
+    vi.spyOn(pwaService, "isSlowOrSavingData").mockReturnValue(true);
+    expect(renderHook(() => usePwaPresenter()).result.current.installArtwork.motion).toBeNull();
   });
 
   it("recognizes iOS installable state when not standalone and not dismissed", async () => {

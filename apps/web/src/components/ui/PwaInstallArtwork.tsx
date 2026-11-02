@@ -1,27 +1,51 @@
+"use client";
+
+import Image from "next/image";
+import { useState } from "react";
+
 export interface InstallArtwork {
-  src: string;
-  /** One frame of the animation, for members whose device asks for reduced motion. */
-  still?: string;
+  /** The finished card: shown at once, and on its own where there's no motion. */
+  still: string;
+  /** The card's motion, a short looping video. Null shows the still alone. */
+  motion: string | null;
   alt: string;
   width: number;
   height: number;
 }
 
-/** The animated install card, already cropped to the card. Reduced motion gets a still. */
+/**
+ * The install card. The still shows straight away, so a slow network never leaves a
+ * blank screen; the motion plays underneath and the still fades out once it's playing.
+ */
 export function PwaInstallArtwork({ artwork }: { artwork: InstallArtwork }) {
+  const [playing, setPlaying] = useState(false);
   return (
-    <picture className="block w-full overflow-hidden rounded-2xl bg-black">
-      {artwork.still ? (
-        <source media="(prefers-reduced-motion: reduce)" srcSet={artwork.still} />
+    <span className="relative block w-full overflow-hidden rounded-2xl bg-black">
+      {artwork.motion ? (
+        // Decorative and muted: the still underneath carries the description.
+        <video
+          src={artwork.motion}
+          width={artwork.width}
+          height={artwork.height}
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+          aria-hidden="true"
+          onPlaying={() => setPlaying(true)}
+          className="absolute inset-0 block h-full w-full"
+        />
       ) : null}
-      <img
-        src={artwork.src}
+      <Image
+        src={artwork.still}
         alt={artwork.alt}
         width={artwork.width}
         height={artwork.height}
-        decoding="async"
-        className="block h-auto w-full"
+        unoptimized
+        loading="eager"
+        className={`relative block h-auto w-full transition-opacity duration-300 ${playing && artwork.motion ? "opacity-0" : "opacity-100"}`}
       />
-    </picture>
+    </span>
   );
 }

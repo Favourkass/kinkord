@@ -2,14 +2,15 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
-import { Routes } from "@/constants/Routes";
 import { PWA_INSTALL_ARTWORK } from "@/constants/pwa";
-import { authClient } from "@/services/authClient";
+import { Routes } from "@/constants/Routes";
+import { ageGateService } from "@/services/ageGate.service";
 import { installPromptMemory } from "@/services/installPromptMemory";
 import { BeforeInstallPromptEvent, pwaService } from "@/services/pwa.service";
 
 export interface PwaVM {
-  installArtwork: typeof PWA_INSTALL_ARTWORK;
+  /** The still shows at once; `motion` is null where it isn't welcome. */
+  installArtwork: Omit<typeof PWA_INSTALL_ARTWORK, "motion"> & { motion: string | null };
   isInstallable: boolean;
   isInstalled: boolean;
   isInstalling: boolean;
@@ -23,27 +24,45 @@ export interface PwaVM {
   openInstallGuide: () => void;
   closeInstallGuide: () => void;
   dismissPrompt: () => void;
+  neverShowPrompt: () => void;
 }
 
 const emptySubscribe = () => () => {};
 
-const getSnoozedSnapshot = () => installPromptMemory.isSnoozed();
-const getSnoozedServerSnapshot = () => false;
+const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
+const subscribeMotion = (onStoreChange: () => void) => {
+  const query = window.matchMedia?.(REDUCED_MOTION);
+  query?.addEventListener?.("change", onStoreChange);
+  return () => query?.removeEventListener?.("change", onStoreChange);
+};
 
-/** Landing owns its popup so it can wait for the video and age confirmation. */
-export function usePwaPresenter({ landing = false }: { landing?: boolean } = {}): PwaVM {
-  // Put off for a week by "Not now", the close button or tapping install (the
-  // browser takes it from there). Read on the client; the server offers nothing.
+export function usePwaPresenter(): PwaVM {
+  // Every visit to someone without the app, until "Don't show again"; "Not now",
+  // closing it or tapping install put it off for the rest of this visit only.
+  // Read on the client; the server offers nothing.
   const [dismissed, setDismissed] = useState(() =>
-    typeof window === "undefined" ? false : installPromptMemory.isSnoozed(),
+    typeof window === "undefined"
+      ? false
+      : installPromptMemory.isOff() || installPromptMemory.isHiddenThisVisit(),
   );
-  const snoozed = useSyncExternalStore(
-    installPromptMemory.subscribe,
-    getSnoozedSnapshot,
-    getSnoozedServerSnapshot,
-  );
-  const [signedIn, setSignedIn] = useState(false);
   const pathname = usePathname();
+  // The landing page asks a visitor's age first: the prompt waits until they've answered.
+  const ageConfirmed = useSyncExternalStore(
+    (onStoreChange) => ageGateService.subscribe(onStoreChange),
+    () => ageGateService.isConfirmed(),
+    () => false,
+  );
+  // The motion only where it's welcome: not on a data saver or 2G, nor for reduced motion.
+  const reducedMotion = useSyncExternalStore(
+    subscribeMotion,
+    () => window.matchMedia?.(REDUCED_MOTION).matches ?? false,
+    () => false,
+  );
+  const sparingData = useSyncExternalStore(
+    emptySubscribe,
+    () => pwaService.isSlowOrSavingData(),
+    () => false,
+  );
 
   const deferredPrompt = useSyncExternalStore(
     (onStoreChange) => pwaService.subscribePrompt(onStoreChange),
@@ -97,6 +116,7 @@ export function usePwaPresenter({ landing = false }: { landing?: boolean } = {})
   useEffect(() => {
     void pwaService.registerServiceWorker();
     pwaService.attachGlobalListeners();
+    installPromptMemory.forgetOldRules();
   }, []);
 
   const canPromptDirectly = Boolean(deferredPrompt);
@@ -123,39 +143,38 @@ export function usePwaPresenter({ landing = false }: { landing?: boolean } = {})
 
   const downloadApp = useCallback(async () => {
     setDismissed(true);
-    installPromptMemory.snooze();
+    installPromptMemory.hideThisVisit();
     await pwaService.downloadApp();
   }, []);
 
   const dismissPrompt = useCallback(() => {
     setDismissed(true);
-    installPromptMemory.snooze();
+    installPromptMemory.hideThisVisit();
   }, []);
 
-  const wouldOffer =
-    !isInstalled && !dismissed && !snoozed && (landing || Boolean(deferredPrompt) || isIos);
-  // The global prompt remains member-only. HomeScreen owns the guest landing popup.
-  // Asked again on each page, so it appears once someone signs in, and goes on sign-out.
-  useEffect(() => {
-    if (!wouldOffer || landing || pathname === Routes.home) return;
-    let live = true;
-    authClient.getSession().then(
-      ({ data }) => {
-        if (live) setSignedIn(Boolean(data?.user));
-      },
-      () => {
-        if (live) setSignedIn(false);
-      },
-    );
-    return () => {
-      live = false;
-    };
-  }, [pathname, wouldOffer, landing]);
+  const neverShowPrompt = useCallback(() => {
+    setDismissed(true);
+    installPromptMemory.turnOff();
+  }, []);
 
-  const isInstallable = wouldOffer && (landing || (pathname !== Routes.home && signedIn));
+  // Without the app: the browser offers to install it, or it's an iPhone, where
+  // nothing can tell (the guide covers it). The installed app never offers it.
+  const wouldOffer = !isInstalled && !dismissed && (Boolean(deferredPrompt) || isIos);
+  const playMotion = !reducedMotion && !sparingData;
+
+  // Fetch the still as soon as the card may be needed (say, while the age question
+  // is up), so it shows the moment the card opens; the motion streams in after.
+  useEffect(() => {
+    if (wouldOffer) void pwaService.preloadImage(PWA_INSTALL_ARTWORK.still).catch(() => undefined);
+  }, [wouldOffer]);
+
+  const isInstallable = wouldOffer && (pathname !== Routes.home || ageConfirmed);
 
   return {
-    installArtwork: PWA_INSTALL_ARTWORK,
+    installArtwork: {
+      ...PWA_INSTALL_ARTWORK,
+      motion: playMotion ? PWA_INSTALL_ARTWORK.motion : null,
+    },
     isInstallable,
     isInstalled,
     isInstalling,
@@ -169,5 +188,6 @@ export function usePwaPresenter({ landing = false }: { landing?: boolean } = {})
     openInstallGuide,
     closeInstallGuide,
     dismissPrompt,
+    neverShowPrompt,
   };
 }
