@@ -1,3 +1,4 @@
+import { purchasedRings } from "./ring-purchases.rules";
 import { ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, asc, desc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
 import { DRIZZLE, type Db } from "../db/db.module";
@@ -97,7 +98,7 @@ export class PaymentsService {
    * Any payment not already verified can be (an admin may find a transfer
    * whose proof never came), and only once, however many admins press it.
    */
-  async verify(actorId: string, id: string): Promise<{ id: string; silverUntil: string }> {
+  async verify(actorId: string, id: string): Promise<{ id: string; silverUntil: string | null }> {
     const result = await this.db.transaction(async (tx) => {
       const [row] = await tx
         .update(subscriptionPayment)
@@ -120,11 +121,19 @@ export class PaymentsService {
       // Silver the founders gave runs on: the payment then adds to the member's
       // own time. Verifying is an admin looking at the member as they are now,
       // so a check held after a name or photo change shows again.
-      const until = await addSilverTime(tx, row.userId, row.plan, row.period, now, {
-        clearHeldCheck: true,
-      });
-      // Kink Rings to give away: as many as the plan brought when they checked out.
-      const rings = ringsFor(row.rings ?? RINGS_FOR[row.period], now);
+      // A ring purchase never touches the buyer's own Silver.
+      const until =
+        row.purpose === "rings"
+          ? null
+          : await addSilverTime(tx, row.userId, row.plan, row.period, now, {
+              clearHeldCheck: true,
+            });
+      // Kink Rings to give away: the rings bought, or as many as the plan
+      // brought when they checked out.
+      const rings =
+        row.purpose === "rings"
+          ? purchasedRings(row.ringQuantity!, now)
+          : ringsFor(row.rings ?? RINGS_FOR[row.period], now);
       if (rings.length) {
         await tx
           .insert(kinkRing)
@@ -144,10 +153,11 @@ export class PaymentsService {
         subjectUserId: row.userId,
         detail: id,
       });
-      return { userId: row.userId, until };
+      return { userId: row.userId, until, rings: row.purpose === "rings" };
     });
-    this.push.paymentVerified(result.userId, id);
-    return { id, silverUntil: result.until.toISOString() };
+    if (result.rings) this.push.ringPurchaseVerified(result.userId, id);
+    else this.push.paymentVerified(result.userId, id);
+    return { id, silverUntil: result.until?.toISOString() ?? null };
   }
 
   /** The transfer couldn't be matched. The member reads `reason` and can pay again. */
@@ -166,7 +176,7 @@ export class PaymentsService {
           inArray(subscriptionPayment.status, ["submitted", "pending"]),
         ),
       )
-      .returning({ userId: subscriptionPayment.userId });
+      .returning({ userId: subscriptionPayment.userId, purpose: subscriptionPayment.purpose });
     if (!row) throw await this.missing(this.db, id, "rejected");
     await this.db.insert(moderationLog).values({
       actorId,
@@ -174,7 +184,8 @@ export class PaymentsService {
       subjectUserId: row.userId,
       detail: `${id}: ${reason}`,
     });
-    this.push.paymentRejected(row.userId, id);
+    if (row.purpose === "rings") this.push.ringPurchaseRejected(row.userId, id);
+    else this.push.paymentRejected(row.userId, id);
     return { id };
   }
 

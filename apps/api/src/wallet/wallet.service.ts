@@ -19,6 +19,7 @@ import {
   walletBank,
   walletLedger,
   walletGift,
+  subscriptionPayment,
   walletOperation,
   walletSettings,
 } from "../db/schema";
@@ -219,7 +220,7 @@ export class WalletService {
     return this.banks(userId);
   }
   async history(userId: string) {
-    const [operations, gifts] = await Promise.all([
+    const [operations, gifts, ringPurchases] = await Promise.all([
       this.db
         .select()
         .from(walletOperation)
@@ -232,10 +233,42 @@ export class WalletService {
         .where(or(eq(walletGift.senderId, userId), eq(walletGift.recipientId, userId)))
         .orderBy(desc(walletGift.createdAt))
         .limit(200),
+      this.db
+        .select()
+        .from(subscriptionPayment)
+        .where(
+          and(
+            eq(subscriptionPayment.userId, userId),
+            eq(subscriptionPayment.purpose, "rings"),
+            eq(subscriptionPayment.method, "coins"),
+          ),
+        )
+        .orderBy(desc(subscriptionPayment.createdAt))
+        .limit(200),
     ]);
     return [
       ...operations.map(walletOperationDto),
       ...gifts.map((row) => giftHistoryDto(row, userId)),
+      ...ringPurchases.map((row) => ({
+        id: row.id,
+        userId,
+        kind: "ring_purchase" as const,
+        currency: "coin" as const,
+        quantity: row.coinQuantity!,
+        amountKobo: row.amountKobo,
+        status: "verified" as const,
+        reference: row.reference,
+        bankName: "KinkCoins",
+        accountName: "",
+        accountNumber: "",
+        receiptKey: null,
+        senderReference: null,
+        senderAccountName: null,
+        reviewNote: null,
+        settlementReference: null,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.createdAt.toISOString(),
+      })),
     ]
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, 200);

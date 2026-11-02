@@ -110,6 +110,8 @@ export const Routes = {
   subscription: "/subscription",
   /** Kink Rings: a month of Silver to give away. */
   kinkRings: "/kink-rings",
+  kinkRingsBuy: "/kink-rings/buy",
+  kinkRingsPurchases: "/kink-rings/purchases",
   subscriptionPay: (paymentId: string) => `/subscription/pay/${encodeURIComponent(paymentId)}`,
   subscriptionProof: (paymentId: string) => `/subscription/proof/${encodeURIComponent(paymentId)}`,
 } as const;

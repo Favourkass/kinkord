@@ -30,6 +30,8 @@ export type NotificationType =
   // A member's payment proof, for the admins to check.
   | "payment"
   // The member's own payment: confirmed, or not.
+  | "ring_purchase_verified"
+  | "ring_purchase_rejected"
   | "payment_verified"
   | "payment_rejected"
   // A Silver member changed their name or photo, for the admins to look at.

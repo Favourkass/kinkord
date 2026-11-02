@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
+import { RingPaymentResult } from "@/components/kink-rings/RingPaymentView";
 import PaymentProofView from "@/components/subscription/PaymentProofView";
 import SubscriptionChrome from "@/components/subscription/SubscriptionChrome";
 import { SUBSCRIPTION_COPY } from "@/constants/subscription";
@@ -19,13 +20,21 @@ export default function SubscriptionProofPage() {
       width="payment"
       footer={p.view === "form"}
     >
-      {p.view ? (
+      {p.ringSummary && p.view !== "form" ? (
+        <RingPaymentResult
+          summary={p.ringSummary}
+          notice={p.notice}
+          backHref={p.subscriptionHref}
+          hero={p.ringHero}
+        />
+      ) : p.view ? (
         <PaymentProofView
           copy={{
             ...copy,
             medalAlt: SUBSCRIPTION_COPY.upgrade.medalAlt,
-            back: SUBSCRIPTION_COPY.state.back,
+            back: p.ringSummary ? "Back to Kink Rings" : SUBSCRIPTION_COPY.state.back,
           }}
+          artwork={p.ringSummary ? { src: p.ringHero, alt: p.ringSummary.title } : undefined}
           view={p.view}
           notice={p.notice}
           subscriptionHref={p.subscriptionHref}

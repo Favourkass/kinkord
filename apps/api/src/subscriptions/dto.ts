@@ -76,6 +76,10 @@ export interface PaymentProofDto {
 }
 
 export interface PaymentDto {
+  purpose?: "silver" | "rings";
+  ringQuantity?: number | null;
+  method?: "bank" | "coins";
+  coinQuantity?: number | null;
   id: string;
   plan: SubscriptionPlan;
   period: BillingPeriod;

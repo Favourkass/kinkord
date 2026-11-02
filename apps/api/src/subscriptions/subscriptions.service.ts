@@ -99,6 +99,10 @@ export function toPaymentDto(row: PaymentRow, now: Date = new Date()): PaymentDt
   const lapsed = row.status === "pending" && now > proofUntil;
   return {
     id: row.id,
+    purpose: row.purpose ?? "silver",
+    ringQuantity: row.ringQuantity ?? null,
+    method: row.method ?? "bank",
+    coinQuantity: row.coinQuantity ?? null,
     plan: row.plan,
     period: row.period,
     status: lapsed ? "expired" : row.status,
@@ -217,6 +221,7 @@ export class SubscriptionsService implements OnApplicationBootstrap {
             .where(
               and(
                 eq(subscriptionPayment.userId, founder.id),
+                eq(subscriptionPayment.purpose, "silver"),
                 eq(subscriptionPayment.status, "pending"),
               ),
             );
@@ -243,7 +248,9 @@ export class SubscriptionsService implements OnApplicationBootstrap {
       this.db
         .select()
         .from(subscriptionPayment)
-        .where(eq(subscriptionPayment.userId, userId))
+        .where(
+          and(eq(subscriptionPayment.userId, userId), eq(subscriptionPayment.purpose, "silver")),
+        )
         .orderBy(desc(subscriptionPayment.createdAt))
         .limit(5),
       silverCheckStatus(this.db, userId, now),
@@ -291,6 +298,7 @@ export class SubscriptionsService implements OnApplicationBootstrap {
       .where(
         and(
           eq(subscriptionPayment.userId, userId),
+          eq(subscriptionPayment.purpose, "silver"),
           inArray(subscriptionPayment.status, ["pending", "submitted"]),
         ),
       )
@@ -307,7 +315,11 @@ export class SubscriptionsService implements OnApplicationBootstrap {
         .update(subscriptionPayment)
         .set({ status: "expired" })
         .where(
-          and(eq(subscriptionPayment.userId, userId), eq(subscriptionPayment.status, "pending")),
+          and(
+            eq(subscriptionPayment.userId, userId),
+            eq(subscriptionPayment.purpose, "silver"),
+            eq(subscriptionPayment.status, "pending"),
+          ),
         );
     }
     await expireAbandoned(this.db, now);
@@ -417,9 +429,7 @@ export class SubscriptionsService implements OnApplicationBootstrap {
       throw new ConflictException("This payment has already been sent for checking.");
     }
     if (row.status !== "pending" || new Date() > proofDeadline(row)) {
-      throw new ConflictException(
-        "This payment can't take proof any more. Start a new one from the Silver page.",
-      );
+      throw new ConflictException("This payment can't take proof any more. Start a new purchase.");
     }
   }
 

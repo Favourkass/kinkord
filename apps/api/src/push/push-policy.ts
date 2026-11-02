@@ -164,6 +164,8 @@ const SAYS: Partial<Record<NotificationType, [one: string, many: string]>> = {
 };
 /** Account notices have no actor; held through the night, they say what they always say. */
 const ACCOUNT_SAYS: Partial<Record<NotificationType, string>> = {
+  ring_purchase_verified: "Your Kink Rings are ready to gift",
+  ring_purchase_rejected: "We couldn't confirm your Kink Ring payment",
   payment_verified: "Your Silver Premium is active",
   payment_rejected: "We couldn't confirm your payment",
   verification_update: "Your identity verification has an update",

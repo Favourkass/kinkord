@@ -13,6 +13,8 @@ export type NotificationKind =
   | "report"
   | "test"
   | "payment"
+  | "ring_purchase_verified"
+  | "ring_purchase_rejected"
   | "payment_verified"
   | "payment_rejected"
   | "verification"
@@ -115,6 +117,16 @@ const KINDS: Record<
   repost: { category: "Share", icon: "repost", action: () => "shared your post." },
   report: { category: "Moderation", icon: "shield", action: () => "New report to review." },
   payment: { category: "Payments", icon: "shield", action: () => "New payment to verify." },
+  ring_purchase_verified: {
+    category: "Kink Rings",
+    icon: "bell",
+    action: () => "Your Kink Rings are ready to gift.",
+  },
+  ring_purchase_rejected: {
+    category: "Kink Rings",
+    icon: "bell",
+    action: () => "We couldn't confirm your Kink Ring payment. Open it to see why.",
+  },
   payment_verified: {
     category: "Silver Premium",
     icon: "bell",
@@ -165,6 +177,8 @@ const OFFICIAL: ReadonlySet<NotificationKind> = new Set([
   "report",
   "test",
   "payment",
+  "ring_purchase_verified",
+  "ring_purchase_rejected",
   "payment_verified",
   "payment_rejected",
   "silver_check",
