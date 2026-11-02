@@ -5,11 +5,13 @@ import { EmailVerificationController } from "../otp/otp.controller";
 import { type PresenceService } from "../presence/presence.service";
 import { ProfilesController } from "../profiles/profiles.controller";
 import { PushController } from "../push/push.controller";
+import { type LocationCheckService } from "../location-check/location-check.service";
 import {
   AllowDuringSignUp,
   AuthGuard,
   EMAIL_VERIFICATION_REQUIRED,
   EMAIL_VERIFICATION_REQUIRED_FROM,
+  LOCATION_CHECK_REQUIRED,
   PROFILE_PHOTOS_REQUIRED,
   needsEmailVerification,
 } from "./auth.guard";
@@ -45,17 +47,27 @@ const presenceStub = () => {
   return { presence: { touch } as unknown as PresenceService, touch };
 };
 
+/** Whether the member owes a country check; the rules themselves are LocationCheckService's. */
+const locationStub = (owes = false) => {
+  const needsCheck = vi.fn(async () => owes);
+  return { location: { needsCheck } as unknown as LocationCheckService, needsCheck };
+};
+
 interface ProfileRow {
   signupPhotosSkipped: boolean;
   photoSkipAvailable: boolean;
   avatarKey: string | null;
   coverKey: string | null;
+  country: string | null;
+  accountType: "person" | "organization";
 }
 const finished: ProfileRow = {
   signupPhotosSkipped: false,
   photoSkipAvailable: false,
   avatarKey: "avatars/u1/a.jpg",
   coverKey: "covers/u1/c.jpg",
+  country: "NG",
+  accountType: "person",
 };
 
 /** `null` is an account with no profile row at all. */
@@ -70,17 +82,25 @@ interface Account {
   email?: string;
 }
 
-const guardWithDb = (account: Account | string, db: ReturnType<typeof dbWithProfile>) => {
+const guardWithDb = (
+  account: Account | string,
+  db: ReturnType<typeof dbWithProfile>,
+  location = locationStub().location,
+) => {
   const {
     createdAt,
     emailVerified = true,
     email = "member@kinkord.com",
   } = typeof account === "string" ? { createdAt: account } : account;
   return new AuthGuard(
-    authWith({ user: { id: "u1", email, emailVerified, createdAt }, session: { id: "s1" } }),
+    authWith({
+      user: { id: "u1", email, emailVerified, createdAt },
+      session: { id: "s1", createdAt: "2026-11-02T08:00:00Z" },
+    }),
     presenceStub().presence,
     new Reflector(),
     db as never,
+    location,
   );
 };
 
@@ -99,7 +119,13 @@ const OLD = "2026-09-01T10:00:00Z";
 describe("AuthGuard", () => {
   it("rejects requests without a session and records no heartbeat", async () => {
     const { presence, touch } = presenceStub();
-    const guard = new AuthGuard(authWith(null), presence, new Reflector(), {} as never);
+    const guard = new AuthGuard(
+      authWith(null),
+      presence,
+      new Reflector(),
+      {} as never,
+      locationStub().location,
+    );
     await expect(guard.canActivate(ctx({ headers: {} }))).rejects.toThrow(UnauthorizedException);
     expect(touch).not.toHaveBeenCalled();
   });
@@ -112,6 +138,7 @@ describe("AuthGuard", () => {
       presence,
       new Reflector(),
       dbWithProfile({}) as never,
+      locationStub().location,
     );
     const req: Record<string, unknown> = { headers: { cookie: "x" } };
     await expect(guard.canActivate(ctx(req))).resolves.toBe(true);
@@ -246,5 +273,46 @@ describe("AuthGuard profile photos", () => {
 
   it("doesn't lock out an account with no profile to add photos to", async () => {
     await expect(guardFor(OLD, null).canActivate(ctx({ headers: {} }))).resolves.toBe(true);
+  });
+});
+
+describe("AuthGuard location check", () => {
+  it("holds a member who owes a country check at the location check", async () => {
+    const { location, needsCheck } = locationStub(true);
+    const guard = guardWithDb(OLD, dbWithProfile({}), location);
+    expect(await holdOf(guard)).toBe(LOCATION_CHECK_REQUIRED);
+    expect(needsCheck).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user: expect.objectContaining({ id: "u1" }),
+        sessionCreatedAt: new Date("2026-11-02T08:00:00Z"),
+        profile: { country: "NG", accountType: "person" },
+      }),
+    );
+  });
+
+  it("lets a member through once they have checked", async () => {
+    const guard = guardWithDb(OLD, dbWithProfile({}), locationStub(false).location);
+    await expect(guard.canActivate(ctx({ headers: {} }))).resolves.toBe(true);
+  });
+
+  it("asks for photos before the country, in sign-up order", async () => {
+    const { location, needsCheck } = locationStub(true);
+    const guard = guardWithDb(OLD, dbWithProfile({ avatarKey: null }), location);
+    expect(await holdOf(guard)).toBe(PROFILE_PHOTOS_REQUIRED);
+    expect(needsCheck).not.toHaveBeenCalled();
+  });
+
+  it("lets a held member reach the routes they need, without asking", async () => {
+    const { location, needsCheck } = locationStub(true);
+    const guard = guardWithDb(OLD, dbWithProfile({}), location);
+    await expect(guard.canActivate(ctx({ headers: {} }, "finishSignUp"))).resolves.toBe(true);
+    expect(needsCheck).not.toHaveBeenCalled();
+  });
+
+  it("doesn't hold an account with no profile, which has no country to check", async () => {
+    const { location, needsCheck } = locationStub(true);
+    const guard = guardWithDb(OLD, dbWithProfile(null), location);
+    await expect(guard.canActivate(ctx({ headers: {} }))).resolves.toBe(true);
+    expect(needsCheck).not.toHaveBeenCalled();
   });
 });

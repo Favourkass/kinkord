@@ -13,6 +13,11 @@ import { fromNodeHeaders } from "better-auth/node";
 import { eq } from "drizzle-orm";
 import { DRIZZLE, type Db } from "../db/db.module";
 import { profile } from "../db/schema";
+import { checkedIp } from "../location-check/client-ip";
+import {
+  LOCATION_CHECK_REQUIRED,
+  LocationCheckService,
+} from "../location-check/location-check.service";
 import { isSuperAdmin } from "../moderation/admins";
 import { PresenceService } from "../presence/presence.service";
 import { AUTH, Auth } from "./auth.instance";
@@ -31,11 +36,14 @@ export const EMAIL_VERIFICATION_REQUIRED = "EMAIL_VERIFICATION_REQUIRED";
 /** The `code` the web app recognises to send a member to the profile-photo step. */
 export const PROFILE_PHOTOS_REQUIRED = "PROFILE_PHOTOS_REQUIRED";
 
+export { LOCATION_CHECK_REQUIRED };
+
 const ALLOW_DURING_SIGN_UP = "kinkord:allowDuringSignUp";
 
 /**
  * Marks the routes a member needs to finish sign-up (verify their email, add
- * profile photos), so the sign-up holds below let them through.
+ * profile photos) or to confirm their country, so the holds below let them
+ * through.
  */
 export const AllowDuringSignUp = () => SetMetadata(ALLOW_DURING_SIGN_UP, true);
 
@@ -56,6 +64,10 @@ interface SignedInUser {
   createdAt: Date | string;
 }
 
+interface SignedInSession {
+  createdAt?: Date | string;
+}
+
 @Injectable()
 export class AuthGuard implements CanActivate {
   constructor(
@@ -63,6 +75,7 @@ export class AuthGuard implements CanActivate {
     private readonly presence: PresenceService,
     private readonly reflector: Reflector,
     @Inject(DRIZZLE) private readonly db: Db,
+    private readonly location: LocationCheckService,
   ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
@@ -75,7 +88,7 @@ export class AuthGuard implements CanActivate {
     req.session = result.session;
     // Presence heartbeat: throttled and fire-and-forget, so it can never slow or fail a request.
     this.presence.touch(result.user.id);
-    const hold = await this.signUpHold(ctx, result.user);
+    const hold = await this.signUpHold(ctx, result.user, result.session, req);
     if (hold) throw new ForbiddenException(hold);
     return true;
   }
@@ -93,8 +106,17 @@ export class AuthGuard implements CanActivate {
    *   ever had a profile photo. A skipped cover stays optional, but once they
    *   have had a photo, deleting it from the Media tab asks for a new one, as
    *   it does for everyone who never skipped.
+   * - Location: members confirm the country they are in after each new
+   *   sign-in, every 30 days, and when their connection moves country
+   *   (LocationCheckService.needsCheck). Watching, one recorded check of any
+   *   result lets them on.
    */
-  private async signUpHold(ctx: ExecutionContext, user: SignedInUser): Promise<SignUpHold | null> {
+  private async signUpHold(
+    ctx: ExecutionContext,
+    user: SignedInUser,
+    session: SignedInSession,
+    req: Request,
+  ): Promise<SignUpHold | null> {
     const allowed = this.reflector.getAllAndOverride<boolean>(ALLOW_DURING_SIGN_UP, [
       ctx.getHandler(),
       ctx.getClass(),
@@ -112,6 +134,8 @@ export class AuthGuard implements CanActivate {
         coverKey: profile.coverKey,
         signupPhotosSkipped: profile.signupPhotosSkipped,
         photoSkipAvailable: profile.photoSkipAvailable,
+        country: profile.country,
+        accountType: profile.accountType,
       })
       .from(profile)
       .where(eq(profile.userId, user.id))
@@ -123,6 +147,17 @@ export class AuthGuard implements CanActivate {
         code: PROFILE_PHOTOS_REQUIRED,
         message: "Add a profile photo and a cover picture to continue.",
       };
+    }
+    if (
+      row &&
+      (await this.location.needsCheck({
+        user,
+        sessionCreatedAt: session.createdAt ? new Date(session.createdAt) : null,
+        ip: checkedIp(fromNodeHeaders(req.headers)),
+        profile: { country: row.country, accountType: row.accountType },
+      }))
+    ) {
+      return { code: LOCATION_CHECK_REQUIRED, message: "Confirm where you are to continue." };
     }
     return null;
   }

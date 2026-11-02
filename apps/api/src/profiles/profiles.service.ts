@@ -1,8 +1,13 @@
-import { canonicalGender, genderSelectionChanges } from "./gender-policy";
+import { canonicalGender, genderSelectionChanges, gendersAllowedIn } from "./gender-policy";
 import { canSelectSexuality } from "./profile-field-policy";
+import {
+  LOCATION_CHECK_NEEDED,
+  LocationCheckService,
+} from "../location-check/location-check.service";
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -190,6 +195,7 @@ export class ProfilesService {
     @Inject(DRIZZLE) private readonly db: Db,
     private readonly storage: StorageService,
     private readonly checks: SilverChecksService,
+    private readonly locationChecks: LocationCheckService,
   ) {}
 
   async getOwn(userId: string, fallbackName: string) {
@@ -204,6 +210,19 @@ export class ProfilesService {
   ) {
     const current = await this.ensureRow(userId, fallbackName);
     const country = input.country ?? current.country;
+    // Switching country takes a check that finds them there (when enforcing), or
+    // anyone could join honestly and then move somewhere with fewer limits.
+    let checkedSwitch = false;
+    if (input.country !== undefined && input.country !== current.country) {
+      const verdict = await this.locationChecks.authorizeCountryChange(userId, input.country, now);
+      if (verdict === "missing") {
+        throw new ForbiddenException({
+          code: LOCATION_CHECK_NEEDED,
+          message: "Confirm you're in that country before switching to it.",
+        });
+      }
+      checkedSwitch = verdict === "claimed";
+    }
     if (input.orientation != null && !canSelectSexuality(country)) {
       throw new BadRequestException({
         orientation: ["Sexuality selection is unavailable for this country."],
@@ -242,15 +261,23 @@ export class ProfilesService {
             : current.gender
               ? [current.gender]
               : []);
+      // A confirmed move keeps only the genders the new country offers, rather
+      // than leaving the member unable to save the country they are in.
+      const kept = checkedSwitch ? gendersAllowedIn(country, selected) : selected;
       try {
-        const normalized = genderSelectionChanges(country, selected, current.gender);
-        if (input.genders !== undefined || input.gender !== undefined)
+        const normalized = genderSelectionChanges(country, kept, current.gender);
+        if (input.genders !== undefined || input.gender !== undefined || kept.length < selected.length)
           Object.assign(changes, normalized);
       } catch (error) {
         throw new BadRequestException({
           genders: [error instanceof Error ? error.message : "Invalid gender selection."],
         });
       }
+    }
+    // Moving somewhere sexuality can't be chosen clears it, as joining there would.
+    if (checkedSwitch && !canSelectSexuality(country)) {
+      changes.orientation = null;
+      changes.orientationSelections = [];
     }
     if (input.displayName !== undefined && input.displayName !== current.displayName) {
       if (takesReservedName(input.displayName, current.displayName)) {

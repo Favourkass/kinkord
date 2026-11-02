@@ -17,6 +17,9 @@ COPY apps/api apps/api
 RUN pnpm --filter api build && pnpm --filter api deploy --prod --legacy /out \
   && cp -r apps/api/dist /out/dist \
   && cp -r apps/api/drizzle /out/drizzle
+# The country check's IP data (DB-IP Lite, CC BY 4.0), fresh with every image.
+# Without it every check would ask members to retry, so the build fails instead.
+RUN node apps/api/scripts/fetch-ip-data.mjs && cp -r apps/api/data /out/data
 
 # Runtime stage
 FROM node:22-alpine

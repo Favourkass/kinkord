@@ -1,5 +1,5 @@
-import { expect, it } from "vitest";
-import { genderSelectionChanges } from "./gender-policy";
+import { describe, expect, it } from "vitest";
+import { genderSelectionChanges, gendersAllowedIn } from "./gender-policy";
 import { GENDERS } from "./profile-options";
 
 it("accepts every supplied gender outside Nigeria and preserves an existing primary", () => {
@@ -19,4 +19,15 @@ it("rejects more than five, duplicates and unknown values", () => {
   for (const values of [GENDERS.slice(0, 6), ["Male", "male"], ["Unknown"]])
     expect(() => genderSelectionChanges("GH", values)).toThrow();
   expect(genderSelectionChanges("GH", GENDERS.slice(0, 5)).genders).toHaveLength(5);
+});
+
+describe("gendersAllowedIn", () => {
+  it("keeps only Male and Female for Nigeria", () => {
+    expect(gendersAllowedIn("NG", ["Non-Binary", "female"])).toEqual(["Female"]);
+    expect(gendersAllowedIn("NG", ["Agender"])).toEqual([]);
+  });
+
+  it("keeps everything elsewhere", () => {
+    expect(gendersAllowedIn("GH", ["Non-Binary", "Female"])).toEqual(["Non-Binary", "Female"]);
+  });
 });

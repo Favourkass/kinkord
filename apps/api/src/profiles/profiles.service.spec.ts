@@ -2,10 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   type HttpException,
   NotFoundException,
 } from "@nestjs/common";
 import { type Db } from "../db/db.module";
+import type { LocationCheckService } from "../location-check/location-check.service";
 import { type StorageService } from "../storage/storage.service";
 import type { SilverChecksService } from "../subscriptions/silver-checks.service";
 import { KINKS, KINK_ROLES, ORIENTATION_SELECTIONS } from "./profile-options";
@@ -193,7 +195,10 @@ describe("name change locks (once every 30 days)", () => {
 
 describe("ProfilesService", () => {
   /** `selects` are returned by successive select() calls before falling back to the profile row. */
-  const makeService = ({ selects = [] as unknown[][] } = {}) => {
+  const makeService = ({
+    selects = [] as unknown[][],
+    countryChange = "free" as "free" | "claimed" | "missing",
+  } = {}) => {
     const row = {
       userId: "u1",
       displayName: "Favour",
@@ -267,13 +272,17 @@ describe("ProfilesService", () => {
     };
     // A Silver member's check waits for an admin after a name or photo change.
     const checks = { hold: vi.fn(async () => true) };
+    // Whether a country switch passed its check (LocationCheckService); free unless enforcing.
+    const locationChecks = { authorizeCountryChange: vi.fn(async () => countryChange) };
     return {
       service: new ProfilesService(
         db,
         storage as unknown as StorageService,
         checks as unknown as SilverChecksService,
+        locationChecks as unknown as LocationCheckService,
       ),
       checks,
+      locationChecks,
       storage,
       db,
       row,
@@ -328,6 +337,51 @@ describe("ProfilesService", () => {
     const unchanged = makeService({ selects: [[row]] });
     await unchanged.service.updateOwn("u1", { bio: "Hello" }, "Favour");
     expect(unchanged.setCalls[0]).not.toHaveProperty("orientation");
+  });
+
+  it("refuses a country switch the location check hasn't confirmed, while enforcing", async () => {
+    const row = { ...makeService().row, country: "NG" };
+    const local = makeService({ selects: [[row]], countryChange: "missing" });
+    const err = await local.service
+      .updateOwn("u1", { country: "GH", state: "Greater Accra" }, "Favour")
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ForbiddenException);
+    expect((err as ForbiddenException).getResponse()).toMatchObject({
+      code: "LOCATION_CHECK_NEEDED",
+    });
+    expect(local.locationChecks.authorizeCountryChange).toHaveBeenCalledWith(
+      "u1",
+      "GH",
+      expect.any(Date),
+    );
+    expect(local.setCalls).toEqual([]);
+  });
+
+  it("only asks about the country when it changes", async () => {
+    const row = { ...makeService().row, country: "NG" };
+    const local = makeService({ selects: [[row]], countryChange: "missing" });
+    await local.service.updateOwn("u1", { country: "NG", state: "Lagos" }, "Favour");
+    expect(local.locationChecks.authorizeCountryChange).not.toHaveBeenCalled();
+    expect(local.setCalls[0]).toMatchObject({ state: "Lagos" });
+  });
+
+  it("on a confirmed move to Nigeria, clears sexuality and keeps only the genders it offers", async () => {
+    const row = {
+      ...makeService().row,
+      country: "GH",
+      orientation: "Bisexual",
+      gender: "Non-Binary",
+      genders: ["Non-Binary", "Female"],
+    };
+    const local = makeService({ selects: [[row]], countryChange: "claimed" });
+    await local.service.updateOwn("u1", { country: "NG", state: "Lagos" }, "Favour");
+    expect(local.setCalls[0]).toMatchObject({
+      country: "NG",
+      orientation: null,
+      orientationSelections: [],
+      genders: ["Female"],
+      gender: "Female",
+    });
   });
 
   it("enforces country-specific multiple genders and preserves the existing primary", async () => {

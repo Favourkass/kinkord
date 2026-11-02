@@ -6,10 +6,16 @@ import {
   Inject,
   Injectable,
   InternalServerErrorException,
+  Logger,
 } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { Db, DRIZZLE } from "../db/db.module";
 import { profile, user } from "../db/schema";
+import {
+  LOCATION_CHECK_REQUIRED,
+  LocationCheckService,
+  type SignupClaim,
+} from "../location-check/location-check.service";
 import { SIGNUP_REFUSED, SignupGuardService } from "../moderation/signup-guard.service";
 import { AUTH, Auth } from "./auth.instance";
 
@@ -18,6 +24,8 @@ export interface SignUpAccount {
   password: string;
   displayName: string;
   username: string;
+  /** The country check made at the start of sign-up; see LocationCheckService.claimForSignup. */
+  locationCheckId?: string | null;
 }
 
 export interface SignUpProfileFields {
@@ -49,10 +57,13 @@ export interface SignUpResult {
  */
 @Injectable()
 export class SignUpService {
+  private readonly log = new Logger(SignUpService.name);
+
   constructor(
     @Inject(DRIZZLE) private readonly db: Db,
     @Inject(AUTH) private readonly auth: Auth,
     private readonly signupGuard: SignupGuardService,
+    private readonly locationChecks: LocationCheckService,
   ) {}
 
   async signUpWithProfile(
@@ -78,6 +89,19 @@ export class SignUpService {
     if (fields.phone) {
       const verdict = await this.signupGuard.review({ phone: fields.phone }, "sign-up");
       if (verdict.action === "block") throw new ForbiddenException(SIGNUP_REFUSED);
+    }
+
+    // The country they chose must have passed a check moments ago (when
+    // enforcing). It is spent here, so one check can't let in two accounts.
+    const { allowed, claim } = await this.locationChecks.claimForSignup(
+      account.locationCheckId ?? null,
+      fields.country,
+    );
+    if (!allowed) {
+      throw new ForbiddenException({
+        code: LOCATION_CHECK_REQUIRED,
+        message: "Confirm where you are before creating your account.",
+      });
     }
 
     // Better Auth's signUpEmail is heavily overloaded (and carries plugin +
@@ -111,10 +135,14 @@ export class SignUpService {
 
     // Better Auth rejected it (email/username taken, weak password, …). Nothing
     // was created — forward its response so the client sees the real reason.
-    if (!res.ok) return { status: res.status, cookies, body };
+    if (!res.ok) {
+      await this.release(claim);
+      return { status: res.status, cookies, body };
+    }
 
     const userId = this.extractUserId(body) ?? (await this.lookupUserId(account.email));
     if (!userId) {
+      await this.release(claim);
       throw new InternalServerErrorException("Sign-up did not return an account.");
     }
 
@@ -131,10 +159,24 @@ export class SignUpService {
       // Roll the half-created account back (cascades to profile + session) so the
       // combined step can be retried instead of erroring "email already exists".
       await this.db.delete(user).where(eq(user.id, userId));
+      await this.release(claim);
       throw new InternalServerErrorException("Could not complete sign-up. Please try again.");
     }
 
+    // The account is made; a failure here only means the app asks for a check once more.
+    if (claim) {
+      await this.locationChecks
+        .attachSignupClaim(claim, userId)
+        .catch((error: unknown) =>
+          this.log.warn(`Country check not linked to new account: ${String(error)}`),
+        );
+    }
     return { status: res.status, cookies, body };
+  }
+
+  /** Sign-up stopped after its country check was spent: let the retry use it again. */
+  private async release(claim: SignupClaim | null): Promise<void> {
+    if (claim) await this.locationChecks.releaseSignupClaim(claim);
   }
 
   private extractUserId(body: string): string | undefined {
