@@ -60,11 +60,13 @@ describe("useContactPresenter", () => {
 
     const facebook = result.current.channels.find((c) => c.id === "facebook");
     expect(facebook?.value).toBe("Kinkord");
-    expect(facebook?.href).toBe("https://www.facebook.com/share/14iTBY2fTuN/");
+    expect(facebook?.href).toBe("https://www.facebook.com/share/1Los7dVc57/");
 
     const instagram = result.current.channels.find((c) => c.id === "instagram");
-    expect(instagram?.value).toBe("@KinkordOfficial");
-    expect(instagram?.href).toBe("https://www.instagram.com/kinkordofficial/");
+    expect(instagram?.value).toBe("@kinkordlimited");
+    expect(instagram?.href).toBe(
+      "https://www.instagram.com/kinkordlimited?cplk=MXJyejNsZ3ZvbG00NQ==",
+    );
 
     // Office
     expect(result.current.office.company).toBe("Kinkord Limited");

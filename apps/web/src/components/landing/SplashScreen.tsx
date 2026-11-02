@@ -81,6 +81,11 @@ export interface SplashScreenProps {
   adultBadge?: AdultBadgeData;
   navLinks: SplashLink[];
   policyLinks?: PolicyItem[];
+  socialLinks: readonly {
+    name: string;
+    href: string;
+    icon: "facebook" | "twitter" | "instagram";
+  }[];
   copyright: string;
   allRightsReserved?: string;
   ageDisclaimer?: { lead: string; rest: string };
@@ -306,30 +311,72 @@ export function PolicyButtonsGrid({ links }: { links: PolicyItem[] }) {
   );
 }
 
+function SocialIcon({ icon }: { icon: "facebook" | "twitter" | "instagram" }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="size-6 sm:size-7"
+      aria-hidden="true"
+    >
+      {icon === "facebook" && (
+        <path d="M15 3h3v4h-3c-.6 0-1 .4-1 1v3h4l-1 4h-3v7h-4v-7H7v-4h3V8a5 5 0 0 1 5-5Z" />
+      )}
+      {icon === "twitter" && (
+        <path d="M22 5.9a8.2 8.2 0 0 1-2.4.7 4.2 4.2 0 0 0 1.8-2.3 8.4 8.4 0 0 1-2.6 1 4.2 4.2 0 0 0-7.2 3.8A11.9 11.9 0 0 1 3 4.7a4.2 4.2 0 0 0 1.3 5.6 4.1 4.1 0 0 1-1.9-.5 4.2 4.2 0 0 0 3.4 4.2 4.2 4.2 0 0 1-1.9.1 4.2 4.2 0 0 0 3.9 2.9A8.4 8.4 0 0 1 2 18.7a11.8 11.8 0 0 0 18.2-10 8.4 8.4 0 0 0 1.8-2.8Z" />
+      )}
+      {icon === "instagram" && (
+        <>
+          <rect x="3" y="3" width="18" height="18" rx="5" />
+          <circle cx="12" cy="12" r="4" />
+          <circle cx="17.5" cy="6.5" r=".8" fill="currentColor" stroke="none" />
+        </>
+      )}
+    </svg>
+  );
+}
+
 function FooterNotice({
   copyright,
   allRightsReserved,
-}: {
-  copyright: string;
-  allRightsReserved?: string;
-}) {
+  socialLinks,
+}: Pick<SplashScreenProps, "copyright" | "allRightsReserved" | "socialLinks">) {
   return (
-    <div className="py-6 text-center">
+    <footer className="mt-6 w-full max-w-[760px] rounded-[22px] bg-[#080808] px-4 py-6 text-center sm:px-6">
+      <nav aria-label="Follow Kinkord" className="flex items-center justify-center gap-6 sm:gap-10">
+        {socialLinks.map((social) => (
+          <a
+            key={social.icon}
+            href={social.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`${social.name} (opens in a new tab)`}
+            className="grid size-12 place-items-center rounded-full bg-kink-gold-bright/5 text-kink-gold-bright transition hover:bg-kink-gold-bright/15 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-kink-gold-bright sm:size-16"
+          >
+            <SocialIcon icon={social.icon} />
+          </a>
+        ))}
+      </nav>
+      <div className="my-6 h-px bg-kink-gold-bright/35" />
       <p className="text-[12px] sm:text-[14px] font-medium text-kink-gold-bright">{copyright}</p>
       {allRightsReserved && (
-        <p className="mt-1.5 flex items-center justify-center gap-1.5 text-[11px] sm:text-[13px] font-medium text-kink-gold-bright">
+        <p className="mt-5 flex items-center justify-center gap-1.5 text-[11px] sm:text-[13px] font-medium text-kink-gold-bright">
           <Lock className="size-3.5 text-[#faab14]" aria-hidden />
           <span>{allRightsReserved}</span>
         </p>
       )}
-    </div>
+    </footer>
   );
 }
 
 function DownloadPill({ cta, compact }: { cta: SplashAction; compact?: boolean }) {
   const isInactive = cta.label === "App Installed" || cta.label === "Installing...";
   const className = `relative grid place-items-center rounded-[24px] bg-kink-gold-deep font-extrabold tracking-[0.3px] text-black transition hover:brightness-110 active:scale-95 cursor-pointer touch-manipulation select-none before:absolute before:-inset-2.5 before:content-[''] disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100 ${
-    compact ? "min-h-11 px-3.5 text-[11px] sm:px-5 sm:text-sm" : "h-[60px] w-[254px] text-[24px]"
+    compact ? "h-8 px-3 text-[10px] sm:h-9 sm:px-3.5 sm:text-xs" : "h-[60px] w-[254px] text-[24px]"
   }`;
 
   if (cta.onClick) {
@@ -433,6 +480,7 @@ export default function SplashScreen({
   signIn,
   navLinks,
   policyLinks,
+  socialLinks,
   copyright,
   allRightsReserved,
   ageGate,
@@ -527,7 +575,11 @@ export default function SplashScreen({
               <PolicyButtonsGrid links={policyLinks} />
             </div>
           )}
-          <FooterNotice copyright={copyright} allRightsReserved={allRightsReserved} />
+          <FooterNotice
+            copyright={copyright}
+            allRightsReserved={allRightsReserved}
+            socialLinks={socialLinks}
+          />
         </div>
       </div>
     </div>
