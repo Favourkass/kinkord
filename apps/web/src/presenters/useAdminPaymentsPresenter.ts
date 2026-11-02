@@ -88,7 +88,9 @@ export function useAdminPaymentsPresenter() {
     try {
       if (dialog.kind === "verify") {
         const done = await paymentsAdminService.verify(dialog.id);
-        setNotice(copy.verified(planDate(done.silverUntil)));
+        setNotice(
+          done.silverUntil ? copy.verified(planDate(done.silverUntil)) : copy.ringsVerified,
+        );
       } else {
         await paymentsAdminService.reject(dialog.id, reason.trim());
         setNotice(copy.rejected);
@@ -106,7 +108,12 @@ export function useAdminPaymentsPresenter() {
   const dialogVM: AdminDialogVM | null = dialog
     ? {
         title: dialog.kind === "verify" ? copy.verifyDialog.title : copy.rejectDialog.title,
-        body: dialog.kind === "verify" ? copy.verifyDialog.body : copy.rejectDialog.body,
+        body:
+          dialog.kind === "verify"
+            ? current?.find((p) => p.id === dialog.id)?.purpose === "rings"
+              ? copy.ringsVerifyBody
+              : copy.verifyDialog.body
+            : copy.rejectDialog.body,
         confirmLabel:
           dialog.kind === "verify" ? copy.verifyDialog.confirm : copy.rejectDialog.confirm,
         cancelLabel: MODERATION_COPY.dialogs.cancel,

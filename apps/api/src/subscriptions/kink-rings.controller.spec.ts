@@ -15,20 +15,20 @@ describe("KinkRingsController", () => {
 
   it("lists the caller's own rings", async () => {
     const service = rings();
-    await new KinkRingsController(service as never, {} as never).mine(req("me"));
+    await new KinkRingsController(service as never, {} as never, {} as never).mine(req("me"));
     expect(service.mine).toHaveBeenCalledWith("me");
   });
 
   it("gives a ring as the caller, to a username", async () => {
     const service = rings();
-    await new KinkRingsController(service as never, {} as never).give(req("me"), {
+    await new KinkRingsController(service as never, {} as never, {} as never).give(req("me"), {
       username: "ada",
     });
     expect(service.give).toHaveBeenCalledWith("me", "ada");
   });
 
   it("refuses a body that names no one, or says whose ring it is", () => {
-    const controller = new KinkRingsController(rings() as never, {} as never);
+    const controller = new KinkRingsController(rings() as never, {} as never, {} as never);
     expect(() => controller.give(req("me"), {})).toThrow();
     expect(() => controller.give(req("me"), { username: "ada", from: "someone" })).toThrow();
   });
@@ -36,7 +36,7 @@ describe("KinkRingsController", () => {
 
 it("scopes inventory, pagination and recipient searches to the authenticated member", () => {
   const inventory = { inventory: vi.fn(), history: vi.fn(), expired: vi.fn(), recipients: vi.fn() };
-  const controller = new KinkRingsController({} as never, inventory as never);
+  const controller = new KinkRingsController({} as never, inventory as never, {} as never);
   controller.inventory(req("me"));
   controller.history(req("me"), "2");
   controller.expired(req("me"));
@@ -50,7 +50,7 @@ it("scopes inventory, pagination and recipient searches to the authenticated mem
 });
 it("validates explicit gifts without trusting an owner in the request body", () => {
   const service = { giveSelected: vi.fn() };
-  const controller = new KinkRingsController(service as never, {} as never);
+  const controller = new KinkRingsController(service as never, {} as never, {} as never);
   const gifts = [{ ringId: "00000000-0000-4000-8000-000000000001", username: "ada" }];
   controller.giveSelected(req("me"), { gifts });
   expect(service.giveSelected).toHaveBeenCalledWith("me", gifts);

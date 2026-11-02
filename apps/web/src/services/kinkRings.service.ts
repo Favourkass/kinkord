@@ -27,10 +27,10 @@ export const kinkRingsApi = {
       `/kink-rings/recipients?tab=${tab}&q=${encodeURIComponent(query)}&page=${page}`,
     ),
   giveSelected: (gifts: RingGiftAssignment[]) =>
-    api.post<{ gifts: Array<{ ringId: string; to: { username: string; displayName: string } }> }>(
-      "/kink-rings/give-selected",
-      { gifts },
-    ),
+    api.post<{
+      givenAt?: string;
+      gifts: Array<{ ringId: string; to: { username: string; displayName: string } }>;
+    }>("/kink-rings/give-selected", { gifts }),
   mine: () => api.get<KinkRingsPM>("/kink-rings"),
   /** "@Ada" or "ada": the API reads usernames lowercase. */
   give: (username: string) =>

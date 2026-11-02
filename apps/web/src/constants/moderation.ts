@@ -54,6 +54,9 @@ export const MODERATION_COPY = {
       reasonLabel: "Reason (the member reads this)",
       confirm: "Reject payment",
     },
+    ringsVerified: "Verified. Kink Rings have been added to the member’s account.",
+    ringsVerifyBody:
+      "Confirm that the transfer was received. This adds the purchased Kink Rings to the member’s account.",
     verified: (until: string) => `Verified. Silver runs until ${until}.`,
     rejected: "Rejected. The member has been told.",
   },
