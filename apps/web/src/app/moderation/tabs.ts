@@ -11,6 +11,7 @@ export function moderationTabs(
     | "wallet"
     | "verification"
     | "blocklist"
+    | "location"
     | "admins",
 ): ModerationTab[] {
   return [
@@ -36,6 +37,11 @@ export function moderationTabs(
       label: MODERATION_COPY.tabs.blocklist,
       href: Routes.moderationBlocklist,
       active: active === "blocklist",
+    },
+    {
+      label: MODERATION_COPY.tabs.location,
+      href: Routes.moderationLocation,
+      active: active === "location",
     },
     {
       label: MODERATION_COPY.tabs.admins,

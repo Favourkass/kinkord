@@ -21,6 +21,20 @@ function sendToSignUpStep(step: string): void {
   window.location.assign(`${Routes.signup}?resume=${step}`);
 }
 
+/** The `code` the API sends when a member's country check is due. */
+const LOCATION_CHECK_REQUIRED = "LOCATION_CHECK_REQUIRED";
+
+/**
+ * A member whose country check is due can't use anything else, so wherever
+ * they are, they're taken to it and brought back after.
+ */
+function sendToLocationCheck(): void {
+  if (typeof window === "undefined") return;
+  const { pathname, search } = window.location;
+  if (pathname.startsWith(Routes.locationCheck) || pathname.startsWith(Routes.signup)) return;
+  window.location.assign(`${Routes.locationCheck}?next=${encodeURIComponent(pathname + search)}`);
+}
+
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -59,6 +73,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const code = (body as { code?: string } | null)?.code;
     const step = res.status === 403 && code ? SIGN_UP_STEP_FOR_CODE.get(code) : undefined;
     if (step) sendToSignUpStep(step);
+    else if (res.status === 403 && code === LOCATION_CHECK_REQUIRED) sendToLocationCheck();
     throw new ApiError(res.status, body);
   }
   return body as T;

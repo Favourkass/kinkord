@@ -11,6 +11,13 @@ export const Routes = {
   contact: "/contact",
   /** Privacy notice for identity verification, linked before members consent. */
   verificationPrivacy: "/privacy/verification",
+  /** How the country check works, linked from the check itself. */
+  locationPrivacy: "/privacy/location",
+  /** Where members are held while a country check is due. */
+  locationCheck: "/location-check",
+  /** The check, opened on choosing a new country, returning to `next` once it's saved. */
+  locationCheckChange: (country: string | null, next: string) =>
+    `/location-check?change=1${country ? `&country=${encodeURIComponent(country)}` : ""}&next=${encodeURIComponent(next)}`,
   invest: "/invest",
   lectures: "/lectures",
   lecture: (slug: string) => `/lectures/${slug}`,
@@ -27,6 +34,7 @@ export const Routes = {
   moderationReports: "/moderation/reports",
   moderationPayments: "/moderation/payments",
   moderationVerification: "/moderation/verification",
+  moderationLocation: "/moderation/location",
   moderationAdmins: "/moderation/admins",
   signup: "/signup",
   login: "/login",

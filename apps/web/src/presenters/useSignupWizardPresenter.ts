@@ -5,7 +5,9 @@ import { canSelectSexuality } from "@/services/profile-field-policy";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, uploadToPresignedUrl } from "@/services/apiClient";
+import { api, ApiError, uploadToPresignedUrl } from "@/services/apiClient";
+import { LOCATION_CHECK_COPY } from "@/constants/locationCheck";
+import { useLocationCheckPresenter } from "./useLocationCheckPresenter";
 import { IMAGE_VARIANTS, buildUploadSet, type ImageVariant } from "@/util/image";
 
 /** Presigned PUT slots returned by POST /profile/upload-url — one per stored size. */
@@ -53,14 +55,17 @@ import {
   KINK_ROLES,
   SEXUALITY_FIELD,
   ORIENTATION_SELECTIONS,
+  LAUNCH_COUNTRIES,
 } from "@/constants/onboarding";
 import { PHOTO_CONFIRMATION_COPY } from "@/constants/photoConfirmation";
 import { useVerification } from "./useVerification";
 
 export type WizardStage =
-  "country" | "account" | "about" | "email" | "preferences" | "profile" | "welcome";
+  "country" | "location" | "account" | "about" | "email" | "preferences" | "profile" | "welcome";
 const STAGE_STEP: Record<WizardStage, number> = {
   country: 1,
+  // Confirming the country belongs to choosing it.
+  location: 1,
   account: 2,
   about: 2,
   email: 3,
@@ -89,6 +94,22 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
   const [ageAttested, setAgeAttested] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [stepOneTouched, setStepOneTouched] = useState(false);
+  // The country check that lets the account in, spent by the server at sign-up.
+  const [locationCheckId, setLocationCheckId] = useState<string | null>(null);
+  const locationCheck = useLocationCheckPresenter({
+    country,
+    countryName: LAUNCH_COUNTRIES.find((c) => c.code === country)?.name ?? null,
+    active: stage === "location",
+    onPassed: (checkId) => {
+      setLocationCheckId(checkId);
+      setStage("account");
+    },
+    // Back to step 1 with where the GPS put them already chosen.
+    onChangeCountry: (detected) => {
+      if (detected && LAUNCH_COUNTRIES.some((c) => c.code === detected)) setCountry(detected);
+      setStage("country");
+    },
+  });
 
   // step 2 (account + about, one combined screen)
   const [account, setAccount] = useState<AccountDraft>({
@@ -276,11 +297,15 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
 
   const step = STAGE_STEP[stage];
 
+  const resetLocation = locationCheck.reset;
   const submitCountry = useCallback(() => {
     setStepOneTouched(true);
     if (!country || !ageAttested || !termsAccepted) return;
-    setStage("account");
-  }, [country, ageAttested, termsAccepted]);
+    // Every choice of country is confirmed afresh; switched off, nothing to confirm.
+    setLocationCheckId(null);
+    resetLocation();
+    setStage(locationCheck.mode === "off" ? "account" : "location");
+  }, [country, ageAttested, termsAccepted, locationCheck.mode, resetLocation]);
 
   const backToCountry = useCallback(() => setStage("country"), []);
 
@@ -316,14 +341,25 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
         genders: selectedGenders(about.genders, about.gender),
         // Sexuality is selected later, with preferences after email verification.
         orientation: null,
+        locationCheckId,
       });
       setStage("email");
     } catch (e) {
+      // The check is only good for half an hour: confirm the country again.
+      if (
+        e instanceof ApiError &&
+        (e.body as { code?: string } | null)?.code === "LOCATION_CHECK_REQUIRED"
+      ) {
+        setLocationCheckId(null);
+        resetLocation(LOCATION_CHECK_COPY.problems.expired);
+        setStage("location");
+        return;
+      }
       setTopError(e instanceof Error ? e.message : "Something went wrong. Try again.");
     } finally {
       setBusy(false);
     }
-  }, [about, account, country]);
+  }, [about, account, country, locationCheckId, resetLocation]);
 
   // Sent automatically when step 3 opens: they typed the address moments ago.
   const emailCode = useVerification("email");
@@ -510,6 +546,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
         touched: stepOneTouched,
         submit: submitCountry,
       },
+      locationStep: locationCheck.panel,
       accountStep: { draft: account, set: setAccount, errors: accountErrors },
       aboutStep: {
         genders: selectedGenders(about.genders, about.gender),
@@ -644,6 +681,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
       termsAccepted,
       stepOneTouched,
       submitCountry,
+      locationCheck.panel,
       account,
       accountErrors,
       genderSearch,
