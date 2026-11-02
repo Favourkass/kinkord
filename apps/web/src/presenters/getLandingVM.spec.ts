@@ -31,10 +31,30 @@ describe("getLandingVM", () => {
 
   it("serves the redesign assets from public/brand", () => {
     expect(vm.logo.src).toBe("/brand/logo-badge.png");
-    expect(vm.hero.src).toBe("/brand/hero-trio.jpg");
-    expect(vm.mobileHero).toMatchObject({ src: "/brand/topa.jpeg", width: 720, height: 1080 });
+    // Light enough for slow networks: WebP, the artwork cropped to what shows.
+    expect(vm.hero).toMatchObject({
+      src: "/brand/landing-connections.webp",
+      width: 1080,
+      height: 625,
+    });
+    expect(vm.wordmark.src).toBe("/brand/kinkord-mask-wordmark.webp");
+    expect(vm.headerTagline).toBe("THE WORLD’S KINK COMMUNITY");
+    expect(vm.audienceStatement).toBe(
+      "The Global Social Network for Kinksters, Fetishists & BDSM Enthusiasts.",
+    );
     expect(vm.logo.alt).not.toHaveLength(0);
     expect(vm.hero.alt).not.toHaveLength(0);
+  });
+
+  it("links only the three live social accounts in the requested order", () => {
+    expect(vm.socialLinks.map(({ name, href }) => ({ name, href }))).toEqual([
+      { name: "Facebook", href: "https://www.facebook.com/share/1Los7dVc57/" },
+      { name: "X / Twitter", href: "https://x.com/kinkordofficial" },
+      {
+        name: "Instagram",
+        href: "https://www.instagram.com/kinkordlimited/",
+      },
+    ]);
   });
 
   it("includes the 18+ age disclaimer", () => {

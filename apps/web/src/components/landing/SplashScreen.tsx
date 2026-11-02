@@ -58,8 +58,10 @@ export interface SplashScreenProps {
   logo: SplashImage;
   /** The animated wordmark, with a still for reduced motion. */
   wordmark: SplashImage & { width: number; height: number; still?: string };
-  hero: SplashImage;
-  mobileHero?: SplashImage & { width: number; height: number };
+  hero: SplashImage & { width: number; height: number };
+  headerTagline: string;
+  /** Who Kinkord is for, above the sign-up buttons. */
+  audienceStatement: string;
   mobileContent?: {
     eyebrow: string;
     title: string;
@@ -81,6 +83,11 @@ export interface SplashScreenProps {
   adultBadge?: AdultBadgeData;
   navLinks: SplashLink[];
   policyLinks?: PolicyItem[];
+  socialLinks: readonly {
+    name: string;
+    href: string;
+    icon: "facebook" | "twitter" | "instagram";
+  }[];
   copyright: string;
   allRightsReserved?: string;
   ageDisclaimer?: { lead: string; rest: string };
@@ -182,25 +189,6 @@ export function StarDivider() {
           <path d="M7 0L8.5 5.5L14 7L8.5 8.5L7 14L5.5 8.5L0 7L5.5 5.5L7 0Z" fill="currentColor" />
         </svg>
       </div>
-    </div>
-  );
-}
-
-function AdultAgeBadge({ badge, className = "" }: { badge: AdultBadgeData; className?: string }) {
-  return (
-    <div
-      className={`inline-flex items-center gap-3 sm:gap-3.5 rounded-[22px] border-[1.5px] border-[#faab14] bg-black/50 px-5 py-2 backdrop-blur-sm shadow-md shadow-black/60 ${className}`}
-      aria-label={`${badge.age} ${badge.label}`}
-    >
-      <span
-        aria-hidden="true"
-        className={`${brandStyles.emoji} text-[32px] leading-none sm:text-[36px]`}
-      >
-        🔞
-      </span>
-      <span className="text-[19px] sm:text-[22px] font-black tracking-wider text-[#faab14]">
-        {badge.label}
-      </span>
     </div>
   );
 }
@@ -325,30 +313,72 @@ export function PolicyButtonsGrid({ links }: { links: PolicyItem[] }) {
   );
 }
 
+function SocialIcon({ icon }: { icon: "facebook" | "twitter" | "instagram" }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="size-6 sm:size-7"
+      aria-hidden="true"
+    >
+      {icon === "facebook" && (
+        <path d="M15 3h3v4h-3c-.6 0-1 .4-1 1v3h4l-1 4h-3v7h-4v-7H7v-4h3V8a5 5 0 0 1 5-5Z" />
+      )}
+      {icon === "twitter" && (
+        <path d="M22 5.9a8.2 8.2 0 0 1-2.4.7 4.2 4.2 0 0 0 1.8-2.3 8.4 8.4 0 0 1-2.6 1 4.2 4.2 0 0 0-7.2 3.8A11.9 11.9 0 0 1 3 4.7a4.2 4.2 0 0 0 1.3 5.6 4.1 4.1 0 0 1-1.9-.5 4.2 4.2 0 0 0 3.4 4.2 4.2 4.2 0 0 1-1.9.1 4.2 4.2 0 0 0 3.9 2.9A8.4 8.4 0 0 1 2 18.7a11.8 11.8 0 0 0 18.2-10 8.4 8.4 0 0 0 1.8-2.8Z" />
+      )}
+      {icon === "instagram" && (
+        <>
+          <rect x="3" y="3" width="18" height="18" rx="5" />
+          <circle cx="12" cy="12" r="4" />
+          <circle cx="17.5" cy="6.5" r=".8" fill="currentColor" stroke="none" />
+        </>
+      )}
+    </svg>
+  );
+}
+
 function FooterNotice({
   copyright,
   allRightsReserved,
-}: {
-  copyright: string;
-  allRightsReserved?: string;
-}) {
+  socialLinks,
+}: Pick<SplashScreenProps, "copyright" | "allRightsReserved" | "socialLinks">) {
   return (
-    <div className="py-6 text-center">
+    <footer className="mt-6 w-full max-w-[760px] rounded-[22px] bg-[#080808] px-4 py-6 text-center sm:px-6">
+      <nav aria-label="Follow Kinkord" className="flex items-center justify-center gap-6 sm:gap-10">
+        {socialLinks.map((social) => (
+          <a
+            key={social.icon}
+            href={social.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`${social.name} (opens in a new tab)`}
+            className="grid size-12 place-items-center rounded-full bg-kink-gold-bright/5 text-kink-gold-bright transition hover:bg-kink-gold-bright/15 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-kink-gold-bright sm:size-16"
+          >
+            <SocialIcon icon={social.icon} />
+          </a>
+        ))}
+      </nav>
+      <div className="my-6 h-px bg-kink-gold-bright/35" />
       <p className="text-[12px] sm:text-[14px] font-medium text-kink-gold-bright">{copyright}</p>
       {allRightsReserved && (
-        <p className="mt-1.5 flex items-center justify-center gap-1.5 text-[11px] sm:text-[13px] font-medium text-kink-gold-bright">
+        <p className="mt-5 flex items-center justify-center gap-1.5 text-[11px] sm:text-[13px] font-medium text-kink-gold-bright">
           <Lock className="size-3.5 text-[#faab14]" aria-hidden />
           <span>{allRightsReserved}</span>
         </p>
       )}
-    </div>
+    </footer>
   );
 }
 
 function DownloadPill({ cta, compact }: { cta: SplashAction; compact?: boolean }) {
   const isInactive = cta.label === "App Installed" || cta.label === "Installing...";
   const className = `relative grid place-items-center rounded-[24px] bg-kink-gold-deep font-extrabold tracking-[0.3px] text-black transition hover:brightness-110 active:scale-95 cursor-pointer touch-manipulation select-none before:absolute before:-inset-2.5 before:content-[''] disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100 ${
-    compact ? "h-[32px] min-w-[120px] px-3.5 text-[11px]" : "h-[60px] w-[254px] text-[24px]"
+    compact ? "h-8 px-3 text-[10px] sm:h-9 sm:px-3.5 sm:text-xs" : "h-[60px] w-[254px] text-[24px]"
   }`;
 
   if (cta.onClick) {
@@ -376,7 +406,7 @@ function SignUpButton({ cta }: { cta: SplashLink }) {
   return (
     <Link
       href={cta.href}
-      className={`${brandStyles.signup} flex h-[48px] w-full max-w-[300px] items-center justify-center gap-2 rounded-[10px] bg-kink-gold-bright text-[17px] font-bold text-black`}
+      className={`${brandStyles.signup} flex h-[48px] sm:h-[56px] w-full items-center justify-center gap-2 rounded-[10px] bg-gradient-to-b from-[#ffce45] to-[#f4aa05] text-[15px] sm:text-[18px] font-bold text-black`}
     >
       <UserIcon />
       {cta.label}
@@ -388,7 +418,7 @@ function SignInButton({ cta }: { cta: SplashLink }) {
   return (
     <Link
       href={cta.href}
-      className="flex h-[48px] w-full max-w-[300px] items-center justify-center gap-2 rounded-[10px] border border-kink-amber text-[17px] font-bold text-kink-gold-bright uppercase"
+      className="flex h-[48px] sm:h-[56px] w-full items-center justify-center gap-2 rounded-[10px] border border-kink-amber text-[15px] sm:text-[18px] font-bold text-kink-gold-bright uppercase"
     >
       <SignInIcon />
       {cta.label}
@@ -403,9 +433,9 @@ function MembershipCount({
   description,
 }: SplashScreenProps["membership"]) {
   return (
-    <section className="w-full py-6 text-center" aria-label={label}>
+    <section className="w-full pb-5 pt-6 text-center" aria-label={label}>
       <h2
-        className="flex items-center justify-center gap-2 whitespace-nowrap text-[clamp(14px,4.5vw,22px)] font-bold leading-tight text-kink-gold-bright"
+        className="flex items-center justify-center gap-3 whitespace-nowrap text-[clamp(14px,4vw,24px)] font-bold leading-tight text-kink-gold-bright"
         aria-live="polite"
         aria-atomic="true"
       >
@@ -420,7 +450,7 @@ function MembershipCount({
           {countries}
         </span>
       </h2>
-      <p className="mx-auto mt-3 max-w-[440px] text-sm leading-6 text-kink-mist sm:text-base">
+      <p className="mx-auto mt-3 max-w-[580px] text-sm leading-[1.45] text-kink-mist sm:text-lg">
         {description}
       </p>
     </section>
@@ -429,10 +459,10 @@ function MembershipCount({
 
 function PlatformOverview({ title, paragraphs }: SplashScreenProps["platformOverview"]) {
   return (
-    <section className="w-full space-y-4 rounded-2xl border border-kink-amber/30 bg-kink-surface p-5 text-left">
-      <h2 className="text-left text-xl font-bold text-kink-gold-bright">{title}</h2>
+    <section className="w-full space-y-4 rounded-2xl border border-kink-amber/55 bg-black/80 p-5 sm:p-7 text-left">
+      <h2 className="text-left text-xl sm:text-2xl font-bold text-kink-gold-bright">{title}</h2>
       {paragraphs.map((paragraph) => (
-        <p key={paragraph} className="text-sm leading-6 text-kink-paper">
+        <p key={paragraph} className="text-sm sm:text-lg leading-[1.5] text-kink-paper">
           {paragraph}
         </p>
       ))}
@@ -443,17 +473,17 @@ function PlatformOverview({ title, paragraphs }: SplashScreenProps["platformOver
 export default function SplashScreen({
   wordmark,
   hero,
-  mobileHero,
+  headerTagline,
+  audienceStatement,
   platformOverview,
   membership,
   downloadCta,
   brand,
-  tagline,
   signUp,
   signIn,
-  adultBadge,
   navLinks,
   policyLinks,
+  socialLinks,
   copyright,
   allRightsReserved,
   ageGate,
@@ -479,44 +509,59 @@ export default function SplashScreen({
         />
       )}
 
-      {/* Only the photo portion remains; the poster’s lower copy and buttons are live UI. */}
-      <div className="flex min-h-dvh flex-col bg-black lg:hidden">
-        <h1 className="sr-only">{brand}</h1>
-        <div className="flex h-[72px] items-center justify-between gap-3 px-3">
-          <AnimatedWordmark image={wordmark} className="w-[200px] max-w-[calc(100%-48px)]" />
-          <span
-            role="img"
-            aria-label="Adults only, 18 plus"
-            className={`${brandStyles.emoji} text-[7vw] leading-none sm:text-[44px]`}
-          >
-            🔞
+      <div className="mx-auto w-full max-w-[1080px]">
+        <header className="flex min-h-[76px] items-center justify-between gap-3 bg-black px-4 py-2 sm:px-8 sm:py-3">
+          <h1 className="sr-only">{brand}</h1>
+          <div className="w-[44%] max-w-[230px] shrink-0">
+            <AnimatedWordmark image={wordmark} />
+            <p className="-mt-0.5 whitespace-nowrap text-center text-[8px] font-bold tracking-[0.2px] text-kink-gold-bright sm:text-[11px]">
+              {headerTagline}
+            </p>
+          </div>
+          <DownloadPill cta={downloadCta} compact />
+        </header>
+
+        <div className="relative">
+          {/* The artwork file is cropped above its baked-in wordmark, to 1080×625;
+              the box keeps that crop if a taller file comes back. Never object-cover. */}
+          <div className="relative aspect-[1080/625] overflow-hidden">
+            <Image
+              src={hero.src}
+              alt={hero.alt}
+              width={hero.width}
+              height={hero.height}
+              preload
+              sizes="(max-width: 1080px) 100vw, 1080px"
+              className="block h-auto w-full max-w-none"
+            />
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-[24%] bg-gradient-to-t from-black via-black/35 to-transparent"
+            />
+          </div>
+          <span role="img" aria-label="Adults only, 18 plus" className={brandStyles.ageSeal}>
+            18+
           </span>
         </div>
-        <div className="relative aspect-[720/900] w-full overflow-hidden">
-          <Image
-            src={mobileHero?.src ?? hero.src}
-            alt={mobileHero?.alt ?? hero.alt}
-            width={mobileHero?.width ?? 720}
-            height={mobileHero?.height ?? 1080}
-            preload
-            unoptimized
-            sizes="100vw"
-            className="block h-auto w-full"
-          />
-        </div>
-        <div className="flex flex-col items-center gap-4 px-5 pb-8 pt-2 sm:px-7">
-          <div className="flex w-full max-w-[300px] flex-col gap-2.5">
+
+        <div
+          className={`${brandStyles.community} flex flex-col items-center px-5 pb-8 pt-3 sm:px-8 sm:pt-5`}
+        >
+          <p className="mb-4 max-w-[680px] text-center text-[17px] font-semibold leading-snug text-kink-paper sm:text-[22px]">
+            {audienceStatement}
+          </p>
+          <div className="grid w-full max-w-[760px] grid-cols-2 gap-2.5 sm:gap-4">
             <SignUpButton cta={signUp} />
             <SignInButton cta={signIn} />
-            <div className="flex justify-center pt-[30px]">
-              <DownloadPill cta={downloadCta} compact />
-            </div>
           </div>
-          <div className="w-full max-w-[460px]">
+          <div className="w-full max-w-[760px]">
             <MembershipCount {...membership} />
             <PlatformOverview {...platformOverview} />
           </div>
-          <nav className="mt-2 w-full max-w-[347px] rounded-[20px] border border-kink-amber bg-kink-surface px-[22px]">
+          <nav
+            aria-label="About Kinkord"
+            className="mt-6 w-full max-w-[760px] rounded-[20px] border border-kink-amber/50 bg-kink-surface px-[22px]"
+          >
             {navLinks.map((link, i) => (
               <Link
                 key={link.href}
@@ -531,93 +576,16 @@ export default function SplashScreen({
             ))}
           </nav>
           {policyLinks && policyLinks.length > 0 && (
-            <div className="mt-3 w-full max-w-[460px]">
+            <div className="mt-3 w-full max-w-[760px]">
               <StarDivider />
               <PolicyButtonsGrid links={policyLinks} />
             </div>
           )}
-          <FooterNotice copyright={copyright} allRightsReserved={allRightsReserved} />
-        </div>
-      </div>
-
-      {/* Desktop splash */}
-      <div className="hidden lg:block">
-        <div className="relative min-h-screen overflow-x-hidden bg-black pb-16">
-          <div className="absolute right-0 top-0 h-[calc(100%-72px)] w-[48.15%]">
-            <Image
-              src={hero.src}
-              alt={hero.alt}
-              fill
-              priority
-              sizes="49vw"
-              className="object-cover object-bottom"
-            />
-          </div>
-          <div className="relative z-10 flex items-center justify-between px-[94px] pt-[24px]">
-            <AnimatedWordmark image={wordmark} className="w-[260px]" />
-            <span
-              role="img"
-              aria-label="Adults only, 18 plus"
-              className={`${brandStyles.emoji} text-5xl`}
-            >
-              🔞
-            </span>
-          </div>
-          <div className="relative z-10 w-full max-w-[51.85%] pl-[64px] xl:pl-[118px] pr-8">
-            <h1 className="mt-[120px] xl:mt-[160px] text-[72px] xl:text-[96px] font-extrabold leading-normal text-kink-gold-bright">
-              {brand}
-            </h1>
-            <p className="mt-[16px] max-w-[635px] text-[20px] xl:text-[24px] font-semibold leading-normal text-kink-mist">
-              {tagline}
-            </p>
-
-            {adultBadge && (
-              <div className="mt-[28px] flex items-center gap-4">
-                <AdultAgeBadge badge={adultBadge} />
-                <div className="text-[14px] xl:text-[15px] font-bold leading-snug text-white">
-                  <p>{adultBadge.line1}</p>
-                  <p>{adultBadge.line2}</p>
-                </div>
-              </div>
-            )}
-
-            <div className="mt-[36px] flex flex-wrap gap-[20px] xl:gap-[38px]">
-              <div className="w-full sm:w-[347px]">
-                <SignUpButton cta={signUp} />
-              </div>
-              <div className="w-full sm:w-[347px]">
-                <SignInButton cta={signIn} />
-              </div>
-            </div>
-            <nav className="mt-[40px] flex flex-wrap gap-[16px] xl:gap-[25px]">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="flex h-[60px] min-w-[200px] xl:min-w-[216px] items-center justify-between gap-6 rounded-[10px] border border-kink-amber px-[24px] text-[18px] xl:text-[20px] font-bold text-kink-gold-bright transition hover:bg-white/5"
-                >
-                  {link.label}
-                  <span className="text-kink-gold-bright">
-                    <ChevronIcon />
-                  </span>
-                </Link>
-              ))}
-            </nav>
-
-            <div className="mt-10 max-w-[732px]">
-              <MembershipCount {...membership} />
-              <PlatformOverview {...platformOverview} />
-            </div>
-
-            {policyLinks && policyLinks.length > 0 && (
-              <div className="mt-[40px] max-w-[732px]">
-                <StarDivider />
-                <PolicyButtonsGrid links={policyLinks} />
-              </div>
-            )}
-          </div>
-
-          <FooterNotice copyright={copyright} allRightsReserved={allRightsReserved} />
+          <FooterNotice
+            copyright={copyright}
+            allRightsReserved={allRightsReserved}
+            socialLinks={socialLinks}
+          />
         </div>
       </div>
     </div>

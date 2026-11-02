@@ -5,7 +5,9 @@ import {
   AGE_GATE_MODAL,
   ALL_RIGHTS_RESERVED,
   BRAND_NAME,
-  HEADER_WORDMARK,
+  LANDING_WORDMARK,
+  LANDING_HEADER_TAGLINE,
+  LANDING_AUDIENCE_STATEMENT,
   BRAND_TAGLINE,
   COPYRIGHT_LINE,
   JOIN_AGE_DISCLAIMER,
@@ -13,6 +15,7 @@ import {
   LANDING_MEMBERS,
   MOBILE_LANDING_CONTENT,
   POLICY_LINKS,
+  SOCIALS,
 } from "@/constants/landing";
 import { AVAILABLE_COUNTRIES } from "@/constants/members";
 import { Routes } from "@/constants/Routes";
@@ -27,16 +30,14 @@ export function getLandingVM() {
   const downloadCta: SplashAction = { label: "Download Kinkord", href: Routes.signup };
   return {
     logo: { src: "/brand/logo-badge.png", alt: "Kinkord" },
-    wordmark: HEADER_WORDMARK,
+    wordmark: LANDING_WORDMARK,
+    headerTagline: LANDING_HEADER_TAGLINE,
+    audienceStatement: LANDING_AUDIENCE_STATEMENT,
     hero: {
-      src: "/brand/hero-trio.jpg",
-      alt: "Three community members in black satin against a dark satin backdrop",
-    },
-    mobileHero: {
-      src: "/brand/topa.jpeg",
-      alt: "Five adult community members in black outfits against a black and gold background.",
-      width: 720,
-      height: 1080,
+      src: "/brand/landing-connections.webp",
+      alt: "Two adult community members connecting through messages in a warm, gold-lit setting.",
+      width: 1080,
+      height: 625,
     },
     mobileContent: MOBILE_LANDING_CONTENT,
     platformOverview: LANDING_PLATFORM_OVERVIEW,
@@ -63,6 +64,7 @@ export function getLandingVM() {
     policyLinks: POLICY_LINKS.map((p) => ({ ...p })),
     adultBadge: { ...ADULT_BADGE },
     ageGate: { ...AGE_GATE_MODAL },
+    socialLinks: SOCIALS.filter((social) => social.href !== null).map((social) => ({ ...social })),
     copyright: COPYRIGHT_LINE,
     allRightsReserved: ALL_RIGHTS_RESERVED,
   };
