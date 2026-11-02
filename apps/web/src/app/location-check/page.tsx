@@ -23,9 +23,18 @@ function LocationCheckScreen() {
       {p.loading ? (
         <p className="mt-16 text-kink-dim">{p.loadingLabel}</p>
       ) : p.loadError ? (
-        <p role="alert" className="mt-16 text-red-300">
-          {p.loadError}
-        </p>
+        <div className="mt-16 flex flex-col items-center gap-4">
+          <p role="alert" className="text-red-300">
+            {p.loadError}
+          </p>
+          <button
+            type="button"
+            onClick={p.retryLoad}
+            className="rounded-full border-2 border-kink-gold-bright px-6 py-2 font-semibold text-kink-gold-bright"
+          >
+            {p.retryLabel}
+          </button>
+        </div>
       ) : (
         <LocationCheckPanel {...p.panel}>
           {p.choose && (

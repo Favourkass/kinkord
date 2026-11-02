@@ -63,10 +63,9 @@ const row = (change: Partial<LocationCheckRowPM> = {}): LocationCheckRowPM => ({
 describe("toLocationCheckRowVM", () => {
   it("reads a check in words, with no coordinates", () => {
     expect(toLocationCheckRowVM(row())).toMatchObject({
-      who: "@tega",
-      purpose: "Recheck",
+      title: "@tega · Recheck",
       chose: "Nigeria",
-      gps: "GB · 4.2 km",
+      gps: "United Kingdom · 4.2 km",
       connection: "USA · M247 Europe SRL",
       anonymizer: "VPN / hosting",
       decision: "Mismatch",
@@ -88,7 +87,7 @@ describe("toLocationCheckRowVM", () => {
         }),
       ),
     ).toMatchObject({
-      who: "Joining",
+      title: "Joining",
       gps: "Location permission refused",
       stopped: false,
       watching: null,

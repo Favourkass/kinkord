@@ -42,7 +42,8 @@ export const MEMBER_LOCATION_COPY = {
   checkCountry: "Check this country",
   stateRequired: "Choose your state first.",
   loading: "Loading…",
-  loadError: "We couldn't load your profile. Try again.",
+  loadError: "We couldn't load your profile.",
+  retry: "Try again",
   saveError: "Your country couldn't be saved. Try again.",
 } as const;
 
@@ -87,7 +88,6 @@ export const LOCATION_ADMIN_COPY = {
   },
   recentTitle: "Recent checks",
   allDecisions: "All decisions",
-  joining: "Joining",
   chose: "Chose",
   gps: "GPS",
   connection: "Connection",

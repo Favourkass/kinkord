@@ -14,8 +14,8 @@ const dbWithMode = (value: string | null) => {
 };
 
 describe("LocationSettingsService", () => {
-  it("watches until the founders choose otherwise", async () => {
-    expect(await new LocationSettingsService(dbWithMode(null).db).mode()).toBe("watch");
+  it("is off until the founders switch it on", async () => {
+    expect(await new LocationSettingsService(dbWithMode(null).db).mode()).toBe("off");
   });
 
   it("reads the founders' choice", async () => {
@@ -23,7 +23,7 @@ describe("LocationSettingsService", () => {
   });
 
   it("ignores a value it doesn't know", async () => {
-    expect(await new LocationSettingsService(dbWithMode("maybe").db).mode()).toBe("watch");
+    expect(await new LocationSettingsService(dbWithMode("maybe").db).mode()).toBe("off");
   });
 
   it("asks the database at most every 30 seconds", async () => {

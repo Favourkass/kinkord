@@ -64,6 +64,13 @@ describe("useLocationCheckPresenter", () => {
     await waitFor(() => expect(opts.onPassed).toHaveBeenCalledWith(null));
   });
 
+  it("lets them through when the API has no check yet (the app deployed first)", async () => {
+    service.mode.mockRejectedValue(new FakeApiError(404, null));
+    const opts = options();
+    renderHook(() => useLocationCheckPresenter(opts));
+    await waitFor(() => expect(opts.onPassed).toHaveBeenCalledWith(null));
+  });
+
   it("can't check before there's a country", () => {
     const { result } = renderHook(() => useLocationCheckPresenter(options({ country: null })));
     expect(result.current.panel.share.disabled).toBe(true);

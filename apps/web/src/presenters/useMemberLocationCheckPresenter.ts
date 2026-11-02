@@ -36,6 +36,8 @@ export function useMemberLocationCheckPresenter() {
   const [state, setState] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Bumped by "Try again" after the profile failed to load.
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let live = true;
@@ -54,7 +56,12 @@ export function useMemberLocationCheckPresenter() {
     return () => {
       live = false;
     };
-  }, [router, copy.loadError]);
+  }, [router, copy.loadError, attempt]);
+
+  const retryLoad = useCallback(() => {
+    setLoadError(null);
+    setAttempt((n) => n + 1);
+  }, []);
 
   const target = choosing ? country : (profileCountry ?? null);
   const ready = choosing ? Boolean(country && state) : Boolean(profileCountry);
@@ -125,6 +132,8 @@ export function useMemberLocationCheckPresenter() {
     loading: profileCountry === undefined && !loadError,
     loadingLabel: copy.loading,
     loadError,
+    retryLoad,
+    retryLabel: copy.retry,
     saving,
     saveError,
     panel: check.panel,

@@ -110,6 +110,17 @@ describe("useMemberLocationCheckPresenter", () => {
     expect(changing.result.current.choose?.country.value).toBe("KE");
   });
 
+  it("offers to try again when the profile can't be loaded", async () => {
+    profile.own.mockRejectedValueOnce(new FakeApiError(500, null));
+    const { result: p } = renderHook(() => useMemberLocationCheckPresenter());
+    await waitFor(() => expect(p.current.loadError).toBe("We couldn't load your profile."));
+    expect(p.current.retryLabel).toBe("Try again");
+    act(() => p.current.retryLoad());
+    await waitFor(() => expect(p.current.loading).toBe(false));
+    expect(p.current.loadError).toBeNull();
+    expect(p.current.panel.chose).toBe("You chose Nigeria.");
+  });
+
   it("sends a signed-out visitor to log in", async () => {
     profile.own.mockRejectedValue(new FakeApiError(401, null));
     renderHook(() => useMemberLocationCheckPresenter());

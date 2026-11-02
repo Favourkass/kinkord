@@ -88,8 +88,10 @@ export function useLocationCheckPresenter(opts: LocationCheckOptions) {
     let live = true;
     locationCheckService.mode().then(
       (m) => live && setMode(m),
-      // Unknown: the check itself will say what's wrong.
-      () => undefined,
+      // An API without the check (this app deployed first) means none to do; anything
+      // else leaves the mode unknown, and the check itself says what's wrong. The
+      // server decides either way: an account it needs a check for is refused without one.
+      (e: unknown) => live && e instanceof ApiError && e.status === 404 && setMode("off"),
     );
     return () => {
       live = false;

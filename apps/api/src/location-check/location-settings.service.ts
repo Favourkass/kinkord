@@ -12,10 +12,12 @@ export const LOCATION_CHECK_MODES = ["off", "watch", "enforce"] as const;
 export type LocationCheckMode = (typeof LOCATION_CHECK_MODES)[number];
 
 /**
- * Watch first (founder, 2026-11-02): for about a week the founders' page shows
- * who would have been stopped, then the founders switch to enforce there.
+ * Off until the founders switch it on in Moderation → Location, so the release
+ * can't hold members whose open app predates it. Then watch first (founder,
+ * 2026-11-02): for about a week the page shows who would have been stopped,
+ * and the founders switch to enforce there.
  */
-export const DEFAULT_LOCATION_CHECK_MODE: LocationCheckMode = "watch";
+export const DEFAULT_LOCATION_CHECK_MODE: LocationCheckMode = "off";
 const MODE_KEY = "location_check_mode";
 /** Every request reads the mode, so each instance holds it this long; a switch spreads within it. */
 const CACHE_MS = 30_000;

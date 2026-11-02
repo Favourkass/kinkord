@@ -26,8 +26,19 @@ const DECISIONS: LocationCheckDecision[] = [
   "skipped",
 ];
 
-const countryName = (code: string | null): string =>
-  code ? (LAUNCH_COUNTRIES.find((c) => c.code === code)?.name ?? code) : "—";
+const regionNames = (() => {
+  try {
+    return new Intl.DisplayNames(["en"], { type: "region" });
+  } catch {
+    return null;
+  }
+})();
+
+/** Kinkord's own names for its countries ("USA"), the browser's for the rest ("United Kingdom"). */
+const countryName = (code: string | null): string => {
+  if (!code) return "—";
+  return LAUNCH_COUNTRIES.find((c) => c.code === code)?.name ?? regionNames?.of(code) ?? code;
+};
 
 const when = (iso: string | null): string =>
   iso
@@ -45,8 +56,8 @@ const messageOf = (e: unknown): string =>
 export interface LocationCheckRowVM {
   id: string;
   when: string;
-  who: string;
-  purpose: string;
+  /** "@tega · Recheck", or just "Joining" for someone without an account yet. */
+  title: string;
   chose: string;
   gps: string;
   connection: string;
@@ -64,8 +75,9 @@ export function toLocationCheckRowVM(row: LocationCheckRowPM): LocationCheckRowV
   return {
     id: row.id,
     when: when(row.createdAt),
-    who: row.username ? `@${row.username}` : copy.joining,
-    purpose: copy.purposes[row.purpose],
+    title: row.username
+      ? `@${row.username} · ${copy.purposes[row.purpose]}`
+      : copy.purposes[row.purpose],
     chose: countryName(row.selectedCountry),
     gps:
       row.gpsStatus === "ok"

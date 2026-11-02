@@ -163,7 +163,8 @@ export function decideCountryCheck(input: CheckInput): CheckOutcome {
   if (gpsEchoesVpn) return decide("mismatch", "vpn_location");
   if (gpsContradicted) return decide("mismatch", "gps_contradicted");
   if (anonymized && ip.country === selected) return decide("mismatch", "vpn");
-  if (deviceElsewhere) return decide("mismatch", "device_elsewhere");
+  // Named only when it outweighed a matching connection; otherwise both were simply elsewhere.
+  if (deviceElsewhere && ip.country === selected) return decide("mismatch", "device_elsewhere");
   return decide("mismatch", "elsewhere");
 }
 

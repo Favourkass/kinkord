@@ -133,9 +133,7 @@ export default function LocationChecksView(vm: LocationChecksVM) {
           {vm.list.rows.map((row) => (
             <li key={row.id} className={`${card} text-[14px]`}>
               <div className="flex flex-wrap items-center justify-between gap-[6px]">
-                <span className="font-semibold text-app-text">
-                  {row.who} · {row.purpose}
-                </span>
+                <span className="font-semibold text-app-text">{row.title}</span>
                 <span className="text-[12px] text-app-muted">{row.when}</span>
               </div>
               <dl className="grid grid-cols-[auto_1fr] gap-x-[10px] gap-y-[2px] pt-[6px] text-app-subtle">
