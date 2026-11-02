@@ -42,6 +42,17 @@ describe("getLandingVM", () => {
     expect(vm.hero.alt).not.toHaveLength(0);
   });
 
+  it("links only the three live social accounts in the requested order", () => {
+    expect(vm.socialLinks.map(({ name, href }) => ({ name, href }))).toEqual([
+      { name: "Facebook", href: "https://www.facebook.com/share/1Los7dVc57/" },
+      { name: "X / Twitter", href: "https://x.com/kinkordofficial" },
+      {
+        name: "Instagram",
+        href: "https://www.instagram.com/kinkordlimited?cplk=MXJyejNsZ3ZvbG00NQ==",
+      },
+    ]);
+  });
+
   it("includes the 18+ age disclaimer", () => {
     expect(vm.ageDisclaimer.lead).toBe("18+ Only.");
     expect(vm.ageDisclaimer.rest).toContain("18 or older");

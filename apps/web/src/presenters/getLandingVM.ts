@@ -14,6 +14,7 @@ import {
   LANDING_MEMBERS,
   MOBILE_LANDING_CONTENT,
   POLICY_LINKS,
+  SOCIALS,
 } from "@/constants/landing";
 import { AVAILABLE_COUNTRIES } from "@/constants/members";
 import { Routes } from "@/constants/Routes";
@@ -61,6 +62,7 @@ export function getLandingVM() {
     policyLinks: POLICY_LINKS.map((p) => ({ ...p })),
     adultBadge: { ...ADULT_BADGE },
     ageGate: { ...AGE_GATE_MODAL },
+    socialLinks: SOCIALS.filter((social) => social.href !== null).map((social) => ({ ...social })),
     copyright: COPYRIGHT_LINE,
     allRightsReserved: ALL_RIGHTS_RESERVED,
   };

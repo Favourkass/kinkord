@@ -98,11 +98,15 @@ export const POLICY_LINKS: readonly PolicyLink[] = [
 export const SOCIALS = [
   {
     name: "Facebook",
-    href: "https://www.facebook.com/share/14iTBY2fTuN/",
+    href: "https://www.facebook.com/share/1Los7dVc57/",
     icon: "facebook",
   },
-  { name: "Instagram", href: null, icon: "instagram" },
   { name: "X / Twitter", href: "https://x.com/kinkordofficial", icon: "twitter" },
+  {
+    name: "Instagram",
+    href: "https://www.instagram.com/kinkordlimited?cplk=MXJyejNsZ3ZvbG00NQ==",
+    icon: "instagram",
+  },
   { name: "TikTok", href: null, icon: "tiktok" },
   { name: "Telegram", href: null, icon: "send" },
   { name: "WhatsApp", href: null, icon: "message-circle" },
