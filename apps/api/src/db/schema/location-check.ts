@@ -16,13 +16,7 @@ export type LocationCheckPurpose = "signup" | "recheck" | "change";
  * - skipped: watch mode only, they chose not to share their location
  */
 export type LocationCheckDecision =
-  | "approved"
-  | "travel"
-  | "mismatch"
-  | "retry"
-  | "refused"
-  | "paused"
-  | "skipped";
+  "approved" | "travel" | "mismatch" | "retry" | "refused" | "paused" | "skipped";
 
 export type GpsStatus = "ok" | "denied" | "unavailable" | "timeout" | "unsupported" | "skipped";
 

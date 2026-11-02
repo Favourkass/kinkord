@@ -266,7 +266,11 @@ export class ProfilesService {
       const kept = checkedSwitch ? gendersAllowedIn(country, selected) : selected;
       try {
         const normalized = genderSelectionChanges(country, kept, current.gender);
-        if (input.genders !== undefined || input.gender !== undefined || kept.length < selected.length)
+        if (
+          input.genders !== undefined ||
+          input.gender !== undefined ||
+          kept.length < selected.length
+        )
           Object.assign(changes, normalized);
       } catch (error) {
         throw new BadRequestException({

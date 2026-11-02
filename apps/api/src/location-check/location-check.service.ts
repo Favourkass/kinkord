@@ -293,46 +293,53 @@ export class LocationCheckService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Whether a member may switch their profile to `country`. Enforcing, it
-   * takes an approved check for that country from the last 30 minutes, which
-   * this spends; founders and organisations need none.
+   * Whether a member may switch their profile to `country`, spending the
+   * check that confirms it: "claimed" when a check backs the switch (its
+   * standing moves with it), "free" when none is needed, "missing" when
+   * enforcing without one. Enforcing, only an approved check for that
+   * country from the last 30 minutes counts; watching, any recent one is
+   * recorded, so the member isn't asked twice. Founders and organisations
+   * need none.
    */
   async authorizeCountryChange(
     userId: string,
     country: string | null,
     now = new Date(),
   ): Promise<"free" | "claimed" | "missing"> {
-    if ((await this.settings.mode()) !== "enforce") return "free";
+    const mode = await this.settings.mode();
+    if (mode === "off") return "free";
     if (await this.exempt(userId)) return "free";
+    const enforcing = mode === "enforce";
     // Clearing the country would lift Nigeria's limits as surely as a new one.
-    if (!country) return "missing";
+    if (!country) return enforcing ? "missing" : "free";
     const [candidate] = await this.db
-      .select({ id: locationCheck.id })
+      .select({ id: locationCheck.id, decision: locationCheck.decision })
       .from(locationCheck)
       .where(
         and(
           eq(locationCheck.userId, userId),
           eq(locationCheck.purpose, "change"),
           eq(locationCheck.selectedCountry, country),
-          eq(locationCheck.decision, "approved"),
+          enforcing ? eq(locationCheck.decision, "approved") : undefined,
           isNull(locationCheck.consumedAt),
           gt(locationCheck.createdAt, new Date(now.getTime() - PASS_VALID_MS)),
         ),
       )
       .orderBy(desc(locationCheck.createdAt))
       .limit(1);
-    if (!candidate) return "missing";
+    if (!candidate) return enforcing ? "missing" : "free";
     const [spent] = await this.db
       .update(locationCheck)
       .set({ consumedAt: now })
       .where(and(eq(locationCheck.id, candidate.id), isNull(locationCheck.consumedAt)))
       .returning({ id: locationCheck.id });
-    if (!spent) return "missing";
+    if (!spent) return enforcing ? "missing" : "free";
+    const approved = candidate.decision === "approved";
     await this.writeStanding(userId, {
       checkedAt: now,
       checkedCountry: country,
-      status: "approved",
-      approvedAt: now,
+      status: approved ? "approved" : "observed",
+      ...(approved ? { approvedAt: now } : {}),
     });
     return "claimed";
   }

@@ -339,9 +339,25 @@ describe("LocationCheckService sign-up claims", () => {
 describe("LocationCheckService.authorizeCountryChange", () => {
   const person = { email: "member@kinkord.com", emailVerified: true, accountType: "person" };
 
-  it("is free unless enforcing", async () => {
-    const { service } = make({ mode: "watch" });
-    expect(await service.authorizeCountryChange("u1", "GH", now)).toBe("free");
+  it("is free while switched off, or watching with no check to record", async () => {
+    expect(await make({ mode: "off" }).service.authorizeCountryChange("u1", "GH", now)).toBe(
+      "free",
+    );
+    const watching = make({ mode: "watch" });
+    watching.reads(user, [person]);
+    watching.reads(locationCheck, []);
+    expect(await watching.service.authorizeCountryChange("u1", "GH", now)).toBe("free");
+  });
+
+  it("watching, records the check behind a switch so the member isn't asked twice", async () => {
+    const { service, reads, returns, written } = make({ mode: "watch" });
+    reads(user, [person]);
+    reads(locationCheck, [{ id: "check-8", decision: "mismatch" }]);
+    returns(locationCheck, [{ id: "check-8" }]);
+    expect(await service.authorizeCountryChange("u1", "GH", now)).toBe("claimed");
+    expect(written("insert", locationStatus)).toEqual([
+      { userId: "u1", checkedAt: now, checkedCountry: "GH", status: "observed" },
+    ]);
   });
 
   it("is free for founders and organisations", async () => {
@@ -369,7 +385,7 @@ describe("LocationCheckService.authorizeCountryChange", () => {
   it("spends that check and records the member there", async () => {
     const { service, reads, returns, written } = make();
     reads(user, [person]);
-    reads(locationCheck, [{ id: "check-9" }]);
+    reads(locationCheck, [{ id: "check-9", decision: "approved" }]);
     returns(locationCheck, [{ id: "check-9" }]);
     expect(await service.authorizeCountryChange("u1", "GH", now)).toBe("claimed");
     expect(written("insert", locationStatus)).toEqual([
@@ -380,7 +396,7 @@ describe("LocationCheckService.authorizeCountryChange", () => {
   it("won't spend a check twice", async () => {
     const { service, reads, returns } = make();
     reads(user, [person]);
-    reads(locationCheck, [{ id: "check-9" }]);
+    reads(locationCheck, [{ id: "check-9", decision: "approved" }]);
     returns(locationCheck, []);
     expect(await service.authorizeCountryChange("u1", "GH", now)).toBe("missing");
   });
