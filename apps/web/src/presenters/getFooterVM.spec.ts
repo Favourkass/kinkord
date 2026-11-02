@@ -23,9 +23,7 @@ describe("getFooterVM", () => {
     const byName = Object.fromEntries(vm.socials.map((s) => [s.name, s.href]));
     expect(byName["Facebook"]).toMatch(/^https:\/\//);
     expect(byName["X / Twitter"]).toBe("https://x.com/kinkordofficial");
-    expect(byName["Instagram"]).toBe(
-      "https://www.instagram.com/kinkordlimited?cplk=MXJyejNsZ3ZvbG00NQ==",
-    );
+    expect(byName["Instagram"]).toBe("https://www.instagram.com/kinkordlimited/");
     expect(byName["TikTok"]).toBeNull();
   });
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { PwaInstallArtwork, type InstallArtwork } from "./PwaInstallArtwork";
 
@@ -22,17 +23,50 @@ export function PwaInstallBanner({
   onDismiss,
   onNeverShow,
 }: PwaInstallBannerProps) {
+  const dialogRef = useRef<HTMLElement>(null);
+
+  // Focus moves into the prompt when it opens, so keys reach it rather than the page
+  // underneath, and goes back to wherever it was once it closes. The prompt itself takes
+  // focus, not a button, so a tap never shows a focus ring around the artwork.
+  useEffect(() => {
+    if (!isInstallable) return;
+    const previous = document.activeElement;
+    dialogRef.current?.focus({ preventScroll: true });
+    return () => {
+      if (previous instanceof HTMLElement && previous.isConnected) {
+        previous.focus({ preventScroll: true });
+      }
+    };
+  }, [isInstallable]);
+
   if (!isInstallable) return null;
 
   return (
     <section
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label="Install Kinkord App"
+      tabIndex={-1}
       onKeyDown={(event) => {
         if (event.key === "Escape") onDismiss();
+        if (event.key !== "Tab") return;
+        // Tab wraps at either end rather than walking into the page behind.
+        const buttons = Array.from(
+          event.currentTarget.querySelectorAll<HTMLElement>("button:not(:disabled)"),
+        );
+        const first = buttons[0];
+        const last = buttons[buttons.length - 1];
+        const onButton = buttons.includes(document.activeElement as HTMLElement);
+        if (event.shiftKey && (!onButton || document.activeElement === first)) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && (!onButton || document.activeElement === last)) {
+          event.preventDefault();
+          first?.focus();
+        }
       }}
-      className="fixed inset-0 z-50 h-dvh w-full overflow-hidden bg-black"
+      className="fixed inset-0 z-50 h-dvh w-full overflow-hidden bg-black outline-none"
     >
       <button
         type="button"
