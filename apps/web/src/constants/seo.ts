@@ -5,7 +5,7 @@ export const SITE_NAME = "Kinkord";
 
 /** The official accounts, for the Organization's `sameAs`. */
 export const SOCIAL_PROFILES = [
-  "https://www.instagram.com/kinkordofficial/",
+  "https://www.instagram.com/kinkordlimited?cplk=MXJyejNsZ3ZvbG00NQ==",
   "https://x.com/kinkordofficial",
 ];
 
