@@ -40,6 +40,7 @@ import {
   silverUntil,
   usdCentsFor,
 } from "./plans";
+import { ringsPerPlan } from "./ring-settings";
 
 export type PaymentRow = typeof subscriptionPayment.$inferSelect;
 
@@ -313,6 +314,8 @@ export class SubscriptionsService implements OnApplicationBootstrap {
 
     const price = settings.prices[period];
     const bank = settings.bank;
+    // The rings on offer now are the ones this payment brings, whatever changes before it's confirmed.
+    const rings = (await ringsPerPlan(this.db))[period];
     for (let attempt = 0; attempt < INSERT_ATTEMPTS; attempt++) {
       const amountKobo = await this.uniqueAmount(price.kobo);
       try {
@@ -329,6 +332,7 @@ export class SubscriptionsService implements OnApplicationBootstrap {
             bankName: bank.name,
             accountName: bank.accountName,
             accountNumber: bank.accountNumber,
+            rings,
             expiresAt: new Date(now.getTime() + PAYMENT_WINDOW_MS),
           })
           .returning();

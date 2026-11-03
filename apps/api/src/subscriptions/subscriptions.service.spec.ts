@@ -352,6 +352,7 @@ describe("SubscriptionsService.checkout", () => {
       [settingsRow],
       [], // nothing open for this member
       undefined, // abandoned checkouts let go
+      [{ key: "kink_rings_yearly", value: "6" }], // the founders set a year's rings to six
       [{ amountKobo: 3_360_000 + 4_700 }], // ₦47 is taken
       [payment()],
     ]);
@@ -368,6 +369,7 @@ describe("SubscriptionsService.checkout", () => {
       bankName: "UBA",
       accountName: "Kinkord Ltd",
       accountNumber: "1028154254",
+      rings: 6,
       expiresAt: new Date(NOW.getTime() + PAYMENT_WINDOW_MS),
     });
   });
@@ -379,6 +381,7 @@ describe("SubscriptionsService.checkout", () => {
       [payment({ period: "monthly", amountKobo: 564_700 })],
       undefined, // their monthly checkout expired
       undefined, // abandoned checkouts let go
+      [], // the rings on offer: one a month, twelve a year
       [],
       [payment()],
     ]);
@@ -394,6 +397,7 @@ describe("SubscriptionsService.checkout", () => {
       [],
       undefined,
       [],
+      [],
       clash,
       [],
       [payment({ reference: "KIN20260924114239" })],
@@ -406,7 +410,15 @@ describe("SubscriptionsService.checkout", () => {
   });
 
   it("passes on any other database failure", async () => {
-    const { service } = make([[], [settingsRow], [], undefined, [], new Error("connection lost")]);
+    const { service } = make([
+      [],
+      [settingsRow],
+      [],
+      undefined,
+      [],
+      [],
+      new Error("connection lost"),
+    ]);
     await expect(service.checkout("u1", "yearly")).rejects.toThrow("connection lost");
   });
 });

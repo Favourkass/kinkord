@@ -10,6 +10,8 @@ export const MODERATION_COPY = {
     verification: "Verification",
     blocklist: "Block list",
     location: "Location",
+    kinkRings: "Kink Rings",
+    silver: "Silver",
     admins: "Admins",
   },
   payments: {
@@ -89,6 +91,96 @@ export const MODERATION_COPY = {
     approved: (name: string) => `Approved. ${name}'s badge shows again.`,
   },
   /** One member's Silver ring, on their page. */
+  memberRings: {
+    title: "Kink Rings",
+    loading: "Loading Kink Rings…",
+    empty: "No Kink Rings yet: none bought with Silver, none received.",
+    summary: (c: {
+      total: number;
+      unused: number;
+      given: number;
+      expired: number;
+      cancelled: number;
+      received: number;
+    }) =>
+      `Balance: ${c.unused} to give · ${c.total} ${c.total === 1 ? "ring" : "rings"} in all · ${c.given} given · ${c.expired} expired${c.cancelled ? ` · ${c.cancelled} cancelled` : ""} · ${c.received} received`,
+    batch: (period: "monthly" | "yearly", confirmed: string | null) =>
+      `${period === "yearly" ? "Yearly" : "Monthly"} Silver${confirmed ? ` · confirmed ${confirmed}` : ""}`,
+    fromKinkord: "Given by Kinkord",
+    ring: (seq: number) => `Ring ${seq}`,
+    status: { unused: "Unused", given: "Given", expired: "Expired", cancelled: "Cancelled" },
+    givenTo: (who: string, date: string) => `To ${who} on ${date}`,
+    expires: (date: string) => `Expires ${date}`,
+    expired: (date: string) => `Expired ${date}, never given`,
+    cancelled: "Cancelled by an admin before it was given",
+    withNote: "with a note",
+    silverCancelled: "Silver cancelled",
+    someoneGone: "a member who has since left",
+    thisMember: "This member",
+    receivedTitle: "Received",
+    receivedFrom: (who: string, date: string) => `From ${who} on ${date}`,
+    cancelUnused: "Cancel unused rings",
+    cancelSilver: "Cancel Silver",
+    reason: "Why? Kept in the records.",
+    goBack: "Go back",
+    cancelUnusedDialog: {
+      title: (n: number) => `Cancel ${n} unused ${n === 1 ? "ring" : "rings"}?`,
+      body: "Their balance goes to zero, so they can't give these rings. Rings they've already given, and the Silver those gave, stay as they are. The rings stay in the records, marked cancelled.",
+      confirm: "Cancel rings",
+    },
+    cancelSilverDialog: {
+      title: "Cancel the Silver from this ring?",
+      body: (who: string) =>
+        `${who} loses the month of Silver this ring gave. If it was their only Silver, they're on Basic from now. Silver they paid for stays theirs.`,
+      confirm: "Cancel Silver",
+    },
+    cancelledUnused: (n: number) => `Cancelled ${n} ${n === 1 ? "ring" : "rings"}.`,
+    cancelledSilver: (until: string | null) =>
+      until
+        ? `Silver cancelled. Their Silver now ends ${until}.`
+        : "Silver cancelled. They're on Basic now.",
+  },
+  /** Everyone on Silver now, and how they got it. */
+  silverMembers: {
+    title: "Silver members",
+    loading: "Loading Silver members…",
+    empty: "Nobody here.",
+    search: "Search by username or name",
+    filters: {
+      all: (n: number) => `All ${n}`,
+      subscription: (n: number) => `Subscription ${n}`,
+      ring: (n: number) => `Kink Ring ${n}`,
+      given: (n: number) => `Given by Kinkord ${n}`,
+    },
+    sources: {
+      subscription: "Subscription",
+      ring: "Kink Ring",
+      both: "Subscription + Kink Ring",
+      given: "Given by Kinkord",
+      other: "Other",
+    },
+    plans: { monthly: "monthly", yearly: "yearly" },
+    until: (date: string) => `Silver until ${date}`,
+    forGood: "Silver for good",
+    more: "Show more",
+    loadingMore: "Loading…",
+  },
+  /** How many Kink Rings each Silver plan brings: the founders set it. */
+  ringSettings: {
+    title: "Kink Rings per plan",
+    hint: "How many rings to give away each Silver plan brings. New checkouts get these; payments already made keep what they were offered. Ring 1 expires 30 days after the payment is confirmed, ring 2 after 60, and so on.",
+    loading: "Loading…",
+    locked: "Only the founders can change this.",
+    monthly: "Monthly Silver",
+    yearly: "Yearly Silver",
+    rings: (n: number) => `${n} ${n === 1 ? "ring" : "rings"}`,
+    edit: "Edit",
+    save: "Save",
+    saving: "Saving…",
+    cancel: "Cancel",
+    saved: "Saved. New checkouts bring these rings.",
+    invalid: (max: number) => `Enter a whole number from 0 to ${max} for each plan.`,
+  },
   memberCheck: {
     title: "Silver ring",
     until: (date: string) => `Silver until ${date}`,

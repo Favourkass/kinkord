@@ -1,3 +1,7 @@
+import { KinkRingsAdminController } from "./kink-rings-admin.controller";
+import { KinkRingsAdminService } from "./kink-rings-admin.service";
+import { SilverMembersController } from "./silver-members.controller";
+import { SilverMembersService } from "./silver-members.service";
 import { KinkRingsInventoryService } from "./kink-rings-inventory.service";
 import { Module } from "@nestjs/common";
 import { PushModule } from "../push/push.module";
@@ -21,6 +25,8 @@ import { SubscriptionsService } from "./subscriptions.service";
     PaymentsController,
     SilverChecksController,
     KinkRingsController,
+    KinkRingsAdminController,
+    SilverMembersController,
   ],
   providers: [
     SubscriptionsService,
@@ -28,6 +34,8 @@ import { SubscriptionsService } from "./subscriptions.service";
     SilverChecksService,
     KinkRingsService,
     KinkRingsInventoryService,
+    KinkRingsAdminService,
+    SilverMembersService,
   ],
   // /me reports the member's plan; a profile change puts their check on hold.
   exports: [SubscriptionsService, SilverChecksService],
