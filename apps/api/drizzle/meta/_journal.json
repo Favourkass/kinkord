@@ -351,6 +351,13 @@
       "when": 1793694933273,
       "tag": "0049_location_check",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1793713416932,
+      "tag": "0050_kink_ring_admin",
+      "breakpoints": true
     }
   ]
 }

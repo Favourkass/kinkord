@@ -63,3 +63,15 @@ export async function addSilverTime(
     });
   return until;
 }
+
+/**
+ * When Silver from these alone would end: each period runs on from the last,
+ * or starts over after a lapse, as `addSilverTime` adds them. Null for none.
+ */
+export function silverFrom(additions: Array<{ at: Date; period: BillingPeriod }>): Date | null {
+  let end: Date | null = null;
+  for (const { at, period } of [...additions].sort((a, b) => a.at.getTime() - b.at.getTime())) {
+    end = addPeriod(end && end > at ? end : at, period);
+  }
+  return end;
+}

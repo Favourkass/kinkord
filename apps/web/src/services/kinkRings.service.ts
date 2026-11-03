@@ -9,6 +9,9 @@ import type {
   RingHistoryPM,
   RingInventoryItemPM,
   RingRecipientPM,
+  MemberRingsPM,
+  RingSettingsPM,
+  RingsPerPlanPM,
 } from "@/domain/kinkRings";
 import { ApiError, api } from "./apiClient";
 
@@ -132,3 +135,24 @@ export function ringAllocationGifts(
     });
   });
 }
+
+/** Admins' view of a member's rings (Moderation → Members → member). */
+export const kinkRingsAdminApi = {
+  forMember: (userId: string) =>
+    api.get<MemberRingsPM>(`/admin/members/${encodeURIComponent(userId)}/kink-rings`),
+  /** Takes back every ring the member still has to give. */
+  cancelUnused: (userId: string, reason: string) =>
+    api.post<{ cancelled: number }>(
+      `/admin/members/${encodeURIComponent(userId)}/kink-rings/cancel`,
+      { reason },
+    ),
+  /** Takes back the month of Silver a ring gave whoever got it. */
+  cancelSilver: (ringId: string, reason: string) =>
+    api.post<{ memberId: string; silverUntil: string | null }>(
+      `/admin/kink-rings/${encodeURIComponent(ringId)}/cancel-silver`,
+      { reason },
+    ),
+  settings: () => api.get<RingSettingsPM>("/admin/kink-rings/settings"),
+  saveSettings: (rings: RingsPerPlanPM) =>
+    api.put<RingSettingsPM>("/admin/kink-rings/settings", rings),
+};

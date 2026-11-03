@@ -37,6 +37,8 @@ export const Routes = {
   moderationPayments: "/moderation/payments",
   moderationVerification: "/moderation/verification",
   moderationLocation: "/moderation/location",
+  moderationKinkRings: "/moderation/kink-rings",
+  moderationSilver: "/moderation/silver",
   moderationAdmins: "/moderation/admins",
   signup: "/signup",
   login: "/login",

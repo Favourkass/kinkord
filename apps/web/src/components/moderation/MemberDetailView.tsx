@@ -42,6 +42,8 @@ export interface MemberDetailViewProps {
   onDeletePost: (postId: string) => void;
   /** Their Silver check, when they have Silver. */
   silverCheck?: ReactNode;
+  /** The member's Kink Rings: given, unused, expired and received. */
+  kinkRings?: ReactNode;
   teamBadge?: ReactNode;
   onRevokeVerification: () => void;
   onReopenVerification: () => void;
@@ -66,6 +68,7 @@ export default function MemberDetailView({
   onDeleteAccount,
   onDeletePost,
   silverCheck,
+  kinkRings,
   teamBadge,
   onRevokeVerification,
   onReopenVerification,
@@ -199,6 +202,8 @@ export default function MemberDetailView({
           )}
 
           {silverCheck}
+
+          {kinkRings}
 
           <h2 className="pt-[28px] pb-[10px] text-[14px] font-bold text-app-text">
             {labels.posts} · {vm.postCount}

@@ -1,4 +1,5 @@
 import { FOUNDER_SILVER_UNTIL } from "./plans";
+import { ringsPerPlan } from "./ring-settings";
 import { Inject, Injectable } from "@nestjs/common";
 import {
   and,
@@ -32,7 +33,7 @@ export class KinkRingsInventoryService {
   ) {}
 
   async inventory(ownerId: string, now = new Date()) {
-    const [available, expired, history] = await Promise.all([
+    const [available, expired, history, perPlan] = await Promise.all([
       this.db
         .select({
           id: kinkRing.id,
@@ -42,19 +43,26 @@ export class KinkRingsInventoryService {
         })
         .from(kinkRing)
         .where(
-          and(eq(kinkRing.ownerId, ownerId), isNull(kinkRing.givenAt), gt(kinkRing.expiresAt, now)),
+          and(
+            eq(kinkRing.ownerId, ownerId),
+            isNull(kinkRing.givenAt),
+            isNull(kinkRing.revokedAt),
+            gt(kinkRing.expiresAt, now),
+          ),
         )
         .orderBy(asc(kinkRing.expiresAt), asc(kinkRing.id)),
       this.expired(ownerId, 1, now),
       this.history(ownerId, 1, now),
+      ringsPerPlan(this.db),
     ]);
-    return { available: available.map(ringDto), expired, history };
+    return { available: available.map(ringDto), expired, history, perPlan };
   }
 
   async expired(ownerId: string, page: number, now = new Date()) {
     const filter = and(
       eq(kinkRing.ownerId, ownerId),
       isNull(kinkRing.givenAt),
+      isNull(kinkRing.revokedAt),
       lte(kinkRing.expiresAt, now),
     );
     const [rows, totals] = await Promise.all([

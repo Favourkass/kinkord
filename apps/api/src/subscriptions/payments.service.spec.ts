@@ -193,6 +193,21 @@ describe("PaymentsService.verify", () => {
     expect(calls.slice(ringInsert).some((c) => c.op === "onConflictDoNothing")).toBe(true);
   });
 
+  it("brings the rings the plan offered at checkout, even none", async () => {
+    const six = make([
+      [payment({ period: "yearly", rings: 6 })],
+      [{ id: "u1" }],
+      [],
+      undefined,
+      undefined,
+    ]);
+    await six.service.verify("a1", ID);
+    expect(six.after("insert", kinkRing, "values")).toHaveLength(6);
+    const none = make([[payment({ rings: 0 })], [{ id: "u1" }], [], undefined]);
+    await none.service.verify("a1", ID);
+    expect(none.calls.some((c) => c.op === "insert" && c.args[0] === kinkRing)).toBe(false);
+  });
+
   it("runs a renewal on from the end of the current period, and a year brings twelve rings", async () => {
     const end = new Date("2026-10-20T08:00:00Z");
     const { service, after } = make([

@@ -5,12 +5,17 @@ founders set the rules on 2026-10-27.
 
 ## Getting rings
 
-- **Silver for a month** brings **1** ring.
-- **Silver for a year** brings **12**.
-- Each ring expires a month of Silver after the payment is confirmed, so a
-  year's twelve run out a month apart. The Nth ring expires **30 × N days**
-  after confirmation: 30 days for the first, 60 for the second, and on to 360
-  for the twelfth.
+- **How many each plan brings is the founders' setting**, on Moderation →
+  Kink Rings (0 to 24 per plan, stored in `app_setting` as
+  `kink_rings_monthly` and `kink_rings_yearly`). Until they set it: **1** for
+  a month, **12** for a year.
+- A checkout records the count on offer then (`subscription_payment.rings`),
+  and confirming the payment brings that many, whatever the setting says by
+  then. Payments from before the setting existed bring 1 or 12.
+- Each ring expires a month of Silver after the payment is confirmed, so the
+  rings run out a month apart. The Nth ring expires **30 × N days** after
+  confirmation: 30 days for the first, 60 for the second, and so on (360 for
+  a twelfth).
 - Rings are made when an admin confirms the payment, in the same transaction
   that turns Silver on, so they come exactly once per payment
   (`kink_ring_payment_seq_idx`). A payment confirmed while the founders' Silver
@@ -107,17 +112,47 @@ Migration `0048_kink_ring_gift_message` adds a nullable `gift_message` column.
 Apply it before deploying the updated API. Existing rings keep a null note; no
 existing balances, Silver grants or payment rules are changed.
 
+## Admins
+
+On a member's admin page (Moderation → Members → member), admins see each
+payment's rings: who got each one and when, which expired unused, and the
+balance left to give, plus the rings others gave the member. Notes stay
+between the members; only that one was sent shows.
+
+Two actions, each with a required reason (stored on the ring and in
+`moderation_log`):
+
+- **Cancel unused rings** (`POST /admin/members/:id/kink-rings/cancel`):
+  every ring the member still has to give is marked `revoked_at`, so their
+  balance is zero. Given rings, and the Silver they gave, stay. Nothing is
+  deleted.
+- **Cancel Silver** (`POST /admin/kink-rings/:ringId/cancel-silver`): takes
+  back the month of Silver a given ring added (`usage_cancelled_at`). The
+  receiver's Silver ends a month sooner, but never sooner than their own
+  payments and their other rings carry it, so paid time is never lost. A
+  member whose only Silver was that ring is on Basic from now. While the
+  founders' Silver runs, the month comes off the time set aside for them
+  (`paid_until`) instead. The ring itself stays given.
+
+`GET/PUT /admin/kink-rings/settings` read and set the rings per plan; only the
+founders may change them.
+
 ## Data
 
 `kink_ring` (migration 0046):
 - `owner_id`
 - `payment_id` (null for the founders' rings)
-- `seq` (1 to 12)
+- `seq` (1 up to the plan's count)
 - `expires_at`
 - `given_to`, `given_at`
 - `gift_message` (nullable, migration 0048)
+- `revoked_at`, `revoked_by`, `revoke_reason`: an admin took it back unused
+  (migration 0050)
+- `usage_cancelled_at`, `usage_cancelled_by`, `usage_cancel_reason`: an admin
+  took back the Silver it gave (migration 0050)
 
-A ring is **available** while `given_at` is null and `expires_at` is ahead.
+A ring is **available** while `given_at` and `revoked_at` are null and
+`expires_at` is ahead.
 Rings go with their owner's account. The giver's record stays if the receiver
 leaves.
 

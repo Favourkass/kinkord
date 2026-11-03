@@ -61,7 +61,11 @@ export function usdCentsFor(amountKobo: number, price: { kobo: number; usdCents:
 
 /** A calendar month or year on; the 31st lands on the month's last day. */
 export function addPeriod(from: Date, period: BillingPeriod): Date {
-  const months = period === "monthly" ? 1 : 12;
+  return addMonths(from, period === "monthly" ? 1 : 12);
+}
+
+/** Calendar months on, or back when negative; the 31st lands on the month's last day. */
+export function addMonths(from: Date, months: number): Date {
   const target = new Date(from.getTime());
   const day = target.getUTCDate();
   target.setUTCDate(1);

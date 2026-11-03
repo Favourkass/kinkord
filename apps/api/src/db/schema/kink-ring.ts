@@ -27,6 +27,19 @@ export const kinkRing = pgTable(
     /** Private note from the giver, displayed only to the recipient in their inbox. */
     giftMessage: text("gift_message"),
     givenAt: timestamp("given_at", { withTimezone: true }),
+    /**
+     * Taken back from the owner by an admin before it was given: it can no
+     * longer be given, and it never counts as theirs again.
+     */
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    revokedBy: text("revoked_by").references(() => user.id, { onDelete: "set null" }),
+    revokeReason: text("revoke_reason"),
+    /** The month of Silver it gave was taken back from the receiver by an admin. */
+    usageCancelledAt: timestamp("usage_cancelled_at", { withTimezone: true }),
+    usageCancelledBy: text("usage_cancelled_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    usageCancelReason: text("usage_cancel_reason"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
