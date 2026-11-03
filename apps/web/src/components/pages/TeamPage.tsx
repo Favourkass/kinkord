@@ -413,6 +413,7 @@ export default function TeamPage({
   joinTeamHref,
   founderMessage,
   ceo,
+  teamMembers,
   founderTopics,
   selectedTopic,
   selectTopic,
@@ -657,8 +658,8 @@ export default function TeamPage({
                 </div>
               </section>
 
-              {/* Team Members List (CEO Alone per requirement) */}
-              <section className="w-full my-6">
+              {/* Team Members List: the CEO, then the team the founders picked */}
+              <section className="w-full my-6 flex flex-col gap-3">
                 <button
                   type="button"
                   onClick={openProfile}
@@ -704,6 +705,48 @@ export default function TeamPage({
                     <ChevronRightIcon className="text-neutral-500 group-hover:text-[#faab14] group-hover:translate-x-1 transition-all" />
                   </div>
                 </button>
+
+                {teamMembers.map((member) => (
+                  <Link
+                    key={member.key}
+                    href={member.href}
+                    className="group w-full rounded-[20px] border border-neutral-800 bg-[#0e0e0c] p-3.5 sm:p-4 hover:border-[#faab14]/50 hover:bg-[#151512] transition-all flex items-center justify-between gap-2 text-left"
+                  >
+                    <div className="flex min-w-0 items-center gap-3.5">
+                      <div className="relative grid size-[68px] sm:size-[76px] shrink-0 place-items-center rounded-[16px] overflow-hidden bg-neutral-900 border border-neutral-700/60 shadow-lg">
+                        {member.avatarUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- presigned S3 URL, not optimizable
+                          <img
+                            src={member.avatarUrl}
+                            alt={member.name}
+                            className="size-full object-cover object-center"
+                          />
+                        ) : (
+                          <span className="text-[26px] font-black text-[#faab14]">
+                            {member.initial}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="min-w-0">
+                        <span className="rounded-full bg-neutral-800/80 px-2 py-0.5 text-[11px] font-medium text-neutral-300">
+                          {member.handle}
+                        </span>
+                        <p className="truncate text-[16px] sm:text-[17px] font-bold text-white group-hover:text-[#faab14] transition-colors mt-0.5">
+                          {member.name}
+                        </p>
+                        <div className="flex items-center gap-1.5 text-[12px] sm:text-[13px] font-medium text-neutral-300 mt-0.5">
+                          <BriefcaseIcon className="size-3.5 shrink-0 text-[#faab14]" />
+                          <span className="truncate">{member.title}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pr-1">
+                      <ChevronRightIcon className="text-neutral-500 group-hover:text-[#faab14] group-hover:translate-x-1 transition-all" />
+                    </div>
+                  </Link>
+                ))}
               </section>
 
               {/* Join Kinkord Team CTA */}

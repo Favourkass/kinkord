@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Routes } from "@/constants/Routes";
 import { POLICY_LINKS, type PolicyLink } from "@/constants/landing";
 import { ABOUT_PAGE_DATA, TeamMemberData, FounderTopic, FounderTopicId } from "@/constants/about";
+import { toTeamMemberVM, type TeamMemberPM, type TeamMemberVM } from "@/domain/team";
 import { authClient } from "@/services/authClient";
 import { api } from "@/services/apiClient";
+import { teamApi } from "@/services/team.service";
 import type { NavLinkVM, SidebarNavVM } from "./useAboutPresenter";
 
 export interface TeamVM {
@@ -19,6 +21,8 @@ export interface TeamVM {
   joinTeamHref: string;
   founderMessage: typeof ABOUT_PAGE_DATA.founderMessage;
   ceo: TeamMemberData;
+  /** Everyone else the founders put on the page, with their role, in their order. */
+  teamMembers: TeamMemberVM[];
   founderTopics: readonly FounderTopic[];
   selectedTopicId: FounderTopicId | null;
   selectedTopic: FounderTopic | null;
@@ -48,6 +52,22 @@ export function useTeamPresenter(): TeamVM {
   const [selectedTopicId, setSelectedTopicId] = useState<FounderTopicId | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [team, setTeam] = useState<TeamMemberPM[]>([]);
+
+  useEffect(() => {
+    let live = true;
+    teamApi.list().then(
+      (members) => live && setTeam(members),
+      () => {
+        // The CEO's card shows regardless; the rest of the team shows on the next visit.
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const teamMembers = useMemo(() => team.map((m) => toTeamMemberVM(m, Routes.member)), [team]);
 
   useEffect(() => {
     let cancelled = false;
@@ -150,6 +170,7 @@ export function useTeamPresenter(): TeamVM {
     joinTeamHref: Routes.contact,
     founderMessage: ABOUT_PAGE_DATA.founderMessage,
     ceo: ABOUT_PAGE_DATA.ceo,
+    teamMembers,
     founderTopics,
     selectedTopicId,
     selectedTopic,

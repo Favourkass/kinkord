@@ -14,6 +14,7 @@ export function moderationTabs(
     | "location"
     | "kink-rings"
     | "silver"
+    | "team-page"
     | "admins",
 ): ModerationTab[] {
   return [
@@ -54,6 +55,11 @@ export function moderationTabs(
       label: MODERATION_COPY.tabs.kinkRings,
       href: Routes.moderationKinkRings,
       active: active === "kink-rings",
+    },
+    {
+      label: MODERATION_COPY.tabs.teamPage,
+      href: Routes.moderationTeamPage,
+      active: active === "team-page",
     },
     {
       label: MODERATION_COPY.tabs.admins,

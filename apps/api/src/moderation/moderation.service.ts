@@ -358,12 +358,19 @@ export class ModerationService {
     return this.toTeamMember(after);
   }
 
-  /** A public identity badge only. Never adds/removes staff or verification. */
+  /**
+   * A public identity badge only. Never adds/removes staff or verification.
+   * Taking it away takes them off Meet the Team too.
+   */
   async setTeamBadge(actorId: string, id: string, enabled: boolean) {
     return this.db.transaction(async (tx) => {
       const [row] = await tx
         .update(profile)
-        .set({ teamMember: enabled })
+        .set(
+          enabled
+            ? { teamMember: true }
+            : { teamMember: false, teamTitle: null, teamTitleAt: null },
+        )
         .where(eq(profile.userId, id))
         .returning({ teamMember: profile.teamMember });
       if (!row) throw new NotFoundException("Member profile not found.");
