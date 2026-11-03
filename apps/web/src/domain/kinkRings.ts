@@ -144,3 +144,119 @@ export interface RingGiftAssignment {
   username: string;
   message?: string;
 }
+
+/** Moderation → Members → member: their rings as admins see them (GET /admin/members/:id/kink-rings). */
+export type AdminRingStatus = "unused" | "given" | "expired";
+
+export interface AdminRingPersonPM {
+  id: string;
+  username: string | null;
+  displayName: string | null;
+}
+
+export interface MemberRingsPM {
+  counts: { total: number; unused: number; given: number; expired: number; received: number };
+  batches: Array<{
+    paymentId: string | null;
+    period: "monthly" | "yearly" | null;
+    confirmedAt: string | null;
+    rings: Array<{
+      id: string;
+      seq: number;
+      status: AdminRingStatus;
+      expiresAt: string;
+      givenAt: string | null;
+      recipient: AdminRingPersonPM | null;
+      recipientLeft: boolean;
+      withNote: boolean;
+    }>;
+  }>;
+  received: Array<{
+    id: string;
+    givenAt: string | null;
+    giver: AdminRingPersonPM;
+    withNote: boolean;
+  }>;
+}
+
+export interface MemberRingsLabels {
+  summary: (counts: MemberRingsPM["counts"]) => string;
+  batch: (period: "monthly" | "yearly", confirmed: string | null) => string;
+  fromKinkord: string;
+  ring: (seq: number) => string;
+  status: Record<AdminRingStatus, string>;
+  givenTo: (who: string, date: string) => string;
+  expires: (date: string) => string;
+  expired: (date: string) => string;
+  withNote: string;
+  someoneGone: string;
+  receivedFrom: (who: string, date: string) => string;
+}
+
+export interface MemberRingsVM {
+  summary: string;
+  empty: boolean;
+  batches: Array<{
+    key: string;
+    heading: string;
+    rings: Array<{
+      id: string;
+      label: string;
+      status: AdminRingStatus;
+      statusLabel: string;
+      line: string;
+      href: string | null;
+    }>;
+  }>;
+  received: Array<{ id: string; line: string; href: string | null }>;
+}
+
+/** "@tega (Tega)", or whichever of the two exists. */
+function personLabel(person: AdminRingPersonPM): string {
+  const handle = person.username ? `@${person.username}` : null;
+  if (handle && person.displayName) return `${handle} (${person.displayName})`;
+  return handle ?? person.displayName ?? person.id;
+}
+
+/** Each payment's rings with where each stands, who got it and when it runs out, in Lagos time. */
+export function toMemberRingsVM(
+  pm: MemberRingsPM,
+  labels: MemberRingsLabels,
+  hrefFor: (memberId: string) => string,
+): MemberRingsVM {
+  return {
+    summary: labels.summary(pm.counts),
+    empty: pm.counts.total === 0 && pm.counts.received === 0,
+    batches: pm.batches.map((batch) => ({
+      key: batch.paymentId ?? "kinkord",
+      heading: batch.period
+        ? labels.batch(batch.period, batch.confirmedAt ? planDate(batch.confirmedAt) : null)
+        : labels.fromKinkord,
+      rings: batch.rings.map((ring) => {
+        const who = ring.recipient ? personLabel(ring.recipient) : labels.someoneGone;
+        const note = ring.withNote ? ` · ${labels.withNote}` : "";
+        const line =
+          ring.status === "given"
+            ? labels.givenTo(who, ring.givenAt ? planDate(ring.givenAt) : "—") + note
+            : ring.status === "expired"
+              ? labels.expired(planDate(ring.expiresAt))
+              : labels.expires(planDate(ring.expiresAt));
+        return {
+          id: ring.id,
+          label: labels.ring(ring.seq),
+          status: ring.status,
+          statusLabel: labels.status[ring.status],
+          line,
+          href: ring.recipient ? hrefFor(ring.recipient.id) : null,
+        };
+      }),
+    })),
+    received: pm.received.map((ring) => ({
+      id: ring.id,
+      line:
+        labels.receivedFrom(personLabel(ring.giver), ring.givenAt ? planDate(ring.givenAt) : "—") +
+        (ring.withNote ? ` · ${labels.withNote}` : ""),
+      href: hrefFor(ring.giver.id),
+    })),
+  };
+}

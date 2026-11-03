@@ -9,6 +9,7 @@ import type {
   RingHistoryPM,
   RingInventoryItemPM,
   RingRecipientPM,
+  MemberRingsPM,
 } from "@/domain/kinkRings";
 import { ApiError, api } from "./apiClient";
 
@@ -132,3 +133,9 @@ export function ringAllocationGifts(
     });
   });
 }
+
+/** Admins' view of a member's rings (Moderation → Members → member). */
+export const kinkRingsAdminApi = {
+  forMember: (userId: string) =>
+    api.get<MemberRingsPM>(`/admin/members/${encodeURIComponent(userId)}/kink-rings`),
+};

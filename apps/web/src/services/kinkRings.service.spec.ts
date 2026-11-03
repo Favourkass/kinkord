@@ -10,7 +10,7 @@ vi.mock("./apiClient", async (importOriginal) => ({
   },
 }));
 
-const { giveRingError, kinkRingsApi } = await import("./kinkRings.service");
+const { giveRingError, kinkRingsAdminApi, kinkRingsApi } = await import("./kinkRings.service");
 const { ApiError } = await import("./apiClient");
 
 beforeEach(() => {
@@ -122,4 +122,11 @@ it("sends a member who doesn't take messages from the giver their ring without t
     { ringId: "r1", username: "ada" },
     { ringId: "r2", username: "bob", message: "Yo" },
   ]);
+});
+
+describe("kinkRingsAdminApi", () => {
+  it("reads a member's rings for their admin page", async () => {
+    await kinkRingsAdminApi.forMember("u/1");
+    expect(get).toHaveBeenCalledWith("/admin/members/u%2F1/kink-rings");
+  });
 });

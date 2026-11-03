@@ -89,6 +89,31 @@ export const MODERATION_COPY = {
     approved: (name: string) => `Approved. ${name}'s badge shows again.`,
   },
   /** One member's Silver ring, on their page. */
+  memberRings: {
+    title: "Kink Rings",
+    loading: "Loading Kink Rings…",
+    empty: "No Kink Rings yet: none bought with Silver, none received.",
+    summary: (c: {
+      total: number;
+      unused: number;
+      given: number;
+      expired: number;
+      received: number;
+    }) =>
+      `${c.total} ${c.total === 1 ? "ring" : "rings"} · ${c.unused} unused · ${c.given} given · ${c.expired} expired · ${c.received} received`,
+    batch: (period: "monthly" | "yearly", confirmed: string | null) =>
+      `${period === "yearly" ? "Yearly" : "Monthly"} Silver${confirmed ? ` · confirmed ${confirmed}` : ""}`,
+    fromKinkord: "Given by Kinkord",
+    ring: (seq: number) => `Ring ${seq}`,
+    status: { unused: "Unused", given: "Given", expired: "Expired" },
+    givenTo: (who: string, date: string) => `To ${who} on ${date}`,
+    expires: (date: string) => `Expires ${date}`,
+    expired: (date: string) => `Expired ${date}, never given`,
+    withNote: "with a note",
+    someoneGone: "a member who has since left",
+    receivedTitle: "Received",
+    receivedFrom: (who: string, date: string) => `From ${who} on ${date}`,
+  },
   memberCheck: {
     title: "Silver ring",
     until: (date: string) => `Silver until ${date}`,
