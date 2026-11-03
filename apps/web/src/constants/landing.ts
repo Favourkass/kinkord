@@ -22,6 +22,12 @@ export const LANDING_HEADER_TAGLINE = "THE WORLD’S KINK COMMUNITY";
 export const LANDING_AUDIENCE_STATEMENT =
   "The Global Social Network for Kinksters, Fetishists & BDSM Enthusiasts.";
 
+export const LANDING_AUDIENCE_LINES = [
+  { text: "The Global Social Network", highlight: false },
+  { text: "for Kinksters, Fetishists", highlight: true },
+  { text: "& BDSM Enthusiasts.", highlight: false },
+] as const;
+
 export const BRAND_TAGLINE =
   "Where kinksters connect, explore their interests, build meaningful relationships, and find a community where they truly belong.";
 

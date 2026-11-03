@@ -30,18 +30,22 @@ describe("getLandingVM", () => {
   });
 
   it("serves the redesign assets from public/brand", () => {
-    expect(vm.logo.src).toBe("/brand/logo-badge.png");
-    // Light enough for slow networks: WebP, the artwork cropped to what shows.
+    expect(vm.logo.src).toBe("/brand/kinkord-circle-k.png");
+    // The supplied mask artwork has room for a live, accessible headline.
     expect(vm.hero).toMatchObject({
-      src: "/brand/landing-connections.webp",
+      src: "/brand/landing-gold-mask.png",
       width: 1080,
-      height: 625,
+      height: 724,
     });
     expect(vm.wordmark.src).toBe("/brand/kinkord-mask-wordmark.webp");
     expect(vm.headerTagline).toBe("THE WORLD’S KINK COMMUNITY");
     expect(vm.audienceStatement).toBe(
       "The Global Social Network for Kinksters, Fetishists & BDSM Enthusiasts.",
     );
+    expect(vm.audienceLines.map((line) => line.text).join(" ")).toBe(vm.audienceStatement);
+    expect(vm.audienceLines.filter((line) => line.highlight).map((line) => line.text)).toEqual([
+      "for Kinksters, Fetishists",
+    ]);
     expect(vm.logo.alt).not.toHaveLength(0);
     expect(vm.hero.alt).not.toHaveLength(0);
   });

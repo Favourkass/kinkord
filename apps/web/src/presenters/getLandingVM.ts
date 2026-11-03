@@ -8,6 +8,7 @@ import {
   LANDING_WORDMARK,
   LANDING_HEADER_TAGLINE,
   LANDING_AUDIENCE_STATEMENT,
+  LANDING_AUDIENCE_LINES,
   BRAND_TAGLINE,
   COPYRIGHT_LINE,
   JOIN_AGE_DISCLAIMER,
@@ -29,15 +30,16 @@ export interface SplashAction {
 export function getLandingVM() {
   const downloadCta: SplashAction = { label: "Download Kinkord", href: Routes.signup };
   return {
-    logo: { src: "/brand/logo-badge.png", alt: "Kinkord" },
+    logo: { src: "/brand/kinkord-circle-k.png", alt: "Kinkord" },
     wordmark: LANDING_WORDMARK,
     headerTagline: LANDING_HEADER_TAGLINE,
     audienceStatement: LANDING_AUDIENCE_STATEMENT,
+    audienceLines: LANDING_AUDIENCE_LINES,
     hero: {
-      src: "/brand/landing-connections.webp",
-      alt: "Two adult community members connecting through messages in a warm, gold-lit setting.",
+      src: "/brand/landing-gold-mask.png",
+      alt: "An ornate gold masquerade mask against a black background.",
       width: 1080,
-      height: 625,
+      height: 724,
     },
     mobileContent: MOBILE_LANDING_CONTENT,
     platformOverview: LANDING_PLATFORM_OVERVIEW,

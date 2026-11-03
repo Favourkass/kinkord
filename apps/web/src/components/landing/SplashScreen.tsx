@@ -1,7 +1,7 @@
-import AnimatedWordmark from "@/components/app/AnimatedWordmark";
 import Image from "next/image";
 import Link from "next/link";
 import {
+  Download,
   Cookie,
   Copyright,
   FileText,
@@ -62,6 +62,7 @@ export interface SplashScreenProps {
   headerTagline: string;
   /** Who Kinkord is for, above the sign-up buttons. */
   audienceStatement: string;
+  audienceLines: readonly { text: string; highlight: boolean }[];
   mobileContent?: {
     eyebrow: string;
     title: string;
@@ -377,9 +378,16 @@ function FooterNotice({
 
 function DownloadPill({ cta, compact }: { cta: SplashAction; compact?: boolean }) {
   const isInactive = cta.label === "App Installed" || cta.label === "Installing...";
-  const className = `relative grid place-items-center rounded-[24px] bg-kink-gold-deep font-extrabold tracking-[0.3px] text-black transition hover:brightness-110 active:scale-95 cursor-pointer touch-manipulation select-none before:absolute before:-inset-2.5 before:content-[''] disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100 ${
-    compact ? "h-8 px-3 text-[10px] sm:h-9 sm:px-3.5 sm:text-xs" : "h-[60px] w-[254px] text-[24px]"
+  const className = `relative inline-flex items-center justify-center gap-2 rounded-full border border-[#ffdd49] bg-gradient-to-b from-[#fff06b] via-[#ffcf0a] to-[#ffb800] font-extrabold text-black shadow-[inset_0_2px_3px_#fff9] transition hover:brightness-110 active:scale-95 cursor-pointer touch-manipulation select-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-kink-gold-bright disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100 ${
+    compact ? "min-h-9 px-3 text-xs sm:min-h-11 sm:px-4 sm:text-base" : "min-h-[52px] px-5 text-lg"
   }`;
+  const content = (
+    <>
+      <Download aria-hidden="true" className="size-5 shrink-0 sm:size-6" strokeWidth={3} />
+      <span aria-hidden="true" className="h-5 w-px bg-black/80 sm:h-6" />
+      <span>{cta.label}</span>
+    </>
+  );
 
   if (cta.onClick) {
     return (
@@ -390,14 +398,14 @@ function DownloadPill({ cta, compact }: { cta: SplashAction; compact?: boolean }
         aria-label={cta.label}
         className={className}
       >
-        {cta.label}
+        {content}
       </button>
     );
   }
 
   return (
     <Link href={cta.href ?? "#"} aria-label={cta.label} className={className}>
-      {cta.label}
+      {content}
     </Link>
   );
 }
@@ -471,10 +479,10 @@ function PlatformOverview({ title, paragraphs }: SplashScreenProps["platformOver
 }
 
 export default function SplashScreen({
-  wordmark,
+  logo,
   hero,
-  headerTagline,
   audienceStatement,
+  audienceLines,
   platformOverview,
   membership,
   downloadCta,
@@ -512,44 +520,45 @@ export default function SplashScreen({
       <div className="mx-auto w-full max-w-[1080px]">
         <header className="flex min-h-[76px] items-center justify-between gap-3 bg-black px-4 py-2 sm:px-8 sm:py-3">
           <h1 className="sr-only">{brand}</h1>
-          <div className="w-[44%] max-w-[230px] shrink-0">
-            <AnimatedWordmark image={wordmark} />
-            <p className="-mt-0.5 whitespace-nowrap text-center text-[8px] font-bold tracking-[0.2px] text-kink-gold-bright sm:text-[11px]">
-              {headerTagline}
-            </p>
-          </div>
           <DownloadPill cta={downloadCta} compact />
+          <div className="size-14 shrink-0 sm:size-[76px]">
+            <Image
+              src={logo.src}
+              alt={logo.alt}
+              width={76}
+              height={76}
+              className="h-full w-full object-contain"
+              preload
+            />
+          </div>
         </header>
 
-        <div className="relative">
-          {/* The artwork file is cropped above its baked-in wordmark, to 1080×625;
-              the box keeps that crop if a taller file comes back. Never object-cover. */}
-          <div className="relative aspect-[1080/625] overflow-hidden">
-            <Image
-              src={hero.src}
-              alt={hero.alt}
-              width={hero.width}
-              height={hero.height}
-              preload
-              sizes="(max-width: 1080px) 100vw, 1080px"
-              className="block h-auto w-full max-w-none"
-            />
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-x-0 bottom-0 h-[24%] bg-gradient-to-t from-black via-black/35 to-transparent"
-            />
-          </div>
-          <span role="img" aria-label="Adults only, 18 plus" className={brandStyles.ageSeal}>
-            18+
-          </span>
-        </div>
+        <section className={brandStyles.maskHero} aria-label={audienceStatement}>
+          <Image
+            src={hero.src}
+            alt={hero.alt}
+            width={hero.width}
+            height={hero.height}
+            preload
+            sizes="(max-width: 1080px) 100vw, 1080px"
+            className={brandStyles.maskArtwork}
+          />
+          <p aria-label={audienceStatement} className={brandStyles.heroHeadline}>
+            {audienceLines.map((line) => (
+              <span
+                key={line.text}
+                aria-hidden="true"
+                className={`block ${line.highlight ? "text-[#ffcf0a]" : "text-white"}`}
+              >
+                {line.text}
+              </span>
+            ))}
+          </p>
+        </section>
 
         <div
           className={`${brandStyles.community} flex flex-col items-center px-5 pb-8 pt-3 sm:px-8 sm:pt-5`}
         >
-          <p className="mb-4 max-w-[680px] text-center text-[17px] font-semibold leading-snug text-kink-paper sm:text-[22px]">
-            {audienceStatement}
-          </p>
           <div className="grid w-full max-w-[760px] grid-cols-2 gap-2.5 sm:gap-4">
             <SignUpButton cta={signUp} />
             <SignInButton cta={signIn} />
