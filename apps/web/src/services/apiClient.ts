@@ -1,4 +1,5 @@
 import { Routes } from "@/constants/Routes";
+import { LOCATION_CHECK_REQUIRED } from "@/domain/locationCheck";
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
@@ -21,9 +22,6 @@ function sendToSignUpStep(step: string): void {
   window.location.assign(`${Routes.signup}?resume=${step}`);
 }
 
-/** The `code` the API sends when a member's country check is due. */
-const LOCATION_CHECK_REQUIRED = "LOCATION_CHECK_REQUIRED";
-
 /**
  * A member whose country check is due can't use anything else, so wherever
  * they are, they're taken to it and brought back after.
@@ -32,7 +30,7 @@ function sendToLocationCheck(): void {
   if (typeof window === "undefined") return;
   const { pathname, search } = window.location;
   if (pathname.startsWith(Routes.locationCheck) || pathname.startsWith(Routes.signup)) return;
-  window.location.assign(`${Routes.locationCheck}?next=${encodeURIComponent(pathname + search)}`);
+  window.location.assign(Routes.locationCheckFrom(pathname + search));
 }
 
 export class ApiError extends Error {

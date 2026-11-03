@@ -28,11 +28,20 @@ const isMode = (value: string | undefined): value is LocationCheckMode =>
 @Injectable()
 export class LocationSettingsService {
   private cached: { mode: LocationCheckMode; until: number } | null = null;
+  /** The read in flight, shared by every request that arrives while it runs. */
+  private reading: Promise<LocationCheckMode> | null = null;
 
   constructor(@Inject(DRIZZLE) private readonly db: Db) {}
 
-  async mode(now = Date.now()): Promise<LocationCheckMode> {
-    if (this.cached && this.cached.until > now) return this.cached.mode;
+  mode(now = Date.now()): Promise<LocationCheckMode> {
+    if (this.cached && this.cached.until > now) return Promise.resolve(this.cached.mode);
+    this.reading ??= this.read(now).finally(() => {
+      this.reading = null;
+    });
+    return this.reading;
+  }
+
+  private async read(now: number): Promise<LocationCheckMode> {
     const [row] = await this.db
       .select({ value: appSetting.value })
       .from(appSetting)

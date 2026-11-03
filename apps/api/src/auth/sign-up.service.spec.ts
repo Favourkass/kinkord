@@ -22,7 +22,7 @@ const fields = {
   phone: "+2348031234567",
 };
 
-const claim: SignupClaim = { id: "check-1", decision: "approved", country: "NG" };
+const claim: SignupClaim = { id: "check-1", decision: "approved", country: "NG", ipCountry: "NG" };
 
 const make = (opts: {
   signUpResponse: Response;
@@ -262,5 +262,18 @@ describe("SignUpService country check", () => {
       new Headers(),
     );
     expect(result.status).toBe(200);
+  });
+
+  it("gives the check back when Better Auth throws, and still shows the real error", async () => {
+    const { service, signUpEmail, releaseSignupClaim } = make({
+      signUpResponse: new Response("{}"),
+      location: { allowed: true, claim },
+    });
+    signUpEmail.mockRejectedValueOnce(new Error("hook failed"));
+    releaseSignupClaim.mockRejectedValueOnce(new Error("db blip"));
+    await expect(
+      service.signUpWithProfile({ ...account, locationCheckId: "check-1" }, fields, new Headers()),
+    ).rejects.toThrow("hook failed");
+    expect(releaseSignupClaim).toHaveBeenCalledWith(claim);
   });
 });

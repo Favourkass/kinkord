@@ -10,3 +10,5 @@ docs
 cdk.out
 **/.env
 **/.env.local
+# IP data a developer fetched locally; images fetch their own.
+apps/api/data

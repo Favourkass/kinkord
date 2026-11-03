@@ -13,11 +13,13 @@ nothing here claims to.
 
 | Moment | What happens |
 | --- | --- |
-| Joining | Right after step 1 (country), the app explains why, then asks for the location. The account can only be created with an approved check for the chosen country from the last 30 minutes, and each check is spent once (`claimForSignup`). |
-| Signing in | Each new session needs a check made after it started. The auth guard holds the member (`LOCATION_CHECK_REQUIRED`), and the app takes them to `/location-check` and back. |
-| Every 30 days | The same hold. |
-| Connection moves country | When the member's connection (not a VPN) is in another country, they're asked again, at most once a day. |
-| Changing country | Edit Profile can only save a new country with an approved check for it (`LOCATION_CHECK_NEEDED`). The app sends the member to the check, which saves the country and state once it passes. |
+| Joining | Right after step 1 (country), the app explains why, then asks for the location. The account can only be created with an approved check for the chosen country from the last 30 minutes, and each check is spent once (`claimForSignup`). Sign-up's checks are marked `joining`, so a browser still signed in to another account can't turn them into that account's. |
+| Signing in | A new session more than 12 hours after the member's last check needs a new one. (Changing the password or two-factor mints a session too, which is why there's a grace period.) |
+| Every 30 days | Asked the day before; held from day 30. |
+| Connection moves country | When the connection (not a VPN) is in a country that is neither the profile's nor the one their last check accepted, they're asked again, at most once a day. Never held for this alone. |
+| Changing country | Edit Profile can only save a new country with an approved check for it (`LOCATION_CHECK_NEEDED`). The app sends the member to the check, which saves the country and state once it passes. The check is spent only once nothing else in the save can refuse it. |
+
+**Asked or held.** The app asks a member whose check is due when they open a page (`GET /location-check/due`, checked at most every two minutes). It never interrupts a page they're in. Only while enforcing does the API also hold them (`LOCATION_CHECK_REQUIRED` on every other route), and only when their check is missing, failed, from before a new sign-in, or over 30 days old. While watching, nobody is ever held.
 
 Founders' and organisation accounts are never checked.
 
@@ -71,11 +73,17 @@ case:
   1,000 km/h over more than 500 km). The member may try again.
 - **Repeated tries pause** for the rest of the day: 5 failures, or more than 3
   different countries, for one member or device. A network address gets 40
-  failures, because mobile networks put thousands of people behind one.
-  Separately, a connection sending more than 120 checks an hour is refused.
-- **Travellers.** A member abroad outside Kinkord's countries keeps their home
-  country, and its rules, for 30 days after a check at home. In another of
-  Kinkord's countries, they switch to it. Nobody joins as a traveller.
+  failures, because mobile networks put thousands of people behind one; this
+  and the 120-checks-an-hour cap apply to people joining only, never to
+  members, who are limited by their own tries.
+- **Travellers.** A member away from home keeps their home country, and its
+  rules, for 30 days after a check there, wherever they are, so a weekend away
+  never forces a country switch (which would drop fields the other country
+  doesn't offer). The GPS must be real and the connection must agree with it,
+  or be their home network roaming. Nobody joins as a traveller.
+- **What the app is told.** Only the decision and a hint for what to do (turn
+  off a VPN, allow location, try again). The signals behind it stay on the
+  server, so the answer can't be used to tune a fake.
 
 ## Modes
 
@@ -102,8 +110,10 @@ within 30 seconds.
   (for the daily limits), like sign-in failures, plus the app's random
   device id.
 - `location_status`: each member's standing. It holds when they last passed
-  and for which country, and their last precise GPS reading rounded to 0.1°
-  (about 11 km, for impossible travel), replaced at every check.
+  and for which country, the connection's country on that check, and their
+  last precise GPS reading rounded to 0.1° (about 11 km, for impossible
+  travel). It is replaced by every check that passes; a refused reading is
+  never kept.
 - Never stored: coordinates, IP addresses.
 
 The member-facing notice is `/privacy/location`. It also credits DB-IP, as the
@@ -112,20 +122,20 @@ of search results until legal has read it.
 
 ## Data upkeep
 
-`apps/api/scripts/fetch-ip-data.mjs` downloads DB-IP's IP to Country Lite and
-IP to ASN Lite (about 18 MB). The API image runs it at build time, so each
-deploy carries the current month's data, falling back to last month's early
-in a month. The build fails rather than ship without the data, which would
-make every check ask members to retry.
-
-The founders' page shows when the data was built and the Tor list's age.
-Without an API deploy for a month or two, the data goes stale; any API
-deploy refreshes it.
+`apps/api/src/location-check/ip-data.ts` downloads DB-IP's IP to Country Lite
+and IP to ASN Lite (about 18 MB), falling back to last month's early in a
+month, three tries each. The API image fetches them at build
+(`scripts/fetch-ip-data.mjs`). That is best effort: if DB-IP can't be
+reached, the build goes on, and the API fetches the data itself when it
+starts, then checks every 6 hours and fetches afresh once it's 40 days old.
+Without the data every check asks members to retry; without the network
+file, VPN detection is off. The founders' page shows both files' dates and
+the Tor list's age.
 
 ## Trying it locally
 
 ```bash
-cd apps/api && node scripts/fetch-ip-data.mjs
+pnpm --filter api build && node apps/api/scripts/fetch-ip-data.mjs
 ```
 
 Then start the API with `LOCATION_CHECK_DEV_IP` set to an address in the

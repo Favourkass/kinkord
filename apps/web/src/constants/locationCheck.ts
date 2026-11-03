@@ -26,6 +26,8 @@ export const LOCATION_CHECK_COPY = {
     refused:
       "We couldn't confirm your location. Turn off any VPN, proxy or app that changes your location, then try again.",
     paused: "Too many attempts. Please try again in 24 hours.",
+    busy: "Too many checks from your connection right now. Try again in a few minutes.",
+    shareNeeded: "Share your location to continue.",
     expired: "That check has expired. Confirm where you are again.",
   },
 } as const;
@@ -39,7 +41,6 @@ export const MEMBER_LOCATION_COPY = {
   countryPlaceholder: "Choose your country",
   countrySearch: "Search countries",
   noCountries: "No countries found",
-  checkCountry: "Check this country",
   stateRequired: "Choose your state first.",
   loading: "Loading…",
   loadError: "We couldn't load your profile.",
@@ -63,10 +64,10 @@ export const LOCATION_ADMIN_COPY = {
   },
   modeTitle: "Mode",
   switchTo: (label: string) => `Switch to ${label}`,
-  switchConfirm: (label: string) =>
-    `Switch the country check to ${label}? It applies to every member within 30 seconds.`,
+  switchTitle: (label: string) => `Switch the country check to ${label}?`,
+  switchConfirm: "It applies to every member within 30 seconds.",
   founderOnly: "Only the founders can switch the country check.",
-  confirm: "Confirm",
+  confirm: "Switch",
   cancel: "Cancel",
   window: (days: number) => `Last ${days} days`,
   stats: {
@@ -84,6 +85,7 @@ export const LOCATION_ADMIN_COPY = {
     network: (date: string) => `Network data built ${date}`,
     tor: (count: number, when: string) => `${count} Tor exits, updated ${when}`,
     missing: "Not loaded: every check will ask members to retry.",
+    networkMissing: "Network data not loaded: VPN detection is off.",
     torMissing: "Tor list not loaded yet.",
   },
   recentTitle: "Recent checks",
@@ -113,7 +115,7 @@ export const LOCATION_ADMIN_COPY = {
   reasons: {
     gps_match: "GPS matched",
     ip_match: "Connection matched",
-    abroad: "Abroad, recent check at home",
+    abroad: "Away, recent check at home",
     elsewhere: "GPS and connection elsewhere",
     vpn: "Matched only through a VPN",
     vpn_location: "GPS only estimated, on a VPN",
@@ -184,7 +186,7 @@ export const LOCATION_PRIVACY_COPY = {
         "If your location or your connection is in the country you chose, the check passes. If neither is, you're asked to choose the country you're in.",
         "A VPN never fails a check on its own, but a connection through one doesn't count as being in a country.",
         "Clear signs of faking, such as a program changing your location, fail that attempt. You can try again; after several failed attempts in a day, checks pause for 24 hours.",
-        "Members travelling outside Kinkord's countries keep their home country for 30 days after a check at home.",
+        "Members away from home keep their home country, and its rules, for 30 days after a check there.",
       ],
     },
     {

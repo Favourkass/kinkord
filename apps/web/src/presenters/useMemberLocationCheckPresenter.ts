@@ -7,14 +7,17 @@ import { LAUNCH_COUNTRIES } from "@/constants/onboarding";
 import { Routes } from "@/constants/Routes";
 import { safeNext } from "@/domain/locationCheck";
 import { ApiError } from "@/services/apiClient";
-import { profileApi } from "@/services/profile.service";
+import { isCountryAvailable } from "@/services/members.service";
+import { locationLine, profileApi } from "@/services/profile.service";
 import { signupCountryOptions, signupLocationFields } from "@/services/signupLocation.service";
+import { countryName } from "@/util/format";
 import { useLocationCheckPresenter } from "./useLocationCheckPresenter";
 
+/** One of Kinkord's countries, as its code ("gh" → "GH"); anything else is no choice. */
 const served = (code: string | null | undefined): string | null =>
-  code && LAUNCH_COUNTRIES.some((c) => c.code === code) ? code : null;
+  code && isCountryAvailable(code) ? code.toUpperCase() : null;
 const nameOf = (code: string | null): string | null =>
-  LAUNCH_COUNTRIES.find((c) => c.code === code)?.name ?? code;
+  LAUNCH_COUNTRIES.find((c) => c.code === code)?.name ?? countryName(code);
 
 /**
  * /location-check, where the app sends a member whose country check is due
@@ -67,15 +70,22 @@ export function useMemberLocationCheckPresenter() {
   const ready = choosing ? Boolean(country && state) : Boolean(profileCountry);
 
   const passed = useCallback(async () => {
-    if (!choosing) {
+    // Nothing chosen (e.g. the check was switched off before they could choose): nothing to save.
+    if (!choosing || !country || !state) {
       router.replace(next);
       return;
     }
-    // The server spends the check on this switch; the state belongs to the new country.
+    // The server spends the check on this switch; the state belongs to the new
+    // country, and so does the whereabouts line, as Edit Profile writes it.
     setSaving(true);
     setSaveError(null);
     try {
-      await profileApi.update({ country, state, city: null });
+      await profileApi.update({
+        country,
+        state,
+        city: null,
+        location: locationLine(null, state, country),
+      });
       router.replace(next);
     } catch {
       setSaveError(copy.saveError);
@@ -128,15 +138,23 @@ export function useMemberLocationCheckPresenter() {
     };
   }, [choosing, country, state, copy]);
 
+  // While the new country saves, the button waits too, so a second tap can't start another check.
+  const panel = useMemo(
+    () =>
+      saving
+        ? { ...check.panel, share: { ...check.panel.share, busy: true, disabled: true } }
+        : check.panel,
+    [saving, check.panel],
+  );
+
   return {
     loading: profileCountry === undefined && !loadError,
     loadingLabel: copy.loading,
     loadError,
     retryLoad,
     retryLabel: copy.retry,
-    saving,
     saveError,
-    panel: check.panel,
+    panel,
     choose,
   };
 }

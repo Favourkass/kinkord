@@ -1,14 +1,17 @@
+import { LOCATION_CHECK_REQUIRED } from "@/domain/locationCheck";
 import type { GiftInDoubt, UnansweredWithdrawal } from "@/domain/wallet";
 import { pendingTransfersRepository as store } from "@/repositories/pendingTransfers.repository";
 import { ApiError } from "./apiClient";
 
 /**
- * Refusals that come before a request is read: the sign-in guard's sign-up holds, and the
- * wallet's check that the member it was sent as is the one signed in.
+ * Refusals that come before a request is read: the sign-in guard's holds (sign-up steps owed,
+ * a country check due), and the wallet's check that the member it was sent as is the one
+ * signed in.
  */
 const UNREAD_CODES = new Set([
   "EMAIL_VERIFICATION_REQUIRED",
   "PROFILE_PHOTOS_REQUIRED",
+  LOCATION_CHECK_REQUIRED,
   "WRONG_ACCOUNT",
 ]);
 

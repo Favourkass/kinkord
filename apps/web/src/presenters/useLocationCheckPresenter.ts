@@ -35,6 +35,8 @@ export interface LocationCheckOptions {
   countryName: string | null;
   /** Whether the check is on screen; a switched-off check lets them straight through only then. */
   active: boolean;
+  /** Sign-up's check: for a new account, whoever the browser is still signed in as. */
+  joining?: boolean;
   /** They may carry on, with the check that let them (null when none was needed). */
   onPassed: (checkId: string | null) => void;
   /** "Change country" on a mismatch, given where the GPS put them; left out where there's nowhere to change it. */
@@ -58,67 +60,89 @@ function problemCopy(problem: Problem) {
       return { message: copy.refused, hint: null };
     case "paused":
       return { message: copy.paused, hint: null };
+    case "busy":
+      return { message: copy.busy, hint: null };
+    case "share-needed":
+      return { message: copy.shareNeeded, hint: null };
   }
 }
 
 /**
  * One country check: say why, ask for the location, let the API decide, and
  * say what to do next. Watching, every result lets the member on and "Not
- * now" is offered; enforcing, only a pass does.
+ * now" is offered; enforcing, only a pass does. The server is the judge: once
+ * it has refused (reset with a reason), the mode read when the screen opened
+ * no longer lets anyone straight through.
  */
 export function useLocationCheckPresenter(opts: LocationCheckOptions) {
   const copy = LOCATION_CHECK_COPY;
+  const { country, countryName, active, joining = false, onChangeCountry } = opts;
   const [mode, setMode] = useState<LocationCheckMode | null>(null);
   const [working, setWorking] = useState(false);
   // A problem belongs to the country it was found for; another country starts afresh.
   const [found, setFound] = useState<{ country: string | null; problem: Problem } | null>(null);
-  const problem = found && found.country === opts.country ? found.problem : null;
+  const problem = found && found.country === country ? found.problem : null;
   const setProblem = useCallback(
-    (next: Problem | null) => setFound(next ? { country: opts.country, problem: next } : null),
-    [opts.country],
+    (next: Problem | null) => setFound(next ? { country, problem: next } : null),
+    [country],
   );
   const [notice, setNotice] = useState<string | null>(null);
-  // The latest callback, for the async check and the switched-off pass to call.
+  const [insisted, setInsisted] = useState(false);
+  // The latest callback and screen, for answers that arrive after things moved on.
   const passed = useRef(opts.onPassed);
+  const current = useRef({ active, country });
   useEffect(() => {
     passed.current = opts.onPassed;
-  }, [opts.onPassed]);
+    current.current = { active, country };
+  }, [opts.onPassed, active, country]);
+
+  const readMode = useCallback(
+    () =>
+      locationCheckService.mode().then(
+        (m) => {
+          setMode(m);
+          return m;
+        },
+        // An API without the check (this app deployed first) means none to do;
+        // anything else leaves the mode unknown and the check says what's wrong.
+        (e: unknown) => {
+          if (e instanceof ApiError && e.status === 404) setMode("off");
+          return null;
+        },
+      ),
+    [],
+  );
 
   useEffect(() => {
-    let live = true;
-    locationCheckService.mode().then(
-      (m) => live && setMode(m),
-      // An API without the check (this app deployed first) means none to do; anything
-      // else leaves the mode unknown, and the check itself says what's wrong. The
-      // server decides either way: an account it needs a check for is refused without one.
-      (e: unknown) => live && e instanceof ApiError && e.status === 404 && setMode("off"),
-    );
-    return () => {
-      live = false;
-    };
+    void readMode();
+  }, [readMode]);
+
+  useEffect(() => {
+    if (active && mode === "off" && !insisted) passed.current(null);
+  }, [active, mode, insisted]);
+
+  /** Hands on a pass only if the screen is still on the country that was checked. */
+  const pass = useCallback((checked: string, checkId: string | null) => {
+    if (current.current.active && current.current.country === checked) passed.current(checkId);
   }, []);
 
-  useEffect(() => {
-    if (opts.active && mode === "off") passed.current(null);
-  }, [opts.active, mode]);
-
   const share = useCallback(async () => {
-    if (!opts.country || working) return;
+    if (!country || working) return;
+    const checked = country;
     setWorking(true);
     setProblem(null);
     setNotice(null);
     try {
-      const outcome = outcomeOf(await locationCheckService.check(opts.country));
-      if (outcome.kind === "pass") passed.current(outcome.checkId);
+      const outcome = outcomeOf(await locationCheckService.check(checked, { joining }));
+      if (outcome.kind === "pass") pass(checked, outcome.checkId);
       else setProblem(outcome);
     } catch (e) {
       if (e instanceof ApiError && e.status === 429) {
-        setProblem({ kind: "paused" });
+        setProblem({ kind: "busy" });
       } else if (e instanceof ApiError && e.status === 400) {
         // Switched off since the screen opened.
-        const now = await locationCheckService.mode().catch(() => null);
-        if (now) setMode(now);
-        if (now === "off") passed.current(null);
+        const now = await readMode();
+        if (now === "off") pass(checked, null);
         else setProblem({ kind: "no-connection" });
       } else {
         setProblem({ kind: "no-connection" });
@@ -126,28 +150,42 @@ export function useLocationCheckPresenter(opts: LocationCheckOptions) {
     } finally {
       setWorking(false);
     }
-  }, [opts.country, working, setProblem]);
+  }, [country, working, joining, pass, readMode, setProblem]);
 
   const skip = useCallback(async () => {
-    if (!opts.country || working) return;
+    if (!country || working) return;
+    const checked = country;
     setWorking(true);
+    setProblem(null);
     try {
-      passed.current((await locationCheckService.skip(opts.country)).id);
-    } catch {
-      // Watching never stops anyone, even when the skip can't be recorded.
-      passed.current(null);
+      pass(checked, (await locationCheckService.skip(checked, { joining })).id);
+    } catch (e) {
+      // Only a recorded "Not now" lets them on: otherwise the next page would
+      // send them straight back here.
+      if (e instanceof ApiError && e.status === 400) {
+        await readMode();
+        setProblem({ kind: "share-needed" });
+      } else if (e instanceof ApiError && e.status === 429) {
+        setProblem({ kind: "busy" });
+      } else {
+        setProblem({ kind: "no-connection" });
+      }
     } finally {
       setWorking(false);
     }
-  }, [opts.country, working]);
+  }, [country, working, joining, pass, readMode, setProblem]);
 
-  /** Back to the start, optionally saying why (an expired check). */
+  /** Back to the start because the server refused: say why, and ask again, whatever the mode said. */
   const reset = useCallback(
     (why: string | null = null) => {
       setProblem(null);
       setNotice(why);
+      if (why) {
+        setInsisted(true);
+        void readMode();
+      }
     },
-    [setProblem],
+    [readMode, setProblem],
   );
 
   const panel = useMemo<LocationCheckPanelVM>(() => {
@@ -155,12 +193,12 @@ export function useLocationCheckPresenter(opts: LocationCheckOptions) {
     return {
       heading: copy.heading,
       intro: copy.intro,
-      chose: opts.countryName ? copy.confirming(opts.countryName) : null,
+      chose: countryName ? copy.confirming(countryName) : null,
       privacy: { label: copy.privacyLink, href: Routes.locationPrivacy },
       share: {
         label: working ? copy.working : problem ? copy.retry : copy.share,
         busy: working,
-        disabled: !opts.country || problem?.kind === "paused",
+        disabled: !country || problem?.kind === "paused",
         onClick: () => void share(),
       },
       skip: mode === "watch" ? { label: copy.skip, onClick: () => void skip() } : null,
@@ -168,15 +206,15 @@ export function useLocationCheckPresenter(opts: LocationCheckOptions) {
       problem: shown && {
         ...shown,
         change:
-          problem?.kind === "mismatch" && opts.onChangeCountry
+          problem?.kind === "mismatch" && onChangeCountry
             ? {
                 label: copy.changeCountry,
-                onClick: () => opts.onChangeCountry?.(problem.detectedCountry),
+                onClick: () => onChangeCountry(problem.detectedCountry),
               }
             : null,
       },
     };
-  }, [copy, opts, working, problem, mode, notice, share, skip]);
+  }, [copy, country, countryName, working, problem, mode, notice, share, skip, onChangeCountry]);
 
   return { mode, panel, reset };
 }

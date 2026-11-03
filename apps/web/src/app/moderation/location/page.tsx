@@ -1,5 +1,6 @@
 "use client";
 
+import ConfirmDialog from "@/components/moderation/ConfirmDialog";
 import LocationChecksView from "@/components/moderation/LocationChecksView";
 import ModerationFrame from "@/components/moderation/ModerationFrame";
 import { MODERATION_COPY } from "@/constants/moderation";
@@ -19,6 +20,7 @@ export default function ModerationLocationPage() {
       deniedLabel={copy.denied}
     >
       <LocationChecksView {...p.view} />
+      {p.dialog ? <ConfirmDialog dialog={p.dialog} /> : null}
     </ModerationFrame>
   );
 }

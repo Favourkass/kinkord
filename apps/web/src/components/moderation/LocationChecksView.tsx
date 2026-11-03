@@ -20,45 +20,18 @@ export default function LocationChecksView(vm: LocationChecksVM) {
         ) : (
           <p className="pt-[6px] text-[14px] text-app-muted">…</p>
         )}
-        {vm.mode.pending ? (
-          <div className="mt-[12px] rounded-[12px] border border-kink-amber/60 p-[12px]">
-            <p className="text-[14px] text-app-text">{vm.mode.pending.text}</p>
-            {vm.mode.pending.error ? (
-              <p className="pt-[6px] text-[14px] text-app-danger">{vm.mode.pending.error}</p>
-            ) : null}
-            <div className="flex gap-[8px] pt-[10px]">
-              <button
-                type="button"
-                onClick={vm.mode.pending.confirm}
-                disabled={vm.mode.pending.busy}
-                className="h-[40px] rounded-[10px] bg-kink-amber px-[16px] text-[14px] font-bold text-black disabled:opacity-50"
-              >
-                {vm.mode.pending.busy ? "…" : vm.mode.pending.confirmLabel}
-              </button>
-              <button
-                type="button"
-                onClick={vm.mode.pending.cancel}
-                disabled={vm.mode.pending.busy}
-                className="h-[40px] rounded-[10px] border border-app-card-border px-[16px] text-[14px] font-semibold text-app-text"
-              >
-                {vm.mode.pending.cancelLabel}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-wrap gap-[8px] pt-[12px]">
-            {vm.mode.options.map((option) => (
-              <button
-                key={option.mode}
-                type="button"
-                onClick={option.onSelect}
-                className="h-[40px] rounded-[10px] border border-kink-amber px-[14px] text-[14px] font-semibold text-kink-amber hover:bg-kink-amber/10"
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="flex flex-wrap gap-[8px] pt-[12px]">
+          {vm.mode.options.map((option) => (
+            <button
+              key={option.mode}
+              type="button"
+              onClick={option.onSelect}
+              className="h-[40px] rounded-[10px] border border-kink-amber px-[14px] text-[14px] font-semibold text-kink-amber hover:bg-kink-amber/10"
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
         {vm.mode.founderOnly ? (
           <p className="pt-[8px] text-[12px] text-app-muted">{vm.mode.founderOnly}</p>
         ) : null}

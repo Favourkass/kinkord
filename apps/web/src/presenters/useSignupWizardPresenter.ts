@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError, uploadToPresignedUrl } from "@/services/apiClient";
 import { LOCATION_CHECK_COPY } from "@/constants/locationCheck";
+import { isLocationCheckRequired } from "@/domain/locationCheck";
 import { useLocationCheckPresenter } from "./useLocationCheckPresenter";
 import { IMAGE_VARIANTS, buildUploadSet, type ImageVariant } from "@/util/image";
 
@@ -100,6 +101,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
     country,
     countryName: LAUNCH_COUNTRIES.find((c) => c.code === country)?.name ?? null,
     active: stage === "location",
+    joining: true,
     onPassed: (checkId) => {
       setLocationCheckId(checkId);
       setStage("account");
@@ -346,10 +348,7 @@ export function useSignupWizardPresenter(initialStage: WizardStage = "country") 
       setStage("email");
     } catch (e) {
       // The check is only good for half an hour: confirm the country again.
-      if (
-        e instanceof ApiError &&
-        (e.body as { code?: string } | null)?.code === "LOCATION_CHECK_REQUIRED"
-      ) {
+      if (e instanceof ApiError && isLocationCheckRequired(e.body)) {
         setLocationCheckId(null);
         resetLocation(LOCATION_CHECK_COPY.problems.expired);
         setStage("location");

@@ -1,5 +1,5 @@
 {
-  "id": "8de50d4a-a932-4a21-8f80-5d6b9eaed44d",
+  "id": "d547906b-2885-4498-a40d-835d52f7f028",
   "prevId": "a2906a6d-bf7d-4853-b3a7-31da93f9fe7b",
   "version": "7",
   "dialect": "postgresql",
@@ -6564,6 +6564,12 @@
         "approved_at": {
           "name": "approved_at",
           "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ip_country": {
+          "name": "ip_country",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },

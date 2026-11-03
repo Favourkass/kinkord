@@ -12,11 +12,13 @@ import type { Request } from "express";
 import { fromNodeHeaders } from "better-auth/node";
 import { eq } from "drizzle-orm";
 import { DRIZZLE, type Db } from "../db/db.module";
-import { profile } from "../db/schema";
+import { locationStatus, profile } from "../db/schema";
 import { checkedIp } from "../location-check/client-ip";
 import {
   LOCATION_CHECK_REQUIRED,
   LocationCheckService,
+  standingColumns,
+  standingFrom,
 } from "../location-check/location-check.service";
 import { isSuperAdmin } from "../moderation/admins";
 import { PresenceService } from "../presence/presence.service";
@@ -106,10 +108,9 @@ export class AuthGuard implements CanActivate {
    *   ever had a profile photo. A skipped cover stays optional, but once they
    *   have had a photo, deleting it from the Media tab asks for a new one, as
    *   it does for everyone who never skipped.
-   * - Location: members confirm the country they are in after each new
-   *   sign-in, every 30 days, and when their connection moves country
-   *   (LocationCheckService.needsCheck). Watching, one recorded check of any
-   *   result lets them on.
+   * - Location (enforcing only): members confirm the country they are in
+   *   after a new sign-in and every 30 days (LocationCheckService.checkDue).
+   *   Watching, nobody is held: the app asks at the next page instead.
    */
   private async signUpHold(
     ctx: ExecutionContext,
@@ -136,8 +137,10 @@ export class AuthGuard implements CanActivate {
         photoSkipAvailable: profile.photoSkipAvailable,
         country: profile.country,
         accountType: profile.accountType,
+        ...standingColumns,
       })
       .from(profile)
+      .leftJoin(locationStatus, eq(locationStatus.userId, profile.userId))
       .where(eq(profile.userId, user.id))
       .limit(1);
     // Without a profile row there is nowhere to save photos, so holding the
@@ -150,12 +153,15 @@ export class AuthGuard implements CanActivate {
     }
     if (
       row &&
-      (await this.location.needsCheck({
-        user,
-        sessionCreatedAt: session.createdAt ? new Date(session.createdAt) : null,
-        ip: checkedIp(fromNodeHeaders(req.headers)),
-        profile: { country: row.country, accountType: row.accountType },
-      }))
+      (
+        await this.location.checkDue({
+          user,
+          sessionCreatedAt: session.createdAt ? new Date(session.createdAt) : null,
+          ip: checkedIp(fromNodeHeaders(req.headers)),
+          profile: { country: row.country, accountType: row.accountType },
+          standing: standingFrom(row),
+        })
+      ).hold
     ) {
       return { code: LOCATION_CHECK_REQUIRED, message: "Confirm where you are to continue." };
     }

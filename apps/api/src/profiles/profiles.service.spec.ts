@@ -357,6 +357,15 @@ describe("ProfilesService", () => {
     expect(local.setCalls).toEqual([]);
   });
 
+  it("spends no check on a switch something else refuses", async () => {
+    const row = { ...makeService().row, country: "GH" };
+    const local = makeService({ selects: [[row]], countryChange: "claimed" });
+    await expect(
+      local.service.updateOwn("u1", { country: "NG", orientation: "Bisexual" }, "Favour"),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(local.locationChecks.authorizeCountryChange).not.toHaveBeenCalled();
+  });
+
   it("only asks about the country when it changes", async () => {
     const row = { ...makeService().row, country: "NG" };
     const local = makeService({ selects: [[row]], countryChange: "missing" });
@@ -365,7 +374,7 @@ describe("ProfilesService", () => {
     expect(local.setCalls[0]).toMatchObject({ state: "Lagos" });
   });
 
-  it("on a confirmed move to Nigeria, clears sexuality and keeps only the genders it offers", async () => {
+  it("on any move to Nigeria, clears sexuality and keeps only the genders it offers", async () => {
     const row = {
       ...makeService().row,
       country: "GH",
@@ -373,7 +382,7 @@ describe("ProfilesService", () => {
       gender: "Non-Binary",
       genders: ["Non-Binary", "Female"],
     };
-    const local = makeService({ selects: [[row]], countryChange: "claimed" });
+    const local = makeService({ selects: [[row]], countryChange: "free" });
     await local.service.updateOwn("u1", { country: "NG", state: "Lagos" }, "Favour");
     expect(local.setCalls[0]).toMatchObject({
       country: "NG",
@@ -396,12 +405,12 @@ describe("ProfilesService", () => {
     await expect(
       local.service.updateOwn("u1", { genders: ["Non-Binary"] }, "Favour"),
     ).rejects.toBeInstanceOf(BadRequestException);
+    // Moving to Nigeria drops the genders it doesn't offer, as joining there would.
     const moving = makeService({
       selects: [[{ ...old, genders: ["Non-Binary"], gender: "Non-Binary" }]],
     });
-    await expect(
-      moving.service.updateOwn("u1", { country: "NG" }, "Favour"),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    await moving.service.updateOwn("u1", { country: "NG" }, "Favour");
+    expect(moving.setCalls[0]).toMatchObject({ country: "NG", genders: [], gender: null });
     const legacy = makeService({ selects: [[old]] });
     await legacy.service.updateOwn("u1", { gender: "Male" }, "Favour");
     expect(legacy.setCalls[0]).toMatchObject({ genders: ["Male"], gender: "Male" });

@@ -21,16 +21,33 @@ export interface DeviceReportPM {
   renderer: string | null;
 }
 
+/** What the member can do about a check that didn't pass; the API never says why. */
+export type LocationCheckHint = "vpn" | "allow-location" | "no-location" | "no-connection" | null;
+
 /** One check, as the API answers it. */
 export interface LocationCheckPM {
   id: string;
   decision: LocationCheckDecision;
-  reasons: string[];
+  hint: LocationCheckHint;
   /** False while the check only watches: the decision was recorded, not applied. */
   enforced: boolean;
   /** Where the GPS put them, when that's one of Kinkord's countries. */
   detectedCountry: string | null;
 }
+
+/** The `code` the API sends when a member's country check is due (auth guard hold). */
+export const LOCATION_CHECK_REQUIRED = "LOCATION_CHECK_REQUIRED";
+/** The `code` the API sends for a country switch no check has confirmed. */
+export const LOCATION_CHECK_NEEDED = "LOCATION_CHECK_NEEDED";
+
+const codeOf = (body: unknown): string | undefined =>
+  (body as { code?: unknown } | null)?.code as string | undefined;
+export const isLocationCheckRequired = (body: unknown) => codeOf(body) === LOCATION_CHECK_REQUIRED;
+export const isLocationCheckNeeded = (body: unknown) => codeOf(body) === LOCATION_CHECK_NEEDED;
+
+/** Whether a decision lets the member through: approved, or travelling. */
+export const isPassing = (decision: LocationCheckDecision): boolean =>
+  decision === "approved" || decision === "travel";
 
 /** What the member is told after a check. Only "pass" carries on. */
 export type LocationCheckOutcome =
@@ -40,25 +57,27 @@ export type LocationCheckOutcome =
   | { kind: "no-location" }
   | { kind: "no-connection" }
   | { kind: "refused" }
-  | { kind: "paused" };
-
-const VPN_REASONS = new Set(["vpn", "vpn_location", "hosting", "tor"]);
+  | { kind: "paused" }
+  /** The connection sent too many checks this hour; it clears within the hour. */
+  | { kind: "busy" }
+  /** "Not now" refused: the check no longer only watches. */
+  | { kind: "share-needed" };
 
 export function outcomeOf(check: LocationCheckPM): LocationCheckOutcome {
   // Watching, every result lets the member on; only the record differs.
-  if (!check.enforced || check.decision === "approved" || check.decision === "travel") {
+  if (!check.enforced || isPassing(check.decision)) {
     return { kind: "pass", checkId: check.id };
   }
   switch (check.decision) {
     case "mismatch":
       return {
         kind: "mismatch",
-        vpn: check.reasons.some((reason) => VPN_REASONS.has(reason)),
+        vpn: check.hint === "vpn",
         detectedCountry: check.detectedCountry,
       };
     case "retry":
-      if (check.reasons[0] === "gps_denied") return { kind: "allow-location" };
-      if (check.reasons[0] === "ip_unavailable") return { kind: "no-connection" };
+      if (check.hint === "allow-location") return { kind: "allow-location" };
+      if (check.hint === "no-connection") return { kind: "no-connection" };
       return { kind: "no-location" };
     case "refused":
       return { kind: "refused" };
@@ -94,9 +113,7 @@ export interface LocationCheckRowPM {
   id: string;
   createdAt: string;
   purpose: "signup" | "recheck" | "change";
-  userId: string | null;
   username: string | null;
-  displayName: string | null;
   selectedCountry: string;
   gpsStatus: string;
   gpsCountry: string | null;
@@ -104,7 +121,6 @@ export interface LocationCheckRowPM {
   ipCountry: string | null;
   ipNetwork: string | null;
   ipAnonymizer: "tor" | "hosting" | null;
-  timezone: string | null;
   reasons: string[];
   decision: LocationCheckDecision;
   enforced: boolean;
@@ -133,10 +149,44 @@ export function accuracyLabel(meters: number | null): string | null {
   return meters < 1000 ? `${meters} m` : `${(meters / 1000).toFixed(meters < 10_000 ? 1 : 0)} km`;
 }
 
-/** Only paths inside the app may be returned to after a check. */
+const SAME_SITE = "https://kinkord.invalid";
+
+/**
+ * Only paths inside the app may be returned to after a check. Parsed as a
+ * browser would, so tricks like "/\t/evil.example" (tabs and newlines are
+ * dropped by URL parsers) can't lead off the site.
+ */
 export function safeNext(next: string | null | undefined, fallback: string): string {
-  if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) {
+  if (!next || !next.startsWith("/")) return fallback;
+  try {
+    const url = new URL(next, SAME_SITE);
+    if (url.origin !== SAME_SITE) return fallback;
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
     return fallback;
   }
-  return next;
+}
+
+/** Pages the app never interrupts for a check: signed-out pages, sign-up, and the check itself. */
+const CHECK_FREE = [
+  "/signup",
+  "/login",
+  "/location-check",
+  "/privacy",
+  "/verify-email",
+  "/forgot-password",
+  "/reset-password",
+  "/about",
+  "/contact",
+  "/invest",
+  "/kinkopedia",
+  "/lectures",
+  "/admin",
+];
+
+export function isCheckFreePath(pathname: string): boolean {
+  return (
+    pathname === "/" ||
+    CHECK_FREE.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+  );
 }

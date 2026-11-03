@@ -24,7 +24,8 @@ const { FakeApiError } = vi.hoisted(() => ({
 vi.mock("@/services/apiClient", () => ({ ApiError: FakeApiError }));
 
 const profile = { own: vi.fn(), update: vi.fn() };
-vi.mock("@/services/profile.service", () => ({
+vi.mock("@/services/profile.service", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/services/profile.service")>()),
   profileApi: {
     own: () => profile.own(),
     update: (...a: unknown[]) => profile.update(...a),
@@ -32,9 +33,10 @@ vi.mock("@/services/profile.service", () => ({
 }));
 
 const check = vi.fn();
+let mode = "enforce";
 vi.mock("@/services/locationCheck.service", () => ({
   locationCheckService: {
-    mode: async () => "enforce",
+    mode: async () => mode,
     check: (...a: unknown[]) => check(...a),
     skip: vi.fn(),
   },
@@ -43,7 +45,7 @@ vi.mock("@/services/locationCheck.service", () => ({
 const result = (change: Record<string, unknown> = {}) => ({
   id: "check-1",
   decision: "approved",
-  reasons: ["gps_match"],
+  hint: null,
   enforced: true,
   detectedCountry: "NG",
   ...change,
@@ -51,6 +53,7 @@ const result = (change: Record<string, unknown> = {}) => ({
 
 describe("useMemberLocationCheckPresenter", () => {
   beforeEach(() => {
+    mode = "enforce";
     search = new URLSearchParams({ next: "/messages" });
     replace.mockReset();
     profile.own.mockReset().mockResolvedValue({ country: "NG" });
@@ -66,15 +69,13 @@ describe("useMemberLocationCheckPresenter", () => {
     expect(p.current.panel.chose).toBe("You chose Nigeria.");
     await act(async () => p.current.panel.share.onClick());
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/messages"));
-    expect(check).toHaveBeenCalledWith("NG");
+    expect(check).toHaveBeenCalledWith("NG", { joining: false });
     expect(profile.update).not.toHaveBeenCalled();
   });
 
   it("on a mismatch, lets them choose where they are, checks it, and saves it", async () => {
     check
-      .mockResolvedValueOnce(
-        result({ decision: "mismatch", reasons: ["elsewhere"], detectedCountry: "GH" }),
-      )
+      .mockResolvedValueOnce(result({ decision: "mismatch", hint: null, detectedCountry: "GH" }))
       .mockResolvedValueOnce(result({ detectedCountry: "GH" }));
     const { result: p } = renderHook(() => useMemberLocationCheckPresenter());
     await waitFor(() => expect(p.current.loading).toBe(false));
@@ -90,11 +91,12 @@ describe("useMemberLocationCheckPresenter", () => {
     expect(p.current.panel.share.disabled).toBe(false);
     await act(async () => p.current.panel.share.onClick());
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/messages"));
-    expect(check).toHaveBeenLastCalledWith("GH");
+    expect(check).toHaveBeenLastCalledWith("GH", { joining: false });
     expect(profile.update).toHaveBeenCalledWith({
       country: "GH",
       state: "Greater Accra",
       city: null,
+      location: "Greater Accra, Ghana",
     });
   });
 
@@ -119,6 +121,21 @@ describe("useMemberLocationCheckPresenter", () => {
     await waitFor(() => expect(p.current.loading).toBe(false));
     expect(p.current.loadError).toBeNull();
     expect(p.current.panel.chose).toBe("You chose Nigeria.");
+  });
+
+  it("saves nothing when the check is off before they've chosen a country", async () => {
+    search = new URLSearchParams({ change: "1", next: "/profile/edit/location" });
+    mode = "off";
+    renderHook(() => useMemberLocationCheckPresenter());
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/profile/edit/location"));
+    expect(profile.update).not.toHaveBeenCalled();
+  });
+
+  it("takes a lower-case country from the link", async () => {
+    search = new URLSearchParams({ change: "1", country: "gh" });
+    const { result: p } = renderHook(() => useMemberLocationCheckPresenter());
+    await waitFor(() => expect(p.current.loading).toBe(false));
+    expect(p.current.choose?.country.value).toBe("GH");
   });
 
   it("sends a signed-out visitor to log in", async () => {

@@ -118,17 +118,23 @@ export class SignUpService {
       headers: Headers;
       asResponse: true;
     }) => Promise<Response>;
-    const res = await signUpEmail({
-      body: {
-        email: account.email,
-        password: account.password,
-        name: account.displayName,
-        username: account.username,
-        ageAttested: true,
-      },
-      headers,
-      asResponse: true,
-    });
+    let res: Response;
+    try {
+      res = await signUpEmail({
+        body: {
+          email: account.email,
+          password: account.password,
+          name: account.displayName,
+          username: account.username,
+          ageAttested: true,
+        },
+        headers,
+        asResponse: true,
+      });
+    } catch (error) {
+      await this.release(claim);
+      throw error;
+    }
 
     const body = await res.text();
     const cookies = res.headers.getSetCookie();
@@ -174,9 +180,18 @@ export class SignUpService {
     return { status: res.status, cookies, body };
   }
 
-  /** Sign-up stopped after its country check was spent: let the retry use it again. */
+  /**
+   * Sign-up stopped after its country check was spent: let the retry use it
+   * again. A failure here is logged, never thrown, so the member still sees
+   * the real reason sign-up stopped.
+   */
   private async release(claim: SignupClaim | null): Promise<void> {
-    if (claim) await this.locationChecks.releaseSignupClaim(claim);
+    if (!claim) return;
+    await this.locationChecks
+      .releaseSignupClaim(claim)
+      .catch((error: unknown) =>
+        this.log.warn(`Country check not released after a failed sign-up: ${String(error)}`),
+      );
   }
 
   private extractUserId(body: string): string | undefined {

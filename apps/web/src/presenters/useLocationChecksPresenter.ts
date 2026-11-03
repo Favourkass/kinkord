@@ -6,15 +6,19 @@ import { LAUNCH_COUNTRIES } from "@/constants/onboarding";
 import {
   accuracyLabel,
   countByDecision,
+  isPassing,
   type LocationCheckDecision,
   type LocationCheckMode,
   type LocationCheckRowPM,
   type LocationCheckSummaryPM,
 } from "@/domain/locationCheck";
 import { locationCheckService } from "@/services/locationCheck.service";
+import { countryName as regionName } from "@/util/format";
+import type { AdminDialogVM } from "./useAdminMemberPresenter";
 import { useAdminAccessPresenter } from "./useAdminAccessPresenter";
 
 const WINDOW_DAYS = 7;
+const PAGE_SIZE = 50;
 const MODES: LocationCheckMode[] = ["off", "watch", "enforce"];
 const DECISIONS: LocationCheckDecision[] = [
   "approved",
@@ -26,29 +30,20 @@ const DECISIONS: LocationCheckDecision[] = [
   "skipped",
 ];
 
-const regionNames = (() => {
-  try {
-    return new Intl.DisplayNames(["en"], { type: "region" });
-  } catch {
-    return null;
-  }
-})();
+/** Kinkord's own names for its countries ("USA"), everyone else's from util/format. */
+const countryName = (code: string | null): string =>
+  code ? (LAUNCH_COUNTRIES.find((c) => c.code === code)?.name ?? regionName(code) ?? code) : "—";
 
-/** Kinkord's own names for its countries ("USA"), the browser's for the rest ("United Kingdom"). */
-const countryName = (code: string | null): string => {
-  if (!code) return "—";
-  return LAUNCH_COUNTRIES.find((c) => c.code === code)?.name ?? regionNames?.of(code) ?? code;
+const timeFormat = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+const when = (iso: string | null): string => {
+  const date = iso ? new Date(iso) : null;
+  return date && !Number.isNaN(date.getTime()) ? timeFormat.format(date) : "—";
 };
-
-const when = (iso: string | null): string =>
-  iso
-    ? new Date(iso).toLocaleString("en-GB", {
-        day: "numeric",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "—";
 
 const messageOf = (e: unknown): string =>
   e instanceof Error ? e.message : LOCATION_ADMIN_COPY.loadError;
@@ -86,7 +81,7 @@ export function toLocationCheckRowVM(row: LocationCheckRowPM): LocationCheckRowV
     connection: [countryName(row.ipCountry), row.ipNetwork].filter(Boolean).join(" · "),
     anonymizer: row.ipAnonymizer ? copy.anonymizers[row.ipAnonymizer] : null,
     decision: copy.decisions[row.decision],
-    stopped: row.decision !== "approved" && row.decision !== "travel",
+    stopped: !isPassing(row.decision),
     watching: row.enforced ? null : copy.notEnforced,
     reasons: row.reasons.map((reason) => copy.reasons[reason] ?? reason),
   };
@@ -102,10 +97,10 @@ export function useLocationChecksPresenter() {
   const [page, setPage] = useState<{
     decision: LocationCheckDecision | null;
     rows: LocationCheckRowPM[];
+    hasMore: boolean;
   } | null>(null);
-  const rows = page && page.decision === decision ? page.rows : null;
+  const loaded = page && page.decision === decision ? page : null;
   const [error, setError] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [pendingMode, setPendingMode] = useState<LocationCheckMode | null>(null);
   const [switching, setSwitching] = useState(false);
@@ -126,12 +121,8 @@ export function useLocationChecksPresenter() {
   useEffect(() => {
     if (!access.isAdmin) return;
     let live = true;
-    locationCheckService.list({ decision }).then(
-      (loaded) => {
-        if (!live) return;
-        setPage({ decision, rows: loaded });
-        setHasMore(loaded.length >= 50);
-      },
+    locationCheckService.list({ decision, limit: PAGE_SIZE }).then(
+      (rows) => live && setPage({ decision, rows, hasMore: rows.length >= PAGE_SIZE }),
       (e: unknown) => live && setError(messageOf(e)),
     );
     return () => {
@@ -140,19 +131,32 @@ export function useLocationChecksPresenter() {
   }, [access.isAdmin, decision]);
 
   const loadMore = useCallback(async () => {
-    const last = rows?.[rows.length - 1];
+    const last = loaded?.rows[loaded.rows.length - 1];
     if (!last || loadingMore) return;
+    const filter = decision;
     setLoadingMore(true);
     try {
-      const more = await locationCheckService.list({ before: last.createdAt, decision });
-      setPage((current) => ({ decision, rows: [...(current?.rows ?? []), ...more] }));
-      setHasMore(more.length >= 50);
+      const more = await locationCheckService.list({
+        before: last.createdAt,
+        decision: filter,
+        limit: PAGE_SIZE,
+      });
+      // Dropped if the filter changed while this page was on its way.
+      setPage((current) =>
+        current && current.decision === filter
+          ? {
+              decision: filter,
+              rows: [...current.rows, ...more],
+              hasMore: more.length >= PAGE_SIZE,
+            }
+          : current,
+      );
     } catch (e) {
       setError(messageOf(e));
     } finally {
       setLoadingMore(false);
     }
-  }, [rows, loadingMore, decision]);
+  }, [loaded, loadingMore, decision]);
 
   const confirmMode = useCallback(async () => {
     if (!pendingMode) return;
@@ -168,6 +172,27 @@ export function useLocationChecksPresenter() {
       setSwitching(false);
     }
   }, [pendingMode]);
+
+  // Rows are formatted when they arrive, not each time the switch or a button changes.
+  const rowVMs = useMemo(() => (loaded?.rows ?? []).map(toLocationCheckRowVM), [loaded]);
+
+  const dialog: AdminDialogVM | null = pendingMode
+    ? {
+        title: copy.switchTitle(copy.modes[pendingMode].label),
+        body: `${copy.modes[pendingMode].body} ${copy.switchConfirm}`,
+        confirmLabel: copy.confirm,
+        cancelLabel: copy.cancel,
+        destructive: pendingMode === "enforce",
+        reason: null,
+        checkbox: null,
+        typeToConfirm: null,
+        canConfirm: true,
+        busy: switching,
+        error: switchError,
+        confirm: () => void confirmMode(),
+        cancel: () => setPendingMode(null),
+      }
+    : null;
 
   const view = useMemo(() => {
     const mode = summary?.mode ?? null;
@@ -188,17 +213,6 @@ export function useLocationChecksPresenter() {
             }))
           : [],
         founderOnly: access.isFounder ? null : copy.founderOnly,
-        pending: pendingMode
-          ? {
-              text: copy.switchConfirm(copy.modes[pendingMode].label),
-              confirmLabel: copy.confirm,
-              cancelLabel: copy.cancel,
-              confirm: () => void confirmMode(),
-              cancel: () => setPendingMode(null),
-              busy: switching,
-              error: switchError,
-            }
-          : null,
       },
       window: copy.window(WINDOW_DAYS),
       stats: summary
@@ -232,9 +246,9 @@ export function useLocationChecksPresenter() {
             summary.data.countryDataBuiltAt
               ? copy.dataLines.country(when(summary.data.countryDataBuiltAt))
               : copy.dataLines.missing,
-            ...(summary.data.networkDataBuiltAt
-              ? [copy.dataLines.network(when(summary.data.networkDataBuiltAt))]
-              : []),
+            summary.data.networkDataBuiltAt
+              ? copy.dataLines.network(when(summary.data.networkDataBuiltAt))
+              : copy.dataLines.networkMissing,
             summary.data.torUpdatedAt
               ? copy.dataLines.tor(summary.data.torExits, when(summary.data.torUpdatedAt))
               : copy.dataLines.torMissing,
@@ -257,33 +271,19 @@ export function useLocationChecksPresenter() {
           ],
           onChange: (value: string) => setDecision(value ? (value as LocationCheckDecision) : null),
         },
-        loading: rows === null && !error,
+        loading: !loaded && !error,
         loadingLabel: copy.loading,
-        rows: (rows ?? []).map(toLocationCheckRowVM),
-        empty: rows !== null && rows.length === 0 ? copy.empty : null,
-        loadMore: hasMore
+        rows: rowVMs,
+        empty: loaded && loaded.rows.length === 0 ? copy.empty : null,
+        loadMore: loaded?.hasMore
           ? { label: copy.loadMore, busy: loadingMore, onClick: () => void loadMore() }
           : null,
       },
       error,
     };
-  }, [
-    copy,
-    summary,
-    rows,
-    decision,
-    error,
-    hasMore,
-    loadingMore,
-    loadMore,
-    pendingMode,
-    switching,
-    switchError,
-    confirmMode,
-    access.isFounder,
-  ]);
+  }, [copy, summary, decision, loaded, rowVMs, error, loadingMore, loadMore, access.isFounder]);
 
-  return { checking: access.checking, isAdmin: access.isAdmin, view };
+  return { checking: access.checking, isAdmin: access.isAdmin, view, dialog };
 }
 
 export type LocationChecksVM = ReturnType<typeof useLocationChecksPresenter>["view"];

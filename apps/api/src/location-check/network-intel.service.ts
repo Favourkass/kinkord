@@ -1,19 +1,29 @@
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import maxmind, { type AsnResponse, type CountryResponse, type Reader } from "maxmind";
 import type { Anonymizer } from "../db/schema";
 import type { IpEvidence } from "./country-check-rules";
 import { isHostingNetwork } from "./hosting-networks";
+import { fetchIpData } from "./ip-data";
 
 /** Tor's own list of exit relays, refreshed hourly; no key needed. */
 const TOR_EXIT_LIST = "https://check.torproject.org/torbulkexitlist";
-const TOR_REFRESH_MS = 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
+const TOR_REFRESH_MS = HOUR_MS;
+/** How often to see whether the IP data needs fetching. */
+const DATA_CHECK_MS = 6 * HOUR_MS;
+/** IP data older than this is fetched afresh; DB-IP publishes monthly. */
+const DATA_STALE_MS = 40 * 24 * HOUR_MS;
 
 /**
  * DB-IP's free country and network files (CC BY 4.0, credited on the privacy
- * page), fetched when the API image is built (scripts/fetch-ip-data.mjs).
+ * page), fetched when the API image is built (scripts/fetch-ip-data.mjs). An
+ * image built while DB-IP was unreachable comes without them; the API then
+ * fetches them itself, into a temporary folder.
  */
-const DATA_DIR = process.env.LOCATION_DATA_DIR ?? join(process.cwd(), "data", "ip");
+const BUILT_DIR = process.env.LOCATION_DATA_DIR ?? join(process.cwd(), "data", "ip");
+const FETCHED_DIR = join(tmpdir(), "kinkord-ip-data");
 const COUNTRY_FILE = "dbip-country-lite.mmdb";
 const ASN_FILE = "dbip-asn-lite.mmdb";
 
@@ -66,25 +76,23 @@ export class NetworkIntelService implements OnModuleInit, OnModuleDestroy {
   private asn: Reader<AsnResponse> | null = null;
   private tor: ReadonlySet<string> = new Set();
   private torUpdatedAt: Date | null = null;
-  private timer?: NodeJS.Timeout;
+  private fetching = false;
+  private readonly timers: NodeJS.Timeout[] = [];
 
   async onModuleInit(): Promise<void> {
     if (process.env.NODE_ENV === "test") return;
-    try {
-      this.country = await maxmind.open<CountryResponse>(join(DATA_DIR, COUNTRY_FILE));
-      this.asn = await maxmind.open<AsnResponse>(join(DATA_DIR, ASN_FILE));
-    } catch (error) {
-      this.log.warn(
-        `IP data missing from ${DATA_DIR}; country checks will ask members to retry (${String(error)})`,
-      );
-    }
+    await this.load(BUILT_DIR);
+    void this.refreshData();
     void this.refreshTor();
-    this.timer = setInterval(() => void this.refreshTor(), TOR_REFRESH_MS);
-    this.timer.unref();
+    this.timers.push(
+      setInterval(() => void this.refreshTor(), TOR_REFRESH_MS),
+      setInterval(() => void this.refreshData(), DATA_CHECK_MS),
+    );
+    for (const timer of this.timers) timer.unref();
   }
 
   onModuleDestroy(): void {
-    clearInterval(this.timer);
+    for (const timer of this.timers) clearInterval(timer);
   }
 
   lookup(ip: string | null): IpLookup {
@@ -99,6 +107,44 @@ export class NetworkIntelService implements OnModuleInit, OnModuleDestroy {
       torExits: this.tor.size,
       torUpdatedAt: this.torUpdatedAt?.toISOString() ?? null,
     };
+  }
+
+  /**
+   * Opens each file on its own, keeping the one already open when a file
+   * can't be read, and says which is missing: without the network file,
+   * VPNs and hosting go undetected.
+   */
+  private async load(dir: string): Promise<void> {
+    try {
+      this.country = await maxmind.open<CountryResponse>(join(dir, COUNTRY_FILE));
+    } catch (error) {
+      this.log.warn(`IP country data not loaded from ${dir}: ${String(error)}`);
+    }
+    try {
+      this.asn = await maxmind.open<AsnResponse>(join(dir, ASN_FILE));
+    } catch (error) {
+      this.log.warn(
+        `IP network data not loaded from ${dir}; VPN detection is off: ${String(error)}`,
+      );
+    }
+  }
+
+  /** Fetches the data when it's missing or over 40 days old, keeping the old copy if that fails. */
+  private async refreshData(now = Date.now()): Promise<void> {
+    const builtAt = (reader: { metadata: { buildEpoch: Date } } | null) =>
+      reader?.metadata.buildEpoch.getTime() ?? 0;
+    const fresh = (reader: { metadata: { buildEpoch: Date } } | null) =>
+      now - builtAt(reader) < DATA_STALE_MS;
+    if ((fresh(this.country) && fresh(this.asn)) || this.fetching) return;
+    this.fetching = true;
+    try {
+      await fetchIpData(FETCHED_DIR, { log: (line) => this.log.log(line) });
+      await this.load(FETCHED_DIR);
+    } catch (error) {
+      this.log.warn(`IP data not fetched; trying again in 6 hours: ${String(error)}`);
+    } finally {
+      this.fetching = false;
+    }
   }
 
   private async refreshTor(): Promise<void> {

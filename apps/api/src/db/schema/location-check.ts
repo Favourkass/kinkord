@@ -84,6 +84,12 @@ export const locationStatus = pgTable("location_status", {
   status: text("status").$type<LocationStanding>().notNull(),
   /** The last check that found them in their own country. Travelling is allowed for 30 days after it. */
   approvedAt: timestamp("approved_at", { withTimezone: true }),
+  /**
+   * The connection's country on the last check that let them through, so a
+   * network that always looks foreign (an office gateway, a border SIM) isn't
+   * taken for a move every day.
+   */
+  ipCountry: text("ip_country"),
   /** The last precise GPS reading, rounded to 0.1° (about 11 km), for spotting impossible travel. */
   cell: text("cell"),
   cellAt: timestamp("cell_at", { withTimezone: true }),

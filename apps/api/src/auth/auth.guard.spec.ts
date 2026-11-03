@@ -49,8 +49,8 @@ const presenceStub = () => {
 
 /** Whether the member owes a country check; the rules themselves are LocationCheckService's. */
 const locationStub = (owes = false) => {
-  const needsCheck = vi.fn(async () => owes);
-  return { location: { needsCheck } as unknown as LocationCheckService, needsCheck };
+  const checkDue = vi.fn(async () => ({ due: owes, hold: owes }));
+  return { location: { checkDue } as unknown as LocationCheckService, checkDue };
 };
 
 interface ProfileRow {
@@ -73,7 +73,10 @@ const finished: ProfileRow = {
 /** `null` is an account with no profile row at all. */
 const dbWithProfile = (row: Partial<ProfileRow> | null) => {
   const limit = vi.fn().mockResolvedValue(row === null ? [] : [{ ...finished, ...row }]);
-  return { select: vi.fn(() => ({ from: () => ({ where: () => ({ limit }) }) })) };
+  // The profile row comes with the member's country-check standing joined on.
+  return {
+    select: vi.fn(() => ({ from: () => ({ leftJoin: () => ({ where: () => ({ limit }) }) }) })),
+  };
 };
 
 interface Account {
@@ -278,14 +281,15 @@ describe("AuthGuard profile photos", () => {
 
 describe("AuthGuard location check", () => {
   it("holds a member who owes a country check at the location check", async () => {
-    const { location, needsCheck } = locationStub(true);
+    const { location, checkDue } = locationStub(true);
     const guard = guardWithDb(OLD, dbWithProfile({}), location);
     expect(await holdOf(guard)).toBe(LOCATION_CHECK_REQUIRED);
-    expect(needsCheck).toHaveBeenCalledWith(
+    expect(checkDue).toHaveBeenCalledWith(
       expect.objectContaining({
         user: expect.objectContaining({ id: "u1" }),
         sessionCreatedAt: new Date("2026-11-02T08:00:00Z"),
         profile: { country: "NG", accountType: "person" },
+        standing: null,
       }),
     );
   });
@@ -296,23 +300,23 @@ describe("AuthGuard location check", () => {
   });
 
   it("asks for photos before the country, in sign-up order", async () => {
-    const { location, needsCheck } = locationStub(true);
+    const { location, checkDue } = locationStub(true);
     const guard = guardWithDb(OLD, dbWithProfile({ avatarKey: null }), location);
     expect(await holdOf(guard)).toBe(PROFILE_PHOTOS_REQUIRED);
-    expect(needsCheck).not.toHaveBeenCalled();
+    expect(checkDue).not.toHaveBeenCalled();
   });
 
   it("lets a held member reach the routes they need, without asking", async () => {
-    const { location, needsCheck } = locationStub(true);
+    const { location, checkDue } = locationStub(true);
     const guard = guardWithDb(OLD, dbWithProfile({}), location);
     await expect(guard.canActivate(ctx({ headers: {} }, "finishSignUp"))).resolves.toBe(true);
-    expect(needsCheck).not.toHaveBeenCalled();
+    expect(checkDue).not.toHaveBeenCalled();
   });
 
   it("doesn't hold an account with no profile, which has no country to check", async () => {
-    const { location, needsCheck } = locationStub(true);
+    const { location, checkDue } = locationStub(true);
     const guard = guardWithDb(OLD, dbWithProfile(null), location);
     await expect(guard.canActivate(ctx({ headers: {} }))).resolves.toBe(true);
-    expect(needsCheck).not.toHaveBeenCalled();
+    expect(checkDue).not.toHaveBeenCalled();
   });
 });

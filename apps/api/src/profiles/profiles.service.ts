@@ -210,19 +210,7 @@ export class ProfilesService {
   ) {
     const current = await this.ensureRow(userId, fallbackName);
     const country = input.country ?? current.country;
-    // Switching country takes a check that finds them there (when enforcing), or
-    // anyone could join honestly and then move somewhere with fewer limits.
-    let checkedSwitch = false;
-    if (input.country !== undefined && input.country !== current.country) {
-      const verdict = await this.locationChecks.authorizeCountryChange(userId, input.country, now);
-      if (verdict === "missing") {
-        throw new ForbiddenException({
-          code: LOCATION_CHECK_NEEDED,
-          message: "Confirm you're in that country before switching to it.",
-        });
-      }
-      checkedSwitch = verdict === "claimed";
-    }
+    const switching = input.country !== undefined && input.country !== current.country;
     if (input.orientation != null && !canSelectSexuality(country)) {
       throw new BadRequestException({
         orientation: ["Sexuality selection is unavailable for this country."],
@@ -261,9 +249,9 @@ export class ProfilesService {
             : current.gender
               ? [current.gender]
               : []);
-      // A confirmed move keeps only the genders the new country offers, rather
-      // than leaving the member unable to save the country they are in.
-      const kept = checkedSwitch ? gendersAllowedIn(country, selected) : selected;
+      // A move keeps only the genders the new country offers, as joining there
+      // would, rather than leaving the member unable to save where they are.
+      const kept = switching ? gendersAllowedIn(country, selected) : selected;
       try {
         const normalized = genderSelectionChanges(country, kept, current.gender);
         if (
@@ -279,7 +267,7 @@ export class ProfilesService {
       }
     }
     // Moving somewhere sexuality can't be chosen clears it, as joining there would.
-    if (checkedSwitch && !canSelectSexuality(country)) {
+    if (switching && !canSelectSexuality(country)) {
       changes.orientation = null;
       changes.orientationSelections = [];
     }
@@ -296,6 +284,22 @@ export class ProfilesService {
     // A new number has not been proved, so "Basic verified" has to be earned again.
     if (input.phone !== undefined && input.phone !== current.phone) {
       changes.phoneVerified = false;
+    }
+    // Switching country takes a check that finds them there (when enforcing), or
+    // anyone could join honestly and then move somewhere with fewer limits. It
+    // spends the check, so it comes last, once nothing else can refuse the save.
+    if (switching) {
+      const verdict = await this.locationChecks.authorizeCountryChange(
+        userId,
+        input.country ?? null,
+        now,
+      );
+      if (verdict === "missing") {
+        throw new ForbiddenException({
+          code: LOCATION_CHECK_NEEDED,
+          message: "Confirm you're in that country before switching to it.",
+        });
+      }
     }
     const [row] = await this.db
       .update(profile)

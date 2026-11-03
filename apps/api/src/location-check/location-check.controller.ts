@@ -19,6 +19,8 @@ const deviceIdSchema = z
 
 const checkSchema = z.object({
   country: countrySchema,
+  /** From the sign-up steps: a check for a new account, whoever this browser is still signed in as. */
+  joining: z.boolean().optional(),
   gps: z.discriminatedUnion("status", [
     z.object({ status: z.literal("ok"), lat: z.number(), lng: z.number(), accuracy: z.number() }),
     z.object({ status: z.enum(["denied", "unavailable", "timeout", "unsupported"]) }),
@@ -32,7 +34,11 @@ const checkSchema = z.object({
   deviceId: deviceIdSchema,
 });
 
-const skipSchema = z.object({ country: countrySchema, deviceId: deviceIdSchema });
+const skipSchema = z.object({
+  country: countrySchema,
+  joining: z.boolean().optional(),
+  deviceId: deviceIdSchema,
+});
 
 function parse<T>(schema: z.ZodType<T>, body: unknown): T {
   const parsed = schema.safeParse(body);
@@ -61,13 +67,24 @@ export class LocationCheckController {
     return { mode: await this.checks.mode() };
   }
 
+  /** Whether the signed-in member owes a check: the app asks at the next page when they do. */
+  @Get("due")
+  async due(@Req() req: Request) {
+    const headers = fromNodeHeaders(req.headers);
+    const session = await this.auth.api.getSession({ headers });
+    if (!session) return { due: false };
+    const createdAt = session.session.createdAt ? new Date(session.session.createdAt) : null;
+    const { due } = await this.checks.dueFor(session.user, createdAt, checkedIp(headers));
+    return { due };
+  }
+
   @Post()
   async check(@Req() req: Request, @Body() body: unknown) {
-    const input = parse(checkSchema, body);
+    const { joining, ...input } = parse(checkSchema, body);
     const headers = fromNodeHeaders(req.headers);
     return this.checks.check({
       ...input,
-      member: await this.memberOf(headers),
+      member: joining ? null : await this.memberOf(headers),
       ip: checkedIp(headers),
     });
   }
@@ -75,11 +92,11 @@ export class LocationCheckController {
   /** Watch mode only: "Not now". */
   @Post("skip")
   async skip(@Req() req: Request, @Body() body: unknown) {
-    const input = parse(skipSchema, body);
+    const { joining, ...input } = parse(skipSchema, body);
     const headers = fromNodeHeaders(req.headers);
     return this.checks.skip({
       ...input,
-      member: await this.memberOf(headers),
+      member: joining ? null : await this.memberOf(headers),
       ip: checkedIp(headers),
     });
   }

@@ -51,6 +51,15 @@ describe("readPosition", () => {
     );
   });
 
+  it("gives up on a prompt nobody answers", async () => {
+    vi.useFakeTimers();
+    const silent = geolocationAnswering(() => undefined);
+    const reading = readPosition(silent);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(await reading).toEqual({ status: "timeout" });
+    vi.useRealTimers();
+  });
+
   it("says why there's no fix", async () => {
     expect(await readPosition(failing(1))).toEqual({ status: "denied" });
     expect(await readPosition(failing(2))).toEqual({ status: "unavailable" });
@@ -65,6 +74,13 @@ describe("isNativeFunction", () => {
     expect(isNativeFunction(() => 1)).toBe(false);
     expect(isNativeFunction(undefined)).toBe(false);
   });
+
+  it("sees through a bound fake, which also prints as native code", () => {
+    const bound = Math.max.bind(null);
+    expect(isNativeFunction(bound)).toBe(true);
+    expect(isNativeFunction(bound, "max")).toBe(false);
+    expect(isNativeFunction(Math.max, "max")).toBe(true);
+  });
 });
 
 describe("deviceReport", () => {
@@ -75,6 +91,14 @@ describe("deviceReport", () => {
     } as unknown as Navigator);
     expect(report.timezone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
     expect(report).toMatchObject({ automation: true, geolocationNative: false });
+  });
+
+  it("notices a geolocation override set on the object itself", () => {
+    const geolocation = Object.create(null) as Geolocation;
+    Object.defineProperty(geolocation, "getCurrentPosition", { value: Math.max, enumerable: true });
+    expect(
+      deviceReport({ webdriver: false, geolocation } as unknown as Navigator).geolocationNative,
+    ).toBe(false);
   });
 
   it("doesn't call a browser without geolocation tampered with", () => {
@@ -125,9 +149,10 @@ describe("locationCheckService", () => {
         ok({ coords: { latitude: 5.6, longitude: -0.19, accuracy: 40 } } as GeolocationPosition),
       ),
     });
-    await locationCheckService.check("GH");
+    await locationCheckService.check("GH", { joining: true });
     expect(post).toHaveBeenCalledWith("/location-check", {
       country: "GH",
+      joining: true,
       gps: { status: "ok", lat: 5.6, lng: -0.19, accuracy: 40 },
       device: expect.objectContaining({ timezone: expect.any(String), automation: false }),
       deviceId: expect.any(String),
@@ -138,16 +163,27 @@ describe("locationCheckService", () => {
     await locationCheckService.skip("NG");
     expect(post).toHaveBeenCalledWith("/location-check/skip", {
       country: "NG",
+      joining: false,
       deviceId: expect.any(String),
     });
+  });
+
+  it("asks whether a check is due", async () => {
+    get.mockResolvedValue({ due: true });
+    expect(await locationCheckService.due()).toBe(true);
+    expect(get).toHaveBeenCalledWith("/location-check/due");
   });
 
   it("serves the founders' page", async () => {
     await locationCheckService.summary();
     expect(get).toHaveBeenCalledWith("/admin/location-checks/summary?days=7");
-    await locationCheckService.list({ before: "2026-11-02T12:00:00.000Z", decision: "mismatch" });
+    await locationCheckService.list({
+      before: "2026-11-02T12:00:00.000Z",
+      decision: "mismatch",
+      limit: 50,
+    });
     expect(get).toHaveBeenLastCalledWith(
-      "/admin/location-checks?before=2026-11-02T12%3A00%3A00.000Z&decision=mismatch",
+      "/admin/location-checks?limit=50&before=2026-11-02T12%3A00%3A00.000Z&decision=mismatch",
     );
     await locationCheckService.list();
     expect(get).toHaveBeenLastCalledWith("/admin/location-checks");

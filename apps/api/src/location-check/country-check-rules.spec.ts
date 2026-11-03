@@ -9,7 +9,6 @@ import {
   type IpEvidence,
 } from "./country-check-rules";
 
-const SERVED = ["GH", "KE", "NG", "ZA", "US"];
 const LAGOS_ZONE = ["NG", "AO", "BJ", "CD", "CF", "CG", "CM", "GA", "GQ", "NE"];
 const LONDON_ZONE = ["GB", "GG", "IM", "JE"];
 
@@ -32,7 +31,6 @@ const ipIn = (country: string, anonymizer: "tor" | "hosting" | null = null): IpE
 const base: CheckInput = {
   selected: "NG",
   purpose: "signup",
-  served: SERVED,
   gps: gpsIn("NG"),
   ip: ipIn("NG"),
   device: {
@@ -201,7 +199,7 @@ describe("decideCountryCheck: travellers", () => {
     ...withDevice({ timezoneCountries: LONDON_ZONE }),
   };
 
-  it("lets a member abroad outside Kinkord's countries carry on soon after a check at home", () => {
+  it("lets a member abroad carry on soon after a check at home", () => {
     const outcome = decide({ ...abroad, ...withHistory({ recentHomeCheck: true }) });
     expect(outcome).toMatchObject({
       decision: "travel",
@@ -222,7 +220,7 @@ describe("decideCountryCheck: travellers", () => {
     expect(decide(abroad).decision).toBe("mismatch");
   });
 
-  it("asks a member in another of Kinkord's countries to switch to it instead", () => {
+  it("lets a member visiting another of Kinkord's countries carry on too, without switching", () => {
     const outcome = decide({
       ...abroad,
       gps: gpsIn("GH"),
@@ -230,7 +228,7 @@ describe("decideCountryCheck: travellers", () => {
       ...withDevice({ timezoneCountries: ["GH"] }),
       ...withHistory({ recentHomeCheck: true }),
     });
-    expect(outcome.decision).toBe("mismatch");
+    expect(outcome.decision).toBe("travel");
   });
 
   it("gives no travel pass while joining", () => {
@@ -252,7 +250,7 @@ describe("decideCountryCheck: travellers", () => {
     expect(outcome.decision).toBe("mismatch");
   });
 
-  it("gives none when the connection is in another of Kinkord's countries", () => {
+  it("gives none when the connection is somewhere else again", () => {
     const outcome = decide({
       ...abroad,
       ip: ipIn("GH"),

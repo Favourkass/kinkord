@@ -15,6 +15,8 @@ export const Routes = {
   locationPrivacy: "/privacy/location",
   /** Where members are held while a country check is due. */
   locationCheck: "/location-check",
+  /** The check, returning to `next` once passed. */
+  locationCheckFrom: (next: string) => `/location-check?next=${encodeURIComponent(next)}`,
   /** The check, opened on choosing a new country, returning to `next` once it's saved. */
   locationCheckChange: (country: string | null, next: string) =>
     `/location-check?change=1${country ? `&country=${encodeURIComponent(country)}` : ""}&next=${encodeURIComponent(next)}`,

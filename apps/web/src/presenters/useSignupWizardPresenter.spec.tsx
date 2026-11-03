@@ -399,7 +399,7 @@ describe("useSignupWizardPresenter", () => {
     const passed = {
       id: "check-1",
       decision: "approved",
-      reasons: ["gps_match"],
+      hint: null,
       enforced: true,
       detectedCountry: "NG",
     };
@@ -435,7 +435,7 @@ describe("useSignupWizardPresenter", () => {
 
       await act(async () => result.current.locationStep.share.onClick());
       await waitFor(() => expect(result.current.stage).toBe("account"));
-      expect(locationCheck.check).toHaveBeenCalledWith("NG");
+      expect(locationCheck.check).toHaveBeenCalledWith("NG", { joining: true });
 
       fillAccount(result);
       fillAbout(result);
@@ -450,7 +450,7 @@ describe("useSignupWizardPresenter", () => {
       locationCheck.check.mockResolvedValue({
         ...passed,
         decision: "mismatch",
-        reasons: ["vpn", "hosting"],
+        hint: "vpn",
         detectedCountry: "GH",
       });
       const { result } = renderHook(() => useSignupWizardPresenter());
@@ -472,7 +472,7 @@ describe("useSignupWizardPresenter", () => {
       locationCheck.check.mockResolvedValue({
         ...passed,
         decision: "retry",
-        reasons: ["gps_denied"],
+        hint: "allow-location",
         detectedCountry: null,
       });
       const { result } = renderHook(() => useSignupWizardPresenter());
@@ -514,7 +514,7 @@ describe("useSignupWizardPresenter", () => {
       expect(result.current.locationStep.skip?.label).toBe("Not now");
       await act(async () => result.current.locationStep.skip?.onClick());
       await waitFor(() => expect(result.current.stage).toBe("account"));
-      expect(locationCheck.skip).toHaveBeenCalledWith("NG");
+      expect(locationCheck.skip).toHaveBeenCalledWith("NG", { joining: true });
     });
   });
 

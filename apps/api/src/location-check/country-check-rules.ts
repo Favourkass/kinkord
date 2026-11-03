@@ -56,8 +56,6 @@ export interface CheckInput {
   /** The country they say they are in, ISO 3166-1 alpha-2. */
   selected: string;
   purpose: LocationCheckPurpose;
-  /** The countries Kinkord serves; abroad outside them, a member may travel. */
-  served: readonly string[];
   gps: GpsEvidence;
   ip: IpEvidence;
   device: DeviceEvidence;
@@ -95,9 +93,12 @@ export interface CheckOutcome {
  *   browser driven by automation, a page whose geolocation is answered by a
  *   script, a reading no device could give, or impossible travel. These are
  *   signals, not proof, so the member may try again.
- * - Members abroad outside Kinkord's countries, soon after a check at home,
- *   carry on as travellers with their home country (and its rules)
- *   unchanged. Never when joining: an account starts where its owner is.
+ * - Members away from home, within 30 days of a check there, carry on as
+ *   travellers with their home country (and its rules) unchanged, wherever
+ *   they are, so a weekend away never forces a country switch. The GPS must
+ *   be real (not a VPN's echo) and the connection must agree with it, or be
+ *   their home network roaming. Never when joining: an account starts where
+ *   its owner is.
  */
 export function decideCountryCheck(input: CheckInput): CheckOutcome {
   const { selected, gps, ip, device, history } = input;
@@ -150,12 +151,11 @@ export function decideCountryCheck(input: CheckInput): CheckOutcome {
     return decide("approved", "ip_match");
   }
 
-  const served = (code: string) => input.served.includes(code);
   const abroad =
     gps.country !== null &&
-    !served(gps.country) &&
+    gps.country !== selected &&
     !gpsEchoesVpn &&
-    (anonymized || !served(ip.country) || ip.country === selected);
+    (anonymized || ip.country === gps.country || ip.country === selected);
   if (input.purpose === "recheck" && history.recentHomeCheck && abroad) {
     return decide("travel", "abroad");
   }

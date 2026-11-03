@@ -33,6 +33,7 @@ CREATE TABLE "location_status" (
 	"checked_country" text NOT NULL,
 	"status" text NOT NULL,
 	"approved_at" timestamp with time zone,
+	"ip_country" text,
 	"cell" text,
 	"cell_at" timestamp with time zone
 );

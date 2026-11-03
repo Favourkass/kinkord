@@ -76,8 +76,26 @@ describe("useLocationCheckPresenter", () => {
     expect(result.current.panel.share.disabled).toBe(true);
   });
 
-  it("pauses the button after too many tries", async () => {
+  it("says the connection is busy, and lets them try again, after too many checks from it", async () => {
     service.check.mockRejectedValue(new FakeApiError(429, null));
+    const { result } = renderHook(() => useLocationCheckPresenter(options()));
+    await act(async () => result.current.panel.share.onClick());
+    await waitFor(() =>
+      expect(result.current.panel.problem?.message).toBe(
+        "Too many checks from your connection right now. Try again in a few minutes.",
+      ),
+    );
+    expect(result.current.panel.share.disabled).toBe(false);
+  });
+
+  it("disables the button for the day once the server pauses their checks", async () => {
+    service.check.mockResolvedValue({
+      id: "c",
+      decision: "paused",
+      hint: null,
+      enforced: true,
+      detectedCountry: null,
+    });
     const { result } = renderHook(() => useLocationCheckPresenter(options()));
     await act(async () => result.current.panel.share.onClick());
     await waitFor(() =>
@@ -111,7 +129,7 @@ describe("useLocationCheckPresenter", () => {
     service.check.mockResolvedValue({
       id: "c",
       decision: "refused",
-      reasons: ["automation"],
+      hint: null,
       enforced: true,
       detectedCountry: null,
     });
@@ -129,13 +147,57 @@ describe("useLocationCheckPresenter", () => {
     expect(result.current.panel.notice).toBe("That check has expired.");
   });
 
-  it("watching, still lets them on when Not now can't be recorded", async () => {
+  it("only lets them on once Not now is recorded", async () => {
     service.mode.mockResolvedValue("watch");
     service.skip.mockRejectedValue(new Error("offline"));
     const opts = options();
     const { result } = renderHook(() => useLocationCheckPresenter(opts));
     await waitFor(() => expect(result.current.panel.skip).not.toBeNull());
     await act(async () => result.current.panel.skip?.onClick());
-    await waitFor(() => expect(opts.onPassed).toHaveBeenCalledWith(null));
+    await waitFor(() => expect(result.current.panel.problem).not.toBeNull());
+    expect(opts.onPassed).not.toHaveBeenCalled();
+  });
+
+  it("asks for the location when Not now is refused because the check stopped watching", async () => {
+    service.mode.mockResolvedValueOnce("watch").mockResolvedValue("enforce");
+    service.skip.mockRejectedValue(new FakeApiError(400, null));
+    const { result } = renderHook(() => useLocationCheckPresenter(options()));
+    await waitFor(() => expect(result.current.panel.skip).not.toBeNull());
+    await act(async () => result.current.panel.skip?.onClick());
+    await waitFor(() =>
+      expect(result.current.panel.problem?.message).toBe("Share your location to continue."),
+    );
+    expect(result.current.panel.skip).toBeNull();
+  });
+
+  it("stops passing anyone straight through once the server has refused", async () => {
+    service.mode.mockResolvedValue("off");
+    const onPassed = vi.fn();
+    const { result, rerender } = renderHook(
+      (props: LocationCheckOptions) => useLocationCheckPresenter(props),
+      { initialProps: options({ active: false, onPassed }) },
+    );
+    await waitFor(() => expect(result.current.mode).toBe("off"));
+    act(() => result.current.reset("That check has expired."));
+    rerender(options({ active: true, onPassed }));
+    await act(async () => undefined);
+    expect(onPassed).not.toHaveBeenCalled();
+    expect(result.current.panel.notice).toBe("That check has expired.");
+  });
+
+  it("ignores an answer for a country they've since changed", async () => {
+    let answer: (value: unknown) => void = () => undefined;
+    service.check.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+    const onPassed = vi.fn();
+    const { result, rerender } = renderHook(
+      (props: LocationCheckOptions) => useLocationCheckPresenter(props),
+      { initialProps: options({ onPassed }) },
+    );
+    act(() => result.current.panel.share.onClick());
+    rerender(options({ country: "GH", countryName: "Ghana", onPassed }));
+    await act(async () =>
+      answer({ id: "c", decision: "approved", hint: null, enforced: true, detectedCountry: "NG" }),
+    );
+    expect(onPassed).not.toHaveBeenCalled();
   });
 });

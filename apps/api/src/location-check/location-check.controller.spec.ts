@@ -22,6 +22,7 @@ function make(session: unknown = null, country: string | null = "NG") {
   const checks = {
     mode: vi.fn(async () => "watch"),
     memberOf: vi.fn(async (id: string) => ({ id, country })),
+    dueFor: vi.fn(async () => ({ due: true, hold: false })),
     check: vi.fn(async () => ({ id: "check-1" })),
     skip: vi.fn(async () => ({ id: "check-2" })),
   };
@@ -81,5 +82,27 @@ describe("LocationCheckController", () => {
       member: null,
       ip: "102.89.32.1",
     });
+  });
+
+  it("treats a sign-up check as one for a new account, whoever the browser is signed in as", async () => {
+    const { controller, checks } = make({ user: { id: "u1" } }, "GH");
+    await controller.check(req, { ...body, joining: true });
+    expect(checks.memberOf).not.toHaveBeenCalled();
+    expect(checks.check).toHaveBeenCalledWith(expect.objectContaining({ member: null }));
+  });
+
+  it("says whether a signed-in member owes a check, and nobody else does", async () => {
+    const signedOut = make();
+    expect(await signedOut.controller.due(req)).toEqual({ due: false });
+    const { controller, checks } = make({
+      user: { id: "u1", email: "member@kinkord.com", emailVerified: true },
+      session: { createdAt: "2026-11-02T08:00:00Z" },
+    });
+    expect(await controller.due(req)).toEqual({ due: true });
+    expect(checks.dueFor).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "u1" }),
+      new Date("2026-11-02T08:00:00Z"),
+      "102.89.32.1",
+    );
   });
 });

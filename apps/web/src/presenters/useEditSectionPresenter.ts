@@ -16,6 +16,7 @@ import type {
   ProfileOptionsPM,
 } from "@/domain/profile";
 import { ApiError } from "@/services/apiClient";
+import { isLocationCheckNeeded } from "@/domain/locationCheck";
 import {
   buildEditRows,
   draftChanged,
@@ -207,10 +208,7 @@ export function useEditSectionPresenter(section: EditSectionKey) {
         return;
       }
       // A new country is confirmed by a location check first, which saves it.
-      if (
-        e instanceof ApiError &&
-        (e.body as { code?: string } | null)?.code === "LOCATION_CHECK_NEEDED"
-      ) {
+      if (e instanceof ApiError && isLocationCheckNeeded(e.body)) {
         const country = (patch as { country?: string | null } | null)?.country ?? null;
         router.push(Routes.locationCheckChange(country, Routes.profileEditLocation));
         return;

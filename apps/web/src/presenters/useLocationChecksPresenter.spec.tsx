@@ -43,9 +43,7 @@ const row = (change: Partial<LocationCheckRowPM> = {}): LocationCheckRowPM => ({
   id: "check-1",
   createdAt: "2026-11-02T10:15:00.000Z",
   purpose: "recheck",
-  userId: "u1",
   username: "tega",
-  displayName: "Tega",
   selectedCountry: "NG",
   gpsStatus: "ok",
   gpsCountry: "GB",
@@ -53,7 +51,6 @@ const row = (change: Partial<LocationCheckRowPM> = {}): LocationCheckRowPM => ({
   ipCountry: "US",
   ipNetwork: "M247 Europe SRL",
   ipAnonymizer: "hosting",
-  timezone: "Europe/London",
   reasons: ["elsewhere", "hosting"],
   decision: "mismatch",
   enforced: false,
@@ -126,11 +123,15 @@ describe("useLocationChecksPresenter", () => {
       "Switch to Enforce",
     ]);
     act(() => result.current.view.mode.options[1].onSelect());
-    expect(result.current.view.mode.pending?.text).toMatch(/Switch the country check to Enforce\?/);
-    await act(async () => result.current.view.mode.pending?.confirm());
+    expect(result.current.dialog).toMatchObject({
+      title: "Switch the country check to Enforce?",
+      confirmLabel: "Switch",
+      destructive: true,
+    });
+    await act(async () => result.current.dialog?.confirm());
     await waitFor(() => expect(result.current.view.mode.current?.label).toBe("Enforce"));
     expect(service.setMode).toHaveBeenCalledWith("enforce");
-    expect(result.current.view.mode.pending).toBeNull();
+    expect(result.current.dialog).toBeNull();
   });
 
   it("shows other admins the mode, but not the switch", async () => {
@@ -151,10 +152,14 @@ describe("useLocationChecksPresenter", () => {
     expect(service.list).toHaveBeenLastCalledWith({
       before: "2026-11-02T10:15:00.000Z",
       decision: null,
+      limit: 50,
     });
     act(() => result.current.view.list.filter.onChange("refused"));
     expect(result.current.view.list.loading).toBe(true);
-    await waitFor(() => expect(service.list).toHaveBeenLastCalledWith({ decision: "refused" }));
+    expect(result.current.view.list.loadMore).toBeNull();
+    await waitFor(() =>
+      expect(service.list).toHaveBeenLastCalledWith({ decision: "refused", limit: 50 }),
+    );
   });
 
   it("loads nothing for someone who isn't an admin", () => {

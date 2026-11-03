@@ -36,6 +36,18 @@ describe("LocationSettingsService", () => {
     expect(limit).toHaveBeenCalledTimes(2);
   });
 
+  it("shares one read among requests that arrive while it runs", async () => {
+    const { db, limit } = dbWithMode("watch");
+    const settings = new LocationSettingsService(db);
+    const modes = await Promise.all([
+      settings.mode(1_000),
+      settings.mode(1_000),
+      settings.mode(1_000),
+    ]);
+    expect(modes).toEqual(["watch", "watch", "watch"]);
+    expect(limit).toHaveBeenCalledTimes(1);
+  });
+
   it("saves a switch, with who made it, and uses it at once", async () => {
     const { db, limit, values } = dbWithMode("watch");
     const settings = new LocationSettingsService(db);
