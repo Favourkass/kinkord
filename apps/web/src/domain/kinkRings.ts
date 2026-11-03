@@ -83,10 +83,38 @@ export interface RingPagePM<T> {
   items: T[];
   nextPage: number | null;
 }
+/** How many Kink Rings each Silver plan brings, as the founders set them. */
+export interface RingsPerPlanPM {
+  monthly: number;
+  yearly: number;
+}
+
+export interface RingSettingsPM {
+  rings: RingsPerPlanPM;
+  canEdit: boolean;
+  /** The most rings a plan can bring. */
+  max: number;
+}
+
+/** The founders' form as counts, or null unless each is a whole number from 0 to `max`. */
+export function ringCountsFrom(
+  form: { monthly: string; yearly: string },
+  max: number,
+): RingsPerPlanPM | null {
+  const read = (value: string) => (/^\d+$/.test(value.trim()) ? Number(value.trim()) : NaN);
+  const monthly = read(form.monthly);
+  const yearly = read(form.yearly);
+  return [monthly, yearly].every((n) => Number.isInteger(n) && n >= 0 && n <= max)
+    ? { monthly, yearly }
+    : null;
+}
+
 export interface RingInventoryPM {
   available: RingInventoryItemPM[];
   expired: RingPagePM<RingInventoryItemPM> & { total: number };
   history: RingPagePM<RingHistoryPM>;
+  /** Missing from an API that predates the founders' setting. */
+  perPlan?: RingsPerPlanPM;
 }
 export interface RingItemVM {
   id: string;
@@ -146,7 +174,8 @@ export interface RingGiftAssignment {
 }
 
 /** Moderation → Members → member: their rings as admins see them (GET /admin/members/:id/kink-rings). */
-export type AdminRingStatus = "unused" | "given" | "expired";
+/** "cancelled": an admin took it back before it was given. */
+export type AdminRingStatus = "unused" | "given" | "expired" | "cancelled";
 
 export interface AdminRingPersonPM {
   id: string;
@@ -155,7 +184,15 @@ export interface AdminRingPersonPM {
 }
 
 export interface MemberRingsPM {
-  counts: { total: number; unused: number; given: number; expired: number; received: number };
+  counts: {
+    total: number;
+    /** Their balance: rings they can still give. */
+    unused: number;
+    given: number;
+    expired: number;
+    cancelled: number;
+    received: number;
+  };
   batches: Array<{
     paymentId: string | null;
     period: "monthly" | "yearly" | null;
@@ -169,6 +206,8 @@ export interface MemberRingsPM {
       recipient: AdminRingPersonPM | null;
       recipientLeft: boolean;
       withNote: boolean;
+      /** An admin took back the month of Silver it gave. */
+      silverCancelled: boolean;
     }>;
   }>;
   received: Array<{
@@ -176,6 +215,7 @@ export interface MemberRingsPM {
     givenAt: string | null;
     giver: AdminRingPersonPM;
     withNote: boolean;
+    silverCancelled: boolean;
   }>;
 }
 
@@ -188,14 +228,20 @@ export interface MemberRingsLabels {
   givenTo: (who: string, date: string) => string;
   expires: (date: string) => string;
   expired: (date: string) => string;
+  cancelled: string;
   withNote: string;
+  silverCancelled: string;
   someoneGone: string;
+  thisMember: string;
   receivedFrom: (who: string, date: string) => string;
 }
 
 export interface MemberRingsVM {
   summary: string;
   empty: boolean;
+  /** They have rings left to give, which an admin can take back. */
+  canCancelUnused: boolean;
+  unused: number;
   batches: Array<{
     key: string;
     heading: string;
@@ -206,9 +252,11 @@ export interface MemberRingsVM {
       statusLabel: string;
       line: string;
       href: string | null;
+      /** Whose month of Silver cancelling would take back; null when there's none to take. */
+      cancelSilverOf: string | null;
     }>;
   }>;
-  received: Array<{ id: string; line: string; href: string | null }>;
+  received: Array<{ id: string; line: string; href: string | null; cancelSilverOf: string | null }>;
 }
 
 /** "@tega (Tega)", or whichever of the two exists. */
@@ -224,9 +272,12 @@ export function toMemberRingsVM(
   labels: MemberRingsLabels,
   hrefFor: (memberId: string) => string,
 ): MemberRingsVM {
+  const silver = (cancelled: boolean) => (cancelled ? ` · ${labels.silverCancelled}` : "");
   return {
     summary: labels.summary(pm.counts),
     empty: pm.counts.total === 0 && pm.counts.received === 0,
+    canCancelUnused: pm.counts.unused > 0,
+    unused: pm.counts.unused,
     batches: pm.batches.map((batch) => ({
       key: batch.paymentId ?? "kinkord",
       heading: batch.period
@@ -237,10 +288,14 @@ export function toMemberRingsVM(
         const note = ring.withNote ? ` · ${labels.withNote}` : "";
         const line =
           ring.status === "given"
-            ? labels.givenTo(who, ring.givenAt ? planDate(ring.givenAt) : "—") + note
-            : ring.status === "expired"
-              ? labels.expired(planDate(ring.expiresAt))
-              : labels.expires(planDate(ring.expiresAt));
+            ? labels.givenTo(who, ring.givenAt ? planDate(ring.givenAt) : "—") +
+              note +
+              silver(ring.silverCancelled)
+            : ring.status === "cancelled"
+              ? labels.cancelled
+              : ring.status === "expired"
+                ? labels.expired(planDate(ring.expiresAt))
+                : labels.expires(planDate(ring.expiresAt));
         return {
           id: ring.id,
           label: labels.ring(ring.seq),
@@ -248,6 +303,8 @@ export function toMemberRingsVM(
           statusLabel: labels.status[ring.status],
           line,
           href: ring.recipient ? hrefFor(ring.recipient.id) : null,
+          cancelSilverOf:
+            ring.status === "given" && ring.recipient && !ring.silverCancelled ? who : null,
         };
       }),
     })),
@@ -255,8 +312,10 @@ export function toMemberRingsVM(
       id: ring.id,
       line:
         labels.receivedFrom(personLabel(ring.giver), ring.givenAt ? planDate(ring.givenAt) : "—") +
-        (ring.withNote ? ` · ${labels.withNote}` : ""),
+        (ring.withNote ? ` · ${labels.withNote}` : "") +
+        silver(ring.silverCancelled),
       href: hrefFor(ring.giver.id),
+      cancelSilverOf: ring.silverCancelled ? null : labels.thisMember,
     })),
   };
 }

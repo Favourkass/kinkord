@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const get = vi.fn();
 const post = vi.fn();
+const put = vi.fn();
 vi.mock("./apiClient", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./apiClient")>()),
   api: {
     get: (...a: unknown[]) => get(...a),
     post: (...a: unknown[]) => post(...a),
+    put: (...a: unknown[]) => put(...a),
   },
 }));
 
@@ -128,5 +130,21 @@ describe("kinkRingsAdminApi", () => {
   it("reads a member's rings for their admin page", async () => {
     await kinkRingsAdminApi.forMember("u/1");
     expect(get).toHaveBeenCalledWith("/admin/members/u%2F1/kink-rings");
+  });
+
+  it("cancels a member's unused rings, or a ring's Silver, with the reason", async () => {
+    await kinkRingsAdminApi.cancelUnused("u/1", "Refunded");
+    expect(post).toHaveBeenCalledWith("/admin/members/u%2F1/kink-rings/cancel", {
+      reason: "Refunded",
+    });
+    await kinkRingsAdminApi.cancelSilver("r1", "Fraud");
+    expect(post).toHaveBeenCalledWith("/admin/kink-rings/r1/cancel-silver", { reason: "Fraud" });
+  });
+
+  it("reads and saves the rings each plan brings", async () => {
+    await kinkRingsAdminApi.settings();
+    expect(get).toHaveBeenCalledWith("/admin/kink-rings/settings");
+    await kinkRingsAdminApi.saveSettings({ monthly: 1, yearly: 6 });
+    expect(put).toHaveBeenCalledWith("/admin/kink-rings/settings", { monthly: 1, yearly: 6 });
   });
 });

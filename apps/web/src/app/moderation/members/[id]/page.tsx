@@ -75,6 +75,7 @@ export default function ModerationMemberPage() {
         onReopenVerification={p.onReopenVerification}
       />
       {c.dialog ? <ConfirmDialog dialog={c.dialog} /> : null}
+      {rings.dialog ? <ConfirmDialog dialog={rings.dialog} /> : null}
     </ModerationFrame>
   );
 }
