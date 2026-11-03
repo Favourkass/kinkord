@@ -44,3 +44,6 @@ infra/cdk.out/
 design/screenshots-*/
 design/**/mock/
 design/*.zip
+
+# IP data for the country check, downloaded by apps/api/scripts/fetch-ip-data.mjs
+apps/api/data/

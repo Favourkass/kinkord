@@ -9,6 +9,7 @@ export const MODERATION_COPY = {
     payments: "Payments",
     verification: "Verification",
     blocklist: "Block list",
+    location: "Location",
     admins: "Admins",
   },
   payments: {

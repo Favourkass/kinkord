@@ -57,6 +57,8 @@ const signUpSchema = z.object({
     .refine((values) => new Set(values).size === values.length, "Choose distinct genders.")
     .optional(),
   orientation: z.enum(ORIENTATIONS).nullish(),
+  /** The country check that lets this account in (location-check), spent on it. */
+  locationCheckId: z.string().uuid().nullish(),
   // Optional at signup; validate any supplied number using the Settings rule.
   phone: z
     .string()
@@ -105,10 +107,10 @@ export class AuthExtController {
     if (!parsed.success) {
       throw new BadRequestException(parsed.error.flatten().fieldErrors);
     }
-    const { email, password, displayName, username, ...about } = parsed.data;
+    const { email, password, displayName, username, locationCheckId, ...about } = parsed.data;
 
     const result = await this.signUp.signUpWithProfile(
-      { email, password, displayName, username },
+      { email, password, displayName, username, locationCheckId: locationCheckId ?? null },
       {
         country: about.country ?? null,
         state: about.state ?? null,

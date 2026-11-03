@@ -276,6 +276,30 @@ describe("useEditSectionPresenter", () => {
     vi.unstubAllGlobals();
   });
 
+  it("sends a country switch the location check hasn't confirmed to the check", async () => {
+    const fetch = vi.fn(async () => new Response(JSON.stringify([])));
+    vi.stubGlobal("fetch", fetch);
+    const { ApiError } = await import("@/services/apiClient");
+    apiPatch.mockRejectedValue(
+      new ApiError(403, {
+        code: "LOCATION_CHECK_NEEDED",
+        message: "Confirm you're in that country before switching to it.",
+      }),
+    );
+    const { result } = renderHook(() => useEditSectionPresenter("location"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const country = result.current.rows.findIndex((r) => r.key === "country");
+    act(() => result.current.rows[country].onClick?.());
+    act(() => result.current.editor?.onDraft({ kind: "single", value: "GH" }));
+    act(() => result.current.editor?.onSave());
+    await waitFor(() =>
+      expect(push).toHaveBeenCalledWith(
+        "/location-check?change=1&country=GH&next=%2Fprofile%2Fedit%2Flocation",
+      ),
+    );
+    vi.unstubAllGlobals();
+  });
+
   it("sends an expired session back to login", async () => {
     const { ApiError } = await import("@/services/apiClient");
     apiGet.mockRejectedValue(new ApiError(401, {}));

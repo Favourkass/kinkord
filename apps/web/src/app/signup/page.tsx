@@ -18,6 +18,7 @@ import MultiSelectField from "@/components/auth/MultiSelectField";
 import PhotoConfirmation from "@/components/profile/PhotoConfirmation";
 import AgePill from "@/components/ui/AgePill";
 import { ShieldCheckIcon } from "@/components/auth/AuthIcons";
+import LocationCheckPanel from "@/components/location/LocationCheckPanel";
 import { useSignupWizardPresenter } from "@/presenters/useSignupWizardPresenter";
 import { Routes } from "@/constants/Routes";
 import type { SignupField } from "@/domain/onboarding";
@@ -131,6 +132,12 @@ function SignupWizard() {
             </p>
             <div className="h-[2px] w-[80px] bg-kink-gold-bright lg:w-[160px]" />
           </section>
+        </SignupShell>
+      )}
+
+      {p.stage === "location" && (
+        <SignupShell step={p.step} onBack={p.backToCountry}>
+          <LocationCheckPanel {...p.locationStep} />
         </SignupShell>
       )}
 
