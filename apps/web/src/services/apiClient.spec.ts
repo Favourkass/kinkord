@@ -162,6 +162,34 @@ describe("members without a profile photo or cover", () => {
   });
 });
 
+describe("members whose country check is due", () => {
+  const due = () =>
+    errJson(403, {
+      code: "LOCATION_CHECK_REQUIRED",
+      message: "Confirm where you are to continue.",
+    });
+
+  it("are taken to the check, and brought back to where they were after", async () => {
+    const assign = vi.fn();
+    vi.stubGlobal("window", { location: { pathname: "/messages", search: "?c=7", assign } });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(due());
+    await expect(api.get("/chat/conversations")).rejects.toBeInstanceOf(ApiError);
+    expect(assign).toHaveBeenCalledWith("/location-check?next=%2Fmessages%3Fc%3D7");
+    vi.unstubAllGlobals();
+  });
+
+  it("are left alone on the check itself and during sign-up", async () => {
+    for (const pathname of ["/location-check", "/signup"]) {
+      const assign = vi.fn();
+      vi.stubGlobal("window", { location: { pathname, search: "", assign } });
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(due());
+      await expect(api.get("/notifications")).rejects.toBeInstanceOf(ApiError);
+      expect(assign).not.toHaveBeenCalled();
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
 describe("headers", () => {
   it("sends no content-type on a GET, so polling needs no CORS preflight", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(okJson([]));

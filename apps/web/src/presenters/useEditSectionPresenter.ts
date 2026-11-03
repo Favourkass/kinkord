@@ -16,6 +16,7 @@ import type {
   ProfileOptionsPM,
 } from "@/domain/profile";
 import { ApiError } from "@/services/apiClient";
+import { isLocationCheckNeeded } from "@/domain/locationCheck";
 import {
   buildEditRows,
   draftChanged,
@@ -180,6 +181,7 @@ export function useEditSectionPresenter(section: EditSectionKey) {
       return;
     }
     setEditor({ ...editor, saving: true, error: null });
+    const patch = editor.key === "username" ? null : patchFor(editor.key, editor.draft, profile);
     try {
       if (editor.key === "username") {
         const res = await profileApi.changeUsername(usernameFromDraft(editor.draft));
@@ -195,14 +197,20 @@ export function useEditSectionPresenter(section: EditSectionKey) {
               }
             : p,
         );
-      } else {
-        setProfile(await profileApi.update(patchFor(editor.key, editor.draft, profile)));
+      } else if (patch) {
+        setProfile(await profileApi.update(patch));
       }
       setEditor(null);
       setNotice(copy.saved);
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
         router.replace(Routes.login);
+        return;
+      }
+      // A new country is confirmed by a location check first, which saves it.
+      if (e instanceof ApiError && isLocationCheckNeeded(e.body)) {
+        const country = (patch as { country?: string | null } | null)?.country ?? null;
+        router.push(Routes.locationCheckChange(country, Routes.profileEditLocation));
         return;
       }
       const message = e instanceof ApiError ? fieldErrorMessage(e.body) : null;

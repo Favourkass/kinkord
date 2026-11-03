@@ -159,6 +159,7 @@ describe("AuthExtController", () => {
         password: "supersecret123",
         displayName: "Sir T",
         username: "tegamaxwell",
+        locationCheckId: null,
       },
       expect.objectContaining({ country: "NG", state: "Delta", phone: "+2348031234567" }),
       expect.any(Headers),
@@ -223,6 +224,25 @@ describe("AuthExtController", () => {
     const underage = new Date().toISOString().slice(0, 10);
     await expect(
       controller.signUpCombined(req, makeRes(), { ...validSignUp, dateOfBirth: underage }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(signUpWithProfile).not.toHaveBeenCalled();
+  });
+
+  it("passes the country check made at the start of sign-up to the service", async () => {
+    const { controller, signUpWithProfile } = makeController();
+    const locationCheckId = "4b8f3c8e-7a52-4f6e-9a39-0c6d2e1f5a77";
+    await controller.signUpCombined(req, makeRes(), { ...validSignUp, locationCheckId });
+    expect(signUpWithProfile).toHaveBeenCalledWith(
+      expect.objectContaining({ locationCheckId }),
+      expect.anything(),
+      expect.any(Headers),
+    );
+  });
+
+  it("refuses a check id that isn't one", async () => {
+    const { controller, signUpWithProfile } = makeController();
+    await expect(
+      controller.signUpCombined(req, makeRes(), { ...validSignUp, locationCheckId: "nope" }),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(signUpWithProfile).not.toHaveBeenCalled();
   });

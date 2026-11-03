@@ -49,6 +49,16 @@ vi.mock("@/services/verification.service", async (importOriginal) => ({
     verify: vi.fn(),
   },
 }));
+// The country check answers its mode at once (switched off unless a test says
+// otherwise), so step 1 knows whether to confirm the country next.
+const locationCheck = { mode: "off" as "off" | "watch" | "enforce", check: vi.fn(), skip: vi.fn() };
+vi.mock("@/services/locationCheck.service", () => ({
+  locationCheckService: {
+    mode: () => ({ then: (ok: (mode: string) => void) => ok(locationCheck.mode) }),
+    check: (...a: unknown[]) => locationCheck.check(...a),
+    skip: (...a: unknown[]) => locationCheck.skip(...a),
+  },
+}));
 vi.mock("@/services/apiClient", () => ({
   ApiError: class ApiError extends Error {},
   api: {

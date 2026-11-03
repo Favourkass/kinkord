@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { OTHER_AREA } from "@/services/signupLocation.service";
 import { useSignupWizardPresenter } from "./useSignupWizardPresenter";
@@ -29,6 +29,17 @@ vi.mock("@/services/apiClient", () => ({
     get: (...a: unknown[]) => get(...a),
   },
   uploadToPresignedUrl: vi.fn(async () => {}),
+}));
+
+// The country check answers its mode at once (switched off unless a test says
+// otherwise), so step 1 knows whether to confirm the country next.
+const locationCheck = { mode: "off" as "off" | "watch" | "enforce", check: vi.fn(), skip: vi.fn() };
+vi.mock("@/services/locationCheck.service", () => ({
+  locationCheckService: {
+    mode: () => ({ then: (ok: (mode: string) => void) => ok(locationCheck.mode) }),
+    check: (...a: unknown[]) => locationCheck.check(...a),
+    skip: (...a: unknown[]) => locationCheck.skip(...a),
+  },
 }));
 
 // Uploads skip the canvas work: the file goes up as it is.
@@ -382,6 +393,129 @@ describe("useSignupWizardPresenter", () => {
 
     expect(result.current.topError).toBe("Email already exists");
     expect(result.current.stage).toBe("account");
+  });
+
+  describe("confirming the country", () => {
+    const passed = {
+      id: "check-1",
+      decision: "approved",
+      hint: null,
+      enforced: true,
+      detectedCountry: "NG",
+    };
+    const reachLocationStep = (result: {
+      current: ReturnType<typeof useSignupWizardPresenter>;
+    }) => {
+      act(() => {
+        result.current.stepOne.setCountry("NG");
+        result.current.stepOne.setAgeAttested(true);
+        result.current.stepOne.setTermsAccepted(true);
+      });
+      act(() => result.current.stepOne.submit());
+    };
+
+    beforeEach(() => {
+      locationCheck.mode = "enforce";
+      locationCheck.check.mockReset();
+      locationCheck.skip.mockReset();
+    });
+    afterEach(() => {
+      locationCheck.mode = "off";
+    });
+
+    it("checks the chosen country before the account step, and spends the check on sign-up", async () => {
+      locationCheck.check.mockResolvedValue(passed);
+      post.mockReset().mockResolvedValue({});
+      const { result } = renderHook(() => useSignupWizardPresenter());
+      reachLocationStep(result);
+      expect(result.current.stage).toBe("location");
+      expect(result.current.step).toBe(1);
+      expect(result.current.locationStep.chose).toBe("You chose Nigeria.");
+      expect(result.current.locationStep.skip).toBeNull();
+
+      await act(async () => result.current.locationStep.share.onClick());
+      await waitFor(() => expect(result.current.stage).toBe("account"));
+      expect(locationCheck.check).toHaveBeenCalledWith("NG", { joining: true });
+
+      fillAccount(result);
+      fillAbout(result);
+      await act(() => result.current.submitCombinedStep());
+      expect(post).toHaveBeenCalledWith(
+        "/auth-ext/sign-up",
+        expect.objectContaining({ country: "NG", locationCheckId: "check-1" }),
+      );
+    });
+
+    it("on a mismatch, says so and goes back to step 1 with where they are chosen", async () => {
+      locationCheck.check.mockResolvedValue({
+        ...passed,
+        decision: "mismatch",
+        hint: "vpn",
+        detectedCountry: "GH",
+      });
+      const { result } = renderHook(() => useSignupWizardPresenter());
+      reachLocationStep(result);
+      await act(async () => result.current.locationStep.share.onClick());
+      await waitFor(() => expect(result.current.locationStep.problem).not.toBeNull());
+      expect(result.current.stage).toBe("location");
+      expect(result.current.locationStep.problem).toMatchObject({
+        message:
+          "⚠️ Your selected country does not match your current location. Please select the country where you are physically located and try again.",
+        hint: "If you're using a VPN or proxy, turn it off and try again.",
+      });
+      act(() => result.current.locationStep.problem?.change?.onClick());
+      expect(result.current.stage).toBe("country");
+      expect(result.current.stepOne.country).toBe("GH");
+    });
+
+    it("asks to allow location when the browser was refused it", async () => {
+      locationCheck.check.mockResolvedValue({
+        ...passed,
+        decision: "retry",
+        hint: "allow-location",
+        detectedCountry: null,
+      });
+      const { result } = renderHook(() => useSignupWizardPresenter());
+      reachLocationStep(result);
+      await act(async () => result.current.locationStep.share.onClick());
+      await waitFor(() =>
+        expect(result.current.locationStep.problem?.message).toMatch(/Allow location/),
+      );
+      expect(result.current.locationStep.share.label).toBe("Try again");
+    });
+
+    it("returns to the check when the server says it has expired", async () => {
+      locationCheck.check.mockResolvedValue(passed);
+      const { ApiError } = await import("@/services/apiClient");
+      post.mockReset().mockRejectedValue(new ApiError(403, { code: "LOCATION_CHECK_REQUIRED" }));
+      const { result } = renderHook(() => useSignupWizardPresenter());
+      reachLocationStep(result);
+      await act(async () => result.current.locationStep.share.onClick());
+      await waitFor(() => expect(result.current.stage).toBe("account"));
+      fillAccount(result);
+      fillAbout(result);
+      await act(() => result.current.submitCombinedStep());
+      expect(result.current.stage).toBe("location");
+      expect(result.current.locationStep.notice).toBe(
+        "That check has expired. Confirm where you are again.",
+      );
+    });
+
+    it("watching, offers Not now and lets them on", async () => {
+      locationCheck.mode = "watch";
+      locationCheck.skip.mockResolvedValue({
+        ...passed,
+        id: "check-2",
+        decision: "skipped",
+        enforced: false,
+      });
+      const { result } = renderHook(() => useSignupWizardPresenter());
+      reachLocationStep(result);
+      expect(result.current.locationStep.skip?.label).toBe("Not now");
+      await act(async () => result.current.locationStep.skip?.onClick());
+      await waitFor(() => expect(result.current.stage).toBe("account"));
+      expect(locationCheck.skip).toHaveBeenCalledWith("NG", { joining: true });
+    });
   });
 
   it("refuses to complete the profile without both images and confirmations", async () => {

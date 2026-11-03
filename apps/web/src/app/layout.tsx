@@ -3,6 +3,7 @@ import { SEO_COPY, SITE_URL } from "@/constants/seo";
 import { Playfair_Display, Inter } from "next/font/google";
 import { themeInitScript } from "@/util/theme";
 import { pwaInitScript } from "@/util/pwaInit";
+import { LocationCheckWatcher } from "./LocationCheckWatcher";
 import { PwaWrapper } from "./PwaWrapper";
 import "./globals.css";
 
@@ -76,6 +77,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <script dangerouslySetInnerHTML={{ __html: pwaInitScript }} />
         {children}
         <PwaWrapper />
+        <LocationCheckWatcher />
       </body>
     </html>
   );
