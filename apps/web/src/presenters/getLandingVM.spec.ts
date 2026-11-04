@@ -16,32 +16,37 @@ describe("getLandingVM", () => {
   });
 
   it("points the auth CTAs at the signup and login routes", () => {
-    expect(vm.signUp).toEqual({ label: "SIGN UP", href: Routes.signup });
-    expect(vm.signIn).toEqual({ label: "LOGIN", href: Routes.login });
+    expect(vm.signUp).toEqual({ label: "Sign Up", href: Routes.signup });
+    expect(vm.signIn).toEqual({ label: "Log In", href: Routes.login });
     expect(vm.downloadCta.href).toBe(Routes.signup);
   });
 
   it("links the secondary navigation to kinkopedia, about and contact", () => {
     expect(vm.navLinks).toEqual([
-      { label: "KINKOPEDIA", href: Routes.kinkopedia },
-      { label: "ABOUT KINKORD", href: Routes.about },
-      { label: "CONTACT US", href: Routes.contact },
+      { label: "Kinkopedia", href: Routes.kinkopedia, emoji: "📖" },
+      { label: "About Kinkord", href: Routes.about, emoji: "i" },
+      { label: "Contact Us", href: Routes.contact, emoji: "✉️" },
     ]);
   });
 
   it("serves the redesign assets from public/brand", () => {
-    expect(vm.logo.src).toBe("/brand/logo-badge.png");
-    // Light enough for slow networks: WebP, the artwork cropped to what shows.
+    expect(vm.logo.src).toBe("/brand/kinkord-circle-k.webp");
+    // The supplied artwork keeps its original aspect ratio and an accessible description.
     expect(vm.hero).toMatchObject({
-      src: "/brand/landing-connections.webp",
+      src: "/brand/landing-gold-accessories.webp",
       width: 1080,
-      height: 625,
+      height: 608,
     });
     expect(vm.wordmark.src).toBe("/brand/kinkord-mask-wordmark.webp");
     expect(vm.headerTagline).toBe("THE WORLD’S KINK COMMUNITY");
     expect(vm.audienceStatement).toBe(
       "The Global Social Network for Kinksters, Fetishists & BDSM Enthusiasts.",
     );
+    expect(vm.audienceLines.map((line) => line.text).join(" ")).toBe(vm.audienceStatement);
+    expect(vm.audienceLines.filter((line) => line.highlight).map((line) => line.text)).toEqual([
+      "The Global Social Network",
+      "for Kinksters, Fetishists & BDSM Enthusiasts.",
+    ]);
     expect(vm.logo.alt).not.toHaveLength(0);
     expect(vm.hero.alt).not.toHaveLength(0);
   });
@@ -63,21 +68,19 @@ describe("getLandingVM", () => {
     expect(vm.joinAgeDisclaimer).toBe("You must be 18 years or older to join.");
   });
 
-  it("exposes the 12 footer tiles for the footer buttons", () => {
-    expect(vm.policyLinks).toHaveLength(12);
+  it("exposes the 10 footer links for the footer buttons", () => {
+    expect(vm.policyLinks).toHaveLength(10);
     expect(vm.policyLinks.map((p) => p.label)).toEqual([
-      "Privacy Policy",
-      "Terms of Service",
-      "Community Guidelines",
-      "Cookie Policy",
-      "Safety & Reporting",
-      "Copyright Policy",
-      "Invest in Kinkord",
-      "Kinkord on WhatsApp",
-      "Marketplace",
-      "Events",
+      "Trust & Safety",
+      "Governance & Transparency",
+      "Legal & Policies",
+      "Investors Portal",
       "Join Our Team",
       "Advertising",
+      "Marketplace",
+      "Events",
+      "Kinkord on WhatsApp",
+      "Help",
     ]);
     expect(vm.allRightsReserved).toBe("All rights reserved.");
   });

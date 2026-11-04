@@ -17,7 +17,8 @@ describe("web app manifest", () => {
 
   it("only lists icons that exist", () => {
     for (const icon of icons) {
-      expect(existsSync(join(process.cwd(), "public", icon.src)), icon.src).toBe(true);
+      const pathname = new URL(icon.src, "https://kinkord.com").pathname;
+      expect(existsSync(join(process.cwd(), "public", pathname)), icon.src).toBe(true);
     }
   });
 });

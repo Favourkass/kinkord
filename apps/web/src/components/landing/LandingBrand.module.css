@@ -52,31 +52,104 @@
   font-variant-emoji: emoji;
 }
 
-/* A live 18+ label sits where the artwork fades into the page. */
-.ageSeal {
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  display: grid;
-  width: clamp(28px, 5.8vw, 42px);
-  aspect-ratio: 1;
-  place-items: center;
-  transform: translate(-50%, 15%);
-  border: 3px solid #e9404d;
-  border-radius: 50%;
-  background: #101010;
-  box-shadow:
-    0 0 0 2px #3b191b,
-    inset 0 0 4px #fff8,
-    0 0 9px #e9404d55;
-  color: white;
-  font-size: clamp(12px, 2.5vw, 18px);
-  font-weight: 800;
-  line-height: 1;
-}
-
 .community {
   background:
     radial-gradient(ellipse at 100% 36%, #a6650712, transparent 35%),
     radial-gradient(ellipse at 0% 50%, #a665070d, transparent 30%);
+}
+
+/* Blend the supplied artwork into the page beneath the live headline. */
+.maskHero {
+  position: relative;
+  min-height: clamp(330px, 82vw, 500px);
+  overflow: hidden;
+  isolation: isolate;
+  background: #000;
+}
+.maskArtwork {
+  position: absolute;
+  z-index: -1;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: auto;
+}
+.maskArtwork {
+  -webkit-mask-image:
+    linear-gradient(to bottom, transparent, #000 16%, #000 76%, transparent),
+    linear-gradient(to right, transparent, #000 10%, #000 85%, transparent);
+  mask-image:
+    linear-gradient(to bottom, transparent, #000 16%, #000 76%, transparent),
+    linear-gradient(to right, transparent, #000 10%, #000 85%, transparent);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+.footerEmoji {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 28px;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-size: 25px;
+  line-height: 1;
+}
+.goldEmoji {
+  filter: grayscale(1) sepia(1) saturate(3) hue-rotate(3deg) brightness(0.9);
+}
+.goldMedallion,
+.whatsappMedallion {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 25px;
+  height: 25px;
+  border: 2px solid #ffdc55;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 25%, #fff5ab, #ffc51b 35%, #ab6200 80%);
+  box-shadow:
+    inset 0 0 0 1px #8b5000,
+    0 1px 2px #000;
+  color: #fff3a5;
+  font-family: Georgia, serif;
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: 0 1px 1px #754100;
+}
+.whatsappMedallion {
+  background: radial-gradient(circle at 35% 25%, #70e37d, #169a45 60%, #075b2a);
+  color: #ffe373;
+}
+.heroHeadline {
+  position: relative;
+  margin: 0 auto;
+  padding: 24px 12px 0;
+  color: #fff;
+  text-align: center;
+  font-family: var(--font-sora), sans-serif;
+  font-size: clamp(12px, 3.9vw, 24px);
+  font-weight: 800;
+  line-height: 1.65;
+  letter-spacing: -0.035em;
+  text-shadow: 0 2px 12px #000;
+}
+@media (min-width: 640px) {
+  .maskHero {
+    min-height: clamp(420px, 52vw, 580px);
+  }
+  .maskArtwork {
+    width: 100%;
+    height: calc(100% - 136px);
+    object-fit: contain;
+    object-position: center bottom;
+  }
+  .heroHeadline {
+    width: 100%;
+    padding: 24px 20px 0;
+    font-size: clamp(16px, 2.5vw, 28px);
+    line-height: 1.7;
+  }
 }
