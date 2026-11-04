@@ -1,7 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 import { alias, PgDialect } from "drizzle-orm/pg-core";
 import { staff, user } from "../db/schema";
-import { adminUserIds, founderAccount, isAdmin, isBanned, isSuperAdmin, notBanned } from "./admins";
+import {
+  adminUserIds,
+  FIXED_TEAM_TITLES,
+  fixedTeamAccount,
+  fixedTeamTitle,
+  founderAccount,
+  isAdmin,
+  isBanned,
+  isSuperAdmin,
+  notBanned,
+} from "./admins";
 
 /** A client whose single select resolves to `result`. */
 function answering(result: unknown[]) {
@@ -91,5 +101,27 @@ describe("notBanned", () => {
     const { sql } = new PgDialect().sqlToQuery(notBanned(user.id));
     expect(sql).toContain('not exists (select 1 from "member_ban"');
     expect(sql).toContain('"member_ban"."user_id" = "user"."id"');
+  });
+});
+
+describe("fixedTeamTitle", () => {
+  const [email] = Object.keys(FIXED_TEAM_TITLES);
+
+  it("gives the fixed role to that account's verified email, in any case", () => {
+    expect(fixedTeamTitle({ email: ` ${email.toUpperCase()} `, emailVerified: true })).toBe(
+      "Chief Software Engineer",
+    );
+  });
+
+  it("gives none to an unverified copy of the email, or to anyone else", () => {
+    expect(fixedTeamTitle({ email, emailVerified: false })).toBeNull();
+    expect(fixedTeamTitle({ email: "someone@example.com", emailVerified: true })).toBeNull();
+  });
+
+  it("matches the same accounts in SQL", () => {
+    const query = new PgDialect().sqlToQuery(fixedTeamAccount(user));
+    expect(query.sql).toContain('lower("user"."email") in');
+    expect(query.sql).toContain('"user"."email_verified" =');
+    expect(query.params).toEqual([...Object.keys(FIXED_TEAM_TITLES), true]);
   });
 });

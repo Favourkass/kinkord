@@ -15,6 +15,7 @@ import {
 import type { PostsService } from "../posts/posts.service";
 import type { StorageService } from "../storage/storage.service";
 import { FOUNDER_SILVER_UNTIL } from "../subscriptions/plans";
+import { FIXED_TEAM_TITLES } from "./admins";
 import { containsPattern, ModerationService, normalizeRuleValue } from "./moderation.service";
 
 /**
@@ -516,8 +517,10 @@ describe("ModerationService team badge", () => {
         insert: vi.fn(() => ({ values })),
       };
       const transaction = vi.fn((fn) => fn(tx));
+      // Whose account it is: an ordinary member's, with no fixed place on Meet the Team.
+      const account = { from: () => account, where: () => account, limit: async () => [] };
       const service = new ModerationService(
-        { transaction } as never,
+        { transaction, select: () => account } as never,
         {} as never,
         {} as never,
         {} as never,
@@ -552,6 +555,25 @@ describe("ModerationService team badge", () => {
     );
     await expect(service.setTeamBadge("admin", "absent", true)).rejects.toThrow(NotFoundException);
     expect(tx.insert).not.toHaveBeenCalled();
+  });
+  it("keeps the badge of an account with a fixed place on Meet the Team", async () => {
+    const [email] = Object.keys(FIXED_TEAM_TITLES);
+    const account = {
+      from: () => account,
+      where: () => account,
+      limit: async () => [{ email, emailVerified: true }],
+    };
+    const transaction = vi.fn();
+    const service = new ModerationService(
+      { transaction, select: () => account } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+    await expect(service.setTeamBadge("admin", "favour", false)).rejects.toThrow(
+      "fixed place on Meet the Team",
+    );
+    expect(transaction).not.toHaveBeenCalled();
   });
 });
 
