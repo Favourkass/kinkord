@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ConflictException, NotFoundException } from "@nestjs/common";
 import { type Db } from "../db/db.module";
 import { moderationLog, profile } from "../db/schema";
+import { FIXED_TEAM_TITLES } from "../moderation/admins";
 import { type StorageService } from "../storage/storage.service";
 import { TeamPageService } from "./team-page.service";
 
@@ -138,5 +139,50 @@ describe("TeamPageService.remove", () => {
     const { service, values } = fake();
     await expect(service.remove("f1", "u7")).rejects.toThrow(NotFoundException);
     expect(values).not.toHaveBeenCalled();
+  });
+});
+
+describe("TeamPageService fixed places", () => {
+  const [email] = Object.keys(FIXED_TEAM_TITLES);
+
+  it("gives a fixed account its badge and role, first on the page, at start", async () => {
+    const set = vi.fn(() => ({ where: async () => undefined }));
+    const pick = {
+      from: () => pick,
+      where: async () => [{ id: "f1", email: email.toUpperCase() }],
+    };
+    const db = { select: () => pick, update: vi.fn(() => ({ set })) } as unknown as Db;
+    await new TeamPageService(db, {} as StorageService).placeFixedTeam();
+    expect(db.update).toHaveBeenCalledWith(profile);
+    expect(set).toHaveBeenCalledWith({
+      teamMember: true,
+      teamTitle: FIXED_TEAM_TITLES[email],
+      teamTitleAt: new Date(0),
+    });
+  });
+
+  it("never stops the API starting", async () => {
+    const db = {
+      select: () => {
+        throw new Error("db down");
+      },
+    } as unknown as Db;
+    await expect(new TeamPageService(db, {} as StorageService).placeFixedTeam()).resolves.toBe(
+      undefined,
+    );
+  });
+
+  it("won't change a fixed account's role", async () => {
+    const { service, tx } = fake([{ id: "f1", hasProfile: "f1", email, emailVerified: true }]);
+    await expect(service.setTitle("f2", "favour", "Intern")).rejects.toThrow(
+      "fixed and can't be changed here",
+    );
+    expect(tx.update).not.toHaveBeenCalled();
+  });
+
+  it("won't take a fixed account off the page", async () => {
+    const { service, tx } = fake([{ email, emailVerified: true }]);
+    await expect(service.remove("f2", "f1")).rejects.toThrow(ConflictException);
+    expect(tx.update).not.toHaveBeenCalled();
   });
 });

@@ -65,6 +65,11 @@ Meet the Team (`/about/team`, API `GET /team`) is open to anyone, signed in or n
 - **Adding someone** gives them the Kinkord Team badge.
 - **Removing someone** takes them off the page, and so does taking the badge away on their member page.
 - **Blocked members** are left off the page, whatever their role.
+- **Fixed places:** an account in `FIXED_TEAM_TITLES` (`apps/api/src/moderation/admins.ts`, matched by verified email the way founders are) keeps its badge and role whatever happens.
+  - The API sets them again on every start, and shows the account first.
+  - The admin Team page doesn't list it.
+  - The Team page, and the badge button on the member page, refuse to change it.
+  - Only a code change can move or remove it.
 
 ## Not available yet
 

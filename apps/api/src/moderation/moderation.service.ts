@@ -28,7 +28,7 @@ import { AVAILABLE_COUNTRIES } from "../members/members.service";
 import { PostsService } from "../posts/posts.service";
 import { IMAGE_VARIANTS, StorageService, variantKey } from "../storage/storage.service";
 import { giveSilver, silverGiven, takeBackSilver } from "../subscriptions/given-silver";
-import { founderAccount, isAdmin, isBanned, isSuperAdmin } from "./admins";
+import { fixedTeamTitle, founderAccount, isAdmin, isBanned, isSuperAdmin } from "./admins";
 import { normalizeEmail, normalizeIp, normalizePhone } from "./signup-rules";
 
 /**
@@ -363,6 +363,18 @@ export class ModerationService {
    * Taking it away takes them off Meet the Team too.
    */
   async setTeamBadge(actorId: string, id: string, enabled: boolean) {
+    if (!enabled) {
+      const [account] = await this.db
+        .select({ email: user.email, emailVerified: user.emailVerified })
+        .from(user)
+        .where(eq(user.id, id))
+        .limit(1);
+      if (account && fixedTeamTitle(account)) {
+        throw new ConflictException(
+          "Their Kinkord Team badge comes with a fixed place on Meet the Team.",
+        );
+      }
+    }
     return this.db.transaction(async (tx) => {
       const [row] = await tx
         .update(profile)

@@ -43,6 +43,29 @@ export function founderAccount(u: { email: AnyColumn; emailVerified: AnyColumn }
   return and(inArray(sql`lower(${u.email})`, SUPER_ADMIN_EMAILS), eq(u.emailVerified, true))!;
 }
 
+/**
+ * Places on Meet the Team that come with an account, by its verified email,
+ * the way admin access comes with a founder's. The API sets the badge and the
+ * role every time it starts, the admin Team page doesn't list them, and no
+ * admin screen can change or remove them (Favour, 2026-11-04).
+ */
+export const FIXED_TEAM_TITLES: Readonly<Record<string, string>> = {
+  "nnabuekassidy@gmail.com": "Chief Software Engineer",
+};
+
+/** SQL: the account has a fixed place on Meet the Team. */
+export function fixedTeamAccount(u: { email: AnyColumn; emailVerified: AnyColumn }): SQL {
+  return and(
+    inArray(sql`lower(${u.email})`, Object.keys(FIXED_TEAM_TITLES)),
+    eq(u.emailVerified, true),
+  )!;
+}
+
+/** The fixed role for this account, or null for anyone else. */
+export function fixedTeamTitle(who: { email: string; emailVerified: boolean }): string | null {
+  return (who.emailVerified && FIXED_TEAM_TITLES[who.email.trim().toLowerCase()]) || null;
+}
+
 /** The founders' accounts, with what isSuperAdmin needs. */
 export function founderAccounts(db: Db): Promise<AdminCandidate[]> {
   return db
