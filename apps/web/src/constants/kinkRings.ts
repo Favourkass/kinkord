@@ -98,8 +98,14 @@ export const RING_FLOW_COPY = {
   info: "About Kink Rings",
   close: "Close",
   details: "Ring details",
-  infoText:
-    "Every ring gives someone one month of Silver. Monthly Silver includes one ring; yearly Silver includes twelve, expiring one month apart. Unused rings expire on their listed dates. Gifting history shows each recipient’s current Silver status.",
+  /** `perPlan`: how many rings each plan brings now, from the API; null while it loads. */
+  infoText: (perPlan: { monthly: number; yearly: number } | null) => {
+    const count = (n: number) => (n === 0 ? "no rings" : n === 1 ? "one ring" : `${n} rings`);
+    const plans = perPlan
+      ? ` Monthly Silver includes ${count(perPlan.monthly)}; yearly Silver includes ${count(perPlan.yearly)}, expiring one month apart.`
+      : "";
+    return `Every ring gives someone one month of Silver.${plans} Unused rings expire on their listed dates. Gifting history shows each recipient’s current Silver status.`;
+  },
   max: "You can select up to 50 rings per gift.",
   maxRecipients: "Select more rings to add another recipient.",
   error: "Could not send the rings. Your selection is saved; retry to check the same gift safely.",

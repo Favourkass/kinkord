@@ -10,6 +10,7 @@ import { DbModule } from "./db/db.module";
 import { EmailModule } from "./email/email.module";
 import { HealthController } from "./health/health.controller";
 import { HealthService } from "./health/health.service";
+import { LocationCheckModule } from "./location-check/location-check.module";
 import { MembersModule } from "./members/members.module";
 import { RelationshipsModule } from "./relationships/relationships.module";
 import { MessagingModule } from "./messaging/messaging.module";
@@ -30,6 +31,7 @@ import { VerificationModule } from "./verification/verification.module";
     EmailModule,
     ModerationModule,
     PresenceModule,
+    LocationCheckModule,
     AuthModule,
     MessagingModule,
     StorageModule,

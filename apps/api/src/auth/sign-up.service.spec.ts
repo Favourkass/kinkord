@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { ForbiddenException, InternalServerErrorException } from "@nestjs/common";
 import { type Db } from "../db/db.module";
+import type { LocationCheckService, SignupClaim } from "../location-check/location-check.service";
 import type { SignupGuardService } from "../moderation/signup-guard.service";
 import { type Auth } from "./auth.instance";
 import { SignUpService } from "./sign-up.service";
@@ -21,10 +22,14 @@ const fields = {
   phone: "+2348031234567",
 };
 
+const claim: SignupClaim = { id: "check-1", decision: "approved", country: "NG", ipCountry: "NG" };
+
 const make = (opts: {
   signUpResponse: Response;
   updateThrows?: boolean;
   verdict?: "allow" | "block" | "flag";
+  /** What the country check says about this sign-up; by default it may go ahead, with no check to spend. */
+  location?: { allowed: boolean; claim: SignupClaim | null };
 }) => {
   const setWhere = opts.updateThrows
     ? vi.fn().mockRejectedValue(new Error("db down"))
@@ -45,14 +50,25 @@ const make = (opts: {
   const auth = { api: { signUpEmail } } as unknown as Auth;
   const review = vi.fn().mockResolvedValue({ action: opts.verdict ?? "allow", matches: [] });
   const guard = { review } as unknown as SignupGuardService;
+  const claimForSignup = vi.fn().mockResolvedValue(opts.location ?? { allowed: true, claim: null });
+  const releaseSignupClaim = vi.fn().mockResolvedValue(undefined);
+  const attachSignupClaim = vi.fn().mockResolvedValue(undefined);
+  const locationChecks = {
+    claimForSignup,
+    releaseSignupClaim,
+    attachSignupClaim,
+  } as unknown as LocationCheckService;
   return {
-    service: new SignUpService(db, auth, guard),
+    service: new SignUpService(db, auth, guard, locationChecks),
     update,
     set,
     del,
     deleteWhere,
     signUpEmail,
     review,
+    claimForSignup,
+    releaseSignupClaim,
+    attachSignupClaim,
   };
 };
 
@@ -170,4 +186,94 @@ it("stores the selected sexuality for Kenya", async () => {
   });
   await service.signUpWithProfile(account, { ...fields, country: "KE" }, new Headers());
   expect(set).toHaveBeenCalledWith({ ...fields, country: "KE", genders: ["Male"] });
+});
+
+describe("SignUpService country check", () => {
+  const created = () => new Response(JSON.stringify({ user: { id: "u1" } }));
+
+  it("refuses an account whose country hasn't passed a check, before creating anything", async () => {
+    const { service, signUpEmail } = make({
+      signUpResponse: created(),
+      location: { allowed: false, claim: null },
+    });
+    const err = await service
+      .signUpWithProfile({ ...account, locationCheckId: "check-1" }, fields, new Headers())
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ForbiddenException);
+    expect((err as ForbiddenException).getResponse()).toMatchObject({
+      code: "LOCATION_CHECK_REQUIRED",
+    });
+    expect(signUpEmail).not.toHaveBeenCalled();
+  });
+
+  it("spends the check on the new account", async () => {
+    const { service, claimForSignup, attachSignupClaim, releaseSignupClaim } = make({
+      signUpResponse: created(),
+      location: { allowed: true, claim },
+    });
+    await service.signUpWithProfile(
+      { ...account, locationCheckId: "check-1" },
+      fields,
+      new Headers(),
+    );
+    expect(claimForSignup).toHaveBeenCalledWith("check-1", "NG");
+    expect(attachSignupClaim).toHaveBeenCalledWith(claim, "u1");
+    expect(releaseSignupClaim).not.toHaveBeenCalled();
+  });
+
+  it("gives the check back when Better Auth refuses the account", async () => {
+    const { service, attachSignupClaim, releaseSignupClaim } = make({
+      signUpResponse: new Response(JSON.stringify({ code: "USER_ALREADY_EXISTS" }), {
+        status: 422,
+      }),
+      location: { allowed: true, claim },
+    });
+    const result = await service.signUpWithProfile(
+      { ...account, locationCheckId: "check-1" },
+      fields,
+      new Headers(),
+    );
+    expect(result.status).toBe(422);
+    expect(releaseSignupClaim).toHaveBeenCalledWith(claim);
+    expect(attachSignupClaim).not.toHaveBeenCalled();
+  });
+
+  it("gives the check back when the account is rolled back", async () => {
+    const { service, releaseSignupClaim } = make({
+      signUpResponse: created(),
+      updateThrows: true,
+      location: { allowed: true, claim },
+    });
+    await expect(
+      service.signUpWithProfile({ ...account, locationCheckId: "check-1" }, fields, new Headers()),
+    ).rejects.toThrow(InternalServerErrorException);
+    expect(releaseSignupClaim).toHaveBeenCalledWith(claim);
+  });
+
+  it("still creates the account when linking the check fails", async () => {
+    const { service, attachSignupClaim } = make({
+      signUpResponse: created(),
+      location: { allowed: true, claim },
+    });
+    attachSignupClaim.mockRejectedValueOnce(new Error("db blip"));
+    const result = await service.signUpWithProfile(
+      { ...account, locationCheckId: "check-1" },
+      fields,
+      new Headers(),
+    );
+    expect(result.status).toBe(200);
+  });
+
+  it("gives the check back when Better Auth throws, and still shows the real error", async () => {
+    const { service, signUpEmail, releaseSignupClaim } = make({
+      signUpResponse: new Response("{}"),
+      location: { allowed: true, claim },
+    });
+    signUpEmail.mockRejectedValueOnce(new Error("hook failed"));
+    releaseSignupClaim.mockRejectedValueOnce(new Error("db blip"));
+    await expect(
+      service.signUpWithProfile({ ...account, locationCheckId: "check-1" }, fields, new Headers()),
+    ).rejects.toThrow("hook failed");
+    expect(releaseSignupClaim).toHaveBeenCalledWith(claim);
+  });
 });

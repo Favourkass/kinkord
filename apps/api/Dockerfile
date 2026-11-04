@@ -17,6 +17,12 @@ COPY apps/api apps/api
 RUN pnpm --filter api build && pnpm --filter api deploy --prod --legacy /out \
   && cp -r apps/api/dist /out/dist \
   && cp -r apps/api/drizzle /out/drizzle
+# The country check's IP data (DB-IP Lite, CC BY 4.0), fresh with every image.
+# Best effort: if DB-IP can't be reached, the API fetches it when it starts,
+# so an outage there never blocks a deploy.
+RUN mkdir -p /out/data/ip && \
+  if node apps/api/scripts/fetch-ip-data.mjs; then cp apps/api/data/ip/*.mmdb /out/data/ip/; \
+  else echo "IP data not fetched at build; the API fetches it when it starts"; fi
 
 # Runtime stage
 FROM node:22-alpine

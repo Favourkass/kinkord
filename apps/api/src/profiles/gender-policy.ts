@@ -3,6 +3,21 @@ import { GENDERS } from "./profile-options";
 export const canonicalGender = (value: string): string =>
   GENDERS.find((option) => option.toLowerCase() === value.trim().toLowerCase()) ?? value.trim();
 
+/** Nigeria offers Male and Female only; an unknown country is treated as Nigeria. */
+const binaryOnly = (country: string | null | undefined): boolean =>
+  ["NG", "NIGERIA"].includes(country?.trim().toUpperCase() ?? "NG");
+
+/** The genders a member keeps on moving to `country`, dropping any it doesn't offer. */
+export function gendersAllowedIn(
+  country: string | null | undefined,
+  values: readonly string[],
+): string[] {
+  const genders = values.map(canonicalGender);
+  return binaryOnly(country)
+    ? genders.filter((value) => value === "Male" || value === "Female")
+    : genders;
+}
+
 /** Keep the existing primary value for older discovery and verification consumers. */
 export function genderSelectionChanges(
   country: string | null | undefined,
@@ -16,10 +31,7 @@ export function genderSelectionChanges(
     genders.some((value) => !(GENDERS as readonly string[]).includes(value))
   )
     throw new Error("Choose up to 5 distinct genders from the list.");
-  if (
-    ["NG", "NIGERIA"].includes(country?.trim().toUpperCase() ?? "NG") &&
-    genders.some((value) => value !== "Male" && value !== "Female")
-  )
+  if (binaryOnly(country) && genders.some((value) => value !== "Male" && value !== "Female"))
     throw new Error("Only Male and Female are available for Nigeria.");
   const gender =
     previousGender && genders.includes(canonicalGender(previousGender))

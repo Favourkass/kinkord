@@ -14,7 +14,7 @@ import { containsPattern } from "../push/notifications.service";
 import { PushService } from "../push/push.service";
 import { StorageService } from "../storage/storage.service";
 import type { AdminPaymentDto, PaymentSettingsDto, PaymentSettingsInput } from "./dto";
-import { ringsFor } from "./kink-rings";
+import { RINGS_FOR, ringsFor } from "./kink-rings";
 import { addSilverTime } from "./silver-time";
 import { expireAbandoned, readSettings, toPaymentDto } from "./subscriptions.service";
 
@@ -123,18 +123,21 @@ export class PaymentsService {
       const until = await addSilverTime(tx, row.userId, row.plan, row.period, now, {
         clearHeldCheck: true,
       });
-      // Kink Rings to give away: one for a month, twelve for a year.
-      await tx
-        .insert(kinkRing)
-        .values(
-          ringsFor(row.period, now).map((r) => ({
-            ownerId: row.userId,
-            paymentId: row.id,
-            seq: r.seq,
-            expiresAt: r.expiresAt,
-          })),
-        )
-        .onConflictDoNothing();
+      // Kink Rings to give away: as many as the plan brought when they checked out.
+      const rings = ringsFor(row.rings ?? RINGS_FOR[row.period], now);
+      if (rings.length) {
+        await tx
+          .insert(kinkRing)
+          .values(
+            rings.map((r) => ({
+              ownerId: row.userId,
+              paymentId: row.id,
+              seq: r.seq,
+              expiresAt: r.expiresAt,
+            })),
+          )
+          .onConflictDoNothing();
+      }
       await tx.insert(moderationLog).values({
         actorId,
         action: "payment_verified",

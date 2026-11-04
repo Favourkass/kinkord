@@ -526,7 +526,10 @@ describe("ModerationService team badge", () => {
         teamMember: enabled,
       });
       expect(tx.update).toHaveBeenCalledExactlyOnceWith(profile);
-      expect(set).toHaveBeenCalledWith({ teamMember: enabled });
+      // Without the badge they come off Meet the Team as well.
+      expect(set).toHaveBeenCalledWith(
+        enabled ? { teamMember: true } : { teamMember: false, teamTitle: null, teamTitleAt: null },
+      );
       expect(tx.insert).toHaveBeenCalledExactlyOnceWith(moderationLog);
       expect(values).toHaveBeenCalledWith({
         actorId: "admin",

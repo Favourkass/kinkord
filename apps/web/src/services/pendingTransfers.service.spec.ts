@@ -57,6 +57,12 @@ describe("what a failed money request says", () => {
         new ApiError(403, { code: "PROFILE_PHOTOS_REQUIRED", message: "Add your photos" }),
       ),
     ).toBe("unread");
+    // The country check's hold turns a request away before the wallet reads it.
+    expect(
+      pending.failure(
+        new ApiError(403, { code: "LOCATION_CHECK_REQUIRED", message: "Confirm where you are" }),
+      ),
+    ).toBe("unread");
     expect(
       pending.failure(
         new ApiError(403, { code: "EMAIL_VERIFICATION_REQUIRED", message: "Verify your email" }),
