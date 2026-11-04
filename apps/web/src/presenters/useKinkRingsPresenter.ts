@@ -258,7 +258,7 @@ export function useKinkRingsPresenter() {
   return {
     stage,
     gifting: ["recipients", "selected", "allocation", "message", "review"].includes(stage),
-    copy,
+    copy: { ...copy, infoText: copy.infoText(pm?.perPlan ?? null) },
     loading: !pm && !error,
     error,
     onRetry: reload,

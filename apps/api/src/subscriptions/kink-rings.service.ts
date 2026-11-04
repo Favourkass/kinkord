@@ -167,6 +167,7 @@ export class KinkRingsService {
           givenAt: kinkRing.givenAt,
           giftMessage: kinkRing.giftMessage,
           expiresAt: kinkRing.expiresAt,
+          revokedAt: kinkRing.revokedAt,
         })
         .from(kinkRing)
         .where(
@@ -191,7 +192,7 @@ export class KinkRingsService {
           (r.giftMessage ?? "") === (assignment.find((a) => a.ringId === r.id)!.message ?? ""),
       );
       if (!replay) {
-        if (rings.some((r) => r.givenAt || r.expiresAt <= now))
+        if (rings.some((r) => r.givenAt || r.revokedAt || r.expiresAt <= now))
           throw new ConflictException(
             "Some selected rings were gifted or have expired. Refresh your inventory.",
           );
@@ -296,7 +297,12 @@ export class KinkRingsService {
   }
 }
 
-/** The member's rings not given yet and not expired. */
+/** The member's rings not given yet, not taken back by an admin and not expired. */
 function unspent(ownerId: string, now: Date): SQL[] {
-  return [eq(kinkRing.ownerId, ownerId), isNull(kinkRing.givenAt), gt(kinkRing.expiresAt, now)];
+  return [
+    eq(kinkRing.ownerId, ownerId),
+    isNull(kinkRing.givenAt),
+    isNull(kinkRing.revokedAt),
+    gt(kinkRing.expiresAt, now),
+  ];
 }

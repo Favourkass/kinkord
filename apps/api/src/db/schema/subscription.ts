@@ -53,6 +53,11 @@ export const subscriptionPayment = pgTable(
     accountName: text("account_name").notNull(),
     accountNumber: text("account_number").notNull(),
     status: text("status").$type<PaymentStatus>().notNull().default("pending"),
+    /**
+     * The Kink Rings the plan brought at checkout, given when it's confirmed.
+     * Null for payments from before the founders could set it.
+     */
+    rings: integer("rings"),
     /** The end of the countdown on the transfer screen. */
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     // What the member says they sent, and from where.

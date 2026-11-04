@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation";
 import ConfirmDialog from "@/components/moderation/ConfirmDialog";
 import MemberDetailView from "@/components/moderation/MemberDetailView";
+import MemberKinkRings from "@/components/moderation/MemberKinkRings";
 import MemberTeamBadge from "@/components/moderation/MemberTeamBadge";
 import MemberOrganization from "@/components/moderation/MemberOrganization";
 import MemberSilverCheck from "@/components/moderation/MemberSilverCheck";
@@ -10,12 +11,14 @@ import ModerationFrame from "@/components/moderation/ModerationFrame";
 import { MODERATION_COPY } from "@/constants/moderation";
 import { useAdminMemberCheckPresenter } from "@/presenters/useAdminMemberCheckPresenter";
 import { useAdminMemberPresenter } from "@/presenters/useAdminMemberPresenter";
+import { useAdminMemberRingsPresenter } from "@/presenters/useAdminMemberRingsPresenter";
 import { moderationTabs } from "../../tabs";
 
 export default function ModerationMemberPage() {
   const { id } = useParams<{ id: string }>();
   const p = useAdminMemberPresenter(id);
   const c = useAdminMemberCheckPresenter(id, p.isAdmin);
+  const rings = useAdminMemberRingsPresenter(id, p.isAdmin);
   const copy = MODERATION_COPY;
   return (
     <ModerationFrame
@@ -67,10 +70,12 @@ export default function ModerationMemberPage() {
             />
           ) : null
         }
+        kinkRings={p.vm ? <MemberKinkRings {...rings} /> : null}
         onRevokeVerification={p.onRevokeVerification}
         onReopenVerification={p.onReopenVerification}
       />
       {c.dialog ? <ConfirmDialog dialog={c.dialog} /> : null}
+      {rings.dialog ? <ConfirmDialog dialog={rings.dialog} /> : null}
     </ModerationFrame>
   );
 }
