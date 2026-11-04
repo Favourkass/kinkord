@@ -16,25 +16,25 @@ export default function manifest(): MetadataRoute.Manifest {
     categories: ["social", "lifestyle"],
     icons: [
       {
-        src: "/icons/icon-192x192.png",
+        src: "/icons/icon-192x192.png?v=gold-k-1",
         sizes: "192x192",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: "/icons/icon-512x512.png",
+        src: "/icons/icon-512x512.png?v=gold-k-1",
         sizes: "512x512",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: "/icons/icon-maskable-512x512.png",
+        src: "/icons/icon-maskable-512x512.png?v=gold-k-1",
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",
       },
       {
-        src: "/icons/icon.svg",
+        src: "/icons/icon.svg?v=gold-k-1",
         sizes: "512x512",
         type: "image/svg+xml",
       },

@@ -1,15 +1,15 @@
 // Kinkord Service Worker
-const CACHE_NAME = "kinkord-pwa-v6";
+const CACHE_NAME = "kinkord-pwa-v7-gold-k";
 const OFFLINE_URL = "/offline";
 
 const PRECACHE_ASSETS = [
   OFFLINE_URL,
-  "/icons/icon-192x192.png",
+  "/icons/icon-192x192.png?v=gold-k-1",
   "/icons/push-icon-v2.png",
   "/icons/badge-96x96.png",
-  "/icons/icon-512x512.png",
-  "/icons/icon-maskable-512x512.png",
-  "/icons/icon.svg",
+  "/icons/icon-512x512.png?v=gold-k-1",
+  "/icons/icon-maskable-512x512.png?v=gold-k-1",
+  "/icons/icon.svg?v=gold-k-1",
   "/brand/logo-badge.png",
   "/brand/logo.png",
   "/favicon.ico",
