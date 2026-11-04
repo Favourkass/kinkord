@@ -30,12 +30,12 @@ describe("getLandingVM", () => {
   });
 
   it("serves the redesign assets from public/brand", () => {
-    expect(vm.logo.src).toBe("/brand/kinkord-circle-k.png");
+    expect(vm.logo.src).toBe("/brand/kinkord-circle-k.webp");
     // The supplied artwork keeps its original aspect ratio and an accessible description.
     expect(vm.hero).toMatchObject({
-      src: "/brand/landing-gold-accessories.png",
-      width: 1280,
-      height: 721,
+      src: "/brand/landing-gold-accessories.webp",
+      width: 1080,
+      height: 608,
     });
     expect(vm.wordmark.src).toBe("/brand/kinkord-mask-wordmark.webp");
     expect(vm.headerTagline).toBe("THE WORLD’S KINK COMMUNITY");

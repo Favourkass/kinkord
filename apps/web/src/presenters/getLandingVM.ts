@@ -33,16 +33,16 @@ export interface SplashAction {
 export function getLandingVM() {
   const downloadCta: SplashAction = { label: "Download Kinkord", href: Routes.signup };
   return {
-    logo: { src: "/brand/kinkord-circle-k.png", alt: "Kinkord" },
+    logo: { src: "/brand/kinkord-circle-k.webp", alt: "Kinkord" },
     wordmark: LANDING_WORDMARK,
     headerTagline: LANDING_HEADER_TAGLINE,
     audienceStatement: LANDING_AUDIENCE_STATEMENT,
     audienceLines: LANDING_AUDIENCE_LINES,
     hero: {
-      src: "/brand/landing-gold-accessories.png",
+      src: "/brand/landing-gold-accessories.webp",
       alt: "A gold masquerade mask, black leather collar and braided flogger against a black background.",
-      width: 1280,
-      height: 721,
+      width: 1080,
+      height: 608,
     },
     mobileContent: MOBILE_LANDING_CONTENT,
     platformOverview: LANDING_PLATFORM_OVERVIEW,
