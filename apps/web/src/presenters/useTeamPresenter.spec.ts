@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
+import { POLICY_LINKS } from "@/constants/landing";
 import { useTeamPresenter } from "./useTeamPresenter";
 
 vi.mock("next/navigation", () => ({
@@ -34,7 +35,7 @@ describe("useTeamPresenter", () => {
     expect(result.current.brand).toBe("KINKORD");
     expect(result.current.teamTitle).toBe("MEET THE");
     expect(result.current.teamTitleAccent).toBe("TEAM");
-    expect(result.current.policyLinks).toHaveLength(8);
+    expect(result.current.policyLinks).toHaveLength(POLICY_LINKS.length);
     expect(result.current.isLoggedIn).toBe(false);
     expect(result.current.loginHref).toBe("/login");
     expect(result.current.signupHref).toBe("/signup");

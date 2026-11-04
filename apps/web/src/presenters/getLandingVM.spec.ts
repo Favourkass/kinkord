@@ -63,8 +63,8 @@ describe("getLandingVM", () => {
     expect(vm.joinAgeDisclaimer).toBe("You must be 18 years or older to join.");
   });
 
-  it("exposes the 8 policy links for the footer buttons", () => {
-    expect(vm.policyLinks).toHaveLength(8);
+  it("exposes the 12 footer tiles for the footer buttons", () => {
+    expect(vm.policyLinks).toHaveLength(12);
     expect(vm.policyLinks.map((p) => p.label)).toEqual([
       "Privacy Policy",
       "Terms of Service",
@@ -74,6 +74,10 @@ describe("getLandingVM", () => {
       "Copyright Policy",
       "Invest in Kinkord",
       "Kinkord on WhatsApp",
+      "Marketplace",
+      "Events",
+      "Join Our Team",
+      "Advertising",
     ]);
     expect(vm.allRightsReserved).toBe("All rights reserved.");
   });

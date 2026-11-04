@@ -79,7 +79,11 @@ export interface PolicyLink {
     | "about"
     | "contact"
     | "invest"
-    | "whatsapp";
+    | "whatsapp"
+    | "marketplace"
+    | "events"
+    | "team"
+    | "advertising";
 }
 
 export const POLICY_LINKS: readonly PolicyLink[] = [
@@ -95,6 +99,10 @@ export const POLICY_LINKS: readonly PolicyLink[] = [
     href: WHATSAPP_COMMUNITY_URL,
     icon: "whatsapp",
   },
+  { label: "Marketplace", href: Routes.marketplace, icon: "marketplace" },
+  { label: "Events", href: Routes.events, icon: "events" },
+  { label: "Join Our Team", href: Routes.contact, icon: "team" },
+  { label: "Advertising", href: Routes.contact, icon: "advertising" },
 ];
 
 /** `href: null` = channel not launched yet; the footer shows it dimmed and unlinked. */

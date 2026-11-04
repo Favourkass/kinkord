@@ -70,6 +70,7 @@ export const Routes = {
   // Account-menu entries still being built: each opens a "coming soon" screen.
   kinkopediaInApp: "/coming-soon/kinkopedia",
   marketplace: "/coming-soon/marketplace",
+  events: "/coming-soon/events",
   settingsData: "/coming-soon/your-data",
   settingsContent: "/coming-soon/content-experience",
   settingsCommunitySafety: "/coming-soon/community-safety",
