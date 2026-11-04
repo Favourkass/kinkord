@@ -1,21 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
-import {
-  Download,
-  Cookie,
-  Copyright,
-  FileText,
-  Info,
-  Landmark,
-  Lock,
-  Shield,
-  ShieldAlert,
-  Users,
-} from "lucide-react";
+import { Download, Lock, LogIn, UserRoundPlus } from "lucide-react";
 import AgeGateModal from "@/components/ui/AgeGateModal";
 import brandStyles from "./LandingBrand.module.css";
 
 export interface SplashLink {
+  emoji?: string;
   label: string;
   href: string;
 }
@@ -44,7 +34,12 @@ export interface PolicyItem {
     | "about"
     | "contact"
     | "invest"
-    | "whatsapp";
+    | "whatsapp"
+    | "governance"
+    | "advertising"
+    | "marketplace"
+    | "events"
+    | "help";
 }
 
 export interface AdultBadgeData {
@@ -74,7 +69,29 @@ export interface SplashScreenProps {
     footer: string;
   };
   platformOverview: { title: string; paragraphs: readonly string[] };
-  membership: { count: string; label: string; countries: string; description: string };
+  mission: { title: string; paragraphs: readonly string[] };
+  whyJoin: {
+    title: string;
+    subtitle: string;
+    introduction: string;
+    benefits: readonly { title: string; description: string }[];
+    closing: string;
+  };
+  safeKink: {
+    title: string;
+    paragraphs: readonly string[];
+    note: string;
+    policy: string;
+    statement: string;
+    closing: string;
+  };
+  membership: {
+    title: string;
+    count: string;
+    label: string;
+    countries: string;
+    description: string;
+  };
   downloadCta: SplashAction;
   brand: string;
   tagline: string;
@@ -107,38 +124,6 @@ export interface SplashScreenProps {
   onDeclineAge?: () => void;
 }
 
-function UserIcon() {
-  return (
-    <span aria-hidden className="grid size-[33px] place-items-center">
-      <svg width="24" height="27" viewBox="0 0 24 26.75" fill="none" overflow="visible">
-        <path
-          d="M23 25.75C23 21.953 18.0751 18.875 12 18.875C5.92487 18.875 1 21.953 1 25.75M12 14.75C8.20304 14.75 5.125 11.672 5.125 7.875C5.125 4.07804 8.20304 1 12 1C15.797 1 18.875 4.07804 18.875 7.875C18.875 11.672 15.797 14.75 12 14.75Z"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </span>
-  );
-}
-
-function SignInIcon() {
-  return (
-    <span aria-hidden className="grid size-[33px] place-items-center">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" overflow="visible">
-        <path
-          d="M12 7.875L16.125 12L12 16.125M16.125 12H1M7.875 5.46681V5.40027C7.875 3.86012 7.875 3.08948 8.17473 2.50122C8.43838 1.98378 8.85877 1.56338 9.37622 1.29973C9.96448 1 10.7351 1 12.2753 1H18.6003C20.1404 1 20.9094 1 21.4977 1.29973C22.0151 1.56338 22.4369 1.98378 22.7006 2.50122C23 3.0889 23 3.85862 23 5.39575V18.6049C23 20.1421 23 20.9107 22.7006 21.4983C22.4369 22.0158 22.0151 22.4369 21.4977 22.7006C20.91 23 20.1414 23 18.6042 23H12.2708C10.7336 23 9.9639 23 9.37622 22.7006C8.85877 22.4369 8.43838 22.0154 8.17473 21.4979C7.875 20.9097 7.875 20.1401 7.875 18.6V18.5313"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </span>
-  );
-}
-
 function ChevronIcon() {
   return (
     <span aria-hidden className="grid size-6 place-items-center">
@@ -159,7 +144,7 @@ function PolicyChevron() {
   return (
     <span
       aria-hidden
-      className="grid size-4 sm:size-5 shrink-0 place-items-center text-[#faab14] ml-1"
+      className="grid size-4 sm:size-5 shrink-0 place-items-center text-[#ffcf0a] ml-1"
     >
       <svg width="7" height="12" viewBox="0 0 8 14" fill="none" overflow="visible">
         <path
@@ -177,43 +162,20 @@ function PolicyChevron() {
 export function StarDivider() {
   return (
     <div className="relative my-5 sm:my-6 flex w-full items-center justify-center">
-      <div className="h-px w-full bg-gradient-to-r from-transparent via-[#faab14]/60 to-transparent" />
+      <div className="h-px w-full bg-gradient-to-r from-transparent via-[#ffcf0a]/60 to-transparent" />
       <div className="absolute grid size-5 place-items-center bg-black">
         <svg
           width="16"
           height="16"
           viewBox="0 0 14 14"
           fill="none"
-          className="text-[#faab14]"
+          className="text-[#ffcf0a]"
           aria-hidden
         >
           <path d="M7 0L8.5 5.5L14 7L8.5 8.5L7 14L5.5 8.5L0 7L5.5 5.5L7 0Z" fill="currentColor" />
         </svg>
       </div>
     </div>
-  );
-}
-
-function ContactIcon({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <line x1="19" x2="23" y1="8" y2="8" />
-      <line x1="19" x2="23" y1="12" y2="12" />
-      <line x1="19" x2="23" y1="16" y2="16" />
-    </svg>
   );
 }
 
@@ -241,31 +203,91 @@ function WhatsAppIcon({ className = "" }: { className?: string }) {
   );
 }
 
-function PolicyIcon({ type }: { type: PolicyItem["icon"] }) {
-  switch (type) {
-    case "privacy":
-      return <Shield className="size-[18px] sm:size-[22px] text-[#faab14]" aria-hidden />;
-    case "terms":
-      return <FileText className="size-[18px] sm:size-[22px] text-[#faab14]" aria-hidden />;
-    case "guidelines":
-      return <Users className="size-[18px] sm:size-[22px] text-[#faab14]" aria-hidden />;
-    case "cookie":
-      return <Cookie className="size-[18px] sm:size-[22px] text-[#faab14]" aria-hidden />;
-    case "safety":
-      return <ShieldAlert className="size-[18px] sm:size-[22px] text-[#faab14]" aria-hidden />;
-    case "copyright":
-      return <Copyright className="size-[18px] sm:size-[22px] text-[#faab14]" aria-hidden />;
-    case "about":
-      return <Info className="size-[18px] sm:size-[22px] text-[#faab14]" aria-hidden />;
-    case "contact":
-      return <ContactIcon className="size-[18px] sm:size-[22px] text-[#faab14]" />;
-    case "invest":
-      return <Landmark className="size-[18px] sm:size-[22px] text-[#faab14]" aria-hidden />;
-    case "whatsapp":
-      return <WhatsAppIcon className="size-[18px] sm:size-[22px] text-[#faab14]" />;
-    default:
-      return <Shield className="size-[18px] sm:size-[22px] text-[#faab14]" aria-hidden />;
+function FooterEmoji({ symbol, natural = false }: { symbol: string; natural?: boolean }) {
+  if (symbol === "i" || symbol === "?") {
+    return (
+      <span aria-hidden="true" className={brandStyles.goldMedallion}>
+        {symbol}
+      </span>
+    );
   }
+  return (
+    <span
+      aria-hidden="true"
+      className={
+        natural ? brandStyles.footerEmoji : `${brandStyles.footerEmoji} ${brandStyles.goldEmoji}`
+      }
+    >
+      {symbol}
+    </span>
+  );
+}
+
+function GoldTileIcon({ type }: { type: "marketplace" | "events" }) {
+  const gradientId = `footer-gold-${type}`;
+  return (
+    <svg viewBox="0 0 28 28" className="size-[26px] shrink-0" aria-hidden="true">
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0.6" y2="1">
+          <stop stopColor="#fff5ad" />
+          <stop offset="0.35" stopColor="#ffd447" />
+          <stop offset="1" stopColor="#b97806" />
+        </linearGradient>
+      </defs>
+      <g fill={`url(#${gradientId})`} stroke="#eab638" strokeWidth="0.7" strokeLinejoin="round">
+        {type === "marketplace" ? (
+          <>
+            <rect x="4" y="11" width="20" height="14" rx="2" />
+            <path d="M4 4h20l2 8c0 3-4 4-6 1-2 3-5 3-6 0-2 3-5 3-6 0-2 3-6 2-6-1Z" />
+            <path d="m9 4-1 9m6-9v9m5-9 1 9" fill="none" stroke="#a76b04" />
+            <rect x="7" y="17" width="6" height="8" fill="#4d3303" />
+            <rect x="17" y="17" width="4" height="4" fill="#4d3303" />
+          </>
+        ) : (
+          <>
+            <rect x="3" y="6" width="22" height="19" rx="3" />
+            <rect x="7" y="2" width="3" height="8" rx="1.5" />
+            <rect x="18" y="2" width="3" height="8" rx="1.5" />
+            <path d="M4 12h20" stroke="#9a6100" />
+            <path
+              d="m14 13 1.7 3.4 3.8.6-2.7 2.6.6 3.8-3.4-1.8-3.4 1.8.6-3.8L8.5 17l3.8-.6Z"
+              fill="#714400"
+              stroke="#ffdf6a"
+            />
+          </>
+        )}
+      </g>
+    </svg>
+  );
+}
+
+function PolicyIcon({ type }: { type: PolicyItem["icon"] }) {
+  if (type === "whatsapp") {
+    return (
+      <span className={brandStyles.whatsappMedallion}>
+        <WhatsAppIcon className="size-full" />
+      </span>
+    );
+  }
+  if (type === "marketplace" || type === "events") return <GoldTileIcon type={type} />;
+  const symbols: Record<
+    Exclude<PolicyItem["icon"], "whatsapp" | "marketplace" | "events">,
+    string
+  > = {
+    privacy: "🛡️",
+    safety: "🛡️",
+    terms: "📄",
+    guidelines: "👥",
+    cookie: "🍪",
+    copyright: "©️",
+    about: "i",
+    contact: "✉️",
+    invest: "🏛️",
+    governance: "⚖️",
+    advertising: "📣",
+    help: "?",
+  };
+  return <FooterEmoji symbol={symbols[type]} />;
 }
 
 export function PolicyButtonsGrid({ links }: { links: PolicyItem[] }) {
@@ -279,7 +301,7 @@ export function PolicyButtonsGrid({ links }: { links: PolicyItem[] }) {
               <span className="shrink-0">
                 <PolicyIcon type={link.icon} />
               </span>
-              <span className="min-w-0 text-[11px] sm:text-[13px] lg:text-[14px] font-bold leading-[1.25] text-kink-gold-bright break-words">
+              <span className="min-w-0 text-[11px] sm:text-[13px] lg:text-[14px] font-bold leading-[1.25] text-[#ffcf0a] break-words">
                 {link.label}
               </span>
             </div>
@@ -288,7 +310,7 @@ export function PolicyButtonsGrid({ links }: { links: PolicyItem[] }) {
         );
 
         const className =
-          "flex min-h-[52px] sm:min-h-[58px] py-2 items-center justify-between rounded-[14px] border border-[#faab14]/40 bg-[#0c0c0b] px-2.5 sm:px-4 text-kink-gold-bright transition hover:border-[#faab14] hover:bg-[#181815] active:scale-[0.99]";
+          "flex min-h-[52px] sm:min-h-[58px] py-2 items-center justify-between rounded-[14px] border border-[#ffcf0a] bg-black px-2.5 sm:px-4 text-[#ffcf0a] transition hover:border-[#ffcf0a] hover:bg-[#ffcf0a]/5 active:scale-[0.99]";
 
         if (isExternal) {
           return (
@@ -327,10 +349,16 @@ function SocialIcon({ icon }: { icon: "facebook" | "twitter" | "instagram" }) {
       aria-hidden="true"
     >
       {icon === "facebook" && (
-        <path d="M15 3h3v4h-3c-.6 0-1 .4-1 1v3h4l-1 4h-3v7h-4v-7H7v-4h3V8a5 5 0 0 1 5-5Z" />
+        <path
+          fill="currentColor"
+          d="M15 3h3v4h-3c-.6 0-1 .4-1 1v3h4l-1 4h-3v7h-4v-7H7v-4h3V8a5 5 0 0 1 5-5Z"
+        />
       )}
       {icon === "twitter" && (
-        <path d="M22 5.9a8.2 8.2 0 0 1-2.4.7 4.2 4.2 0 0 0 1.8-2.3 8.4 8.4 0 0 1-2.6 1 4.2 4.2 0 0 0-7.2 3.8A11.9 11.9 0 0 1 3 4.7a4.2 4.2 0 0 0 1.3 5.6 4.1 4.1 0 0 1-1.9-.5 4.2 4.2 0 0 0 3.4 4.2 4.2 4.2 0 0 1-1.9.1 4.2 4.2 0 0 0 3.9 2.9A8.4 8.4 0 0 1 2 18.7a11.8 11.8 0 0 0 18.2-10 8.4 8.4 0 0 0 1.8-2.8Z" />
+        <path
+          fill="currentColor"
+          d="M22 5.9a8.2 8.2 0 0 1-2.4.7 4.2 4.2 0 0 0 1.8-2.3 8.4 8.4 0 0 1-2.6 1 4.2 4.2 0 0 0-7.2 3.8A11.9 11.9 0 0 1 3 4.7a4.2 4.2 0 0 0 1.3 5.6 4.1 4.1 0 0 1-1.9-.5 4.2 4.2 0 0 0 3.4 4.2 4.2 4.2 0 0 1-1.9.1 4.2 4.2 0 0 0 3.9 2.9A8.4 8.4 0 0 1 2 18.7a11.8 11.8 0 0 0 18.2-10 8.4 8.4 0 0 0 1.8-2.8Z"
+        />
       )}
       {icon === "instagram" && (
         <>
@@ -414,9 +442,9 @@ function SignUpButton({ cta }: { cta: SplashLink }) {
   return (
     <Link
       href={cta.href}
-      className={`${brandStyles.signup} flex h-[48px] sm:h-[56px] w-full items-center justify-center gap-2 rounded-[10px] bg-gradient-to-b from-[#ffce45] to-[#f4aa05] text-[15px] sm:text-[18px] font-bold text-black`}
+      className={`${brandStyles.signup} flex h-[48px] sm:h-[56px] w-full items-center justify-center gap-2 rounded-[10px] bg-gradient-to-b from-[#ffce45] to-[#f4aa05] text-[15px] sm:text-[18px] font-extrabold text-black`}
     >
-      <UserIcon />
+      <UserRoundPlus aria-hidden className="size-6 shrink-0" strokeWidth={3} />
       {cta.label}
     </Link>
   );
@@ -426,24 +454,29 @@ function SignInButton({ cta }: { cta: SplashLink }) {
   return (
     <Link
       href={cta.href}
-      className="flex h-[48px] sm:h-[56px] w-full items-center justify-center gap-2 rounded-[10px] border border-kink-amber text-[15px] sm:text-[18px] font-bold text-kink-gold-bright uppercase"
+      className="flex h-[48px] sm:h-[56px] w-full items-center justify-center gap-2 rounded-[10px] border border-kink-amber text-[15px] sm:text-[18px] font-extrabold text-kink-gold-bright"
     >
-      <SignInIcon />
+      <LogIn aria-hidden className="size-6 shrink-0" strokeWidth={3} />
       {cta.label}
     </Link>
   );
 }
 
 function MembershipCount({
+  title,
   count,
   label,
   countries,
   description,
 }: SplashScreenProps["membership"]) {
   return (
-    <section className="w-full pb-5 pt-6 text-center" aria-label={label}>
-      <h2
-        className="flex items-center justify-center gap-3 whitespace-nowrap text-[clamp(14px,4vw,24px)] font-bold leading-tight text-kink-gold-bright"
+    <section
+      className="w-full rounded-2xl border border-kink-amber/55 bg-black/80 p-4 text-left sm:p-7"
+      aria-label={title}
+    >
+      <h2 className="text-xl font-bold text-kink-gold-bright sm:text-2xl">{title}</h2>
+      <p
+        className="mt-3 flex items-center justify-center gap-2 whitespace-nowrap text-[clamp(13px,3.8vw,24px)] font-bold leading-tight text-kink-gold-bright sm:gap-3"
         aria-live="polite"
         aria-atomic="true"
       >
@@ -457,9 +490,38 @@ function MembershipCount({
           </span>{" "}
           {countries}
         </span>
-      </h2>
-      <p className="mx-auto mt-3 max-w-[580px] text-sm leading-[1.45] text-kink-mist sm:text-lg">
-        {description}
+      </p>
+      <p className="mt-3 text-sm leading-[1.45] text-kink-mist sm:text-lg">{description}</p>
+    </section>
+  );
+}
+
+function WhyJoin({
+  title,
+  subtitle,
+  introduction,
+  benefits,
+  closing,
+}: SplashScreenProps["whyJoin"]) {
+  return (
+    <section className="w-full rounded-2xl border border-kink-amber/55 bg-black/80 p-5 text-left sm:p-7">
+      <h2 className="text-xl font-bold text-kink-gold-bright sm:text-2xl">{title}</h2>
+      <p className="mt-3 text-lg font-semibold text-kink-paper sm:text-xl">{subtitle}</p>
+      <p className="mt-3 text-sm leading-[1.5] text-kink-paper sm:text-lg">{introduction}</p>
+      <ol className="mt-6 list-decimal space-y-6 pl-5 marker:font-bold marker:text-kink-gold-bright">
+        {benefits.map((benefit) => (
+          <li key={benefit.title} className="pl-1">
+            <h3 className="text-base font-bold text-kink-gold-bright sm:text-xl">
+              {benefit.title}
+            </h3>
+            <p className="mt-2 text-sm leading-[1.5] text-kink-paper sm:text-lg">
+              {benefit.description}
+            </p>
+          </li>
+        ))}
+      </ol>
+      <p className="mt-6 border-t border-kink-amber/40 pt-5 text-center text-base font-semibold text-kink-gold-bright sm:text-lg">
+        {closing}
       </p>
     </section>
   );
@@ -478,12 +540,41 @@ function PlatformOverview({ title, paragraphs }: SplashScreenProps["platformOver
   );
 }
 
+function SafeKink({
+  title,
+  paragraphs,
+  note,
+  policy,
+  statement,
+  closing,
+}: SplashScreenProps["safeKink"]) {
+  return (
+    <section className="w-full space-y-4 rounded-2xl border border-kink-amber/55 bg-black/80 p-5 text-left text-sm leading-[1.5] text-kink-paper sm:p-7 sm:text-lg">
+      <h2 className="text-xl font-bold text-kink-gold-bright sm:text-2xl">{title}</h2>
+      {paragraphs.map((paragraph) => (
+        <p key={paragraph}>{paragraph}</p>
+      ))}
+      <p className="rounded-xl border-l-4 border-kink-gold-bright bg-kink-gold-bright/10 p-4">
+        {note}
+      </p>
+      <p className="text-kink-gold-bright">{policy}</p>
+      <p>{statement}</p>
+      <p className="border-t border-kink-amber/40 pt-5 text-center text-kink-gold-bright">
+        {closing}
+      </p>
+    </section>
+  );
+}
+
 export default function SplashScreen({
   logo,
   hero,
   audienceStatement,
   audienceLines,
   platformOverview,
+  mission,
+  whyJoin,
+  safeKink,
   membership,
   downloadCta,
   brand,
@@ -520,7 +611,6 @@ export default function SplashScreen({
       <div className="mx-auto w-full max-w-[1080px]">
         <header className="flex min-h-[76px] items-center justify-between gap-3 bg-black px-4 py-2 sm:px-8 sm:py-3">
           <h1 className="sr-only">{brand}</h1>
-          <DownloadPill cta={downloadCta} compact />
           <div className="size-14 shrink-0 sm:size-[76px]">
             <Image
               src={logo.src}
@@ -530,6 +620,9 @@ export default function SplashScreen({
               className="h-full w-full object-contain"
               preload
             />
+          </div>
+          <div className="origin-right scale-[0.8]">
+            <DownloadPill cta={downloadCta} compact />
           </div>
         </header>
 
@@ -563,9 +656,12 @@ export default function SplashScreen({
             <SignUpButton cta={signUp} />
             <SignInButton cta={signIn} />
           </div>
-          <div className="w-full max-w-[760px]">
-            <MembershipCount {...membership} />
+          <div className="mt-6 w-full max-w-[760px] space-y-6">
             <PlatformOverview {...platformOverview} />
+            <PlatformOverview {...mission} />
+            <MembershipCount {...membership} />
+            <WhyJoin {...whyJoin} />
+            <SafeKink {...safeKink} />
           </div>
           <nav
             aria-label="About Kinkord"
@@ -577,7 +673,10 @@ export default function SplashScreen({
                 href={link.href}
                 className={`flex h-[52px] items-center justify-between text-[15px] font-extrabold tracking-[0.3px] text-kink-gold-bright transition hover:bg-white/5 ${i > 0 ? "border-t border-kink-divider" : ""}`}
               >
-                {link.label}
+                <span className="flex min-w-0 items-center gap-3">
+                  {link.emoji && <FooterEmoji symbol={link.emoji} natural={link.emoji === "📖"} />}
+                  {link.label}
+                </span>
                 <span className="text-kink-gold-bright">
                   <ChevronIcon />
                 </span>

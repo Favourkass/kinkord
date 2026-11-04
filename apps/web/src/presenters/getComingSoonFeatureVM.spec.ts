@@ -7,6 +7,7 @@ describe("getComingSoonFeatureVM", () => {
     const slugs = [
       Routes.kinkopediaInApp,
       Routes.marketplace,
+      Routes.events,
       Routes.settingsData,
       Routes.settingsContent,
       Routes.settingsCommunitySafety,

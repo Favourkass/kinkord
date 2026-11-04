@@ -16,26 +16,26 @@ describe("getLandingVM", () => {
   });
 
   it("points the auth CTAs at the signup and login routes", () => {
-    expect(vm.signUp).toEqual({ label: "SIGN UP", href: Routes.signup });
-    expect(vm.signIn).toEqual({ label: "LOGIN", href: Routes.login });
+    expect(vm.signUp).toEqual({ label: "Sign Up", href: Routes.signup });
+    expect(vm.signIn).toEqual({ label: "Log In", href: Routes.login });
     expect(vm.downloadCta.href).toBe(Routes.signup);
   });
 
   it("links the secondary navigation to kinkopedia, about and contact", () => {
     expect(vm.navLinks).toEqual([
-      { label: "KINKOPEDIA", href: Routes.kinkopedia },
-      { label: "ABOUT KINKORD", href: Routes.about },
-      { label: "CONTACT US", href: Routes.contact },
+      { label: "Kinkopedia", href: Routes.kinkopedia, emoji: "📖" },
+      { label: "About Kinkord", href: Routes.about, emoji: "i" },
+      { label: "Contact Us", href: Routes.contact, emoji: "✉️" },
     ]);
   });
 
   it("serves the redesign assets from public/brand", () => {
     expect(vm.logo.src).toBe("/brand/kinkord-circle-k.png");
-    // The supplied mask artwork has room for a live, accessible headline.
+    // The supplied artwork keeps its original aspect ratio and an accessible description.
     expect(vm.hero).toMatchObject({
-      src: "/brand/landing-gold-mask.png",
-      width: 1080,
-      height: 724,
+      src: "/brand/landing-gold-accessories.png",
+      width: 1280,
+      height: 721,
     });
     expect(vm.wordmark.src).toBe("/brand/kinkord-mask-wordmark.webp");
     expect(vm.headerTagline).toBe("THE WORLD’S KINK COMMUNITY");
@@ -44,7 +44,8 @@ describe("getLandingVM", () => {
     );
     expect(vm.audienceLines.map((line) => line.text).join(" ")).toBe(vm.audienceStatement);
     expect(vm.audienceLines.filter((line) => line.highlight).map((line) => line.text)).toEqual([
-      "for Kinksters, Fetishists",
+      "The Global Social Network",
+      "for Kinksters, Fetishists & BDSM Enthusiasts.",
     ]);
     expect(vm.logo.alt).not.toHaveLength(0);
     expect(vm.hero.alt).not.toHaveLength(0);
@@ -67,17 +68,19 @@ describe("getLandingVM", () => {
     expect(vm.joinAgeDisclaimer).toBe("You must be 18 years or older to join.");
   });
 
-  it("exposes the 8 policy links for the footer buttons", () => {
-    expect(vm.policyLinks).toHaveLength(8);
+  it("exposes the 10 footer links for the footer buttons", () => {
+    expect(vm.policyLinks).toHaveLength(10);
     expect(vm.policyLinks.map((p) => p.label)).toEqual([
-      "Privacy Policy",
-      "Terms of Service",
-      "Community Guidelines",
-      "Cookie Policy",
-      "Safety & Reporting",
-      "Copyright Policy",
-      "Invest in Kinkord",
+      "Trust & Safety",
+      "Governance & Transparency",
+      "Legal & Policies",
+      "Investors Portal",
+      "Join Our Team",
+      "Advertising",
+      "Marketplace",
+      "Events",
       "Kinkord on WhatsApp",
+      "Help",
     ]);
     expect(vm.allRightsReserved).toBe("All rights reserved.");
   });

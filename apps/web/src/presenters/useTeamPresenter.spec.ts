@@ -31,7 +31,7 @@ describe("useTeamPresenter", () => {
     expect(result.current.brand).toBe("KINKORD");
     expect(result.current.teamTitle).toBe("MEET THE");
     expect(result.current.teamTitleAccent).toBe("TEAM");
-    expect(result.current.policyLinks).toHaveLength(8);
+    expect(result.current.policyLinks).toHaveLength(10);
     expect(result.current.isLoggedIn).toBe(false);
     expect(result.current.loginHref).toBe("/login");
     expect(result.current.signupHref).toBe("/signup");
