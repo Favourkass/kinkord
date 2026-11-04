@@ -27,6 +27,12 @@ export const profile = pgTable("profile", {
   displayName: text("display_name").notNull(),
   /** Public team identity, assigned only by an admin; grants no permissions. */
   teamMember: boolean("team_member").notNull().default(false),
+  /**
+   * What they do at Kinkord ("Software Engineer"), set by the founders. A team
+   * member with one is shown on Meet the Team, in the order they were added.
+   */
+  teamTitle: text("team_title"),
+  teamTitleAt: timestamp("team_title_at", { withTimezone: true }),
   /** A person, or an organization the founders made it; see AccountType. */
   accountType: text("account_type").$type<AccountType>().notNull().default("person"),
   bio: text("bio"),

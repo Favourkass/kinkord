@@ -58,6 +58,14 @@ This setting is under Settings → Privacy → Messaging, Friend Requests & Foll
 
 Neither changes the member totals. Those count everyone except suspended accounts, and show nothing for a place with fewer than 10 members.
 
+## Meet the Team
+
+Meet the Team (`/about/team`, API `GET /team`) is open to anyone, signed in or not. Besides the CEO's card, it shows the members the founders add on Moderation → Team page. For each one it shows only their profile photo, display name, @username, and the role the founders typed. Their privacy settings don't hide them from it: being added is the founders' decision, made with the member.
+
+- **Adding someone** gives them the Kinkord Team badge.
+- **Removing someone** takes them off the page, and so does taking the badge away on their member page.
+- **Blocked members** are left off the page, whatever their role.
+
 ## Not available yet
 
 The API refuses to save these:
