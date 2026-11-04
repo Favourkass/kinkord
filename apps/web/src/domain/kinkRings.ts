@@ -196,6 +196,8 @@ export interface MemberRingsPM {
   batches: Array<{
     paymentId: string | null;
     period: "monthly" | "yearly" | null;
+    /** Rings bought on their own, and how they were paid for; absent from an older API. */
+    bought?: { quantity: number; method: "bank" | "coins" } | null;
     confirmedAt: string | null;
     rings: Array<{
       id: string;
@@ -222,6 +224,7 @@ export interface MemberRingsPM {
 export interface MemberRingsLabels {
   summary: (counts: MemberRingsPM["counts"]) => string;
   batch: (period: "monthly" | "yearly", confirmed: string | null) => string;
+  bought: (quantity: number, method: "bank" | "coins", confirmed: string | null) => string;
   fromKinkord: string;
   ring: (seq: number) => string;
   status: Record<AdminRingStatus, string>;
@@ -280,9 +283,15 @@ export function toMemberRingsVM(
     unused: pm.counts.unused,
     batches: pm.batches.map((batch) => ({
       key: batch.paymentId ?? "kinkord",
-      heading: batch.period
-        ? labels.batch(batch.period, batch.confirmedAt ? planDate(batch.confirmedAt) : null)
-        : labels.fromKinkord,
+      heading: batch.bought
+        ? labels.bought(
+            batch.bought.quantity,
+            batch.bought.method,
+            batch.confirmedAt ? planDate(batch.confirmedAt) : null,
+          )
+        : batch.period
+          ? labels.batch(batch.period, batch.confirmedAt ? planDate(batch.confirmedAt) : null)
+          : labels.fromKinkord,
       rings: batch.rings.map((ring) => {
         const who = ring.recipient ? personLabel(ring.recipient) : labels.someoneGone;
         const note = ring.withNote ? ` · ${labels.withNote}` : "";

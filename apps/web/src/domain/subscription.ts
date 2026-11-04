@@ -71,6 +71,8 @@ export interface SubscriptionStatusPM {
   forGood?: boolean;
   available: boolean;
   prices: PlanPricesPM;
+  /** The Kink Rings each plan brings now, the founders' setting; absent from an older API. */
+  rings?: { monthly: number; yearly: number };
   open: PaymentPM | null;
   rejected: PaymentPM | null;
 }

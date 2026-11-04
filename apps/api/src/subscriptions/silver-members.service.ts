@@ -107,6 +107,7 @@ export class SilverMembersService {
               and(
                 inArray(subscriptionPayment.userId, ids),
                 eq(subscriptionPayment.status, "verified"),
+                eq(subscriptionPayment.purpose, "silver"),
                 isNotNull(subscriptionPayment.reviewedAt),
               ),
             ),

@@ -118,6 +118,8 @@ export interface SubscriptionStatusDto {
   /** Checkout stays closed until there's an account to pay into. */
   available: boolean;
   prices: PlanPrices;
+  /** The Kink Rings each plan brings now: the founders' setting. */
+  rings: { monthly: number; yearly: number };
   /** The payment still in play: being paid, or waiting for an admin. */
   open: PaymentDto | null;
   /** The latest payment, when it was rejected and nothing has replaced it. */
