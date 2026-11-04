@@ -38,13 +38,15 @@ describe("useRingSettingsPresenter", () => {
     const { result } = renderHook(() => useRingSettingsPresenter());
     await waitFor(() => expect(result.current.card.canEdit).toBe(true));
     act(() => result.current.card.onEdit());
-    expect(result.current.card.form).toEqual({ monthly: "1", yearly: "12" });
+    // An API from before the price: no price field, and the counts alone are saved.
+    expect(result.current.card.form).toEqual({ monthly: "1", yearly: "12", price: "" });
+    expect(result.current.card.showPrice).toBe(false);
     act(() => result.current.card.onField("yearly", "6"));
     await act(async () => result.current.card.onSave());
     expect(saveSettings).toHaveBeenCalledWith({ monthly: 1, yearly: 6 });
     expect(result.current.card.editing).toBe(false);
     expect(result.current.card.plans[1].value).toBe("6 rings");
-    expect(result.current.card.notice).toBe("Saved. New checkouts bring these rings.");
+    expect(result.current.card.notice).toBe("Saved. New checkouts use these.");
   });
 
   it("asks for whole numbers before saving anything", async () => {
@@ -55,6 +57,51 @@ describe("useRingSettingsPresenter", () => {
     await act(async () => result.current.card.onSave());
     expect(saveSettings).not.toHaveBeenCalled();
     expect(result.current.card.error).toBe("Enter a whole number from 0 to 24 for each plan.");
+  });
+
+  it("shows and changes what 2 bought rings cost", async () => {
+    settings.mockResolvedValue({
+      rings: { monthly: 1, yearly: 6 },
+      pairUsdCents: 500,
+      canEdit: true,
+      max: 24,
+    });
+    saveSettings.mockResolvedValue({
+      rings: { monthly: 1, yearly: 6 },
+      pairUsdCents: 499,
+      canEdit: true,
+      max: 24,
+    });
+    const { result } = renderHook(() => useRingSettingsPresenter());
+    await waitFor(() => expect(result.current.card.plans).toHaveLength(3));
+    expect(result.current.card.plans[2]).toMatchObject({
+      label: "2 bought rings cost (USD)",
+      value: "$5",
+    });
+    act(() => result.current.card.onEdit());
+    expect(result.current.card.form.price).toBe("5.00");
+    act(() => result.current.card.onField("price", "4.99"));
+    await act(async () => result.current.card.onSave());
+    expect(saveSettings).toHaveBeenCalledWith({ monthly: 1, yearly: 6, pairUsdCents: 499 });
+    expect(result.current.card.plans[2].value).toBe("$4.99");
+  });
+
+  it("asks for a dollar price before saving anything", async () => {
+    settings.mockResolvedValue({
+      rings: { monthly: 1, yearly: 6 },
+      pairUsdCents: 500,
+      canEdit: true,
+      max: 24,
+    });
+    const { result } = renderHook(() => useRingSettingsPresenter());
+    await waitFor(() => expect(result.current.card.canEdit).toBe(true));
+    act(() => result.current.card.onEdit());
+    act(() => result.current.card.onField("price", "4.999"));
+    await act(async () => result.current.card.onSave());
+    expect(saveSettings).not.toHaveBeenCalled();
+    expect(result.current.card.error).toBe(
+      "Enter the price of 2 rings in dollars, like 5 or 4.99.",
+    );
   });
 
   it("shows other admins the numbers without the form", async () => {

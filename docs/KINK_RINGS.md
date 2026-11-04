@@ -50,7 +50,12 @@ From **Kink Rings** in the account menu (`/kink-rings`):
    button submits the gifts, together in one transaction.
 
 **Buy Kink Ring opens `/kink-rings/buy`**. Separate purchases cost **$5 per
-2 rings**, in multiples of two (2–100 per checkout). Purchased rings expire
+2 rings** until the founders set another price on Moderation → Kink Rings
+(app setting `kink_ring_pair_usd_cents`, $0.50 to $500; founders only, logged as
+`set-kink-rings`). Quotes and new checkouts use the price at that moment; a
+checkout already started keeps its amount, and a member whose quote went stale is
+asked to review the new total. Purchases come in multiples of two (2–100 per
+checkout). Purchased rings expire
 **90 days after payment confirmation**; bank purchases are confirmed on admin
 approval. Existing monthly/yearly Silver bundles keep the expiry rules above.
 

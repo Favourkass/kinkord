@@ -71,4 +71,21 @@ describe("KinkRingsAdminController", () => {
       expect(() => controller.saveSettings(founder, bad)).toThrow("whole number from 0 to 24");
     }
   });
+
+  it("takes the founders' price for 2 rings in cents, from $0.50 to $500", async () => {
+    const saveSettings = vi.fn(async () => ({}));
+    const controller = new KinkRingsAdminController({
+      saveSettings,
+    } as unknown as KinkRingsAdminService);
+    const founder = {
+      user: { id: "f1", email: SUPER_ADMIN_EMAILS[0], emailVerified: true },
+    } as never;
+    await controller.saveSettings(founder, { monthly: 1, yearly: 6, pairUsdCents: 499 });
+    expect(saveSettings).toHaveBeenCalledWith("f1", { monthly: 1, yearly: 6, pairUsdCents: 499 });
+    for (const pairUsdCents of [49, 50001, 4.99, "5"]) {
+      expect(() =>
+        controller.saveSettings(founder, { monthly: 1, yearly: 6, pairUsdCents }),
+      ).toThrow("Enter a price from $0.50 to $500 for 2 rings.");
+    }
+  });
 });

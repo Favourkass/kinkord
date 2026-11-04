@@ -171,21 +171,23 @@ export const MODERATION_COPY = {
     more: "Show more",
     loadingMore: "Loading…",
   },
-  /** How many Kink Rings each Silver plan brings: the founders set it. */
+  /** How many Kink Rings each Silver plan brings, and what bought ones cost: the founders set it. */
   ringSettings: {
-    title: "Kink Rings per plan",
-    hint: "How many rings to give away each Silver plan brings. New checkouts get these; payments already made keep what they were offered. Ring 1 expires 30 days after the payment is confirmed, ring 2 after 60, and so on.",
+    title: "Kink Rings per plan, and their price",
+    hint: "How many rings to give away each Silver plan brings, and what members pay for 2 rings bought on their own. New checkouts get these; payments already made keep what they were offered. Ring 1 from a plan expires 30 days after the payment is confirmed, ring 2 after 60, and so on. Bought rings expire after 90 days.",
     loading: "Loading…",
     locked: "Only the founders can change this.",
     monthly: "Monthly Silver",
     yearly: "Yearly Silver",
+    price: "2 bought rings cost (USD)",
     rings: (n: number) => `${n} ${n === 1 ? "ring" : "rings"}`,
     edit: "Edit",
     save: "Save",
     saving: "Saving…",
     cancel: "Cancel",
-    saved: "Saved. New checkouts bring these rings.",
+    saved: "Saved. New checkouts use these.",
     invalid: (max: number) => `Enter a whole number from 0 to ${max} for each plan.`,
+    invalidPrice: "Enter the price of 2 rings in dollars, like 5 or 4.99.",
   },
   memberCheck: {
     title: "Silver ring",

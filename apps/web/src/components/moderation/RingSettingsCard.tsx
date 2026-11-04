@@ -4,19 +4,23 @@ function CountInput({
   label,
   value,
   onChange,
+  prefix,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
+  /** "$" before a price; a count has none. */
+  prefix?: string;
 }) {
   return (
     <label className="block text-[13px] font-bold text-app-text">
       {label}
-      <span className="mt-[6px] flex h-[44px] items-center rounded-[12px] border border-app-input-border bg-app-input px-[10px] focus-within:border-kink-amber">
+      <span className="mt-[6px] flex h-[44px] items-center gap-[4px] rounded-[12px] border border-app-input-border bg-app-input px-[10px] focus-within:border-kink-amber">
+        {prefix ? <span className="text-[15px] text-app-subtle">{prefix}</span> : null}
         <input
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          inputMode="numeric"
+          inputMode={prefix ? "decimal" : "numeric"}
           className="w-full bg-transparent text-[15px] font-normal text-app-value outline-none"
         />
       </span>
@@ -24,7 +28,7 @@ function CountInput({
   );
 }
 
-/** How many Kink Rings each Silver plan brings, and the founders' form to change it. */
+/** How many Kink Rings each Silver plan brings, what bought ones cost, and the founders' form. */
 export default function RingSettingsCard(p: RingSettingsCardVM) {
   const l = p.labels;
   return (
@@ -56,6 +60,14 @@ export default function RingSettingsCard(p: RingSettingsCardVM) {
             value={p.form.yearly}
             onChange={(v) => p.onField("yearly", v)}
           />
+          {p.showPrice ? (
+            <CountInput
+              label={l.price}
+              value={p.form.price}
+              onChange={(v) => p.onField("price", v)}
+              prefix="$"
+            />
+          ) : null}
           {p.error ? <p className="text-[14px] text-app-danger sm:col-span-2">{p.error}</p> : null}
           <div className="flex gap-[8px] sm:col-span-2">
             <button

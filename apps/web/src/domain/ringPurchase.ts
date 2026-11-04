@@ -2,6 +2,8 @@ import { naira, usd, planDate, type PaymentPM } from "./subscription";
 export interface RingQuotePM {
   userId: string;
   quantity: number;
+  /** What 2 rings cost now, in US cents; absent from an API that predates the founders' price. */
+  pairUsdCents?: number;
   usdCents: number;
   amountKobo: number;
   coins: number | null;
