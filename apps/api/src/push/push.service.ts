@@ -364,6 +364,18 @@ export class PushService {
     this.toMember(userId, "payment_verified", paymentId, "Your Silver Premium is active");
   }
 
+  ringPurchaseVerified(userId: string, paymentId: string): void {
+    this.toMember(userId, "ring_purchase_verified", paymentId, "Your Kink Rings are ready to gift");
+  }
+  ringPurchaseRejected(userId: string, paymentId: string): void {
+    this.toMember(
+      userId,
+      "ring_purchase_rejected",
+      paymentId,
+      "We couldn't confirm your Kink Ring payment",
+    );
+  }
+
   /** A member gave another a Kink Ring: a month of Silver. The push says who, as every push does. */
   kinkRingGiven(giverId: string, receiverId: string, ringId: string): void {
     if (giverId === receiverId) return;
@@ -435,7 +447,12 @@ export class PushService {
 
   private toMember(
     userId: string,
-    type: "payment_verified" | "payment_rejected" | "verification_update",
+    type:
+      | "payment_verified"
+      | "payment_rejected"
+      | "verification_update"
+      | "ring_purchase_verified"
+      | "ring_purchase_rejected",
     subjectId: string | null,
     body: string,
     tag = `payment-${subjectId}`,

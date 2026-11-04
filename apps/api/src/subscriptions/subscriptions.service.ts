@@ -99,6 +99,10 @@ export function toPaymentDto(row: PaymentRow, now: Date = new Date()): PaymentDt
   const lapsed = row.status === "pending" && now > proofUntil;
   return {
     id: row.id,
+    purpose: row.purpose ?? "silver",
+    ringQuantity: row.ringQuantity ?? null,
+    method: row.method ?? "bank",
+    coinQuantity: row.coinQuantity ?? null,
     plan: row.plan,
     period: row.period,
     status: lapsed ? "expired" : row.status,
@@ -217,6 +221,7 @@ export class SubscriptionsService implements OnApplicationBootstrap {
             .where(
               and(
                 eq(subscriptionPayment.userId, founder.id),
+                eq(subscriptionPayment.purpose, "silver"),
                 eq(subscriptionPayment.status, "pending"),
               ),
             );
@@ -238,15 +243,18 @@ export class SubscriptionsService implements OnApplicationBootstrap {
     const now = new Date();
     // First, so a founder put on Silver here sees it in this same answer.
     const until = await this.silverUntil(who);
-    const [settings, recent, check] = await Promise.all([
+    const [settings, recent, check, rings] = await Promise.all([
       readSettings(this.db),
       this.db
         .select()
         .from(subscriptionPayment)
-        .where(eq(subscriptionPayment.userId, userId))
+        .where(
+          and(eq(subscriptionPayment.userId, userId), eq(subscriptionPayment.purpose, "silver")),
+        )
         .orderBy(desc(subscriptionPayment.createdAt))
         .limit(5),
       silverCheckStatus(this.db, userId, now),
+      ringsPerPlan(this.db),
     ]);
     const payments = recent.map((row) => toPaymentDto(row, now));
     const open = payments.find((p) => p.status === "pending" || p.status === "submitted") ?? null;
@@ -265,6 +273,7 @@ export class SubscriptionsService implements OnApplicationBootstrap {
       forGood,
       available: settings.bank !== null,
       prices: settings.prices,
+      rings,
       // Silver for good has nothing to pay: no payment to finish, nor one to retry.
       open: forGood ? null : open,
       rejected: !forGood && latest?.status === "rejected" ? latest : null,
@@ -291,6 +300,7 @@ export class SubscriptionsService implements OnApplicationBootstrap {
       .where(
         and(
           eq(subscriptionPayment.userId, userId),
+          eq(subscriptionPayment.purpose, "silver"),
           inArray(subscriptionPayment.status, ["pending", "submitted"]),
         ),
       )
@@ -307,7 +317,11 @@ export class SubscriptionsService implements OnApplicationBootstrap {
         .update(subscriptionPayment)
         .set({ status: "expired" })
         .where(
-          and(eq(subscriptionPayment.userId, userId), eq(subscriptionPayment.status, "pending")),
+          and(
+            eq(subscriptionPayment.userId, userId),
+            eq(subscriptionPayment.purpose, "silver"),
+            eq(subscriptionPayment.status, "pending"),
+          ),
         );
     }
     await expireAbandoned(this.db, now);
@@ -417,9 +431,7 @@ export class SubscriptionsService implements OnApplicationBootstrap {
       throw new ConflictException("This payment has already been sent for checking.");
     }
     if (row.status !== "pending" || new Date() > proofDeadline(row)) {
-      throw new ConflictException(
-        "This payment can't take proof any more. Start a new one from the Silver page.",
-      );
+      throw new ConflictException("This payment can't take proof any more. Start a new purchase.");
     }
   }
 

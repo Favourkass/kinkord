@@ -1,5 +1,14 @@
 import { sql } from "drizzle-orm";
-import { index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import {
+  check,
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
 export type SubscriptionPlan = "silver";
@@ -42,6 +51,13 @@ export const subscriptionPayment = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     userId: text("user_id").notNull(),
+    /** Ring purchases use the same receipt review queue; they never grant buyer Silver. */
+    purpose: text("purpose").$type<"silver" | "rings">().notNull().default("silver"),
+    ringQuantity: integer("ring_quantity"),
+    method: text("method").$type<"bank" | "coins">().notNull().default("bank"),
+    requestKey: uuid("request_key"),
+    coinQuantity: integer("coin_quantity"),
+    earnedCoinsSpent: integer("earned_coins_spent"),
     plan: text("plan").$type<SubscriptionPlan>().notNull(),
     period: text("period").$type<BillingPeriod>().notNull(),
     /** KIN + the Lagos time of checkout, e.g. KIN20260924114238. */
@@ -75,6 +91,15 @@ export const subscriptionPayment = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
+    uniqueIndex("subscription_payment_request_idx").on(t.userId, t.requestKey),
+    check(
+      "ring_purchase_quantity",
+      sql`${t.purpose} != 'rings' or (${t.ringQuantity} is not null and ${t.ringQuantity} between 2 and 100 and ${t.ringQuantity} % 2 = 0)`,
+    ),
+    check(
+      "ring_purchase_coins",
+      sql`${t.method} != 'coins' or (${t.purpose} = 'rings' and ${t.status} = 'verified' and ${t.coinQuantity} is not null and ${t.earnedCoinsSpent} is not null and ${t.coinQuantity} > 0 and ${t.earnedCoinsSpent} >= 0 and ${t.earnedCoinsSpent} <= ${t.coinQuantity})`,
+    ),
     uniqueIndex("subscription_payment_reference_idx").on(t.reference),
     // An amount names one open payment, so a transfer can only be one member's.
     uniqueIndex("subscription_payment_open_amount_idx")

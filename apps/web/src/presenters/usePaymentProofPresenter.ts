@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ringPurchaseSummary } from "@/domain/ringPurchase";
 import { Routes } from "@/constants/Routes";
 import { SUBSCRIPTION_COPY } from "@/constants/subscription";
 import { nairaDigits, parseNaira, type PaymentPM } from "@/domain/subscription";
@@ -59,6 +60,7 @@ export function usePaymentProofPresenter(id: string) {
   const [sent, setSent] = useState<PaymentPM | null>(null);
   // Only the latest pick's upload may land; a replaced or removed one is ignored.
   const uploadSeq = useRef(0);
+  const submitLock = useRef(false);
   const previewRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -110,11 +112,13 @@ export function usePaymentProofPresenter(id: string) {
   }, [setPreview]);
 
   const submit = useCallback(async () => {
+    if (submitLock.current) return;
     const problem = proofProblem({ reference, amount, bank, name, number, receipt });
     if (problem) {
       setError(problem);
       return;
     }
+    submitLock.current = true;
     setSubmitting(true);
     setError(null);
     try {
@@ -131,11 +135,28 @@ export function usePaymentProofPresenter(id: string) {
     } catch (e) {
       setError(messageOf(e));
     } finally {
+      submitLock.current = false;
       setSubmitting(false);
     }
   }, [amount, bank, id, name, number, receipt, reference]);
 
   const current = sent ?? payment;
+  useEffect(() => {
+    if (current?.status !== "submitted") return;
+    let live = true;
+    const timer = setInterval(() => {
+      void subscriptionService
+        .payment(id)
+        .then((p) => {
+          if (live) setSent(p);
+        })
+        .catch(() => {});
+    }, 15_000);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [id, current?.status]);
   const view: PaymentView | null = current ? paymentView(current, new Date()) : null;
 
   return {
@@ -143,9 +164,11 @@ export function usePaymentProofPresenter(id: string) {
     loadError,
     /** "pay" and "expired" both take proof; anything else shows where the payment stands. */
     view: view === "pay" || view === "expired" ? ("form" as const) : view,
-    notice: paymentNotice(view, current?.reviewNote ?? null),
+    notice: paymentNotice(view, current?.reviewNote ?? null, current?.purpose === "rings"),
+    ringSummary: current?.purpose === "rings" ? ringPurchaseSummary(current) : null,
+    ringHero: "/kink-rings/gift-box.webp",
     backHref: Routes.subscriptionPay(id),
-    subscriptionHref: Routes.subscription,
+    subscriptionHref: current?.purpose === "rings" ? Routes.kinkRings : Routes.subscription,
     reference,
     setReference,
     amount,

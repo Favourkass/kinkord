@@ -25,7 +25,7 @@ export default function SubscriptionPage() {
           medalAlt: copy.medalAlt,
           headline: copy.headline,
           tagline: copy.tagline,
-          features: copy.features,
+          features: p.features,
           gold: copy.gold,
           diamond: copy.diamond,
           comingSoon: copy.comingSoon,

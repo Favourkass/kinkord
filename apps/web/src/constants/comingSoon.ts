@@ -16,7 +16,7 @@ export const COMING_SOON_COPY = {
     headline: "EVENTS",
     constructionLead: "Events are",
     constructionAccent: "coming soon",
-    subcopy: "Discover community events, meetups and workshops here soon.",
+    subcopy: "Discover community meetups, workshops, and experiences here when events launch.",
   },
   "your-data": {
     headline: "YOUR DATA",

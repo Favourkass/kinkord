@@ -54,6 +54,9 @@ export const MODERATION_COPY = {
       reasonLabel: "Reason (the member reads this)",
       confirm: "Reject payment",
     },
+    ringsVerified: "Verified. Kink Rings have been added to the member’s account.",
+    ringsVerifyBody:
+      "Confirm that the transfer was received. This adds the purchased Kink Rings to the member’s account.",
     verified: (until: string) => `Verified. Silver runs until ${until}.`,
     rejected: "Rejected. The member has been told.",
   },
@@ -107,6 +110,8 @@ export const MODERATION_COPY = {
       `Balance: ${c.unused} to give · ${c.total} ${c.total === 1 ? "ring" : "rings"} in all · ${c.given} given · ${c.expired} expired${c.cancelled ? ` · ${c.cancelled} cancelled` : ""} · ${c.received} received`,
     batch: (period: "monthly" | "yearly", confirmed: string | null) =>
       `${period === "yearly" ? "Yearly" : "Monthly"} Silver${confirmed ? ` · confirmed ${confirmed}` : ""}`,
+    bought: (quantity: number, method: "bank" | "coins", confirmed: string | null) =>
+      `Bought ${quantity} rings with ${method === "coins" ? "KinkCoins" : "a bank transfer"}${confirmed ? ` · confirmed ${confirmed}` : ""}`,
     fromKinkord: "Given by Kinkord",
     ring: (seq: number) => `Ring ${seq}`,
     status: { unused: "Unused", given: "Given", expired: "Expired", cancelled: "Cancelled" },

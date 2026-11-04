@@ -31,6 +31,10 @@ export interface PaymentProofPM {
 }
 
 export interface PaymentPM {
+  purpose?: "silver" | "rings";
+  ringQuantity?: number | null;
+  method?: "bank" | "coins";
+  coinQuantity?: number | null;
   id: string;
   plan: "silver";
   period: PlanPeriod;
@@ -67,6 +71,8 @@ export interface SubscriptionStatusPM {
   forGood?: boolean;
   available: boolean;
   prices: PlanPricesPM;
+  /** The Kink Rings each plan brings now, the founders' setting; absent from an older API. */
+  rings?: { monthly: number; yearly: number };
   open: PaymentPM | null;
   rejected: PaymentPM | null;
 }
@@ -225,7 +231,10 @@ export function toAdminPaymentVM(
         : member.displayName
       : labels.deletedAccount,
     memberHref: member ? memberHref(member.userId) : null,
-    plan: `${labels.plan} · ${labels.periods[pm.period]}`,
+    plan:
+      pm.purpose === "rings"
+        ? `${pm.ringQuantity} Kink Rings · ${pm.method === "coins" ? "KinkCoins" : "Bank transfer"}`
+        : `${labels.plan} · ${labels.periods[pm.period]}`,
     expected: naira(pm.amountKobo),
     paid: proof ? naira(proof.amountKobo) : null,
     amountMatches: proof ? proof.amountKobo === pm.amountKobo : false,

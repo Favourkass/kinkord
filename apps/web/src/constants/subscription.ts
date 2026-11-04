@@ -58,6 +58,22 @@ export const SUBSCRIPTION_COPY = {
       { icon: "globe", title: "International messaging", body: "Connect globally" },
       { icon: "ban", title: "Ad-free experience", body: "No ads, just Kinkord" },
     ],
+    /**
+     * Shown after the gifts line once the plans have loaded, with the founders'
+     * counts (Moderation → Kink Rings). Left out when neither plan brings any.
+     */
+    rings: {
+      icon: "gift",
+      title: "Kink Rings included",
+      body: ({ monthly, yearly }: { monthly: number; yearly: number }) => {
+        const rings = (n: number) => `${n} ${n === 1 ? "ring" : "rings"}`;
+        const plans = [
+          monthly > 0 ? `${rings(monthly)} with every monthly payment` : null,
+          yearly > 0 ? `${rings(yearly)} with a yearly payment` : null,
+        ].filter(Boolean);
+        return plans.length ? `${plans.join(", or ")}, added to your inventory to gift` : null;
+      },
+    },
     /** The full list behind "See all 15 Silver benefits"; the link shows once it's longer than what's above. */
     allBenefits: [] as Array<{ title: string; body: string }>,
     seeAll: (n: number) => `See all ${n} Silver benefits`,

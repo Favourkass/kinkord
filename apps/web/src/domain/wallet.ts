@@ -44,7 +44,7 @@ export interface WalletSummaryPM {
 export interface WalletOperationPM {
   id: string;
   userId: string;
-  kind: "purchase" | "withdrawal" | "gift_sent" | "gift_received";
+  kind: "purchase" | "withdrawal" | "gift_sent" | "gift_received" | "ring_purchase";
   counterpartyName?: string;
   postId?: string;
   currency: KinkCurrency;
@@ -77,11 +77,12 @@ export function walletOperationVM(row: WalletOperationPM) {
   return {
     ...row,
     amount:
-      row.kind === "gift_sent" || row.kind === "gift_received"
-        ? `${row.kind === "gift_sent" ? "−" : "+"}${row.quantity.toLocaleString("en-NG")}`
+      row.kind === "gift_sent" || row.kind === "gift_received" || row.kind === "ring_purchase"
+        ? `${row.kind === "gift_received" ? "+" : "−"}${row.quantity.toLocaleString("en-NG")}`
         : walletMoney(row.amountKobo),
     title: {
       purchase: "Coin purchase",
+      ring_purchase: "Kink Rings purchased",
       withdrawal: "Withdrawal",
       gift_sent: "Gift sent",
       gift_received: "Gift received",
@@ -95,7 +96,7 @@ export function walletOperationVM(row: WalletOperationPM) {
     ),
     maskedAccount: `•••• ${row.accountNumber.slice(-4)}`,
     statusLabel:
-      row.kind === "gift_sent" || row.kind === "gift_received"
+      row.kind === "gift_sent" || row.kind === "gift_received" || row.kind === "ring_purchase"
         ? "Completed"
         : {
             pending: "Awaiting action",

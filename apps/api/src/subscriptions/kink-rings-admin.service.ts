@@ -52,7 +52,10 @@ export interface AdminRing {
 /** The rings one Silver payment brought, or the ones Kinkord gave (no payment). */
 export interface AdminRingBatch {
   paymentId: string | null;
+  /** The Silver plan that brought them; null for rings bought on their own, or the founders'. */
   period: BillingPeriod | null;
+  /** Rings the member bought on their own, and how they paid; null for Silver's. */
+  bought: { quantity: number; method: "bank" | "coins" } | null;
   /** When the payment was confirmed, which is when its rings started counting down. */
   confirmedAt: string | null;
   rings: AdminRing[];
@@ -131,6 +134,9 @@ export class KinkRingsAdminService {
           createdAt: kinkRing.createdAt,
           paymentId: kinkRing.paymentId,
           period: subscriptionPayment.period,
+          purpose: subscriptionPayment.purpose,
+          ringQuantity: subscriptionPayment.ringQuantity,
+          method: subscriptionPayment.method,
           confirmedAt: subscriptionPayment.reviewedAt,
           recipientUsername: recipient.username,
           recipientName: recipientProfile.displayName,
@@ -164,9 +170,13 @@ export class KinkRingsAdminService {
       const key = row.paymentId ?? "kinkord";
       let batch = batches.get(key);
       if (!batch) {
+        const bought = row.purpose === "rings";
         batch = {
           paymentId: row.paymentId,
-          period: row.period,
+          period: bought ? null : row.period,
+          bought: bought
+            ? { quantity: row.ringQuantity ?? 0, method: row.method === "coins" ? "coins" : "bank" }
+            : null,
           confirmedAt: iso(row.confirmedAt),
           rings: [],
         };
@@ -329,6 +339,8 @@ async function takeRingMonth(tx: Queryable, userId: string, now: Date): Promise<
         and(
           eq(subscriptionPayment.userId, userId),
           eq(subscriptionPayment.status, "verified"),
+          // Rings bought on their own never paid for the member's Silver.
+          eq(subscriptionPayment.purpose, "silver"),
           isNotNull(subscriptionPayment.reviewedAt),
         ),
       ),

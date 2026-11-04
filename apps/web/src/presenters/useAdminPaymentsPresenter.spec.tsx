@@ -118,3 +118,14 @@ describe("useAdminPaymentsPresenter", () => {
     expect(result.current.rows).toHaveLength(2);
   });
 });
+
+it("approves ring purchases without describing a Silver extension", async () => {
+  list.mockResolvedValue([row("rings", { purpose: "rings", ringQuantity: 2, method: "bank" })]);
+  verify.mockResolvedValue({ id: "rings", silverUntil: null });
+  const { result } = renderHook(() => useAdminPaymentsPresenter());
+  await waitFor(() => expect(result.current.rows).toHaveLength(1));
+  act(() => result.current.askVerify("rings"));
+  expect(result.current.dialog?.body).toContain("Kink Rings");
+  act(() => result.current.dialog?.confirm());
+  await waitFor(() => expect(result.current.notice).toContain("Kink Rings have been added"));
+});
