@@ -243,7 +243,7 @@ export class SubscriptionsService implements OnApplicationBootstrap {
     const now = new Date();
     // First, so a founder put on Silver here sees it in this same answer.
     const until = await this.silverUntil(who);
-    const [settings, recent, check] = await Promise.all([
+    const [settings, recent, check, rings] = await Promise.all([
       readSettings(this.db),
       this.db
         .select()
@@ -254,6 +254,7 @@ export class SubscriptionsService implements OnApplicationBootstrap {
         .orderBy(desc(subscriptionPayment.createdAt))
         .limit(5),
       silverCheckStatus(this.db, userId, now),
+      ringsPerPlan(this.db),
     ]);
     const payments = recent.map((row) => toPaymentDto(row, now));
     const open = payments.find((p) => p.status === "pending" || p.status === "submitted") ?? null;
@@ -272,6 +273,7 @@ export class SubscriptionsService implements OnApplicationBootstrap {
       forGood,
       available: settings.bank !== null,
       prices: settings.prices,
+      rings,
       // Silver for good has nothing to pay: no payment to finish, nor one to retry.
       open: forGood ? null : open,
       rejected: !forGood && latest?.status === "rejected" ? latest : null,

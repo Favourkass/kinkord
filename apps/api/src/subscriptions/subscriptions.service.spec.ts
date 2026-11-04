@@ -237,7 +237,8 @@ describe("SubscriptionsService.status", () => {
   const member = { id: "u1", email: "member@example.test", emailVerified: true };
 
   it("is Basic with the design's prices while no account is set", async () => {
-    const { service } = make([[], [], [], []]);
+    // The plan, the settings, the check, the ring setting (unset), then payments.
+    const { service } = make([[], [], [], [], []]);
     await expect(service.status(member)).resolves.toEqual({
       plan: "basic",
       silverUntil: null,
@@ -245,6 +246,7 @@ describe("SubscriptionsService.status", () => {
       forGood: false,
       available: false,
       prices: DEFAULT_PRICES,
+      rings: { monthly: 1, yearly: 12 },
       open: null,
       rejected: null,
     });
@@ -264,6 +266,7 @@ describe("SubscriptionsService.status", () => {
           coverKey: "c",
         },
       ],
+      [],
       [payment({ status: "submitted" })],
     ]);
     const status = await service.status(member);
@@ -280,6 +283,7 @@ describe("SubscriptionsService.status", () => {
       [settingsRow],
       [{ heldAt: NOW, heldFor: "name", avatarKey: "a", coverKey: "c" }],
       [],
+      [],
     ]);
     await expect(held.service.status(member)).resolves.toMatchObject({
       check: { shown: false, reason: "held", heldFor: "name" },
@@ -288,7 +292,13 @@ describe("SubscriptionsService.status", () => {
 
   it("surfaces the last payment when it was rejected", async () => {
     const rejected = payment({ status: "rejected", reviewNote: "No such transfer" });
-    const { service } = make([[], [settingsRow], [], [rejected, payment({ status: "verified" })]]);
+    const { service } = make([
+      [],
+      [settingsRow],
+      [],
+      [],
+      [rejected, payment({ status: "verified" })],
+    ]);
     const status = await service.status(member);
     expect(status.rejected?.reviewNote).toBe("No such transfer");
     expect(status.open).toBeNull();
@@ -298,6 +308,7 @@ describe("SubscriptionsService.status", () => {
     const { service } = make([
       [{ end: FOUNDER_SILVER_UNTIL }],
       [settingsRow],
+      [],
       [],
       [payment({ status: "pending" }), payment({ status: "rejected" })],
     ]);
@@ -309,9 +320,25 @@ describe("SubscriptionsService.status", () => {
     });
   });
 
+  it("says how many rings each plan brings, as the founders set it", async () => {
+    const { service } = make([
+      [],
+      [settingsRow],
+      [],
+      [
+        { key: "kink_rings_monthly", value: "1" },
+        { key: "kink_rings_yearly", value: "6" },
+      ],
+      [],
+    ]);
+    await expect(service.status(member)).resolves.toMatchObject({
+      rings: { monthly: 1, yearly: 6 },
+    });
+  });
+
   it("shows a founder on Silver the first time they look", async () => {
     const founder = { id: "f1", email: SUPER_ADMIN_EMAILS[0], emailVerified: true };
-    const { service } = make([[], undefined, [settingsRow], [], []]);
+    const { service } = make([[], undefined, [settingsRow], [], [], []]);
     await expect(service.status(founder)).resolves.toMatchObject({
       plan: "silver",
       silverUntil: FOUNDER_SILVER_UNTIL.toISOString(),

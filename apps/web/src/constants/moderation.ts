@@ -110,6 +110,8 @@ export const MODERATION_COPY = {
       `Balance: ${c.unused} to give · ${c.total} ${c.total === 1 ? "ring" : "rings"} in all · ${c.given} given · ${c.expired} expired${c.cancelled ? ` · ${c.cancelled} cancelled` : ""} · ${c.received} received`,
     batch: (period: "monthly" | "yearly", confirmed: string | null) =>
       `${period === "yearly" ? "Yearly" : "Monthly"} Silver${confirmed ? ` · confirmed ${confirmed}` : ""}`,
+    bought: (quantity: number, method: "bank" | "coins", confirmed: string | null) =>
+      `Bought ${quantity} rings with ${method === "coins" ? "KinkCoins" : "a bank transfer"}${confirmed ? ` · confirmed ${confirmed}` : ""}`,
     fromKinkord: "Given by Kinkord",
     ring: (seq: number) => `Ring ${seq}`,
     status: { unused: "Unused", given: "Given", expired: "Expired", cancelled: "Cancelled" },

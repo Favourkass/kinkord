@@ -40,6 +40,7 @@ export class RingPurchasesService {
           and(
             eq(kinkRing.ownerId, userId),
             isNull(kinkRing.givenAt),
+            isNull(kinkRing.revokedAt),
             gt(kinkRing.expiresAt, new Date()),
           ),
         ),

@@ -141,6 +141,28 @@ describe("KinkRingsAdminService.forMember", () => {
       },
     ]);
   });
+
+  it("heads rings the member bought on their own apart from Silver's", async () => {
+    const bought = {
+      paymentId: "buy-1",
+      period: "monthly",
+      purpose: "rings",
+      ringQuantity: 2,
+      method: "coins",
+      confirmedAt: day(-1),
+    };
+    const own = [
+      ring(1, { ...bought, expiresAt: day(89) }),
+      ring(2, { ...bought, expiresAt: day(89) }),
+      ring(1, { purpose: "silver", ringQuantity: null, method: "bank", expiresAt: day(10) }),
+    ];
+    const result = await new KinkRingsAdminService(dbAnswering(own, [])).forMember("u1", now);
+    expect(result.batches.map((b) => [b.paymentId, b.period, b.bought])).toEqual([
+      ["buy-1", null, { quantity: 2, method: "coins" }],
+      ["pay-1", "yearly", null],
+    ]);
+    expect(result.counts.unused).toBe(3);
+  });
 });
 
 describe("silverFrom", () => {
