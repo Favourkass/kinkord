@@ -90,6 +90,8 @@ const ringLabels: MemberRingsLabels = {
     `Balance: ${c.unused} to give · ${c.total} ${c.total === 1 ? "ring" : "rings"} in all · ${c.given} given · ${c.expired} expired${c.cancelled ? ` · ${c.cancelled} cancelled` : ""} · ${c.received} received`,
   batch: (period, confirmed) =>
     `${period === "yearly" ? "Yearly" : "Monthly"} Silver${confirmed ? ` · confirmed ${confirmed}` : ""}`,
+  bought: (quantity, method, confirmed) =>
+    `Bought ${quantity} rings with ${method === "coins" ? "KinkCoins" : "a bank transfer"}${confirmed ? ` · confirmed ${confirmed}` : ""}`,
   fromKinkord: "Given by Kinkord",
   ring: (seq) => `Ring ${seq}`,
   status: { unused: "Unused", given: "Given", expired: "Expired", cancelled: "Cancelled" },
@@ -251,6 +253,37 @@ describe("toMemberRingsVM", () => {
     );
     expect(vm.batches[0].heading).toBe("Given by Kinkord");
     expect(vm.batches[0].rings[0].line).toBe("To a member who has since left on 1 Nov 2026");
+  });
+
+  it("heads rings a member bought by what they bought and how they paid", () => {
+    const vm = toMemberRingsVM(
+      {
+        counts: { total: 2, unused: 2, given: 0, expired: 0, cancelled: 0, received: 0 },
+        batches: [
+          {
+            paymentId: "buy-1",
+            period: null,
+            bought: { quantity: 2, method: "coins" },
+            confirmedAt: "2026-11-03T09:00:00.000Z",
+            rings: [],
+          },
+          {
+            paymentId: "buy-2",
+            period: null,
+            bought: { quantity: 4, method: "bank" },
+            confirmedAt: null,
+            rings: [],
+          },
+        ],
+        received: [],
+      },
+      ringLabels,
+      href,
+    );
+    expect(vm.batches.map((b) => b.heading)).toEqual([
+      "Bought 2 rings with KinkCoins · confirmed 3 Nov 2026",
+      "Bought 4 rings with a bank transfer",
+    ]);
   });
 
   it("is empty with no rings either way", () => {

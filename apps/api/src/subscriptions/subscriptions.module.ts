@@ -1,5 +1,6 @@
 import { KinkRingsAdminController } from "./kink-rings-admin.controller";
 import { KinkRingsAdminService } from "./kink-rings-admin.service";
+import { RingPurchasesService } from "./ring-purchases.service";
 import { SilverMembersController } from "./silver-members.controller";
 import { SilverMembersService } from "./silver-members.service";
 import { KinkRingsInventoryService } from "./kink-rings-inventory.service";
@@ -33,6 +34,7 @@ import { SubscriptionsService } from "./subscriptions.service";
     PaymentsService,
     SilverChecksService,
     KinkRingsService,
+    RingPurchasesService,
     KinkRingsInventoryService,
     KinkRingsAdminService,
     SilverMembersService,

@@ -344,7 +344,12 @@ describe("notification links and search words", () => {
       "silver_check",
       "kink_ring",
     ]);
-    expect(typesMatching("ring")).toEqual(["kink_ring"]);
+    expect(typesMatching("ring")).toEqual([
+      "ring_purchase_verified",
+      "ring_purchase_rejected",
+      "kink_ring",
+    ]);
+    expect(notificationUrl("ring_purchase_verified", "pay1", null)).toBe("/subscription/pay/pay1");
   });
 });
 

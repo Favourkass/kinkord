@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
+import RingPaymentView from "@/components/kink-rings/RingPaymentView";
 import BankTransferView from "@/components/subscription/BankTransferView";
 import SubscriptionChrome from "@/components/subscription/SubscriptionChrome";
 import { SUBSCRIPTION_COPY } from "@/constants/subscription";
@@ -20,7 +21,9 @@ export default function SubscriptionPayPage() {
       width="payment"
       footer
     >
-      {p.view && p.amount && p.bank && p.reference ? (
+      {p.ringSummary ? (
+        <RingPaymentView {...p} />
+      ) : p.view && p.amount && p.bank && p.reference ? (
         <BankTransferView
           copy={{
             title: copy.title,

@@ -2,6 +2,10 @@ import AnimatedWordmark from "@/components/app/AnimatedWordmark";
 import Image from "next/image";
 import Link from "next/link";
 import {
+  CalendarDays,
+  Store,
+  UserPlus,
+  Megaphone,
   Cookie,
   Copyright,
   FileText,
@@ -44,7 +48,11 @@ export interface PolicyItem {
     | "about"
     | "contact"
     | "invest"
-    | "whatsapp";
+    | "whatsapp"
+    | "marketplace"
+    | "events"
+    | "team"
+    | "advertising";
 }
 
 export interface AdultBadgeData {
@@ -242,6 +250,14 @@ function WhatsAppIcon({ className = "" }: { className?: string }) {
 
 function PolicyIcon({ type }: { type: PolicyItem["icon"] }) {
   switch (type) {
+    case "marketplace":
+      return <Store className="size-[18px] sm:size-[22px] text-[#faab14]" aria-hidden />;
+    case "events":
+      return <CalendarDays className="size-[18px] sm:size-[22px] text-[#faab14]" aria-hidden />;
+    case "team":
+      return <UserPlus className="size-[18px] sm:size-[22px] text-[#faab14]" aria-hidden />;
+    case "advertising":
+      return <Megaphone className="size-[18px] sm:size-[22px] text-[#faab14]" aria-hidden />;
     case "privacy":
       return <Shield className="size-[18px] sm:size-[22px] text-[#faab14]" aria-hidden />;
     case "terms":

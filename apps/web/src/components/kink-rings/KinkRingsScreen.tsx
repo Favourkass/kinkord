@@ -15,6 +15,7 @@ import {
   Plus,
   Minus,
   MapPin,
+  CheckCircle2,
   Check,
   Search,
   CalendarDays,
@@ -133,7 +134,10 @@ function RecipientIdentity({
   member,
   large = false,
 }: {
-  member: KinkRingsScreenProps["picked"][number];
+  member: Pick<
+    KinkRingsScreenProps["picked"][number],
+    "avatarUrl" | "online" | "name" | "handle" | "location"
+  >;
   large?: boolean;
 }) {
   return (
@@ -167,6 +171,51 @@ function RecipientIdentity({
 }
 export default function KinkRingsScreen(p: KinkRingsScreenProps) {
   const c = p.copy;
+  if (p.stage === "success" && p.completed)
+    return (
+      <main className="mx-auto max-w-[680px] space-y-6 px-5 py-8 text-white">
+        <CheckCircle2 className="mx-auto size-20 text-kink-gold-bright" />
+        <h1 className="text-center text-3xl font-bold">{c.successTitle}</h1>
+        <p className="text-center text-white/65">{c.successIntro}</p>
+        <div className="relative mx-auto h-52 w-full max-w-sm overflow-hidden rounded-2xl">
+          <Image src={p.hero} alt="Gold Kink Ring" fill sizes="400px" className="object-cover" />
+        </div>
+        <section className={`${panel} space-y-4 p-5`}>
+          <h2 className="flex items-center gap-2 text-xl font-bold">
+            <Gift className="text-kink-gold-bright" />
+            {c.giftSummary}
+          </h2>
+          <dl className="space-y-3 text-sm">
+            <div className="flex justify-between gap-4">
+              <dt>{c.totalSent}</dt>
+              <dd className="font-bold text-kink-gold-bright">{p.completed.count}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt>{c.dateTime}</dt>
+              <dd>{p.completed.date}</dd>
+            </div>
+          </dl>
+        </section>
+        <h2 className="text-xl font-bold">Recipients ({p.completed.recipients.length})</h2>
+        {p.completed.recipients.map((member) => (
+          <article key={member.userId} className={`${panel} space-y-4 p-4`}>
+            <RecipientIdentity member={member} large />
+            <p className="font-bold text-kink-gold-bright">
+              {member.quantity} {c.quantity}
+            </p>
+            {member.message && (
+              <p className="whitespace-pre-wrap break-words rounded-xl border border-[#8c702e]/50 p-3 text-sm">
+                {member.message}
+              </p>
+            )}
+          </article>
+        ))}
+        <p className={`${panel} p-4 text-sm text-white/65`}>{c.successNote}</p>
+        <button className={`${gold} w-full`} onClick={p.onDone}>
+          {c.done}
+        </button>
+      </main>
+    );
   const gifting = ["recipients", "selected", "allocation", "message", "review"].includes(p.stage);
   const heading =
     p.stage === "recipients"

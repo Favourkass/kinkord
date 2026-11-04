@@ -70,6 +70,7 @@ export const Routes = {
   // Account-menu entries still being built: each opens a "coming soon" screen.
   kinkopediaInApp: "/coming-soon/kinkopedia",
   marketplace: "/coming-soon/marketplace",
+  events: "/coming-soon/events",
   settingsData: "/coming-soon/your-data",
   settingsContent: "/coming-soon/content-experience",
   settingsCommunitySafety: "/coming-soon/community-safety",
@@ -109,6 +110,8 @@ export const Routes = {
   subscription: "/subscription",
   /** Kink Rings: a month of Silver to give away. */
   kinkRings: "/kink-rings",
+  kinkRingsBuy: "/kink-rings/buy",
+  kinkRingsPurchases: "/kink-rings/purchases",
   subscriptionPay: (paymentId: string) => `/subscription/pay/${encodeURIComponent(paymentId)}`,
   subscriptionProof: (paymentId: string) => `/subscription/proof/${encodeURIComponent(paymentId)}`,
 } as const;

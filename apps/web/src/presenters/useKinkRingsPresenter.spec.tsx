@@ -94,7 +94,7 @@ it("reviews quantities before sending explicit rings and prevents duplicate clic
     { ringId: "r2", username: "ada" },
   ]);
   await act(async () => resolve({ gifts: [] }));
-  expect(result.current.stage).toBe("overview");
+  expect(result.current.stage).toBe("success");
 });
 it("retains the same assignment after a network error so retry cannot consume other rings", async () => {
   vi.mocked(kinkRingsApi.giveSelected).mockRejectedValueOnce(new Error("offline"));
@@ -110,8 +110,9 @@ it("does not present a completed gift as failed if balance refresh fails", async
   const { result } = await selected();
   vi.mocked(kinkRingsApi.inventory).mockRejectedValueOnce(new Error("offline"));
   await act(() => result.current.onGive());
-  expect(result.current.stage).toBe("overview");
-  expect(result.current.note).toContain("gifted");
+  expect(result.current.stage).toBe("success");
+  expect(result.current.completed?.count).toBe(1);
+  expect(result.current.completed?.recipients[0].username).toBe("ada");
   expect(result.current.giveError).toBeNull();
   expect(result.current.count).toBe(1);
 });

@@ -75,6 +75,19 @@ export function planState(status: SubscriptionStatusPM): PlanState {
 }
 
 /** Upgrade to Silver (Figma 2:179 mobile, 2:2 desktop): the plans, and the way into paying. */
+/** Silver's benefits, with the rings line only once the founders' counts are in. */
+export function silverFeatures(rings: { monthly: number; yearly: number } | undefined) {
+  const { features, rings: line } = SUBSCRIPTION_COPY.upgrade;
+  const body = rings ? line.body(rings) : null;
+  if (!body) return [...features];
+  const gifts = features.findIndex((f) => f.icon === "gift");
+  return [
+    ...features.slice(0, gifts + 1),
+    { icon: line.icon, title: line.title, body },
+    ...features.slice(gifts + 1),
+  ];
+}
+
 export function useSubscriptionPresenter() {
   const router = useRouter();
   const copy = SUBSCRIPTION_COPY.upgrade;
@@ -171,6 +184,7 @@ export function useSubscriptionPresenter() {
       href: open ? Routes.subscriptionPay(open.id) : "#silver-plans",
     },
     options: status ? planOptions(status.prices, period) : [],
+    features: silverFeatures(status?.rings),
     // Picking the other plan with a checkout open starts that plan's instead.
     selectPeriod: setPeriod,
     showSeeAll: copy.allBenefits.length > copy.features.length,

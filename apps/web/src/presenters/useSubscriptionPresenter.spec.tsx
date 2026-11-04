@@ -6,6 +6,7 @@ import {
   checkNote,
   planOptions,
   planState,
+  silverFeatures,
   useSubscriptionPresenter,
 } from "./useSubscriptionPresenter";
 
@@ -113,6 +114,29 @@ describe("checkNote", () => {
     expect(checkNote({ ...check, reason: "photos" }).text).toBe(
       "Add a profile photo and a cover photo to show your badge.",
     );
+  });
+});
+
+describe("silverFeatures", () => {
+  it("adds the founders' ring counts after the gifts line", () => {
+    const features = silverFeatures({ monthly: 1, yearly: 6 });
+    const at = features.findIndex((f) => f.title === "Kink Rings included");
+    expect(features[at - 1].title).toBe("Receive & send gifts");
+    expect(features[at].body).toBe(
+      "1 ring with every monthly payment, or 6 rings with a yearly payment, added to your inventory to gift",
+    );
+  });
+
+  it("names only the plan that brings rings, and leaves the line out when neither does", () => {
+    expect(
+      silverFeatures({ monthly: 0, yearly: 6 }).find((f) => f.title === "Kink Rings included")
+        ?.body,
+    ).toBe("6 rings with a yearly payment, added to your inventory to gift");
+    expect(
+      silverFeatures({ monthly: 0, yearly: 0 }).some((f) => f.title === "Kink Rings included"),
+    ).toBe(false);
+    // Before the plans load, nothing about rings rather than a number that may be wrong.
+    expect(silverFeatures(undefined).some((f) => f.title === "Kink Rings included")).toBe(false);
   });
 });
 

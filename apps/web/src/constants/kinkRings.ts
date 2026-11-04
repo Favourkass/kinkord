@@ -89,7 +89,7 @@ export const RING_FLOW_COPY = {
   searchHint: "Enter at least two characters to search.",
   searchError: "Could not load recipients. Try again.",
   noHistory: "Your gifts will appear here after you send a Kink Ring.",
-  noRings: "You have no rings available. Silver Premium includes rings to give.",
+  noRings: "You have no rings available. Buy rings or get them with Silver Premium.",
   noExpired: "No expired rings.",
   more: "Load more",
   retry: "Try again",
@@ -104,15 +104,23 @@ export const RING_FLOW_COPY = {
     const plans = perPlan
       ? ` Monthly Silver includes ${count(perPlan.monthly)}; yearly Silver includes ${count(perPlan.yearly)}, expiring one month apart.`
       : "";
-    return `Every ring gives someone one month of Silver.${plans} Unused rings expire on their listed dates. Gifting history shows each recipient’s current Silver status.`;
+    return `Every ring gives someone one month of Silver.${plans} Separately purchased rings expire 90 days after payment confirmation. Unused rings expire on their listed dates. Gifting history shows each recipient’s current Silver status.`;
   },
   max: "You can select up to 50 rings per gift.",
   maxRecipients: "Select more rings to add another recipient.",
   error: "Could not send the rings. Your selection is saved; retry to check the same gift safely.",
   loadError: "Could not load your Kink Rings. Please try again.",
   success: "Your Kink Rings have been gifted.",
+  successTitle: "Kink Rings Gifted!",
+  successIntro: "Your Kink Rings have been sent to your selected recipients.",
+  giftSummary: "Gift Summary",
+  totalSent: "Total Kink Rings Sent",
+  dateTime: "Date & Time (Lagos)",
+  successNote:
+    "Silver time has been added to each recipient's account. Their gift notification includes your personal message, if provided.",
+  done: "Done",
   back: "Back",
-  purchaseNote: "Silver Premium includes Kink Rings.",
+  purchaseNote: "Buy extra rings, or get rings with Silver Premium.",
   received: "Received",
   expiry: "Expiry",
 } as const;

@@ -14,6 +14,7 @@ interface Field {
 }
 
 export interface PaymentProofViewProps {
+  artwork?: { src: string; alt: string };
   copy: {
     title: readonly string[];
     subtitle: string;
@@ -181,7 +182,17 @@ export default function PaymentProofView(p: PaymentProofViewProps) {
         </p>
       </div>
       <div className="mt-[6px] lg:mt-[37px]">
-        <SilverOctagon alt={copy.medalAlt} phone={[88, 96]} desktop={[112, 122]} />
+        {p.artwork ? (
+          <Image
+            src={p.artwork.src}
+            alt={p.artwork.alt}
+            width={140}
+            height={140}
+            className="rounded-xl"
+          />
+        ) : (
+          <SilverOctagon alt={copy.medalAlt} phone={[88, 96]} desktop={[112, 122]} />
+        )}
       </div>
     </div>
   );
