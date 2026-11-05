@@ -367,3 +367,61 @@ describe("KinkRingsAdminService.cancelSilver", () => {
     await expect(cancel({ ...given, silverCancelledAt: day(-1) })).rejects.toThrow("already");
   });
 });
+
+describe("KinkRingsAdminService settings", () => {
+  /** Selects answer in turn; inserts are kept, so the test sees what was stored and logged. */
+  function settingsDb(...answers: unknown[][]) {
+    const queue = [...answers];
+    const writes: Array<{ table: unknown; values: Record<string, unknown> }> = [];
+    const chain = (): Record<string, unknown> => {
+      const c: Record<string, unknown> = {};
+      for (const step of ["from", "where", "limit"]) c[step] = () => c;
+      c.then = (ok: (rows: unknown[]) => unknown) => Promise.resolve(queue.shift() ?? []).then(ok);
+      return c;
+    };
+    const db: Record<string, unknown> = {
+      select: vi.fn(() => chain()),
+      insert: vi.fn((table: unknown) => ({
+        values: (values: Record<string, unknown>) => {
+          writes.push({ table, values });
+          return Object.assign(Promise.resolve(), { onConflictDoUpdate: () => Promise.resolve() });
+        },
+      })),
+    };
+    db.transaction = (fn: (tx: unknown) => unknown) => fn(db);
+    return { db: db as unknown as Db, writes };
+  }
+
+  it("shows the founders' price for 2 rings with the counts", async () => {
+    const { db } = settingsDb([{ key: "kink_rings_yearly", value: "6" }], [{ value: "499" }]);
+    await expect(new KinkRingsAdminService(db).settings(true)).resolves.toEqual({
+      rings: { monthly: 1, yearly: 6 },
+      pairUsdCents: 499,
+      canEdit: true,
+      max: 24,
+    });
+  });
+
+  it("stores a new price with the counts and logs both", async () => {
+    const { db, writes } = settingsDb();
+    await new KinkRingsAdminService(db).saveSettings("f1", {
+      monthly: 1,
+      yearly: 6,
+      pairUsdCents: 499,
+    });
+    expect(writes.map((w) => w.values.key ?? w.values.action)).toEqual([
+      "kink_rings_monthly",
+      "kink_rings_yearly",
+      "kink_ring_pair_usd_cents",
+      "set-kink-rings",
+    ]);
+    expect(writes.at(-1)?.values.detail).toBe("monthly 1, yearly 6, 2 rings $4.99");
+  });
+
+  it("leaves the price alone when a page from before it existed saves the counts", async () => {
+    const { db, writes } = settingsDb();
+    await new KinkRingsAdminService(db).saveSettings("f1", { monthly: 1, yearly: 6 });
+    expect(writes.some((w) => w.values.key === "kink_ring_pair_usd_cents")).toBe(false);
+    expect(writes.at(-1)?.values.detail).toBe("monthly 1, yearly 6");
+  });
+});

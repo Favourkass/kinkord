@@ -14,7 +14,13 @@ import {
 import { silverGiven } from "./given-silver";
 import { MAX_RINGS } from "./kink-rings";
 import { addMonths } from "./plans";
-import { ringsPerPlan, saveRingsPerPlan, type RingsPerPlan } from "./ring-settings";
+import {
+  ringPairPrice,
+  ringsPerPlan,
+  saveRingPairPrice,
+  saveRingsPerPlan,
+  type RingsPerPlan,
+} from "./ring-settings";
 import { silverFrom } from "./silver-time";
 
 /** The client or an open transaction: both run the same queries. */
@@ -220,20 +226,28 @@ export class KinkRingsAdminService {
     };
   }
 
-  /** How many rings each plan brings; only the founders may change it. */
+  /** How many rings each plan brings, and what 2 bought rings cost; only the founders change them. */
   async settings(
     canEdit: boolean,
-  ): Promise<{ rings: RingsPerPlan; canEdit: boolean; max: number }> {
-    return { rings: await ringsPerPlan(this.db), canEdit, max: MAX_RINGS };
+  ): Promise<{ rings: RingsPerPlan; pairUsdCents: number; canEdit: boolean; max: number }> {
+    const rings = await ringsPerPlan(this.db);
+    const pairUsdCents = await ringPairPrice(this.db);
+    return { rings, pairUsdCents, canEdit, max: MAX_RINGS };
   }
 
-  async saveSettings(actorId: string, rings: RingsPerPlan) {
+  /** The price is optional so a page from before it existed can still save the counts. */
+  async saveSettings(actorId: string, input: RingsPerPlan & { pairUsdCents?: number }) {
+    const rings = { monthly: input.monthly, yearly: input.yearly };
+    const price = input.pairUsdCents;
     await this.db.transaction(async (tx) => {
       await saveRingsPerPlan(tx, rings, actorId);
+      if (price !== undefined) await saveRingPairPrice(tx, price, actorId);
       await tx.insert(moderationLog).values({
         actorId,
         action: "set-kink-rings",
-        detail: `monthly ${rings.monthly}, yearly ${rings.yearly}`,
+        detail:
+          `monthly ${rings.monthly}, yearly ${rings.yearly}` +
+          (price !== undefined ? `, 2 rings $${(price / 100).toFixed(2)}` : ""),
       });
     });
     return this.settings(true);

@@ -15,6 +15,7 @@ import { AdminGuard } from "../moderation/admin.guard";
 import { isSuperAdmin } from "../moderation/admins";
 import { MAX_RINGS } from "./kink-rings";
 import { KinkRingsAdminService } from "./kink-rings-admin.service";
+import { PAIR_USD_CENTS_MAX, PAIR_USD_CENTS_MIN } from "./ring-purchases.rules";
 import { parse } from "./subscriptions.controller";
 
 const memberId = z.string().trim().min(1).max(64);
@@ -26,7 +27,16 @@ const ringCount = z
   .int(`Enter a whole number from 0 to ${MAX_RINGS}.`)
   .min(0, `Enter a whole number from 0 to ${MAX_RINGS}.`)
   .max(MAX_RINGS, `Enter a whole number from 0 to ${MAX_RINGS}.`);
-const settingsSchema = z.object({ monthly: ringCount, yearly: ringCount }).strict();
+const PRICE = "Enter a price from $0.50 to $500 for 2 rings.";
+/** US cents for 2 rings, so $4.99 is 499. */
+const pairPrice = z
+  .number({ message: PRICE })
+  .int(PRICE)
+  .min(PAIR_USD_CENTS_MIN, PRICE)
+  .max(PAIR_USD_CENTS_MAX, PRICE);
+const settingsSchema = z
+  .object({ monthly: ringCount, yearly: ringCount, pairUsdCents: pairPrice.optional() })
+  .strict();
 
 /**
  * A member's Kink Rings on their admin page: what each payment brought, who
@@ -43,11 +53,11 @@ export class KinkRingsAdminController {
     return this.rings.settings(isSuperAdmin(req.user));
   }
 
-  /** What each plan brings is part of its price: founders only. */
+  /** What each plan brings, and what bought rings cost, are prices: founders only. */
   @Put("kink-rings/settings")
   saveSettings(@Req() req: AuthedRequest, @Body() body: unknown) {
     if (!isSuperAdmin(req.user)) {
-      throw new ForbiddenException("Only the founders can change how many rings a plan brings.");
+      throw new ForbiddenException("Only the founders can change Kink Ring plans and prices.");
     }
     return this.rings.saveSettings(req.user.id, parse(settingsSchema, body));
   }

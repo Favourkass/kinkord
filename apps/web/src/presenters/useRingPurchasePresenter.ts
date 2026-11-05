@@ -114,8 +114,15 @@ export function useRingPurchasePresenter(historyOnly = false) {
     }
   };
   const current = quote?.quantity === quantity ? quote : null;
+  // What 2 rings cost doesn't change with the quantity, so the last quote's price stands.
+  const pairUsdCents = quote
+    ? (quote.pairUsdCents ?? Math.round((quote.usdCents * 2) / quote.quantity))
+    : null;
   return {
-    copy: RING_PURCHASE_COPY,
+    copy: {
+      ...RING_PURCHASE_COPY,
+      pack: RING_PURCHASE_COPY.pack(pairUsdCents === null ? null : usd(pairUsdCents)),
+    },
     historyOnly,
     step,
     quantity,

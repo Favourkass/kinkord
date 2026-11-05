@@ -96,3 +96,17 @@ it("keeps the price-change error and requires a new review after a definitive re
   expect(sessionStorage.length).toBe(0);
   expect(h.result.current.error).toContain("price has changed");
 });
+it("shows the founders' price for 2 rings once the quote has it", async () => {
+  vi.mocked(ringPurchaseService.quote).mockResolvedValue({
+    ...quote,
+    pairUsdCents: 499,
+    usdCents: 499,
+  });
+  const { result } = renderHook(() => useRingPurchasePresenter());
+  expect(result.current.copy.pack).toBe("2 Kink Rings");
+  await waitFor(() => expect(result.current.copy.pack).toBe("2 Kink Rings = $4.99"));
+});
+it("works the price out from the total when the API predates the founders' price", async () => {
+  const { result } = renderHook(() => useRingPurchasePresenter());
+  await waitFor(() => expect(result.current.copy.pack).toBe("2 Kink Rings = $5"));
+});

@@ -91,6 +91,8 @@ export interface RingsPerPlanPM {
 
 export interface RingSettingsPM {
   rings: RingsPerPlanPM;
+  /** What 2 bought rings cost, in US cents; absent from an API that predates the setting. */
+  pairUsdCents?: number;
   canEdit: boolean;
   /** The most rings a plan can bring. */
   max: number;
@@ -107,6 +109,14 @@ export function ringCountsFrom(
   return [monthly, yearly].every((n) => Number.isInteger(n) && n >= 0 && n <= max)
     ? { monthly, yearly }
     : null;
+}
+
+/** The founders' "4.99" or "$5" as cents; null unless it's a dollar amount with at most 2 decimals. */
+export function pairPriceFrom(input: string): number | null {
+  const text = input.trim().replace(/^\$/, "").trim();
+  if (!/^\d+(\.\d{1,2})?$/.test(text)) return null;
+  const [dollars, cents = ""] = text.split(".");
+  return Number(dollars) * 100 + Number(cents.padEnd(2, "0"));
 }
 
 export interface RingInventoryPM {

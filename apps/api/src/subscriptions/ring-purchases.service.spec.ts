@@ -67,6 +67,7 @@ it("refuses a stale reviewed price before charging", async () => {
     [],
     [],
     [{ enabled: 1, exchangeRateKobo: 140000, usdRates: { coin: { buy: 20 } } }],
+    [], // the founders' price: unset, so $5
     [],
   ]);
   await expect(service.checkout("buyer", input)).rejects.toThrow("price has changed");

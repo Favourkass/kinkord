@@ -5,6 +5,7 @@ import { DRIZZLE, type Db } from "../db/db.module";
 import { kinkRing, subscriptionPayment, walletBalance, walletSettings } from "../db/schema";
 import { z } from "zod";
 import { purchasedRings, ringCheckoutSchema, ringPrice } from "./ring-purchases.rules";
+import { ringPairPrice } from "./ring-settings";
 import { expireAbandoned, readSettings, toPaymentDto } from "./subscriptions.service";
 import { paymentReference } from "./plans";
 
@@ -17,13 +18,16 @@ export class RingPurchasesService {
   private async pricing(db: Db | Tx, quantity: number) {
     const [config] = await db.select().from(walletSettings).where(eq(walletSettings.id, 1));
     if (!config) throw new ServiceUnavailableException("Ring purchases are not configured yet.");
+    // The founders' price for 2 rings, read inside the checkout's transaction.
+    const pairUsdCents = await ringPairPrice(db);
     const price = ringPrice(
       quantity,
       config.exchangeRateKobo,
       config.enabled ? config.usdRates.coin.buy : null,
+      pairUsdCents,
     );
     const settings = await readSettings(db as Db);
-    return { ...price, bank: settings.bank };
+    return { ...price, pairUsdCents, bank: settings.bank };
   }
 
   async quote(userId: string, quantity: number) {
@@ -48,6 +52,7 @@ export class RingPurchasesService {
     return {
       userId,
       quantity: price.quantity,
+      pairUsdCents: price.pairUsdCents,
       usdCents: price.usdCents,
       amountKobo: price.amountKobo,
       coins: price.coins,

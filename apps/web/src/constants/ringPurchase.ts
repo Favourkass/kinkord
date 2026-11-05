@@ -3,7 +3,8 @@ export const RING_PURCHASE_COPY = {
   intro: "Buy extra Kink Rings and gift Silver access to others.",
   history: "Previous Purchases",
   balance: "Current Balance",
-  pack: "2 Kink Rings = $5",
+  /** The founders set the price, so it shows once the quote has it. */
+  pack: (price: string | null) => (price ? `2 Kink Rings = ${price}` : "2 Kink Rings"),
   quantity: "Select 2–100 rings (in multiples of 2)",
   expiry: "Each purchased ring expires 90 days after payment confirmation.",
   total: "Total Price",
