@@ -153,6 +153,7 @@ export const kinkRingsAdminApi = {
       { reason },
     ),
   settings: () => api.get<RingSettingsPM>("/admin/kink-rings/settings"),
-  saveSettings: (rings: RingsPerPlanPM) =>
-    api.put<RingSettingsPM>("/admin/kink-rings/settings", rings),
+  /** The counts, and the price of 2 bought rings in US cents. */
+  saveSettings: (settings: RingsPerPlanPM & { pairUsdCents?: number }) =>
+    api.put<RingSettingsPM>("/admin/kink-rings/settings", settings),
 };

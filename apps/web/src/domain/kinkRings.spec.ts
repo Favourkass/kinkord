@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  pairPriceFrom,
   toKinkRingsVM,
   toMemberRingsVM,
   ringCountsFrom,
@@ -310,5 +311,19 @@ describe("ringCountsFrom", () => {
     for (const bad of ["", "-1", "1.5", "25", "six", "1e1"]) {
       expect(ringCountsFrom({ monthly: "1", yearly: bad }, 24)).toBeNull();
     }
+  });
+});
+
+describe("pairPriceFrom", () => {
+  it("reads a dollar amount as cents", () => {
+    expect(pairPriceFrom("5")).toBe(500);
+    expect(pairPriceFrom(" 4.99 ")).toBe(499);
+    expect(pairPriceFrom("$5.5")).toBe(550);
+    expect(pairPriceFrom("0.50")).toBe(50);
+  });
+
+  it("refuses anything that isn't one", () => {
+    for (const bad of ["", "five", "4.999", "-5", "5,00", "1e3"])
+      expect(pairPriceFrom(bad)).toBeNull();
   });
 });

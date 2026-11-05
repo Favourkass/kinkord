@@ -17,6 +17,14 @@ describe("ring purchases", () => {
     expect(ringPrice(2, 140000, 3).coins).toBe(167);
     expect(ringPrice(2, 140000, null).coins).toBeNull();
   });
+  it("prices pairs at the founders' price when they set one", () => {
+    expect(ringPrice(4, 140000, 10, 499)).toEqual({
+      quantity: 4,
+      usdCents: 998,
+      amountKobo: 1397200,
+      coins: 100,
+    });
+  });
   it.each([0, 1, 3, -2, 101, 2.5, NaN])("refuses invalid quantity %s", (n) =>
     expect(() => ringPrice(n, 140000, 10)).toThrow(),
   );
