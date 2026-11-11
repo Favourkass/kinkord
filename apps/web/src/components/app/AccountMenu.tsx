@@ -28,15 +28,10 @@ function MenuLink({
   soonLabel: string;
   onNavigate?: () => void;
 }) {
-  return (
-    <Link
-      href={item.href}
-      onClick={onNavigate}
-      aria-current={current ? "page" : undefined}
-      className={`flex min-h-11 items-center gap-3 border-b border-drawer-identity-border px-3 py-2.5 text-sm font-semibold last:border-b-0 ${
-        current ? "text-kink-gold-bright" : "text-drawer-text"
-      }`}
-    >
+  const row =
+    "flex min-h-11 items-center gap-3 border-b border-drawer-identity-border px-3 py-2.5 text-sm font-semibold last:border-b-0";
+  const content = (
+    <>
       <DrawerNavIcon icon={item.icon} size={17} className="shrink-0 text-app-members-count" />
       <span>{item.label}</span>
       <span className="ml-auto flex items-center gap-2">
@@ -50,8 +45,32 @@ function MenuLink({
             {soonLabel}
           </span>
         ) : null}
-        <ChevronRight aria-hidden="true" size={16} className="text-app-muted" />
+        {item.disabled ? null : (
+          <ChevronRight aria-hidden="true" size={16} className="text-app-muted" />
+        )}
       </span>
+    </>
+  );
+  // Switched off: no href, so a tap goes nowhere and the drawer stays open.
+  if (item.disabled) {
+    return (
+      <a
+        role="link"
+        aria-disabled="true"
+        className={`${row} cursor-default text-drawer-text opacity-50`}
+      >
+        {content}
+      </a>
+    );
+  }
+  return (
+    <Link
+      href={item.href}
+      onClick={onNavigate}
+      aria-current={current ? "page" : undefined}
+      className={`${row} ${current ? "text-kink-gold-bright" : "text-drawer-text"}`}
+    >
+      {content}
     </Link>
   );
 }

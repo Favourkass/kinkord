@@ -28,6 +28,7 @@ interface AppShellDrawerItemVM {
   count?: "members";
   nav?: "members" | "saved" | "settings" | "kinkcoins";
   soon?: boolean;
+  disabled?: boolean;
   verification?: boolean;
 }
 
@@ -111,7 +112,14 @@ function drawerNavigation(): AppShellDrawerVM {
         nav: "kinkcoins",
       },
       { key: "silver", label: nav.subscription, href: Routes.subscription, icon: "subscription" },
-      { key: "kink-rings", label: nav.kinkRings, href: Routes.kinkRings, icon: "rings" },
+      // Switched off for now (founders, 2026-11-11): listed, but a tap does nothing.
+      {
+        key: "kink-rings",
+        label: nav.kinkRings,
+        href: Routes.kinkRings,
+        icon: "rings",
+        disabled: true,
+      },
       {
         key: "marketplace",
         label: copy.marketplace,
