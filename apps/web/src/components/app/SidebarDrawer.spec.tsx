@@ -79,6 +79,17 @@ describe("SidebarDrawer", () => {
     expect(screen.queryByText("Account Settings")).toBeNull();
   });
 
+  it("lists Kink Rings switched off: nothing to open, and a tap leaves the drawer open", () => {
+    const { onClose } = renderDrawer();
+    const rings = screen.getByRole("link", { name: /Kink Rings/ });
+    expect(rings.getAttribute("href")).toBeNull();
+    expect(rings.getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(rings);
+    expect(onClose).not.toHaveBeenCalled();
+    const silver = screen.getByRole("link", { name: /Silver Premium/ });
+    expect(silver.getAttribute("aria-disabled")).toBeNull();
+  });
+
   it("closes after a destination is chosen", () => {
     const { onClose } = renderDrawer();
     fireEvent.click(screen.getByRole("link", { name: /Kinkopedia/ }));

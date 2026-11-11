@@ -52,11 +52,20 @@ describe("the account menu", () => {
       "Kink Rings",
       "Marketplace",
     ]);
-    expect(byKey("kink-rings")).toMatchObject({ href: "/kink-rings", icon: "rings" });
+    expect(byKey("kink-rings")).toMatchObject({
+      href: "/kink-rings",
+      icon: "rings",
+      disabled: true,
+    });
     expect(byKey("silver")).toMatchObject({ href: "/subscription" });
     expect(byKey("silver")?.soon).toBeUndefined();
     expect(byKey("kinkcoins")).toMatchObject({ href: "/kinkcoins", nav: "kinkcoins" });
     expect(byKey("kinkcoins")?.soon).toBeUndefined();
+  });
+
+  it("switches only Kink Rings off for now (founders, 2026-11-11)", () => {
+    const all = [...drawer.primary, ...drawer.settingsGroups.flatMap((g) => g.items)];
+    expect(all.filter((i) => i.disabled).map((i) => i.key)).toEqual(["kink-rings"]);
   });
 
   it("marks Verification as listed only while it's open", () => {
