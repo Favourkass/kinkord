@@ -70,6 +70,8 @@ export interface DrawerNavItem {
   nav?: AppNav;
   /** Not built yet: the link opens a "coming soon" screen. */
   soon?: boolean;
+  /** Switched off for now: still listed, dimmed, but can't be opened. */
+  disabled?: boolean;
   /** Listed only while identity verification is open to the member. */
   verification?: boolean;
 }
