@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   Req,
@@ -15,6 +16,9 @@ import { AuthGuard, type AuthedRequest } from "../auth/auth.guard";
 import { RealtimeService } from "../realtime/realtime.service";
 import { ChatService } from "./chat.service";
 import {
+  deleteMessageSchema,
+  editMessageSchema,
+  forwardMessageSchema,
   historyQuerySchema,
   deliverySchema,
   markReadSchema,
@@ -141,6 +145,40 @@ export class ChatController {
   ) {
     await this.chat.setTyping(req.user.id, id, parse(typingSchema, body).typing);
     return { ok: true };
+  }
+
+  /** The sender changes a message's text, within a few minutes of sending it. */
+  @Patch("messages/:id")
+  async edit(
+    @Req() req: AuthedRequest,
+    @Param("id", new ParseUUIDPipe()) id: string,
+    @Body() body: unknown,
+  ) {
+    return this.chat.editMessage(req.user.id, id, parse(editMessageSchema, body).body);
+  }
+
+  /** Delete for me, or, for the sender's own recent message, for everyone. */
+  @Post("messages/:id/delete")
+  async remove(
+    @Req() req: AuthedRequest,
+    @Param("id", new ParseUUIDPipe()) id: string,
+    @Body() body: unknown,
+  ) {
+    return this.chat.deleteMessage(req.user.id, id, parse(deleteMessageSchema, body).for);
+  }
+
+  /** A copy of the message in up to five other chats, marked as forwarded. */
+  @Post("messages/:id/forward")
+  async forward(
+    @Req() req: AuthedRequest,
+    @Param("id", new ParseUUIDPipe()) id: string,
+    @Body() body: unknown,
+  ) {
+    return this.chat.forwardMessage(
+      req.user,
+      id,
+      parse(forwardMessageSchema, body).conversationIds,
+    );
   }
 
   @Post("conversations/:id/read")

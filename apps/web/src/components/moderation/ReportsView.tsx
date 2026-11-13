@@ -19,6 +19,10 @@ export interface ReportsViewProps {
     details: string;
     evidence: string;
     noEvidence: string;
+    /** On a message its sender deleted for everyone. */
+    deletedBySender: string;
+    /** Before what an edited message first said. */
+    editedFrom: string;
     openMember: string;
     resolve: string;
     dismiss: string;
@@ -99,6 +103,21 @@ export default function ReportsView(p: ReportsViewProps) {
                   >
                     <span className="font-bold text-app-value">{e.who}</span>{" "}
                     <span className="text-[11px] text-app-muted">{e.time}</span>
+                    {e.deleted ? (
+                      <span className="ml-[6px] rounded-full bg-app-danger px-[6px] py-[1px] text-[10px] font-bold text-app-surface">
+                        {p.labels.deletedBySender}
+                      </span>
+                    ) : null}
+                    {e.earlierBodies.length > 0 ? (
+                      <div className="mt-[2px] border-l-2 border-app-line pl-[8px] text-[12px] text-app-muted">
+                        <p className="font-bold">{p.labels.editedFrom}</p>
+                        {e.earlierBodies.map((before, i) => (
+                          <p key={i} className="whitespace-pre-wrap break-words line-through">
+                            {before}
+                          </p>
+                        ))}
+                      </div>
+                    ) : null}
                     {e.body ? (
                       <p className="whitespace-pre-wrap break-words text-app-value">{e.body}</p>
                     ) : null}

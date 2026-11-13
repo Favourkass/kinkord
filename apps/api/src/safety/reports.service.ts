@@ -12,6 +12,7 @@ import { DRIZZLE, type Db } from "../db/db.module";
 import {
   conversationParticipant,
   message,
+  messageEdit,
   moderationLog,
   profile,
   report,
@@ -118,12 +119,23 @@ export class ReportsService {
       .where(eq(message.conversationId, conversationId))
       .orderBy(desc(message.createdAt), desc(message.id))
       .limit(EVIDENCE_MESSAGES);
+    // What edited messages said before, so an edit can't hide what was sent.
+    const edited = rows.filter((m) => m.editedAt).map((m) => m.id);
+    const edits = edited.length
+      ? await this.db
+          .select({ messageId: messageEdit.messageId, body: messageEdit.body })
+          .from(messageEdit)
+          .where(inArray(messageEdit.messageId, edited))
+          .orderBy(messageEdit.replacedAt)
+      : [];
     return rows.reverse().map((m) => ({
       id: m.id,
       senderId: m.senderId,
       body: m.body,
       photoKey: m.photoKey,
       createdAt: m.createdAt.toISOString(),
+      deletedAt: m.deletedAt?.toISOString() ?? null,
+      earlierBodies: edits.filter((e) => e.messageId === m.id).map((e) => e.body),
     }));
   }
 
@@ -199,6 +211,8 @@ export class ReportsService {
                   }
                 : null,
               createdAt: m.createdAt,
+              deleted: Boolean(m.deletedAt),
+              earlierBodies: (m.earlierBodies ?? []).map((b) => b ?? ""),
             })),
           ),
         };

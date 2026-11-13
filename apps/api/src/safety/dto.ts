@@ -49,6 +49,10 @@ export interface ReportEvidenceDto {
   body: string;
   photo: { thumbUrl: string; url: string } | null;
   createdAt: string;
+  /** Its sender deleted it for everyone. The moderators still see what it said. */
+  deleted: boolean;
+  /** What it said before each edit, oldest first. */
+  earlierBodies: string[];
 }
 
 export interface AdminReportDto {

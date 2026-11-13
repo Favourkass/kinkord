@@ -86,6 +86,8 @@ export function useAdminReportsPresenter() {
       details: copy.details,
       evidence: copy.evidence,
       noEvidence: copy.noEvidence,
+      deletedBySender: copy.deletedBySender,
+      editedFrom: copy.editedFrom,
       openMember: copy.openMember,
       resolve: copy.resolve,
       dismiss: copy.dismiss,

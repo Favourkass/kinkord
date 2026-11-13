@@ -18,6 +18,7 @@ export default function ThreadPage({ params }: { params: Promise<{ id: string }>
     thread,
     composerPhoto,
     safety,
+    actions,
     backHref,
     send,
     onTyping,
@@ -96,6 +97,18 @@ export default function ThreadPage({ params }: { params: Promise<{ id: string }>
           reveal: CHAT_COPY.photoReveal,
           open: CHAT_COPY.photoOpen,
         }}
+        messageLabels={{
+          options: CHAT_COPY.message.options,
+          edited: CHAT_COPY.message.edited,
+          forwarded: CHAT_COPY.message.forwarded,
+          deletedOwn: CHAT_COPY.message.deletedOwn,
+          deletedOther: CHAT_COPY.message.deletedOther,
+        }}
+        onOpenActions={actions.open}
+        actionSheet={actions.sheet}
+        editSheet={actions.editSheet}
+        forwardSheet={actions.forwardSheet}
+        notice={actions.notice}
         onRevealPhoto={revealPhoto}
         onOpenPhoto={openPhoto}
         viewingPhoto={thread.viewingPhoto}

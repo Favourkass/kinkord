@@ -130,6 +130,8 @@ describe("ReportsService.create", () => {
           body: "message m1",
           photoKey: null,
           createdAt: at(1).toISOString(),
+          deletedAt: null,
+          earlierBodies: [],
         },
         {
           id: "m2",
@@ -137,6 +139,8 @@ describe("ReportsService.create", () => {
           body: "message m2",
           photoKey: null,
           createdAt: at(2).toISOString(),
+          deletedAt: null,
+          earlierBodies: [],
         },
         {
           id: "m3",
@@ -144,11 +148,49 @@ describe("ReportsService.create", () => {
           body: null,
           photoKey: "chat/c/u2/p.jpg",
           createdAt: at(3).toISOString(),
+          deletedAt: null,
+          earlierBodies: [],
         },
       ],
     });
     expect(push.newReport).toHaveBeenCalledTimes(1);
     expect(blocks.block).not.toHaveBeenCalled();
+  });
+
+  it("keeps what an edited message first said, and that a deleted one was deleted", async () => {
+    const { service, after } = make([
+      [{ id: "u2" }],
+      [{ n: 0 }],
+      [{ userId: "u1" }, { userId: "u2" }],
+      [
+        msg("m2", "u2", 2, { body: "sorry", editedAt: at(3) }),
+        msg("m1", "u2", 1, { body: "you ugly", deletedAt: at(4) }),
+      ],
+      // The earlier versions of the edited message, oldest first.
+      [
+        { messageId: "m2", body: "send me money" },
+        { messageId: "m2", body: "send money" },
+      ],
+      [{ id: "r1" }],
+    ]);
+    await service.create("u1", {
+      userId: "u2",
+      conversationId: CONV,
+      reason: "harassment",
+      block: false,
+    });
+    const { evidence } = after("insert", report, "values") as {
+      evidence: Array<{
+        id: string;
+        body: string;
+        deletedAt: string | null;
+        earlierBodies: string[];
+      }>;
+    };
+    expect(evidence.map((e) => [e.id, e.body, e.deletedAt, e.earlierBodies])).toEqual([
+      ["m1", "you ugly", at(4).toISOString(), []],
+      ["m2", "sorry", null, ["send me money", "send money"]],
+    ]);
   });
 
   it("only takes as much of the thread as the evidence limit", async () => {
@@ -249,6 +291,46 @@ describe("ReportsService.list", () => {
       ["m1", true, "hey", null],
       ["m2", true, "", "https://media/chat/c/u2/p.jpg?md"],
       ["m3", false, "how old are you?", null],
+    ]);
+  });
+
+  it("tells the moderators a message was deleted or edited, and what it said before", async () => {
+    const { service } = make([
+      [
+        {
+          report: {
+            ...stored,
+            evidence: [
+              ...stored.evidence,
+              {
+                id: "m4",
+                senderId: "u2",
+                body: "never mind",
+                photoKey: null,
+                createdAt: at(4).toISOString(),
+                deletedAt: at(5).toISOString(),
+                earlierBodies: ["send a photo", null],
+              },
+            ],
+          },
+          reporterId: "u1",
+          reporterUsername: "favour",
+          reporterName: "Favour",
+          reporterDisplayName: null,
+          reportedId: "u2",
+          reportedUsername: "ada",
+          reportedName: "Adaeze Obi",
+          reportedDisplayName: "Ada",
+        },
+      ],
+    ]);
+    const [r] = await service.list("open");
+    // Reports made before edits and deletes existed read as neither.
+    expect(r.evidence.map((e) => [e.id, e.deleted, e.earlierBodies])).toEqual([
+      ["m1", false, []],
+      ["m2", false, []],
+      ["m3", false, []],
+      ["m4", true, ["send a photo", ""]],
     ]);
   });
 

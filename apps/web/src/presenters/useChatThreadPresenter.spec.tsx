@@ -52,6 +52,11 @@ const svc = {
   markRead: vi.fn(),
   allowance: vi.fn(),
   uploadPhoto: vi.fn(),
+  edit: vi.fn(),
+  remove: vi.fn(),
+  forward: vi.fn(),
+  copy: vi.fn(),
+  list: vi.fn(),
 };
 vi.mock("@/services/chat.service", () => ({
   chatService: new Proxy(
@@ -191,7 +196,11 @@ describe("useChatThreadPresenter", () => {
     svc.history.mockResolvedValueOnce([msg("m3", "u2", 3)]);
     await act(async () => polls.get(THREAD_POLL_MS)?.tick());
 
-    expect(svc.history).toHaveBeenLastCalledWith("c1", { after: "m2" });
+    // Changes since the newest message was sent come with it.
+    expect(svc.history).toHaveBeenLastCalledWith("c1", {
+      after: "m2",
+      changedSince: "2026-09-28T10:00:02.000Z",
+    });
     expect(result.current.thread.messages.map((m) => m.id)).toEqual(["m1", "m2", "m3"]);
     await waitFor(() => expect(svc.markRead).toHaveBeenLastCalledWith("c1", "m3"));
   });
@@ -426,7 +435,10 @@ describe("useChatThreadPresenter", () => {
       const { result } = await ready();
       svc.history.mockResolvedValueOnce([msg("m3", "u2", 3)]);
       await act(async () => live.hear?.({ type: "message", conversationId: "c1" }));
-      expect(svc.history).toHaveBeenLastCalledWith("c1", { after: "m2" });
+      expect(svc.history).toHaveBeenLastCalledWith("c1", {
+        after: "m2",
+        changedSince: "2026-09-28T10:00:02.000Z",
+      });
       expect(result.current.thread.messages.map((m) => m.id)).toEqual(["m1", "m2", "m3"]);
     });
 
@@ -660,5 +672,178 @@ describe("useChatThreadPresenter", () => {
     svc.setTyping.mockClear();
     act(() => result.current.onTyping(true));
     expect(svc.setTyping).not.toHaveBeenCalled();
+  });
+
+  describe("a message's own menu", () => {
+    // Five minutes after m2 was sent: inside the edit window.
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-09-28T10:05:00.000Z"));
+    });
+    afterEach(() => vi.useRealTimers());
+
+    const edited = (over: Partial<ChatMessagePM> = {}): ChatMessagePM => ({
+      ...msg("m1", "u2", 1),
+      body: "message m1, better",
+      editedAt: "2026-09-28T10:03:00.000Z",
+      ...over,
+    });
+
+    it("picks up an edit or a deletion of a message it already shows, then asks from there", async () => {
+      const { result } = await ready();
+      svc.history.mockResolvedValueOnce([edited()]);
+      await act(async () => polls.get(THREAD_POLL_MS)?.tick());
+      const m1 = result.current.thread.messages.find((m) => m.id === "m1")!;
+      expect([m1.body, m1.edited]).toEqual(["message m1, better", true]);
+
+      svc.history.mockResolvedValueOnce([
+        { ...msg("m2", "u1", 2), body: "", deletedAt: "2026-09-28T10:04:00.000Z" },
+      ]);
+      await act(async () => polls.get(THREAD_POLL_MS)?.tick());
+      expect(svc.history).toHaveBeenLastCalledWith("c1", {
+        after: "m2",
+        changedSince: "2026-09-28T10:03:00.000Z",
+      });
+      expect(result.current.thread.messages.find((m) => m.id === "m2")?.deleted).toBe(true);
+
+      svc.history.mockResolvedValueOnce([]);
+      await act(async () => polls.get(THREAD_POLL_MS)?.tick());
+      expect(svc.history).toHaveBeenLastCalledWith("c1", {
+        after: "m2",
+        changedSince: "2026-09-28T10:04:00.000Z",
+      });
+    });
+
+    it("leaves out an edit to a message older than the ones loaded", async () => {
+      const { result } = await ready();
+      svc.history.mockResolvedValueOnce([
+        edited({ id: "m0", createdAt: "2026-09-28T09:00:00.000Z" }),
+      ]);
+      await act(async () => polls.get(THREAD_POLL_MS)?.tick());
+      expect(result.current.thread.messages.map((m) => m.id)).toEqual(["m1", "m2"]);
+    });
+
+    it("offers editing only on the viewer's own recent text", async () => {
+      const { result } = await ready();
+      act(() => result.current.actions.open("m2"));
+      expect(result.current.actions.sheet?.items.map((i) => i.key)).toEqual([
+        "copy",
+        "edit",
+        "forward",
+        "delete",
+      ]);
+      act(() => result.current.actions.sheet?.onClose());
+      act(() => result.current.actions.open("m1"));
+      expect(result.current.actions.sheet?.items.map((i) => i.key)).toEqual([
+        "copy",
+        "forward",
+        "delete",
+      ]);
+    });
+
+    it("deletes for me: the message leaves only this member's thread", async () => {
+      svc.remove.mockResolvedValue({ message: null });
+      const { result } = await ready();
+      act(() => result.current.actions.open("m1"));
+      act(() => result.current.actions.sheet?.onSelect("delete"));
+      // Someone else's message: only "for me".
+      expect(result.current.actions.sheet?.title).toBe(CHAT_COPY.message.deleteTitle);
+      expect(result.current.actions.sheet?.items.map((i) => i.key)).toEqual(["me"]);
+      await act(async () => result.current.actions.sheet?.onSelect("me"));
+      expect(svc.remove).toHaveBeenCalledWith("m1", "me");
+      expect(result.current.thread.messages.map((m) => m.id)).toEqual(["m2"]);
+      expect(result.current.actions.sheet).toBeNull();
+    });
+
+    it("deletes for everyone: the bubble says it was deleted", async () => {
+      svc.remove.mockResolvedValue({
+        message: { ...msg("m2", "u1", 2), body: "", deletedAt: "2026-09-28T10:05:00.000Z" },
+      });
+      const { result } = await ready();
+      act(() => result.current.actions.open("m2"));
+      act(() => result.current.actions.sheet?.onSelect("delete"));
+      expect(result.current.actions.sheet?.items.map((i) => i.key)).toEqual(["everyone", "me"]);
+      await act(async () => result.current.actions.sheet?.onSelect("everyone"));
+      expect(svc.remove).toHaveBeenCalledWith("m2", "everyone");
+      const m2 = result.current.thread.messages.find((m) => m.id === "m2")!;
+      expect([m2.deleted, m2.body]).toEqual([true, ""]);
+    });
+
+    it("edits: the new text replaces the old, and a refusal stays in the editor", async () => {
+      const { result } = await ready();
+      act(() => result.current.actions.open("m2"));
+      act(() => result.current.actions.sheet?.onSelect("edit"));
+      expect(result.current.actions.editSheet?.text).toBe("message m2");
+
+      svc.edit.mockRejectedValueOnce(
+        new ApiError(400, { message: "Messages can only be edited for 15 minutes after sending." }),
+      );
+      await act(async () => result.current.actions.editSheet?.onSave("  new words "));
+      expect(svc.edit).toHaveBeenLastCalledWith("m2", "new words");
+      expect(result.current.actions.editSheet?.error).toBe(
+        "Messages can only be edited for 15 minutes after sending.",
+      );
+
+      svc.edit.mockResolvedValueOnce({
+        ...msg("m2", "u1", 2),
+        body: "new words",
+        editedAt: "2026-09-28T10:05:00.000Z",
+      });
+      await act(async () => result.current.actions.editSheet?.onSave("new words"));
+      expect(result.current.actions.editSheet).toBeNull();
+      const m2 = result.current.thread.messages.find((m) => m.id === "m2")!;
+      expect([m2.body, m2.edited]).toEqual(["new words", true]);
+    });
+
+    it("forwards: keeps the chats that refused chosen, each saying why, then closes with a note", async () => {
+      const chat = (id: string, name: string) => ({
+        ...header({ id }),
+        peer: { ...header().peer!, userId: `p-${id}`, displayName: name },
+      });
+      svc.list.mockResolvedValue([chat("c2", "Bola"), chat("c3", "Chidi")]);
+      const { result } = await ready();
+      act(() => result.current.actions.open("m1"));
+      act(() => result.current.actions.sheet?.onSelect("forward"));
+      await waitFor(() => expect(result.current.actions.forwardSheet?.loading).toBe(false));
+      act(() => result.current.actions.forwardSheet?.onToggle("c2"));
+      act(() => result.current.actions.forwardSheet?.onToggle("c3"));
+      expect(result.current.actions.forwardSheet?.chosenLabel).toBe("2 of 5 chosen");
+
+      svc.forward.mockResolvedValueOnce([
+        {
+          conversationId: "c2",
+          message: { ...msg("m9", "u1", 9), conversationId: "c2" },
+          error: null,
+        },
+        { conversationId: "c3", message: null, error: "This member is no longer on Kinkord." },
+      ]);
+      await act(async () => result.current.actions.forwardSheet?.onSend());
+      expect(svc.forward).toHaveBeenLastCalledWith("m1", ["c2", "c3"]);
+      const chats = result.current.actions.forwardSheet?.chats ?? [];
+      expect(chats.map((c) => [c.id, c.selected, c.result])).toEqual([
+        ["c2", false, { sent: true }],
+        ["c3", true, { sent: false, error: "This member is no longer on Kinkord." }],
+      ]);
+
+      svc.forward.mockResolvedValueOnce([
+        {
+          conversationId: "c3",
+          message: { ...msg("m10", "u1", 10), conversationId: "c3" },
+          error: null,
+        },
+      ]);
+      await act(async () => result.current.actions.forwardSheet?.onSend());
+      expect(result.current.actions.forwardSheet).toBeNull();
+      expect(result.current.actions.notice).toBe("Forwarded to 1 chat.");
+    });
+
+    it("copies a message's text", async () => {
+      svc.copy.mockResolvedValue(undefined);
+      const { result } = await ready();
+      act(() => result.current.actions.open("m1"));
+      await act(async () => result.current.actions.sheet?.onSelect("copy"));
+      expect(svc.copy).toHaveBeenCalledWith("message m1");
+      expect(result.current.actions.notice).toBe(CHAT_COPY.message.copied);
+    });
   });
 });
