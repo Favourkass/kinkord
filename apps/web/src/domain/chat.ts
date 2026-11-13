@@ -23,6 +23,26 @@ export interface ChatMessagePM {
   photo: ChatPhotoPM | null;
   createdAt: string;
   editedAt: string | null;
+  /** Deleted for everyone by its sender: no text or photo. Absent from an older API. */
+  deletedAt?: string | null;
+  /** A copy forwarded from another chat. Absent from an older API. */
+  forwarded?: boolean;
+}
+
+/** The longest message the API takes, edits included. */
+export const MESSAGE_BODY_MAX = 4000;
+/** How long after sending a message its sender may change its text. The API enforces it. */
+export const EDIT_WINDOW_MS = 15 * 60_000;
+/** How long after sending a message its sender may delete it for everyone. */
+export const DELETE_FOR_EVERYONE_MS = 48 * 3_600_000;
+/** The most chats one message can be forwarded to at once. */
+export const FORWARD_MAX = 5;
+
+/** One chat a message was forwarded to: the copy sent there, or why not. */
+export interface ForwardResultPM {
+  conversationId: string;
+  message: ChatMessagePM | null;
+  error: string | null;
 }
 
 /** The saved message the send call returns, with the client's id echoed back. */
@@ -138,6 +158,80 @@ export interface ThreadMessageVM {
   day: ChatDayVM;
   isOwn: boolean;
   status: "sending" | MessageReceiptStatus | "failed";
+  /** Deleted for everyone: shown as deleted, with nothing of what it said. */
+  deleted: boolean;
+  edited: boolean;
+  forwarded: boolean;
+  /** Saved, so it has a menu (copy, edit, forward, delete); not one still sending. */
+  actionable: boolean;
+}
+
+/** What a saved message's menu offers. Deleting for yourself is always there. */
+export type MessageActionKey = "copy" | "edit" | "forward" | "delete";
+
+/**
+ * The menu for one message, at the moment it opens: copy its text; edit your
+ * own, for a few minutes, unless it was forwarded; forward it, except someone
+ * else's photo, which stays with whoever it was sent to; delete it.
+ */
+export function messageActions(
+  pm: ChatMessagePM,
+  viewerId: string | null,
+  now: Date,
+): MessageActionKey[] {
+  if (pm.deletedAt) return ["delete"];
+  const own = viewerId !== null && pm.senderId === viewerId;
+  const age = now.getTime() - Date.parse(pm.createdAt);
+  const keys: MessageActionKey[] = [];
+  if (pm.body.trim()) keys.push("copy");
+  if (own && !pm.forwarded && age < EDIT_WINDOW_MS) keys.push("edit");
+  if (!pm.photo || own) keys.push("forward");
+  keys.push("delete");
+  return keys;
+}
+
+/** Who a deletion can reach: everyone, for your own recent message, and always yourself. */
+export function deleteScopes(
+  pm: ChatMessagePM,
+  viewerId: string | null,
+  now: Date,
+): Array<"everyone" | "me"> {
+  const own = viewerId !== null && pm.senderId === viewerId;
+  const recent = now.getTime() - Date.parse(pm.createdAt) < DELETE_FOR_EVERYONE_MS;
+  return own && recent && !pm.deletedAt ? ["everyone", "me"] : ["me"];
+}
+
+/**
+ * Where an open thread's next poll asks for changes from: the latest edit or
+ * deletion a poll has brought since `since`. Server times only, so the
+ * device's clock never decides what counts as changed; ISO times in the one
+ * format the API sends sort as text.
+ */
+export function changeCursor(fresh: ChatMessagePM[], since: string | null): string | null {
+  let latest = since;
+  for (const m of fresh) {
+    for (const t of [m.editedAt, m.deletedAt]) {
+      if (t && (latest === null || t > latest)) latest = t;
+    }
+  }
+  return latest;
+}
+
+/**
+ * Folds a poll's answer into the thread: new messages, and new versions of
+ * ones it already shows. An edit to a message older than the loaded page is
+ * left out, so "Load earlier messages" still starts from the oldest one shown.
+ */
+export function applyChanges(current: ChatMessagePM[], incoming: ChatMessagePM[]): ChatMessagePM[] {
+  const oldest = current[0];
+  if (!oldest) return mergeMessages(current, incoming);
+  const known = new Set(current.map((m) => m.id));
+  const isOlder = (m: ChatMessagePM) =>
+    m.createdAt < oldest.createdAt || (m.createdAt === oldest.createdAt && m.id < oldest.id);
+  return mergeMessages(
+    current,
+    incoming.filter((m) => known.has(m.id) || !isOlder(m)),
+  );
 }
 
 export interface ThreadPeerVM {
@@ -239,16 +333,21 @@ export function toThreadMessageVM(
   now: Date = new Date(),
 ): ThreadMessageVM {
   const isOwn = viewerId !== null && pm.senderId === viewerId;
+  const deleted = Boolean(pm.deletedAt);
   return {
     id: pm.id,
     clientId: null,
     senderId: pm.senderId,
-    body: pm.body,
-    photo: pm.photo ? toThreadPhotoVM(pm.photo, isOwn || revealed.has(pm.id)) : null,
+    body: deleted ? "" : pm.body,
+    photo: !deleted && pm.photo ? toThreadPhotoVM(pm.photo, isOwn || revealed.has(pm.id)) : null,
     time: bubbleTime(pm.createdAt),
     day: chatDay(pm.createdAt, now),
     isOwn,
     status: isOwn ? messageReceiptStatus(pm.createdAt, receipts) : "sent",
+    deleted,
+    edited: !deleted && Boolean(pm.editedAt),
+    forwarded: !deleted && Boolean(pm.forwarded),
+    actionable: true,
   };
 }
 
@@ -267,6 +366,10 @@ export function toPendingMessageVM(
     day: chatDay(p.createdAt, now),
     isOwn: true,
     status: p.status,
+    deleted: false,
+    edited: false,
+    forwarded: false,
+    actionable: false,
   };
 }
 
@@ -371,4 +474,51 @@ export function groupThreadDays(messages: ThreadMessageVM[]): ThreadDayGroupVM[]
     else groups.push({ day: message.day, messages: [message] });
   }
   return groups;
+}
+
+/** A chat in the forward picker. */
+export interface ForwardChatVM {
+  id: string;
+  displayName: string;
+  avatarUrl: string | null;
+  silver: boolean;
+  organization: boolean;
+  selected: boolean;
+  /** At the limit and not one of the chosen: can't be added. */
+  disabled: boolean;
+  /** After forwarding: whether the copy went there, or why not. */
+  result: { sent: true } | { sent: false; error: string } | null;
+}
+
+/**
+ * The chats a message can be forwarded to: the inbox's, minus anyone the
+ * member can't write to now. `results` marks each after a forward.
+ */
+export function toForwardChatVMs(
+  chats: ConversationSummaryPM[],
+  selected: readonly string[],
+  results: readonly ForwardResultPM[] | null,
+  isOrganization: (userId: string) => boolean = () => false,
+): ForwardChatVM[] {
+  const full = selected.length >= FORWARD_MAX;
+  return chats
+    .filter((c) => c.peer !== null && !c.peer.blockedByMe && c.peer.canMessage !== false)
+    .map((c) => {
+      const result = results?.find((r) => r.conversationId === c.id);
+      const chosen = selected.includes(c.id);
+      return {
+        id: c.id,
+        displayName: c.peer?.displayName ?? "Member",
+        avatarUrl: c.peer?.avatarUrl ?? null,
+        silver: Boolean(c.peer?.silver),
+        organization: c.peer ? isOrganization(c.peer.userId) : false,
+        selected: chosen,
+        disabled: full && !chosen,
+        result: !result
+          ? null
+          : result.message
+            ? { sent: true as const }
+            : { sent: false as const, error: result.error ?? "" },
+      };
+    });
 }

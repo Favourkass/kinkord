@@ -344,6 +344,10 @@ export interface AdminReportEvidencePM {
   body: string;
   photo: { thumbUrl: string; url: string } | null;
   createdAt: string;
+  /** Its sender deleted it for everyone; absent from an older API. */
+  deleted?: boolean;
+  /** What it said before each edit, oldest first; absent from an older API. */
+  earlierBodies?: string[];
 }
 
 export interface AdminReportPM {
@@ -367,6 +371,10 @@ export interface AdminReportEvidenceVM {
   body: string;
   photo: { thumbUrl: string; url: string } | null;
   time: string;
+  /** Its sender deleted it for everyone: the member who reported it no longer sees it. */
+  deleted: boolean;
+  /** What it said before it was edited, oldest first. */
+  earlierBodies: string[];
 }
 
 export interface AdminReportVM {
@@ -427,6 +435,8 @@ export function toAdminReportVM(
       body: e.body,
       photo: e.photo,
       time: timeAgo(e.createdAt, now) ?? "",
+      deleted: Boolean(e.deleted),
+      earlierBodies: e.earlierBodies ?? [],
     })),
     open: pm.status === "open",
   };
