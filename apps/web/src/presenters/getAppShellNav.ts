@@ -54,7 +54,8 @@ export interface AppShellNavVM {
     profile: string;
     settings: string;
     saved: string;
-    kinkcoins: string;
+    /** Left out while KinkCoins & Payment is switched off. */
+    kinkcoins?: string;
     subscription: string;
   };
   labels: {
@@ -73,6 +74,13 @@ export interface AppShellNavVM {
   /** The phone drawer's account menu. */
   drawer: AppShellDrawerVM;
 }
+
+/**
+ * KinkCoins & Payment is switched off for now (founders, 2026-11-13). The phone
+ * menu lists it dimmed and a tap does nothing; the desktop sidebar and the
+ * profile bar leave it out. Set this to false to turn it back on.
+ */
+const KINKCOINS_OFF = true;
 
 /** The account menu (Philip's design): live entries first, then Settings & Privacy's groups. */
 function drawerNavigation(): AppShellDrawerVM {
@@ -110,16 +118,10 @@ function drawerNavigation(): AppShellDrawerVM {
         href: Routes.kinkcoins,
         icon: "coins",
         nav: "kinkcoins",
+        disabled: KINKCOINS_OFF,
       },
       { key: "silver", label: nav.subscription, href: Routes.subscription, icon: "subscription" },
-      // Switched off for now (founders, 2026-11-11): listed, but a tap does nothing.
-      {
-        key: "kink-rings",
-        label: nav.kinkRings,
-        href: Routes.kinkRings,
-        icon: "rings",
-        disabled: true,
-      },
+      { key: "kink-rings", label: nav.kinkRings, href: Routes.kinkRings, icon: "rings" },
       {
         key: "marketplace",
         label: copy.marketplace,
@@ -211,7 +213,7 @@ export function getAppShellNav(): AppShellNavVM {
       profile: Routes.profile,
       settings: Routes.settings,
       saved: Routes.saved,
-      kinkcoins: Routes.kinkcoins,
+      kinkcoins: KINKCOINS_OFF ? undefined : Routes.kinkcoins,
       subscription: Routes.subscription,
     },
     labels: { ...MEMBERS_COPY.nav },
