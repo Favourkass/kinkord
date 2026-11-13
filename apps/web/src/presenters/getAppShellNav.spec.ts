@@ -13,9 +13,11 @@ describe("getAppShellNav", () => {
       profile: "/profile",
       settings: "/settings",
       saved: "/saved",
-      kinkcoins: "/kinkcoins",
       subscription: "/subscription",
     });
+    // KinkCoins & Payment is switched off (founders, 2026-11-13): no link, so the
+    // desktop sidebar and the profile bar leave it out.
+    expect(nav.links.kinkcoins).toBeUndefined();
     expect(nav.labels).toEqual({
       home: "Home",
       search: "Search",
@@ -40,7 +42,7 @@ describe("the account menu", () => {
       (i) => i.key === key,
     );
 
-  it("keeps Philip's order, with Silver Premium and KinkCoins live", () => {
+  it("keeps Philip's order, with Silver Premium and Kink Rings live", () => {
     // Kink Rings follows Silver Premium (founders, 2026-10-27).
     expect(drawer.primary.map((i) => i.label)).toEqual([
       "Members",
@@ -52,20 +54,22 @@ describe("the account menu", () => {
       "Kink Rings",
       "Marketplace",
     ]);
-    expect(byKey("kink-rings")).toMatchObject({
-      href: "/kink-rings",
-      icon: "rings",
-      disabled: true,
-    });
+    // Kink Rings is back on (founders, 2026-11-13).
+    expect(byKey("kink-rings")).toMatchObject({ href: "/kink-rings", icon: "rings" });
+    expect(byKey("kink-rings")?.disabled).toBeFalsy();
     expect(byKey("silver")).toMatchObject({ href: "/subscription" });
     expect(byKey("silver")?.soon).toBeUndefined();
-    expect(byKey("kinkcoins")).toMatchObject({ href: "/kinkcoins", nav: "kinkcoins" });
+    expect(byKey("kinkcoins")).toMatchObject({
+      href: "/kinkcoins",
+      nav: "kinkcoins",
+      disabled: true,
+    });
     expect(byKey("kinkcoins")?.soon).toBeUndefined();
   });
 
-  it("switches only Kink Rings off for now (founders, 2026-11-11)", () => {
+  it("switches only KinkCoins & Payment off for now (founders, 2026-11-13)", () => {
     const all = [...drawer.primary, ...drawer.settingsGroups.flatMap((g) => g.items)];
-    expect(all.filter((i) => i.disabled).map((i) => i.key)).toEqual(["kink-rings"]);
+    expect(all.filter((i) => i.disabled).map((i) => i.key)).toEqual(["kinkcoins"]);
   });
 
   it("marks Verification as listed only while it's open", () => {

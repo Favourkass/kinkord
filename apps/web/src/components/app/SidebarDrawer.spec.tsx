@@ -60,7 +60,7 @@ describe("SidebarDrawer", () => {
 
   it("marks only the unfinished entries as Soon, and the current page", () => {
     renderDrawer({ active: "saved" });
-    // Kinkopedia and Marketplace; KinkCoins and Silver Premium are live.
+    // Kinkopedia and Marketplace; Silver Premium and Kink Rings are live.
     expect(screen.getAllByText("Soon")).toHaveLength(2);
     expect(screen.getByRole("link", { name: /Silver Premium/ }).getAttribute("href")).toBe(
       "/subscription",
@@ -79,15 +79,17 @@ describe("SidebarDrawer", () => {
     expect(screen.queryByText("Account Settings")).toBeNull();
   });
 
-  it("lists Kink Rings switched off: nothing to open, and a tap leaves the drawer open", () => {
+  it("lists KinkCoins & Payment switched off: nothing to open, and a tap leaves the drawer open", () => {
     const { onClose } = renderDrawer();
-    const rings = screen.getByRole("link", { name: /Kink Rings/ });
-    expect(rings.getAttribute("href")).toBeNull();
-    expect(rings.getAttribute("aria-disabled")).toBe("true");
-    fireEvent.click(rings);
+    const coins = screen.getByRole("link", { name: /KinkCoins & Payment/ });
+    expect(coins.getAttribute("href")).toBeNull();
+    expect(coins.getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(coins);
     expect(onClose).not.toHaveBeenCalled();
-    const silver = screen.getByRole("link", { name: /Silver Premium/ });
-    expect(silver.getAttribute("aria-disabled")).toBeNull();
+    // Kink Rings is back on.
+    const rings = screen.getByRole("link", { name: /Kink Rings/ });
+    expect(rings.getAttribute("href")).toBe("/kink-rings");
+    expect(rings.getAttribute("aria-disabled")).toBeNull();
   });
 
   it("closes after a destination is chosen", () => {
