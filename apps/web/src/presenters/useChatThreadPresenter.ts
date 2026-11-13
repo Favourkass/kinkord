@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CHAT_COPY, photosLockedText } from "@/constants/chat";
 import { Routes } from "@/constants/Routes";
 import {
+  applyChanges,
+  changeCursor,
   isCrossCountryPremium,
   isNewChatLimit,
   mergeMessages,
@@ -26,6 +28,7 @@ import { useOrganizations } from "./useOrganizations";
 import { chatRulesStore } from "@/util/chatRules";
 import { useHomePresenter } from "./useHomePresenter";
 import { useChatSafety } from "./useChatSafety";
+import { useMessageActions } from "./useMessageActions";
 import { usePolling } from "./usePolling";
 import { useTypingIndicators } from "./useTypingIndicators";
 import { useRealtime } from "./useRealtime";
@@ -114,6 +117,8 @@ export function useChatThreadPresenter(conversationId: string) {
   const [photoLockedTapped, setPhotoLockedTapped] = useState(false);
   // Device copies of photos (drafts, and bubbles still sending), freed with the thread.
   const localUrls = useRef<string[]>([]);
+  // The latest edit or deletion a poll has brought, so the next asks only for what changed since.
+  const changedSince = useRef<string | null>(null);
 
   useEffect(() => {
     const urls = localUrls.current;
@@ -129,6 +134,7 @@ export function useChatThreadPresenter(conversationId: string) {
     ]).then(
       ([me, header, page]) => {
         if (!live) return;
+        changedSince.current = null;
         setViewerId(me.id);
         setSummary(header);
         setMessages(page);
@@ -173,11 +179,22 @@ export function useChatThreadPresenter(conversationId: string) {
     };
   }, [empty, conversationId]);
 
+  /**
+   * What's new since the newest message, and any message edited or deleted
+   * since the last change a poll brought (or, before any, since the newest
+   * message was sent). A change the member made here doesn't move that on, so
+   * one the other member made a moment earlier is never skipped.
+   */
   const pollNew = useCallback(async () => {
     const newest = messages[messages.length - 1];
+    const since = changedSince.current ?? newest?.createdAt ?? null;
     try {
-      const fresh = await chatService.history(conversationId, newest ? { after: newest.id } : {});
-      if (fresh.length > 0) setMessages((m) => mergeMessages(m, fresh));
+      const fresh = await chatService.history(
+        conversationId,
+        newest ? { after: newest.id, changedSince: since } : {},
+      );
+      changedSince.current = changeCursor(fresh, since);
+      if (fresh.length > 0) setMessages((m) => applyChanges(m, fresh));
     } catch {
       // A missed poll is caught up by the next one.
     }
@@ -244,6 +261,17 @@ export function useChatThreadPresenter(conversationId: string) {
 
   const refreshHeader = useCallback(() => void pollHeader(), [pollHeader]);
   const safety = useChatSafety(conversationId, summary?.peer ?? null, refreshHeader);
+  const isOrg = useCallback(
+    (userId: string) => isOrganization(userId, organizations),
+    [organizations],
+  );
+  const actions = useMessageActions({
+    conversationId,
+    messages,
+    viewerId,
+    setMessages,
+    isOrganization: isOrg,
+  });
 
   // Only a visible conversation can mark messages read. Delivery never clears unread counts.
   useEffect(() => {
@@ -457,6 +485,8 @@ export function useChatThreadPresenter(conversationId: string) {
         : null,
     },
     safety,
+    /** A message's own menu, the editor and the forward picker. */
+    actions,
     backHref: Routes.messages,
     send,
     onTyping,

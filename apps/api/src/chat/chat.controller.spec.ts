@@ -21,6 +21,9 @@ function make() {
     markRead: vi.fn(async () => undefined),
     allowance: vi.fn(async () => ({ newChatsPerDay: 1, usedToday: 0, resetsAt: "x" })),
     presignPhotoUpload: vi.fn(async () => ({ key: "chat/c1/u1/a.jpg" })),
+    editMessage: vi.fn(async () => ({ id: "m1" })),
+    deleteMessage: vi.fn(async () => ({ message: null })),
+    forwardMessage: vi.fn(async () => []),
   };
   const realtime = {
     connectionFor: vi.fn(async () => ({ enabled: true, channel: "/chat/u1", token: "v1.a.b" })),
@@ -150,4 +153,52 @@ it("counts each tab for the search in force", async () => {
     online: 2,
   });
   expect(chat.inboxCounts).toHaveBeenCalledWith("u1", "ada");
+});
+
+describe("a message's own actions", () => {
+  const id = "22222222-2222-4222-8222-222222222222";
+  const chats = (n: number) =>
+    Array.from({ length: n }, (_, i) => `33333333-3333-4333-8333-33333333333${i}`);
+
+  it("edits with the trimmed text, for the signed-in member", async () => {
+    const { controller, chat } = make();
+    await controller.edit(req, id, { body: "  better words " });
+    expect(chat.editMessage).toHaveBeenCalledWith("u1", id, "better words");
+  });
+
+  it("deletes for me or for everyone, and nothing else", async () => {
+    const { controller, chat } = make();
+    await controller.remove(req, id, { for: "everyone" });
+    expect(chat.deleteMessage).toHaveBeenCalledWith("u1", id, "everyone");
+    await expect(controller.remove(req, id, { for: "them" })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    await expect(controller.remove(req, id, {})).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it("forwards to at most five chats, as the whole session user", async () => {
+    const { controller, chat } = make();
+    await controller.forward(req, id, { conversationIds: chats(5) });
+    // Their verified email decides their limits, as for any message they send.
+    expect(chat.forwardMessage).toHaveBeenCalledWith(req.user, id, chats(5));
+    await expect(controller.forward(req, id, { conversationIds: chats(6) })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    await expect(controller.forward(req, id, { conversationIds: [] })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+
+  it("passes on the time an open thread last saw a change", async () => {
+    const { controller, chat } = make();
+    await controller.history(req, "c1", { after: id, changedSince: "2026-11-13T10:00:00.123Z" });
+    expect(chat.history).toHaveBeenCalledWith("u1", "c1", {
+      after: id,
+      changedSince: "2026-11-13T10:00:00.123Z",
+      limit: 50,
+    });
+    await expect(
+      controller.history(req, "c1", { changedSince: "yesterday" }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
 });

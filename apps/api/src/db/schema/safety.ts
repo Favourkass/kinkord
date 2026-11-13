@@ -37,6 +37,10 @@ export interface ReportEvidence {
   body: string | null;
   photoKey: string | null;
   createdAt: string;
+  /** Its sender had deleted it for everyone; absent from reports made before that existed. */
+  deletedAt?: string | null;
+  /** Its text before each edit, oldest first; absent before edits existed. */
+  earlierBodies?: Array<string | null>;
 }
 
 /**

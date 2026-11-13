@@ -11,6 +11,7 @@ import {
   Inject,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import {
@@ -28,6 +29,7 @@ import {
   ne,
   or,
   sql,
+  type AnyColumn,
   type SQL,
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -37,6 +39,8 @@ import {
   conversation,
   conversationParticipant,
   message,
+  messageEdit,
+  messageHidden,
   profile,
   user,
 } from "../db/schema";
@@ -55,16 +59,19 @@ import {
 import { hasSilver, silverCheck } from "../subscriptions/plans";
 import { chatDay, NEW_CHAT_LIMIT, newChatsPerDay } from "./allowance";
 import { CROSS_COUNTRY_MESSAGE, CROSS_COUNTRY_PREMIUM, differentCountries } from "./cross-country";
-import type {
-  ChatAllowanceDto,
-  ChatPeerDto,
-  InboxCountsDto,
-  InboxFilter,
-  ChatPhotoDto,
-  ConversationSummaryDto,
-  ConversationThreadDto,
-  MessageDto,
-  SendMessageInput,
+import {
+  DELETE_FOR_EVERYONE_HOURS,
+  EDIT_WINDOW_MINUTES,
+  type ChatAllowanceDto,
+  type ChatPeerDto,
+  type InboxCountsDto,
+  type InboxFilter,
+  type ChatPhotoDto,
+  type ConversationSummaryDto,
+  type ConversationThreadDto,
+  type ForwardResultDto,
+  type MessageDto,
+  type SendMessageInput,
 } from "./dto";
 
 /**
@@ -115,6 +122,22 @@ const messagingDenied = () =>
 /** Said to a member writing to someone they blocked; the blocked side reads them as gone. */
 export const YOU_BLOCKED = "You've blocked this member. Unblock them to send messages.";
 const photoTooLarge = () => `Photo is too large — max ${CHAT_PHOTO_MAX_MB}MB.`;
+export const MESSAGE_NOT_FOUND = "Message not found.";
+export const MESSAGE_DELETED = "This message was deleted.";
+export const EDIT_NOT_YOURS = "You can only edit your own messages.";
+export const EDIT_FORWARDED = "A forwarded message can't be edited.";
+export const EDIT_WINDOW_PASSED = `Messages can only be edited for ${EDIT_WINDOW_MINUTES} minutes after sending.`;
+export const DELETE_NOT_YOURS = "You can only delete your own messages for everyone.";
+export const DELETE_WINDOW_PASSED = `Messages can only be deleted for everyone within ${DELETE_FOR_EVERYONE_HOURS} hours of sending.`;
+/**
+ * Someone else's chat photos stay with whoever they were sent to: forwarding
+ * them on is how private photos get spread without consent.
+ */
+export const FORWARD_PHOTO_NOT_YOURS = "Photos someone else sent you can't be forwarded.";
+const EDIT_WINDOW_MS = EDIT_WINDOW_MINUTES * 60_000;
+const DELETE_WINDOW_MS = DELETE_FOR_EVERYONE_HOURS * 3_600_000;
+/** The most edited or deleted messages one poll picks up: far more than a few seconds bring. */
+const CHANGES_PAGE = 500;
 const photoTypes = () => `contentType must be one of: ${Object.keys(PHOTO_TYPES).join(", ")}`;
 
 type MessageRow = typeof message.$inferSelect;
@@ -128,8 +151,34 @@ function positionOf(id: string) {
   return sql`(select "created_at", "id" from "message" where "id" = ${id})`;
 }
 
+/** Not deleted by this member for themselves ("Delete for me"). */
+function notHiddenFor(userId: string, messageId: SQL | AnyColumn = message.id): SQL {
+  return sql`not exists (select 1 from ${messageHidden} where ${messageHidden.userId} = ${userId} and ${messageHidden.messageId} = ${messageId})`;
+}
+
+/**
+ * When a message last changed after it was sent: edited, or deleted for
+ * everyone. Cut to the millisecond, as the app reads it back, so the time the
+ * app sends as `changedSince` doesn't match the same change again.
+ */
+const changedAt = sql`date_trunc('milliseconds', greatest(${message.editedAt}, ${message.deletedAt}))`;
+
+/** What an HTTP refusal says, for a forward's per-chat result. */
+function refusalOf(e: unknown): string {
+  if (e instanceof HttpException) {
+    const body = e.getResponse();
+    if (typeof body === "string") return body;
+    const text = (body as { message?: unknown }).message;
+    if (typeof text === "string") return text;
+    return e.message;
+  }
+  return "Couldn't forward to this chat. Try again.";
+}
+
 @Injectable()
 export class ChatService {
+  private readonly logger = new Logger(ChatService.name);
+
   constructor(
     @Inject(DRIZZLE) private readonly db: Db,
     private readonly storage: StorageService,
@@ -289,10 +338,12 @@ export class ChatService {
     throw new ForbiddenException({ code: CROSS_COUNTRY_PREMIUM, message: CROSS_COUNTRY_MESSAGE });
   }
 
+  /** `forwardedFromId`: the message this is a forwarded copy of. */
   async sendMessage(
     sender: Member,
     conversationId: string,
     input: SendMessageInput,
+    forwardedFromId?: string,
   ): Promise<MessageDto & { clientId: string | null }> {
     const senderId = sender.id;
     await this.assertMember(conversationId, senderId);
@@ -328,8 +379,9 @@ export class ChatService {
           conversationId,
           input,
           await this.newChatLimit(sender, senderCountry),
+          forwardedFromId,
         )
-      : await this.insertMessage(this.db, senderId, conversationId, input);
+      : await this.insertMessage(this.db, senderId, conversationId, input, forwardedFromId);
     // Both members' open apps hear of it at once, the sender's other tabs too.
     void this.realtime.notify([peerId, senderId], { type: "message", conversationId });
     // And their phone, if the app isn't open on this thread, and their inbox.
@@ -347,6 +399,7 @@ export class ChatService {
     conversationId: string,
     input: SendMessageInput,
     limit: number,
+    forwardedFromId?: string,
   ): Promise<MessageDto & { clientId: string | null }> {
     return this.db.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`new-chat:${senderId}`}))`);
@@ -364,7 +417,7 @@ export class ChatService {
           HttpStatus.TOO_MANY_REQUESTS,
         );
       }
-      return this.insertMessage(tx, senderId, conversationId, input);
+      return this.insertMessage(tx, senderId, conversationId, input, forwardedFromId);
     });
   }
 
@@ -373,6 +426,7 @@ export class ChatService {
     senderId: string,
     conversationId: string,
     input: SendMessageInput,
+    forwardedFromId?: string,
   ): Promise<MessageDto & { clientId: string | null }> {
     const [created] = await q
       .insert(message)
@@ -381,6 +435,7 @@ export class ChatService {
         senderId,
         body: input.body || null,
         ...(input.photoKey ? { photoKey: input.photoKey } : {}),
+        ...(forwardedFromId ? { forwardedFromId } : {}),
       })
       .returning();
     // Keeps the list ordered by activity without a join on message.
@@ -454,11 +509,16 @@ export class ChatService {
    * message; `after` returns what arrived since one, which is how an open
    * thread polls. Positions compare in the database, where timestamps keep the
    * microseconds a JavaScript Date would drop.
+   *
+   * A message deleted for everyone stays in its place, without its text or
+   * photo, so both members see that it was deleted. One this member deleted
+   * for themselves is left out. `changedSince` adds messages edited or deleted
+   * since then, wherever they are in the thread.
    */
   async history(
     userId: string,
     conversationId: string,
-    opts: { before?: string; after?: string; limit: number },
+    opts: { before?: string; after?: string; changedSince?: string; limit: number },
   ): Promise<MessageDto[]> {
     await this.assertMember(conversationId, userId);
     const pivot = opts.before ?? opts.after;
@@ -470,7 +530,7 @@ export class ChatService {
         .limit(1);
       if (!known) throw new BadRequestException("Unknown message.");
     }
-    const conditions = [eq(message.conversationId, conversationId), isNull(message.deletedAt)];
+    const conditions = [eq(message.conversationId, conversationId), notHiddenFor(userId)];
     if (opts.before) {
       conditions.push(sql`(${message.createdAt}, ${message.id}) < ${positionOf(opts.before)}`);
     }
@@ -487,7 +547,217 @@ export class ChatService {
           : [desc(message.createdAt), desc(message.id)]),
       )
       .limit(opts.limit);
-    return Promise.all((opts.after ? rows : rows.reverse()).map((m) => this.toDto(m)));
+    const page = opts.after ? rows : rows.reverse();
+    if (!opts.changedSince) return Promise.all(page.map((m) => this.toDto(m)));
+    const changed = await this.db
+      .select()
+      .from(message)
+      .where(
+        and(
+          eq(message.conversationId, conversationId),
+          notHiddenFor(userId),
+          // Only a message sent within the delete window can have changed
+          // since: this keeps the poll on the thread's recent end.
+          sql`${message.createdAt} > ${opts.changedSince}::timestamptz - (${sql.raw(String(DELETE_FOR_EVERYONE_HOURS))} * interval '1 hour')`,
+          sql`${changedAt} > ${opts.changedSince}::timestamptz`,
+        ),
+      )
+      .orderBy(asc(changedAt))
+      .limit(CHANGES_PAGE);
+    const byId = new Map([...page, ...changed].map((m) => [m.id, m]));
+    const merged = [...byId.values()].sort(
+      (a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id),
+    );
+    return Promise.all(merged.map((m) => this.toDto(m)));
+  }
+
+  /**
+   * A message in a thread this member is in. Someone else's thread reads as no
+   * such message: both are 404.
+   */
+  private async messageFor(userId: string, messageId: string): Promise<MessageRow> {
+    const [row] = await this.db
+      .select({ message })
+      .from(message)
+      .innerJoin(
+        conversationParticipant,
+        and(
+          eq(conversationParticipant.conversationId, message.conversationId),
+          eq(conversationParticipant.userId, userId),
+        ),
+      )
+      .where(eq(message.id, messageId))
+      .limit(1);
+    if (!row) throw new NotFoundException(MESSAGE_NOT_FOUND);
+    return row.message;
+  }
+
+  /** Everyone in a thread: who hears that one of its messages changed. */
+  private async membersOf(conversationId: string): Promise<string[]> {
+    const rows = await this.db
+      .select({ userId: conversationParticipant.userId })
+      .from(conversationParticipant)
+      .where(eq(conversationParticipant.conversationId, conversationId));
+    return rows.map((r) => r.userId);
+  }
+
+  /**
+   * The sender changes a message's text, within a few minutes of sending it,
+   * while they may still write to the other member. The text it replaces is
+   * kept for the moderators. A forwarded copy keeps the words it was sent with.
+   */
+  async editMessage(userId: string, messageId: string, body: string): Promise<MessageDto> {
+    const m = await this.messageFor(userId, messageId);
+    if (m.senderId !== userId) throw new ForbiddenException(EDIT_NOT_YOURS);
+    if (m.deletedAt) throw new BadRequestException(MESSAGE_DELETED);
+    if (m.forwardedFromId) throw new BadRequestException(EDIT_FORWARDED);
+    if (Date.now() - m.createdAt.getTime() > EDIT_WINDOW_MS) {
+      throw new BadRequestException(EDIT_WINDOW_PASSED);
+    }
+    // A photo can lose its caption; a text message needs some text.
+    if (!body && !m.photoKey) throw new BadRequestException("Write a message first.");
+    if (body === (m.body ?? "")) return this.toDto(m);
+    const peerId = await this.writablePeer(m.conversationId, userId);
+
+    const [recent] = await this.db
+      .select({ n: count() })
+      .from(messageEdit)
+      .where(
+        and(
+          eq(messageEdit.senderId, userId),
+          gt(messageEdit.replacedAt, sql`now() - interval '1 minute'`),
+        ),
+      );
+    if (Number(recent?.n ?? 0) >= MAX_MESSAGES_PER_MINUTE) {
+      throw new HttpException(
+        "You're editing messages too fast. Wait a moment.",
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    // The row is locked while the old text is copied, so two edits at once
+    // both keep what they replaced.
+    const saved = await this.db.transaction(async (tx) => {
+      const [current] = await tx
+        .select({ body: message.body, deletedAt: message.deletedAt })
+        .from(message)
+        .where(eq(message.id, m.id))
+        .for("update");
+      if (!current || current.deletedAt) return null;
+      await tx
+        .insert(messageEdit)
+        .values({ messageId: m.id, senderId: userId, body: current.body });
+      const [updated] = await tx
+        .update(message)
+        .set({ body: body || null, editedAt: sql`now()` })
+        .where(eq(message.id, m.id))
+        .returning();
+      return updated ?? null;
+    });
+    if (!saved) throw new BadRequestException(MESSAGE_DELETED);
+    void this.realtime.notify([peerId, userId], {
+      type: "message",
+      conversationId: m.conversationId,
+    });
+    return this.toDto(saved);
+  }
+
+  /**
+   * "Delete for me" hides any message in the thread from this member only.
+   * "Delete for everyone" is the sender's, within two days of sending: both
+   * members see that it was deleted, and its text and photo stay only for the
+   * moderators. Returns what the thread now shows in its place, if anything.
+   */
+  async deleteMessage(
+    userId: string,
+    messageId: string,
+    scope: "me" | "everyone",
+  ): Promise<{ message: MessageDto | null }> {
+    const m = await this.messageFor(userId, messageId);
+    if (scope === "me") {
+      await this.db.insert(messageHidden).values({ userId, messageId: m.id }).onConflictDoNothing();
+      // This member's other open tabs drop it too.
+      void this.realtime.notify([userId], { type: "message", conversationId: m.conversationId });
+      return { message: null };
+    }
+    if (m.senderId !== userId) throw new ForbiddenException(DELETE_NOT_YOURS);
+    if (m.deletedAt) return { message: await this.toDto(m) };
+    if (Date.now() - m.createdAt.getTime() > DELETE_WINDOW_MS) {
+      throw new BadRequestException(DELETE_WINDOW_PASSED);
+    }
+    const [deleted] = await this.db
+      .update(message)
+      .set({ deletedAt: sql`now()` })
+      .where(and(eq(message.id, m.id), isNull(message.deletedAt)))
+      .returning();
+    void this.realtime.notify(await this.membersOf(m.conversationId), {
+      type: "message",
+      conversationId: m.conversationId,
+    });
+    return { message: await this.toDto(deleted ?? { ...m, deletedAt: new Date() }) };
+  }
+
+  /**
+   * Sends a copy of a message to other chats, marked as forwarded. Each copy
+   * is an ordinary message there, so every rule for sending applies: the
+   * daily allowance, Silver for someone abroad, photos only once open, and
+   * the rate limit. One chat refusing doesn't stop the others.
+   */
+  async forwardMessage(
+    sender: Member,
+    messageId: string,
+    conversationIds: string[],
+  ): Promise<ForwardResultDto[]> {
+    const m = await this.messageFor(sender.id, messageId);
+    if (m.deletedAt) throw new BadRequestException(MESSAGE_DELETED);
+    if (m.photoKey && m.senderId !== sender.id) {
+      throw new ForbiddenException(FORWARD_PHOTO_NOT_YOURS);
+    }
+    const results: ForwardResultDto[] = [];
+    // One at a time, so the allowance and the rate limit count each in turn.
+    for (const conversationId of [...new Set(conversationIds)]) {
+      try {
+        const photoKey = m.photoKey
+          ? await this.copyPhotoTo(sender.id, conversationId, m.photoKey)
+          : undefined;
+        const { clientId: _clientId, ...sent } = await this.sendMessage(
+          sender,
+          conversationId,
+          { body: m.body ?? "", ...(photoKey ? { photoKey } : {}) },
+          m.id,
+        );
+        results.push({ conversationId, message: sent, error: null });
+      } catch (e) {
+        // A refusal says why; anything else is ours to look into.
+        if (!(e instanceof HttpException)) {
+          this.logger.error(`forward ${m.id} to ${conversationId} failed`, e as Error);
+        }
+        results.push({ conversationId, message: null, error: refusalOf(e) });
+      }
+    }
+    return results;
+  }
+
+  /**
+   * The sender's own photo, copied under their prefix for the other thread:
+   * the forwarded message passes the same checks as a photo sent there, and
+   * deleting either message never touches the other's photo. Checked before
+   * copying, so a chat that can't take photos costs nothing.
+   */
+  private async copyPhotoTo(senderId: string, conversationId: string, sourceKey: string) {
+    await this.assertMember(conversationId, senderId);
+    await this.writablePeer(conversationId, senderId);
+    await this.assertPhotosAllowed(conversationId, senderId);
+    const ext = sourceKey.slice(sourceKey.lastIndexOf(".") + 1);
+    const key = `${photoPrefix(conversationId, senderId)}${randomUUID()}.${ext}`;
+    await this.storage.copy(sourceKey, key);
+    // A stored size that fails to copy is made from the original when the message is checked.
+    await Promise.all(
+      IMAGE_VARIANTS.map((v) =>
+        this.storage.copy(variantKey(sourceKey, v), variantKey(key, v)).catch(() => undefined),
+      ),
+    );
+    return key;
   }
 
   /** Ephemeral hints: throttled, authorised, published, never saved as messages. */
@@ -780,6 +1050,7 @@ export class ChatService {
             and(
               eq(searchMessage.conversationId, conversation.id),
               isNull(searchMessage.deletedAt),
+              notHiddenFor(userId, searchMessage.id),
               ilike(searchMessage.body, pattern),
             ),
           ),
@@ -854,7 +1125,9 @@ export class ChatService {
     const lastRows = await this.db
       .selectDistinctOn([message.conversationId])
       .from(message)
-      .where(and(inArray(message.conversationId, ids), isNull(message.deletedAt)))
+      .where(
+        and(inArray(message.conversationId, ids), isNull(message.deletedAt), notHiddenFor(userId)),
+      )
       .orderBy(message.conversationId, desc(message.createdAt), desc(message.id));
 
     // Unread: written by someone else after my read pointer.
@@ -1013,15 +1286,19 @@ export class ChatService {
     );
   }
 
+  /** A message deleted for everyone keeps only its place: no text, no photo. */
   private async toDto(m: MessageRow): Promise<MessageDto> {
+    const deleted = Boolean(m.deletedAt);
     return {
       id: m.id,
       conversationId: m.conversationId,
       senderId: m.senderId,
-      body: m.body ?? "",
-      photo: m.photoKey ? await this.photoLinks(m.photoKey) : null,
+      body: deleted ? "" : (m.body ?? ""),
+      photo: !deleted && m.photoKey ? await this.photoLinks(m.photoKey) : null,
       createdAt: m.createdAt.toISOString(),
-      editedAt: m.editedAt?.toISOString() ?? null,
+      editedAt: deleted ? null : (m.editedAt?.toISOString() ?? null),
+      deletedAt: m.deletedAt?.toISOString() ?? null,
+      forwarded: !deleted && Boolean(m.forwardedFromId),
     };
   }
 

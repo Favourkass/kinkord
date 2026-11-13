@@ -210,6 +210,35 @@ describe("toAdminReportVM", () => {
     ]);
   });
 
+  it("says when the sender deleted or edited a message, with what it said before", () => {
+    const vm = toAdminReportVM(
+      {
+        ...report,
+        evidence: [
+          ...report.evidence,
+          {
+            id: "m3",
+            fromReported: true,
+            body: "sorry",
+            photo: null,
+            createdAt: "2026-09-28T08:00:00Z",
+            deleted: true,
+            earlierBodies: ["send me photos"],
+          },
+        ],
+      },
+      href,
+      { deletedAccount: "a deleted account" },
+      now,
+    );
+    // An older API sends neither: nothing deleted, nothing edited.
+    expect(vm.evidence.map((e) => [e.id, e.deleted, e.earlierBodies])).toEqual([
+      ["m1", false, []],
+      ["m2", false, []],
+      ["m3", true, ["send me photos"]],
+    ]);
+  });
+
   it("keeps a report whose accounts are gone, and doesn't call spam urgent", () => {
     const vm = toAdminReportVM(
       {

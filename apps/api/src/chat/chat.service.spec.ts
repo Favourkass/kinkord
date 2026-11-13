@@ -8,7 +8,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { type SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { PgDialect } from "drizzle-orm/pg-core";
-import { conversation, conversationParticipant, message, profile } from "../db/schema";
+import {
+  conversation,
+  conversationParticipant,
+  message,
+  messageEdit,
+  messageHidden,
+  profile,
+} from "../db/schema";
 import type { PushService } from "../push/push.service";
 import type { RealtimeService } from "../realtime/realtime.service";
 import type { StorageService } from "../storage/storage.service";
@@ -18,6 +25,13 @@ import { CROSS_COUNTRY_MESSAGE, CROSS_COUNTRY_PREMIUM } from "./cross-country";
 import {
   CHAT_PHOTO_MAX_MB,
   ChatService,
+  DELETE_NOT_YOURS,
+  DELETE_WINDOW_PASSED,
+  EDIT_FORWARDED,
+  EDIT_NOT_YOURS,
+  EDIT_WINDOW_PASSED,
+  FORWARD_PHOTO_NOT_YOURS,
+  MESSAGE_DELETED,
   MAX_MESSAGES_PER_MINUTE,
   MAX_EMPTY_CONVERSATIONS_PER_DAY,
   PHOTOS_LOCKED,
@@ -247,6 +261,8 @@ describe("ChatService.sendMessage", () => {
       photo: null,
       createdAt: at.toISOString(),
       editedAt: null,
+      deletedAt: null,
+      forwarded: false,
       clientId: "tmp-1",
     });
     expect(after("insert", message, "values")).toEqual({
@@ -1359,8 +1375,12 @@ describe("ChatService inbox search", () => {
       '("search_profile"."display_name" is null and "search_user"."username" is null and "search_user"."name" ilike $',
     );
     expect(sql).toContain('"search_message"."deleted_at" is null');
+    // Not a message this member deleted for themselves.
+    expect(sql).toContain(
+      'not exists (select 1 from "message_hidden" where "message_hidden"."user_id" = $5 and "message_hidden"."message_id" = "search_message"."id")',
+    );
     expect(sql).toContain('"search_message"."body" ilike $');
-    expect(params).toEqual(["u1", "%ada\\_%", "%ada\\_%", "%ada\\_%", "%ada\\_%"]);
+    expect(params).toEqual(["u1", "%ada\\_%", "%ada\\_%", "%ada\\_%", "u1", "%ada\\_%"]);
   });
 });
 
@@ -1416,5 +1436,354 @@ describe("messaging privacy", () => {
       lastMessage: { body: "hello" },
     });
     expect(left()).toBe(0);
+  });
+});
+
+describe("editing, deleting and forwarding messages", () => {
+  const minutesAgo = (n: number) => new Date(Date.now() - n * 60_000);
+  /** u1's own text message in c1, sent a minute ago. */
+  const mine = (over: Record<string, unknown> = {}) =>
+    row("m1", {
+      senderId: "u1",
+      body: "hi",
+      photoKey: null,
+      forwardedFromId: null,
+      createdAt: minutesAgo(1),
+      ...over,
+    });
+  const ownPhoto = "chat/c1/u1/0b5c6c3e-1d0e-4c55-9d4e-3c1f2a9b8e71.jpg";
+
+  describe("editing", () => {
+    it("is a 404 for a message in a thread you aren't in", async () => {
+      const { service } = make([[]]);
+      await expect(service.editMessage("u1", "m1", "new")).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it("is the sender's, for 15 minutes, and never a forwarded or deleted message", async () => {
+      const refusals: Array<[Record<string, unknown>, string]> = [
+        [{ senderId: "u2" }, EDIT_NOT_YOURS],
+        [{ createdAt: minutesAgo(16) }, EDIT_WINDOW_PASSED],
+        [{ forwardedFromId: "m0" }, EDIT_FORWARDED],
+        [{ deletedAt: new Date() }, MESSAGE_DELETED],
+      ];
+      for (const [over, text] of refusals) {
+        const { service, calls } = make([[{ message: mine(over) }]]);
+        await expect(service.editMessage("u1", "m1", "new")).rejects.toThrow(text);
+        expect(calls.some((c) => c.op === "update")).toBe(false);
+      }
+    });
+
+    it("needs some text, unless it's a photo losing its caption", async () => {
+      const text = make([[{ message: mine() }]]);
+      await expect(text.service.editMessage("u1", "m1", "")).rejects.toThrow(
+        "Write a message first.",
+      );
+      const edited = mine({ body: null, photoKey: ownPhoto, editedAt: new Date() });
+      const photo = make([
+        [{ message: mine({ body: "look", photoKey: ownPhoto }) }],
+        [{ userId: "u2", canMessage: true }],
+        [{ n: 0 }],
+        [{ body: "look", deletedAt: null }],
+        undefined,
+        [edited],
+      ]);
+      await expect(photo.service.editMessage("u1", "m1", "")).resolves.toMatchObject({
+        body: "",
+      });
+      expect(photo.after("update", message, "set")).toMatchObject({ body: null });
+    });
+
+    it("saves the new text, keeps the old for the moderators, and tells both apps", async () => {
+      const editedAt = new Date("2026-11-13T10:00:00.123Z");
+      const { service, after, calls, realtime } = make([
+        [{ message: mine() }],
+        [{ userId: "u2", canMessage: true }], // they may still be written to
+        [{ n: 0 }], // not editing too fast
+        [{ body: "hi", deletedAt: null }], // the row, locked
+        undefined, // the old text, kept
+        [mine({ body: "hello there", editedAt })],
+      ]);
+      const dto = await service.editMessage("u1", "m1", "hello there");
+      expect(calls.some((c) => c.op === "for" && c.args[0] === "update")).toBe(true);
+      expect(after("insert", messageEdit, "values")).toEqual({
+        messageId: "m1",
+        senderId: "u1",
+        body: "hi",
+      });
+      expect(after("update", message, "set")).toMatchObject({ body: "hello there" });
+      expect(dto).toMatchObject({
+        body: "hello there",
+        editedAt: editedAt.toISOString(),
+        deletedAt: null,
+        forwarded: false,
+      });
+      expect(realtime.notify).toHaveBeenCalledWith(["u2", "u1"], {
+        type: "message",
+        conversationId: "c1",
+      });
+    });
+
+    it("changes nothing when the text is the same", async () => {
+      const { service, calls, realtime } = make([[{ message: mine() }]]);
+      await expect(service.editMessage("u1", "m1", "hi")).resolves.toMatchObject({
+        body: "hi",
+        editedAt: null,
+      });
+      expect(calls.some((c) => c.op === "update" || c.op === "insert")).toBe(false);
+      expect(realtime.notify).not.toHaveBeenCalled();
+    });
+
+    it("can't change what a member who blocked you sees", async () => {
+      const { service } = make([[{ message: mine() }], []]);
+      await expect(service.editMessage("u1", "m1", "new")).rejects.toThrow(
+        "This member is no longer on Kinkord.",
+      );
+    });
+
+    it("slows down a member editing too fast", async () => {
+      const { service } = make([
+        [{ message: mine() }],
+        [{ userId: "u2", canMessage: true }],
+        [{ n: MAX_MESSAGES_PER_MINUTE }],
+      ]);
+      const err = await service.editMessage("u1", "m1", "again").catch((e: unknown) => e);
+      expect((err as HttpException).getStatus()).toBe(429);
+    });
+
+    it("refuses a message deleted while the edit was on its way", async () => {
+      const { service, calls } = make([
+        [{ message: mine() }],
+        [{ userId: "u2", canMessage: true }],
+        [{ n: 0 }],
+        [{ body: "hi", deletedAt: new Date() }],
+      ]);
+      await expect(service.editMessage("u1", "m1", "new")).rejects.toThrow(MESSAGE_DELETED);
+      expect(calls.some((c) => c.op === "insert")).toBe(false);
+    });
+  });
+
+  describe("deleting", () => {
+    it("for me hides any message in the thread from this member only", async () => {
+      const { service, after, calls, realtime } = make([[{ message: row("m1") }], undefined]);
+      await expect(service.deleteMessage("u1", "m1", "me")).resolves.toEqual({ message: null });
+      expect(after("insert", messageHidden, "values")).toEqual({ userId: "u1", messageId: "m1" });
+      expect(calls.some((c) => c.op === "update")).toBe(false);
+      // Only this member's own apps hear of it.
+      expect(realtime.notify).toHaveBeenCalledWith(["u1"], {
+        type: "message",
+        conversationId: "c1",
+      });
+    });
+
+    it("for everyone is only the sender's, within 48 hours", async () => {
+      const theirs = make([[{ message: row("m1") }]]);
+      await expect(theirs.service.deleteMessage("u1", "m1", "everyone")).rejects.toThrow(
+        DELETE_NOT_YOURS,
+      );
+      const old = make([[{ message: mine({ createdAt: minutesAgo(49 * 60) }) }]]);
+      await expect(old.service.deleteMessage("u1", "m1", "everyone")).rejects.toThrow(
+        DELETE_WINDOW_PASSED,
+      );
+      expect(old.calls.some((c) => c.op === "update")).toBe(false);
+    });
+
+    it("for everyone keeps its place without text or photo, and tells everyone in the thread", async () => {
+      const deletedAt = new Date("2026-11-13T10:00:00.000Z");
+      const { service, realtime, storage, calls } = make([
+        [{ message: mine({ body: "look", photoKey: ownPhoto, forwardedFromId: "m0" }) }],
+        [mine({ body: "look", photoKey: ownPhoto, forwardedFromId: "m0", deletedAt })],
+        [{ userId: "u1" }, { userId: "u2" }],
+      ]);
+      const { message: left } = await service.deleteMessage("u1", "m1", "everyone");
+      expect(left).toEqual({
+        id: "m1",
+        conversationId: "c1",
+        senderId: "u1",
+        body: "",
+        photo: null,
+        createdAt: expect.any(String),
+        editedAt: null,
+        deletedAt: deletedAt.toISOString(),
+        forwarded: false,
+      });
+      // The photo stays stored, for the moderators; no link to it goes out.
+      expect(storage.presignDownload).not.toHaveBeenCalled();
+      expect(storage.remove).not.toHaveBeenCalled();
+      expect(calls.some((c) => c.op === "delete")).toBe(false);
+      expect(realtime.notify).toHaveBeenCalledWith(["u1", "u2"], {
+        type: "message",
+        conversationId: "c1",
+      });
+    });
+
+    it("for everyone a second time only returns what's left", async () => {
+      const { service, calls, realtime } = make([[{ message: mine({ deletedAt: new Date() }) }]]);
+      await expect(service.deleteMessage("u1", "m1", "everyone")).resolves.toMatchObject({
+        message: { id: "m1", body: "" },
+      });
+      expect(calls.some((c) => c.op === "update")).toBe(false);
+      expect(realtime.notify).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("the thread's history", () => {
+    it("keeps a message deleted for everyone in its place, without its text or photo", async () => {
+      const { service, storage } = make([
+        [{ userId: "u1" }],
+        [row("m2"), row("m1", { body: "secret", photoKey: ownPhoto, deletedAt: new Date() })],
+      ]);
+      const page = await service.history("u1", "c1", { limit: 50 });
+      expect(page.map((m) => [m.id, m.body, m.photo, m.deletedAt !== null])).toEqual([
+        ["m1", "", null, true],
+        ["m2", "hello", null, false],
+      ]);
+      expect(storage.presignDownload).not.toHaveBeenCalled();
+    });
+
+    it("leaves out messages this member deleted for themselves", async () => {
+      const { service, calls } = make([[{ userId: "u1" }], []]);
+      await service.history("u1", "c1", { limit: 50 });
+      const where = whereSql(calls, 1);
+      expect(where).toContain(
+        'not exists (select 1 from "message_hidden" where "message_hidden"."user_id" = $2 and "message_hidden"."message_id" = "message"."id")',
+      );
+      expect(where).not.toContain('"message"."deleted_at" is null');
+    });
+
+    it("adds what was edited or deleted since a time, wherever it is, in thread order", async () => {
+      const early = new Date("2026-09-28T09:00:00.000Z");
+      const { service, calls } = make([
+        [{ userId: "u1" }],
+        [{ id: "m5" }], // the cursor is in this thread
+        [row("m6")], // newer than the cursor
+        // Changed since: an old one edited, and the newest one again.
+        [row("m1", { createdAt: early, body: "edited", editedAt: new Date() }), row("m6")],
+      ]);
+      const page = await service.history("u1", "c1", {
+        after: "11111111-1111-4111-8111-111111111111",
+        changedSince: "2026-11-13T10:00:00.000Z",
+        limit: 50,
+      });
+      expect(page.map((m) => m.id)).toEqual(["m1", "m6"]);
+      const changed = whereSql(calls, 3);
+      expect(changed).toContain(
+        'date_trunc(\'milliseconds\', greatest("message"."edited_at", "message"."deleted_at")) > $',
+      );
+      expect(changed).toContain('"message_hidden"');
+      // Nothing sent before the delete window can have changed since.
+      expect(changed).toContain(
+        '"message"."created_at" > $3::timestamptz - (48 * interval \'1 hour\')',
+      );
+    });
+
+    it("asks nothing more when the app doesn't ask for changes", async () => {
+      const { service, left } = make([[{ userId: "u1" }], [row("m1")], [row("m9")]]);
+      await service.history("u1", "c1", { limit: 50 });
+      expect(left()).toBe(1);
+    });
+  });
+
+  describe("forwarding", () => {
+    /** One forwarded copy saved in a chat with u3, an existing thread in the same country. */
+    const sendsTo = (saved: unknown) => [
+      [{ userId: "u1" }], // a member of the chat
+      [{ userId: "u3", canMessage: true }], // u3 can be written to
+      [{ n: 0 }], // not sending too fast
+      nigerians,
+      [{ id: "m0" }], // not a new chat
+      [saved],
+      undefined,
+    ];
+
+    it("refuses a message that was deleted", async () => {
+      const { service } = make([[{ message: mine({ deletedAt: new Date() }) }]]);
+      await expect(service.forwardMessage(member("u1"), "m1", ["c2"])).rejects.toThrow(
+        MESSAGE_DELETED,
+      );
+    });
+
+    it("won't pass on a photo someone else sent you", async () => {
+      const { service, storage, calls } = make([
+        [{ message: row("m1", { photoKey: "chat/c1/u2/p.jpg" }) }],
+      ]);
+      await expect(service.forwardMessage(member("u1"), "m1", ["c2"])).rejects.toThrow(
+        FORWARD_PHOTO_NOT_YOURS,
+      );
+      expect(storage.copy).not.toHaveBeenCalled();
+      expect(calls.some((c) => c.op === "insert")).toBe(false);
+    });
+
+    it("sends each chat a copy marked as forwarded, and says why a chat refused", async () => {
+      const copy = row("m7", { conversationId: "c2", senderId: "u1", forwardedFromId: "m1" });
+      const { service, calls, push } = make([
+        [{ message: row("m1", { body: "party at 9" }) }], // someone else's words may go on
+        ...sendsTo(copy),
+        [], // not a member of c3
+      ]);
+      const results = await service.forwardMessage(member("u1"), "m1", ["c2", "c3", "c2"]);
+      expect(results).toEqual([
+        {
+          conversationId: "c2",
+          message: expect.objectContaining({ id: "m7", forwarded: true }),
+          error: null,
+        },
+        { conversationId: "c3", message: null, error: "Conversation not found." },
+      ]);
+      const inserts = calls.filter((c) => c.op === "values");
+      expect(inserts).toHaveLength(1);
+      expect(inserts[0].args[0]).toEqual({
+        conversationId: "c2",
+        senderId: "u1",
+        body: "party at 9",
+        forwardedFromId: "m1",
+      });
+      expect(push.newMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it("copies the sender's own photo into the other chat before sending it there", async () => {
+      const copy = row("m7", { conversationId: "c2", senderId: "u1", body: null });
+      const { service, storage, calls } = make([
+        [{ message: mine({ body: null, photoKey: ownPhoto }) }],
+        [{ userId: "u1" }], // a member of c2
+        [{ userId: "u3", canMessage: true }],
+        [{ id: "m5" }], // u3 has written there: photos are open
+        [{ userId: "u1" }],
+        [{ userId: "u3", canMessage: true }],
+        [{ n: 0 }],
+        [{ id: "m5" }],
+        nigerians,
+        [{ id: "m0" }],
+        [copy],
+        undefined,
+      ]);
+      const [result] = await service.forwardMessage(member("u1"), "m1", ["c2"]);
+      expect(result.error).toBeNull();
+      const [from, to] = storage.copy.mock.calls[0] as unknown as [string, string];
+      expect(from).toBe(ownPhoto);
+      expect(to).toMatch(/^chat\/c2\/u1\/[0-9a-f-]{36}\.jpg$/);
+      expect(storage.copy).toHaveBeenCalledWith(
+        ownPhoto.replace(".jpg", "_sm.jpg"),
+        to.replace(".jpg", "_sm.jpg"),
+      );
+      expect(calls.find((c) => c.op === "values")?.args[0]).toMatchObject({
+        conversationId: "c2",
+        photoKey: to,
+        forwardedFromId: "m1",
+      });
+    });
+
+    it("copies no photo into a chat where photos aren't open yet", async () => {
+      const { service, storage } = make([
+        [{ message: mine({ body: null, photoKey: ownPhoto }) }],
+        [{ userId: "u1" }],
+        [{ userId: "u3", canMessage: true }],
+        [], // u3 hasn't written there yet
+      ]);
+      const [result] = await service.forwardMessage(member("u1"), "m1", ["c2"]);
+      expect(result).toEqual({ conversationId: "c2", message: null, error: PHOTOS_LOCKED });
+      expect(storage.copy).not.toHaveBeenCalled();
+    });
   });
 });

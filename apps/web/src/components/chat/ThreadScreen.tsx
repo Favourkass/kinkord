@@ -10,7 +10,13 @@ import ConfirmDialog, { type ConfirmDialogProps } from "@/components/feed/Confir
 import MediaLightbox from "@/components/feed/MediaLightbox";
 import type { ThreadDayGroupVM, ThreadMessageVM, ThreadPeerVM } from "@/domain/chat";
 import type { PostMediaVM } from "@/domain/post";
-import MessageBubble, { type MessageBubblePhotoLabels } from "./MessageBubble";
+import EditMessageSheet, { type EditMessageSheetProps } from "./EditMessageSheet";
+import ForwardSheet, { type ForwardSheetProps } from "./ForwardSheet";
+import MessageActionSheet, { type MessageActionSheetProps } from "./MessageActionSheet";
+import MessageBubble, {
+  type MessageBubbleLabels,
+  type MessageBubblePhotoLabels,
+} from "./MessageBubble";
 import MessageComposer, { type MessageComposerProps } from "./MessageComposer";
 import PresenceDot from "./PresenceDot";
 import ReportSheet, { type ReportSheetProps } from "./ReportSheet";
@@ -49,6 +55,16 @@ export interface ThreadScreenProps {
   /** Why photos aren't open yet, after the member tried to add one. */
   photoNotice: string | null;
   photoLabels: MessageBubblePhotoLabels;
+  /** Edited, forwarded and deleted, and the arrow that opens a message's menu. */
+  messageLabels: MessageBubbleLabels;
+  /** A long press, a right-click or the arrow on a message. */
+  onOpenActions: (messageId: string) => void;
+  /** A message's menu, or who to delete it for. */
+  actionSheet: MessageActionSheetProps | null;
+  editSheet: EditMessageSheetProps | null;
+  forwardSheet: ForwardSheetProps | null;
+  /** A short confirmation, such as "Copied". */
+  notice: string | null;
   onRevealPhoto: (messageId: string) => void;
   onOpenPhoto: (src: string) => void;
   /** The photo open full size, if any. */
@@ -164,7 +180,7 @@ export default function ThreadScreen(p: ThreadScreenProps) {
     <>
       <div
         style={fit}
-        className="fixed inset-x-0 top-0 z-30 flex h-[var(--thread-h,100dvh)] w-full translate-y-[var(--thread-top,0px)] flex-col bg-app-page pt-[env(safe-area-inset-top)] lg:static lg:z-auto lg:mx-auto lg:h-auto lg:min-h-0 lg:max-w-[640px] lg:flex-1 lg:translate-y-0 lg:border-x lg:border-app-line lg:bg-transparent lg:pt-0"
+        className="fixed inset-x-0 top-0 z-30 flex h-[var(--thread-h,100dvh)] w-full translate-y-[var(--thread-top,0px)] flex-col bg-app-page pt-[env(safe-area-inset-top)] lg:relative lg:z-auto lg:mx-auto lg:h-auto lg:min-h-0 lg:max-w-[640px] lg:flex-1 lg:translate-y-0 lg:border-x lg:border-app-line lg:bg-transparent lg:pt-0"
       >
         <header className="flex items-center gap-[6px] border-b border-white/5 bg-[#141414] px-[8px] py-[10px]">
           <Link
@@ -246,8 +262,10 @@ export default function ThreadScreen(p: ThreadScreenProps) {
                     retryLabel={p.retryLabel}
                     onRetry={p.onRetry}
                     photoLabels={p.photoLabels}
+                    labels={p.messageLabels}
                     onRevealPhoto={p.onRevealPhoto}
                     onOpenPhoto={p.onOpenPhoto}
+                    onOpenActions={p.onOpenActions}
                   />
                 ))}
               </ul>
@@ -255,6 +273,16 @@ export default function ThreadScreen(p: ThreadScreenProps) {
           ))}
         </div>
 
+        {p.notice && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-[96px] z-20 flex justify-center px-[16px]">
+            <p
+              role="status"
+              className="rounded-full bg-black/85 px-[14px] py-[7px] text-[13px] font-medium text-white shadow-lg"
+            >
+              {p.notice}
+            </p>
+          </div>
+        )}
         {(p.sendError || p.safetyError) && (
           <p className="border-t border-app-line bg-app-surface px-[16px] pt-[8px] text-[12px] text-app-danger">
             {p.safetyError ?? p.sendError}
@@ -310,6 +338,9 @@ export default function ThreadScreen(p: ThreadScreenProps) {
       />
       {p.blockDialog && <ConfirmDialog open {...p.blockDialog} />}
       {p.report && <ReportSheet {...p.report} />}
+      {p.actionSheet && <MessageActionSheet {...p.actionSheet} />}
+      {p.editSheet && <EditMessageSheet key={p.editSheet.id} {...p.editSheet} />}
+      {p.forwardSheet && <ForwardSheet {...p.forwardSheet} />}
     </>
   );
 }

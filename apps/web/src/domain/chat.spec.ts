@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyChanges,
+  changeCursor,
+  deleteScopes,
   isCrossCountryPremium,
   isNewChatLimit,
+  messageActions,
   mergeMessages,
+  toForwardChatVMs,
   groupThreadDays,
   newChatNotice,
   previewOf,
@@ -325,5 +330,154 @@ describe("daily thread grouping", () => {
     expect(groups.map((g) => g.messages.map((m) => m.id))).toEqual([["old"], ["new", "pending"]]);
     expect(groups[0].messages[0].body).toBe("First line\n\nSecond paragraph");
     expect(groupThreadDays([])).toEqual([]);
+  });
+});
+
+describe("a message's own menu", () => {
+  const sent = "2026-09-28T10:00:00.000Z";
+  const after = (minutes: number) => new Date(Date.parse(sent) + minutes * 60_000);
+  const mine = (over: Partial<ChatMessagePM> = {}) => msg("m1", { senderId: "u1", ...over });
+
+  it("lets the sender edit for 15 minutes, never a forwarded copy", () => {
+    expect(messageActions(mine(), "u1", after(14))).toEqual(["copy", "edit", "forward", "delete"]);
+    expect(messageActions(mine(), "u1", after(15))).toEqual(["copy", "forward", "delete"]);
+    expect(messageActions(mine({ forwarded: true }), "u1", after(1))).not.toContain("edit");
+    expect(messageActions(msg("m1"), "u1", after(1))).toEqual(["copy", "forward", "delete"]);
+  });
+
+  it("forwards someone else's words but not their photo, and copies only text", () => {
+    expect(messageActions(msg("m1", { photo, body: "" }), "u1", after(1))).toEqual(["delete"]);
+    expect(messageActions(mine({ photo, body: "" }), "u1", after(1))).toEqual([
+      "edit",
+      "forward",
+      "delete",
+    ]);
+  });
+
+  it("offers only deleting it for yourself once it's deleted for everyone", () => {
+    const gone = mine({ body: "", deletedAt: after(2).toISOString() });
+    expect(messageActions(gone, "u1", after(3))).toEqual(["delete"]);
+    expect(deleteScopes(gone, "u1", after(3))).toEqual(["me"]);
+  });
+
+  it("deletes for everyone only the sender's own message, within 48 hours", () => {
+    expect(deleteScopes(mine(), "u1", after(47 * 60))).toEqual(["everyone", "me"]);
+    expect(deleteScopes(mine(), "u1", after(48 * 60))).toEqual(["me"]);
+    expect(deleteScopes(msg("m1"), "u1", after(1))).toEqual(["me"]);
+  });
+});
+
+describe("edited, forwarded and deleted messages in the thread", () => {
+  it("shows a message deleted for everyone as deleted, with nothing of what it said", () => {
+    const vm = toThreadMessageVM(
+      msg("m1", { body: "secret", photo, deletedAt: "2026-09-28T10:01:00.000Z", forwarded: true }),
+      "u1",
+    );
+    expect(vm).toMatchObject({
+      deleted: true,
+      body: "",
+      photo: null,
+      forwarded: false,
+      edited: false,
+    });
+  });
+
+  it("marks an edited message and a forwarded copy", () => {
+    const vm = toThreadMessageVM(
+      msg("m1", { editedAt: "2026-09-28T10:01:00.000Z", forwarded: true }),
+      "u1",
+    );
+    expect(vm).toMatchObject({ edited: true, forwarded: true, actionable: true });
+  });
+
+  it("has no menu on a bubble still sending", () => {
+    const vm = toPendingMessageVM(
+      {
+        clientId: "tmp",
+        body: "hi",
+        photo: null,
+        createdAt: "2026-09-28T10:00:00.000Z",
+        status: "sending",
+      },
+      "u1",
+    );
+    expect(vm.actionable).toBe(false);
+  });
+});
+
+describe("keeping an open thread up to date", () => {
+  it("moves the change cursor only on edits and deletions, never a new message's time", () => {
+    const since = "2026-09-28T10:00:00.000Z";
+    expect(changeCursor([msg("m2", { createdAt: "2026-09-28T11:00:00.000Z" })], since)).toBe(since);
+    expect(
+      changeCursor(
+        [
+          msg("m1", { editedAt: "2026-09-28T10:05:00.000Z" }),
+          msg("m2", { deletedAt: "2026-09-28T10:07:00.000Z" }),
+        ],
+        since,
+      ),
+    ).toBe("2026-09-28T10:07:00.000Z");
+    expect(changeCursor([], null)).toBeNull();
+  });
+
+  it("replaces what it shows, adds what's new, and leaves out changes older than the loaded page", () => {
+    const current = [
+      msg("m2", { createdAt: "2026-09-28T10:02:00.000Z" }),
+      msg("m3", { createdAt: "2026-09-28T10:03:00.000Z" }),
+    ];
+    const next = applyChanges(current, [
+      msg("m1", { createdAt: "2026-09-28T10:01:00.000Z", body: "edited" }),
+      msg("m2", { createdAt: "2026-09-28T10:02:00.000Z", body: "edited too" }),
+      msg("m4", { createdAt: "2026-09-28T10:04:00.000Z" }),
+    ]);
+    expect(next.map((m) => [m.id, m.body])).toEqual([
+      ["m2", "edited too"],
+      ["m3", "hello"],
+      ["m4", "hello"],
+    ]);
+    expect(applyChanges([], [msg("m1")]).map((m) => m.id)).toEqual(["m1"]);
+  });
+});
+
+describe("toForwardChatVMs", () => {
+  const chat = (id: string, peer: Partial<NonNullable<ConversationSummaryPM["peer"]>> | null) =>
+    summary({
+      id,
+      peer: peer === null ? null : { ...summary().peer!, userId: `p-${id}`, ...peer },
+    });
+
+  it("lists only chats the member can write in now", () => {
+    const vms = toForwardChatVMs(
+      [
+        chat("c1", {}),
+        chat("c2", { blockedByMe: true }),
+        chat("c3", { canMessage: false }),
+        chat("c4", null),
+      ],
+      [],
+      null,
+    );
+    expect(vms.map((c) => c.id)).toEqual(["c1"]);
+  });
+
+  it("stops at five chosen, and marks what each chat said after a forward", () => {
+    const chats = ["c1", "c2", "c3", "c4", "c5", "c6"].map((id) => chat(id, {}));
+    const vms = toForwardChatVMs(
+      chats,
+      ["c1", "c2", "c3", "c4", "c5"],
+      [
+        { conversationId: "c1", message: msg("m9"), error: null },
+        { conversationId: "c2", message: null, error: "Not allowed." },
+      ],
+    );
+    expect(vms.map((c) => [c.id, c.selected, c.disabled, c.result])).toEqual([
+      ["c1", true, false, { sent: true }],
+      ["c2", true, false, { sent: false, error: "Not allowed." }],
+      ["c3", true, false, null],
+      ["c4", true, false, null],
+      ["c5", true, false, null],
+      ["c6", false, true, null],
+    ]);
   });
 });

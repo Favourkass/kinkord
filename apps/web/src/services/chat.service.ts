@@ -8,6 +8,7 @@ import type {
   ChatMessagePM,
   ConversationSummaryPM,
   ConversationThreadPM,
+  ForwardResultPM,
   SentMessagePM,
   ChatInboxFilter,
   InboxCountsPM,
@@ -16,6 +17,7 @@ import { IMAGE_VARIANTS, buildUploadSet, type ImageVariant } from "@/util/image"
 import { api, uploadToPresignedUrl } from "./apiClient";
 
 const thread = (id: string) => `/chat/conversations/${encodeURIComponent(id)}`;
+const one = (messageId: string) => `/chat/messages/${encodeURIComponent(messageId)}`;
 
 interface PhotoUploadSlot {
   key: string;
@@ -81,11 +83,18 @@ export const chatService = {
   start: (userId: string) =>
     api.post<{ conversationId: string }>("/chat/conversations", { userId }),
 
-  /** `before` pages back through history; `after` fetches what's new. */
-  history: async (id: string, cursor: { before?: string; after?: string } = {}) => {
+  /**
+   * `before` pages back through history; `after` fetches what's new;
+   * `changedSince` adds messages edited or deleted since then.
+   */
+  history: async (
+    id: string,
+    cursor: { before?: string; after?: string; changedSince?: string | null } = {},
+  ) => {
     const params = new URLSearchParams();
     if (cursor.before) params.set("before", cursor.before);
     if (cursor.after) params.set("after", cursor.after);
+    if (cursor.changedSince) params.set("changedSince", cursor.changedSince);
     const query = params.toString();
     const messages = await api.get<ChatMessagePM[]>(
       `${thread(id)}/messages${query ? `?${query}` : ""}`,
@@ -118,6 +127,23 @@ export const chatService = {
     );
     await uploadToPresignedUrl(slot.uploadUrl, original);
     return slot.key;
+  },
+
+  /** The sender's new text for their message, within minutes of sending it. */
+  edit: (messageId: string, body: string) => api.patch<ChatMessagePM>(one(messageId), { body }),
+
+  /** For me hides it here only; for everyone leaves "deleted" in its place for both. */
+  remove: (messageId: string, scope: "me" | "everyone") =>
+    api.post<{ message: ChatMessagePM | null }>(`${one(messageId)}/delete`, { for: scope }),
+
+  /** A copy in each chat, marked as forwarded; each chat says whether it took it. */
+  forward: (messageId: string, conversationIds: string[]) =>
+    api.post<ForwardResultPM[]>(`${one(messageId)}/forward`, { conversationIds }),
+
+  /** A message's text onto the device's clipboard. */
+  copy: async (text: string) => {
+    if (!navigator.clipboard) throw new Error("Copying isn't available here.");
+    await navigator.clipboard.writeText(text);
   },
 
   setTyping: (id: string, typing: boolean) =>

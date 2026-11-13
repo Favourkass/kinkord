@@ -3,6 +3,12 @@ import { z } from "zod";
 /** Room for a long paste, but not a novel — matches the feel of a chat window. */
 export const MESSAGE_BODY_MAX = 4000;
 export const HISTORY_PAGE = 50;
+/** How long after sending a message its sender may still change its text. */
+export const EDIT_WINDOW_MINUTES = 15;
+/** How long after sending a message its sender may still delete it for everyone. */
+export const DELETE_FOR_EVERYONE_HOURS = 48;
+/** The most chats one message can be forwarded to at once. */
+export const FORWARD_MAX = 5;
 
 export const startDmSchema = z.object({
   userId: z.string().trim().min(1).max(64),
@@ -35,6 +41,21 @@ export const photoUploadSchema = z.object({
 
 export const typingSchema = z.object({ typing: z.boolean() });
 
+/** A message's new text. Empty only for a photo, whose caption it then removes. */
+export const editMessageSchema = z.object({
+  body: z.string().trim().max(MESSAGE_BODY_MAX),
+});
+
+/** "Delete for me" hides it from this member; "for everyone", from both. */
+export const deleteMessageSchema = z.object({
+  for: z.enum(["me", "everyone"]),
+});
+
+/** The chats to forward a message to. */
+export const forwardMessageSchema = z.object({
+  conversationIds: z.array(z.string().uuid()).min(1).max(FORWARD_MAX),
+});
+
 /** The inbox's tabs. */
 export const INBOX_FILTERS = ["all", "unread", "online"] as const;
 export type InboxFilter = (typeof INBOX_FILTERS)[number];
@@ -66,6 +87,11 @@ export const historyQuerySchema = z
     before: z.string().uuid().optional(),
     /** Messages newer than this one: what the open thread polls for. */
     after: z.string().uuid().optional(),
+    /**
+     * Also any message in the thread edited or deleted after this time, so an
+     * open thread picks up changes to messages it already shows.
+     */
+    changedSince: z.string().datetime({ offset: true }).optional(),
     limit: z.coerce.number().int().min(1).max(100).default(HISTORY_PAGE),
   })
   .refine((q) => !(q.before && q.after), { message: "Use before or after, not both." });
@@ -89,6 +115,17 @@ export interface MessageDto {
   photo: ChatPhotoDto | null;
   createdAt: string;
   editedAt: string | null;
+  /** Deleted for everyone by its sender: the text and photo are left out. */
+  deletedAt: string | null;
+  /** A copy forwarded from another chat. */
+  forwarded: boolean;
+}
+
+/** One chat a message was forwarded to: the copy sent there, or why it wasn't. */
+export interface ForwardResultDto {
+  conversationId: string;
+  message: MessageDto | null;
+  error: string | null;
 }
 
 export interface ChatPeerDto {

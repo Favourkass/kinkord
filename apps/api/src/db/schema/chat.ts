@@ -75,9 +75,18 @@ export const message = pgTable(
      */
     photoKey: text("photo_key"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    /** When the sender last changed its text. Earlier versions are kept in `message_edit`. */
     editedAt: timestamp("edited_at", { withTimezone: true }),
-    /** Soft delete — a reply in flight still has a row to point at. */
+    /**
+     * Deleted for everyone by its sender: both members see "deleted" in its
+     * place. The text and photo stay, for the moderators, and never reach the app.
+     */
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    /**
+     * The message this one was forwarded from, shown as "Forwarded". A plain
+     * id, not a foreign key: the copy stays when the original goes.
+     */
+    forwardedFromId: uuid("forwarded_from_id"),
   },
   (t) => [
     index("message_conversation_idx").on(t.conversationId, t.createdAt),
@@ -93,3 +102,46 @@ export const chatInboxSeen = pgTable("chat_inbox_seen", {
     .references(() => user.id, { onDelete: "cascade" }),
   seenAt: timestamp("seen_at", { withTimezone: true }).notNull(),
 });
+
+/**
+ * "Delete for me": a message one member no longer sees. The other member
+ * still does, and nothing is removed.
+ */
+export const messageHidden = pgTable(
+  "message_hidden",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    messageId: uuid("message_id")
+      .notNull()
+      .references(() => message.id, { onDelete: "cascade" }),
+    hiddenAt: timestamp("hidden_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.messageId] })],
+);
+
+/**
+ * A message's text before each edit, so a report shows the moderators what
+ * was first said, not only what it was changed to.
+ */
+export const messageEdit = pgTable(
+  "message_edit",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    messageId: uuid("message_id")
+      .notNull()
+      .references(() => message.id, { onDelete: "cascade" }),
+    /** Who edited: always the sender. Here so the edit rate limit reads one index. */
+    senderId: text("sender_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /** The text before this edit; null for a photo that had no caption. */
+    body: text("body"),
+    replacedAt: timestamp("replaced_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("message_edit_message_idx").on(t.messageId, t.replacedAt),
+    index("message_edit_sender_idx").on(t.senderId, t.replacedAt),
+  ],
+);

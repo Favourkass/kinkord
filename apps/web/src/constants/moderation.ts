@@ -220,6 +220,8 @@ export const MODERATION_COPY = {
     details: "Their note",
     evidence: "Last messages in the chat",
     noEvidence: "No chat attached.",
+    deletedBySender: "Deleted by the sender",
+    editedFrom: "Before editing:",
     reported: "Reported",
     openMember: "Open member",
     resolve: "Resolve",
